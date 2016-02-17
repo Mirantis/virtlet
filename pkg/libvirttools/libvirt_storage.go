@@ -111,6 +111,7 @@ func (pool *libvirtStoragePool) CreateStorageVol(def *libvirtxml.StorageVolume) 
 	// Here we work around this problem by refreshing the pool
 	// which invokes acquiring volume info.
 	if err := pool.p.Refresh(0); err != nil {
+		v.Delete(0)
 		return nil, fmt.Errorf("failed to refresh the storage pool: %v", err)
 	}
 	return &libvirtStorageVolume{Mutex: pool.Mutex, name: def.Name, v: v}, nil
