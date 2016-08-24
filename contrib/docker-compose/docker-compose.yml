@@ -1,0 +1,20 @@
+version: '2'
+services:
+  libvirt:
+    build: ../docker/libvirt/
+    pid: host
+    privileged: true
+    ports:
+      - "16509:16509"
+    volumes:
+      - /lib/modules:/lib/modules:ro
+      - /run:/run
+      - /dev:/dev
+      - /sys/fs/cgroup:/sys/fs/cgroup
+      - ./libvirt.conf:/etc/libvirt/libvirtd.conf
+      - ./qemu.conf:/etc/libvirt/qemu.conf
+      - libvirtd:/var/lib/libvirt
+      - libvirt_qemu:/etc/libvirt/qemu
+volumes:
+  libvirtd: {}
+  libvirt_qemu: {}
