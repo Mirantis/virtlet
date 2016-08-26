@@ -28,5 +28,9 @@ install:
 	install $(BUILD_DIR)/virtlet $(bindir)/virtlet
 	install $(BUILD_DIR)/virtlet-fake-image-pull $(bindir)/virtlet-fake-image-pull
 
+vendor:
+	glide update --strip-vcs --strip-vendor --update-vendored --delete
+	glide-vc --only-code --no-tests --keep="**/*.json.in"
+
 clean:
 	rm -rf $(BUILD_DIR)
