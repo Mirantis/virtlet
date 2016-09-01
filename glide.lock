@@ -1,0 +1,51 @@
+hash: 13d3d389cb159f3678d45494ddea5d0802d023c50caabd3e9d051ded4094c893
+updated: 2016-08-30T10:41:28.405050667+02:00
+imports:
+- name: github.com/coreos/etcd
+  version: 9e9bbb829ef25181e5178138af6349f7971cba59
+  subpackages:
+  - client
+  - pkg/pathutil
+  - pkg/types
+- name: github.com/gogo/protobuf
+  version: 966a6f4b3274f2692aa2f30df2ea5c7172c832ca
+  subpackages:
+  - proto
+- name: github.com/golang/glog
+  version: 23def4e6c14b4da8ac2ed8007337bc5eb5007998
+- name: github.com/golang/protobuf
+  version: 888eb0692c857ec880338addf316bd662d5e630e
+  subpackages:
+  - proto
+- name: github.com/nu7hatch/gouuid
+  version: 179d4d0c4d8d407a32af483c2354df1d2c91e6c3
+- name: github.com/ugorji/go
+  version: 5cd0f2b3b6cca8e3a0a4101821e41a73cb59bed6
+  subpackages:
+  - codec
+- name: golang.org/x/net
+  version: 6c89f9617983ee917132513a791d8b5850fe90c5
+  subpackages:
+  - context
+  - http2
+  - http2/hpack
+  - internal/timeseries
+  - lex/httplex
+  - trace
+- name: google.golang.org/grpc
+  version: 0032a855ba5c8a3c8e0d71c2deef354b70af1584
+  subpackages:
+  - codes
+  - credentials
+  - grpclog
+  - internal
+  - metadata
+  - naming
+  - peer
+  - transport
+- name: k8s.io/kubernetes
+  version: 8705a41c56a946875dc0601363a79e7718a03d86
+  subpackages:
+  - pkg/kubelet/api
+  - pkg/kubelet/api/v1alpha1/runtime
+testImports: []
