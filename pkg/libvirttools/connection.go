@@ -17,7 +17,6 @@ limitations under the License.
 package libvirttools
 
 /*
-#cgo LDFLAGS: -lvirt
 #include <libvirt/libvirt.h>
 #include <libvirt/virterror.h>
 #include <stdlib.h>
