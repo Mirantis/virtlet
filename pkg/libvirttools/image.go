@@ -35,6 +35,7 @@ import (
 	"syscall"
 	"unsafe"
 
+	"github.com/golang/glog"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
 	"github.com/Mirantis/virtlet/pkg/download"
@@ -71,12 +72,36 @@ type ImageTool struct {
 	storageBackend StorageBackend
 }
 
+func createDefaultPool(conn C.virConnectPtr) error {
+	poolXML := `
+<pool type="dir">
+    <name>default</name>
+    <target>
+	<path>/var/lib/libvirt/images</path>
+    </target>
+</pool>`
+	bPoolXML := []byte(poolXML)
+	cPoolXML := (*C.char)(unsafe.Pointer(&bPoolXML[0]))
+
+	glog.Infof("Creating default storage pool")
+	if pool := C.virStoragePoolCreateXML(conn, cPoolXML, 0); pool == nil {
+		return GetLastError()
+	}
+	return nil
+}
+
 func lookupStoragePool(conn C.virConnectPtr, name string) (C.virStoragePoolPtr, error) {
 	cName := C.CString(name)
 	defer C.free(unsafe.Pointer(cName))
 	storagePool := C.virStoragePoolLookupByName(conn, cName)
 	if storagePool == nil {
-		return nil, GetLastError()
+		if name == "default" {
+			if err := createDefaultPool(conn); err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, GetLastError()
+		}
 	}
 	return storagePool, nil
 }
