@@ -12,25 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-export GO15VENDOREXPERIMENT=1
+check_PROGRAMS = image.test
+check_SCRIPTS = go.test
+TESTS = $(check_PROGRAMS) $(check_SCRIPTS)
 
-BUILD_DIR ?= ./out
-PREFIX ?= /usr/local
-bindir = $(PREFIX)/bin
-
-.PHONY: all install vendor clean
-
-all:
-	go build -o $(BUILD_DIR)/virtlet ./cmd/virtlet
-	go build -o $(BUILD_DIR)/virtlet-fake-image-pull ./cmd/fake-image-pull
-
-install:
-	install $(BUILD_DIR)/virtlet $(bindir)/virtlet
-	install $(BUILD_DIR)/virtlet-fake-image-pull $(bindir)/virtlet-fake-image-pull
-
-vendor:
-	glide update --strip-vcs --strip-vendor --update-vendored --delete
-	glide-vc --only-code --no-tests --keep="**/*.json.in"
-
-clean:
-	rm -rf $(BUILD_DIR)
+image_test_CFLAGS = $(CFLAGS) -I.
+image_test_SOURCES = tests/test_image.c image.h image.c
