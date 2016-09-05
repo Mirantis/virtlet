@@ -19,13 +19,13 @@ package main
 import (
 	"flag"
 	"fmt"
-	"net"
 	"os"
-	"time"
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 var (
@@ -37,14 +37,10 @@ var (
 		"The unix socket to connect, e.g. /run/virtlet.sock")
 )
 
-func dial(socket string, timeout time.Duration) (net.Conn, error) {
-	return net.DialTimeout("unix", socket, timeout)
-}
-
 func main() {
 	flag.Parse()
 
-	conn, err := grpc.Dial(*virtletSocket, grpc.WithInsecure(), grpc.WithDialer(dial))
+	conn, err := grpc.Dial(*virtletSocket, grpc.WithInsecure(), grpc.WithDialer(utils.Dial))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Cannot connect: %#v", err)
 		os.Exit(1)

@@ -41,35 +41,41 @@ const (
 type VirtletManager struct {
 	server *grpc.Server
 	// libvirt
-	connTool  *libvirttools.ConnectionTool
-	imageTool *libvirttools.ImageTool
+	libvirtConnTool           *libvirttools.ConnectionTool
+	libvirtImageTool          *libvirttools.ImageTool
+	libvirtVirtualizationTool *libvirttools.VirtualizationTool
 	// etcd
-	keysAPITool *etcdtools.KeysAPITool
-	sandboxTool *etcdtools.SandboxTool
+	etcdKeysAPITool *etcdtools.KeysAPITool
+	etcdImageTool   *etcdtools.ImageTool
+	etcdSandboxTool *etcdtools.SandboxTool
 }
 
 func NewVirtletManager(libvirtUri string, poolName string, storageBackend string, etcdEndpoint string) (*VirtletManager, error) {
-	connTool, err := libvirttools.NewConnectionTool(libvirtUri)
+	libvirtConnTool, err := libvirttools.NewConnectionTool(libvirtUri)
 	if err != nil {
 		return nil, err
 	}
-	imageTool, err := libvirttools.NewImageTool(connTool.Conn, poolName, storageBackend)
+	libvirtImageTool, err := libvirttools.NewImageTool(libvirtConnTool.Conn, poolName, storageBackend)
 	if err != nil {
 		return nil, err
 	}
+	libvirtVirtualizationTool := libvirttools.NewVirtualizationTool(libvirtConnTool.Conn)
 	// TODO(nhlfr): Use many endpoints of etcd.
-	keysAPITool, err := etcdtools.NewKeysAPI([]string{etcdEndpoint})
+	etcdKeysAPITool, err := etcdtools.NewKeysAPI([]string{etcdEndpoint})
 	if err != nil {
 		return nil, err
 	}
-	sandboxTool := etcdtools.NewSandboxTool(keysAPITool.KeysAPI)
+	etcdImageTool := etcdtools.NewImageEtcdTool(etcdKeysAPITool.KeysAPI)
+	etcdSandboxTool := etcdtools.NewSandboxTool(etcdKeysAPITool.KeysAPI)
 
 	virtletManager := &VirtletManager{
-		server:      grpc.NewServer(),
-		connTool:    connTool,
-		imageTool:   imageTool,
-		keysAPITool: keysAPITool,
-		sandboxTool: sandboxTool,
+		server:                    grpc.NewServer(),
+		libvirtConnTool:           libvirtConnTool,
+		libvirtImageTool:          libvirtImageTool,
+		libvirtVirtualizationTool: libvirtVirtualizationTool,
+		etcdKeysAPITool:           etcdKeysAPITool,
+		etcdImageTool:             etcdImageTool,
+		etcdSandboxTool:           etcdSandboxTool,
 	}
 
 	kubeapi.RegisterRuntimeServiceServer(virtletManager.server, virtletManager)
@@ -103,7 +109,7 @@ func (v *VirtletManager) Version(ctx context.Context, in *kubeapi.VersionRequest
 }
 
 func (v *VirtletManager) CreatePodSandbox(ctx context.Context, in *kubeapi.CreatePodSandboxRequest) (*kubeapi.CreatePodSandboxResponse, error) {
-	podId, err := sandbox.CreatePodSandbox(v.sandboxTool, in.Config)
+	podId, err := sandbox.CreatePodSandbox(v.etcdSandboxTool, in.Config)
 	if err != nil {
 		glog.Errorf("Error when creating pod sandbox: %#v", err)
 		return nil, err
@@ -124,7 +130,7 @@ func (v *VirtletManager) RemovePodSandbox(ctx context.Context, in *kubeapi.Remov
 }
 
 func (v *VirtletManager) PodSandboxStatus(ctx context.Context, in *kubeapi.PodSandboxStatusRequest) (*kubeapi.PodSandboxStatusResponse, error) {
-	status, err := v.sandboxTool.PodSandboxStatus(in.GetPodSandboxId())
+	status, err := v.etcdSandboxTool.PodSandboxStatus(in.GetPodSandboxId())
 	if err != nil {
 		glog.Errorf("Error when getting pod sandbox status: %#v", err)
 		return nil, err
@@ -135,7 +141,7 @@ func (v *VirtletManager) PodSandboxStatus(ctx context.Context, in *kubeapi.PodSa
 }
 
 func (v *VirtletManager) ListPodSandbox(ctx context.Context, in *kubeapi.ListPodSandboxRequest) (*kubeapi.ListPodSandboxResponse, error) {
-	podSandboxList, err := v.sandboxTool.ListPodSandbox()
+	podSandboxList, err := v.etcdSandboxTool.ListPodSandbox()
 	if err != nil {
 		glog.Errorf("Error when listing pod sandboxes: %#v", err)
 		return nil, err
@@ -145,7 +151,18 @@ func (v *VirtletManager) ListPodSandbox(ctx context.Context, in *kubeapi.ListPod
 }
 
 func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.CreateContainerRequest) (*kubeapi.CreateContainerResponse, error) {
-	return &kubeapi.CreateContainerResponse{}, nil
+	imageName := *in.Config.Image.Image
+	imageFilepath, err := v.etcdImageTool.GetImageFilepath(imageName)
+	if err != nil {
+		return nil, err
+	}
+
+	uuid, err := v.libvirtVirtualizationTool.CreateContainer(in, imageFilepath)
+	if err != nil {
+		glog.Errorf("Error when creating container: %#v:, err")
+		return nil, err
+	}
+	return &kubeapi.CreateContainerResponse{ContainerId: &uuid}, nil
 }
 
 func (v *VirtletManager) StartContainer(ctx context.Context, in *kubeapi.StartContainerRequest) (*kubeapi.StartContainerResponse, error) {
@@ -173,7 +190,7 @@ func (v *VirtletManager) Exec(kubeapi.RuntimeService_ExecServer) error {
 }
 
 func (v *VirtletManager) ListImages(ctx context.Context, in *kubeapi.ListImagesRequest) (*kubeapi.ListImagesResponse, error) {
-	response, err := v.imageTool.ListImages()
+	response, err := v.libvirtImageTool.ListImages()
 	if err != nil {
 		glog.Errorf("Error when listing images: %#v", err)
 	}
@@ -182,7 +199,7 @@ func (v *VirtletManager) ListImages(ctx context.Context, in *kubeapi.ListImagesR
 }
 
 func (v *VirtletManager) ImageStatus(ctx context.Context, in *kubeapi.ImageStatusRequest) (*kubeapi.ImageStatusResponse, error) {
-	response, err := v.imageTool.ImageStatus(in)
+	response, err := v.libvirtImageTool.ImageStatus(in)
 	if err != nil {
 		glog.Errorf("Error when getting image status: %#v", err)
 	}
@@ -191,7 +208,7 @@ func (v *VirtletManager) ImageStatus(ctx context.Context, in *kubeapi.ImageStatu
 }
 
 func (v *VirtletManager) PullImage(ctx context.Context, in *kubeapi.PullImageRequest) (*kubeapi.PullImageResponse, error) {
-	response, err := v.imageTool.PullImage(in)
+	response, err := v.libvirtImageTool.PullImage(in)
 	if err != nil {
 		glog.Errorf("Error when pulling image: %#v", err)
 	}
@@ -200,7 +217,7 @@ func (v *VirtletManager) PullImage(ctx context.Context, in *kubeapi.PullImageReq
 }
 
 func (v *VirtletManager) RemoveImage(ctx context.Context, in *kubeapi.RemoveImageRequest) (*kubeapi.RemoveImageResponse, error) {
-	response, err := v.imageTool.RemoveImage(in)
+	response, err := v.libvirtImageTool.RemoveImage(in)
 	if err != nil {
 		glog.Errorf("Error when removing image: %#v", err)
 	}
