@@ -22,6 +22,7 @@ SUBDIRS = pkg/download pkg/etcdtools pkg/libvirttools pkg/manager pkg/sandbox
 
 all:
 	go build -o $(builddir)/virtlet ./cmd/virtlet
+	go build -o $(builddir)/virtlet-fake-create-container ./cmd/fake-create-container
 	go build -o $(builddir)/virtlet-fake-image-pull ./cmd/fake-image-pull
 
 vendor:
@@ -29,8 +30,9 @@ vendor:
 	glide-vc --only-code --no-tests --keep="**/*.json.in"
 
 clean-local:
-	rm -f $(builddir)/virtlet $(builddir)/virtlet-fake-image-pull
+	rm -f $(builddir)/virtlet $(builddir)/virtlet-fake-create-container $(builddir)/virtlet-fake-image-pull
 
 install-exec-local:
 	install $(builddir)/virtlet $(bindir)/virtlet
+	install $(builddir)/virtlet-fake-create-container $(bindir)/virtlet-fake-create-container
 	install $(builddir)/virtlet-fake-image-pull $(bindir)/virtlet-fake-image-pull

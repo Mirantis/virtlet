@@ -42,6 +42,7 @@ _testmain.go
 
 # virtlet binaries
 /virtlet
+/virtlet-fake-create-container
 /virtlet-fake-image-pull
 
 # Autotools

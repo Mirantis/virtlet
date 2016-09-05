@@ -14,24 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package sandbox
+package utils
 
 import (
-	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-
-	"github.com/Mirantis/virtlet/pkg/etcdtools"
-	"github.com/Mirantis/virtlet/pkg/utils"
+	"net"
+	"time"
 )
 
-func CreatePodSandbox(sandboxTool *etcdtools.SandboxTool, config *kubeapi.PodSandboxConfig) (string, error) {
-	podId, err := utils.NewUuid()
-	if err != nil {
-		return "", nil
-	}
-
-	if err = sandboxTool.CreatePodSandbox(podId, config); err != nil {
-		return "", err
-	}
-
-	return podId, nil
+func Dial(socket string, timeout time.Duration) (net.Conn, error) {
+	return net.DialTimeout("unix", socket, timeout)
 }

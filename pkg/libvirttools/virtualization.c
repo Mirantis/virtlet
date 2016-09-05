@@ -14,24 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package sandbox
+#include <libvirt/libvirt.h>
+#include <libvirt/virterror.h>
+#include <stdlib.h>
+#include "virtualization.h"
 
-import (
-	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+int
+createDomain(virConnectPtr conn, char *domXML)
+{
+	int result = 0;
+	virDomainPtr domain = NULL;
 
-	"github.com/Mirantis/virtlet/pkg/etcdtools"
-	"github.com/Mirantis/virtlet/pkg/utils"
-)
-
-func CreatePodSandbox(sandboxTool *etcdtools.SandboxTool, config *kubeapi.PodSandboxConfig) (string, error) {
-	podId, err := utils.NewUuid()
-	if err != nil {
-		return "", nil
+	if (!(domain = virDomainCreateXML(conn, (const char*) domXML, 0))) {
+		result = -1;
 	}
 
-	if err = sandboxTool.CreatePodSandbox(podId, config); err != nil {
-		return "", err
-	}
+	virDomainFree(domain);
 
-	return podId, nil
+	return result;
 }

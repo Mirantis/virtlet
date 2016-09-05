@@ -23,20 +23,24 @@ import (
 )
 
 type KeysAPITool struct {
-	KeysAPI etcd.KeysAPI
+	Config *etcd.Config
 }
 
-func NewKeysAPI(endpoints []string) (*KeysAPITool, error) {
-	cfg := etcd.Config{
+func NewKeysAPITool(endpoints []string) (*KeysAPITool, error) {
+	cfg := &etcd.Config{
 		Endpoints:               endpoints,
 		Transport:               etcd.DefaultTransport,
 		HeaderTimeoutPerRequest: time.Second,
 	}
-	c, err := etcd.New(cfg)
+	return &KeysAPITool{Config: cfg}, nil
+}
+
+func (k *KeysAPITool) newKeysAPI() (etcd.KeysAPI, error) {
+	c, err := etcd.New(*k.Config)
 	if err != nil {
 		return nil, err
 	}
 	kapi := etcd.NewKeysAPI(c)
 
-	return &KeysAPITool{KeysAPI: kapi}, nil
+	return kapi, nil
 }

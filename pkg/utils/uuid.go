@@ -14,24 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package sandbox
+package utils
 
 import (
-	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-
-	"github.com/Mirantis/virtlet/pkg/etcdtools"
-	"github.com/Mirantis/virtlet/pkg/utils"
+	uuid "github.com/nu7hatch/gouuid"
 )
 
-func CreatePodSandbox(sandboxTool *etcdtools.SandboxTool, config *kubeapi.PodSandboxConfig) (string, error) {
-	podId, err := utils.NewUuid()
+func NewUuid() (string, error) {
+	u, err := uuid.NewV4()
 	if err != nil {
-		return "", nil
-	}
-
-	if err = sandboxTool.CreatePodSandbox(podId, config); err != nil {
 		return "", err
 	}
-
-	return podId, nil
+	return u.String(), nil
 }

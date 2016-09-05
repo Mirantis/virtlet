@@ -14,24 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package sandbox
+#ifndef VIRTLET_VIRTUALIZATION_H
+#define VIRTLET_VIRTUALIZATION_H
 
-import (
-	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+int createDomain(virConnectPtr conn, char *domXML);
 
-	"github.com/Mirantis/virtlet/pkg/etcdtools"
-	"github.com/Mirantis/virtlet/pkg/utils"
-)
-
-func CreatePodSandbox(sandboxTool *etcdtools.SandboxTool, config *kubeapi.PodSandboxConfig) (string, error) {
-	podId, err := utils.NewUuid()
-	if err != nil {
-		return "", nil
-	}
-
-	if err = sandboxTool.CreatePodSandbox(podId, config); err != nil {
-		return "", err
-	}
-
-	return podId, nil
-}
+#endif /* VIRTLET_VIRTUALIZATION_H */
