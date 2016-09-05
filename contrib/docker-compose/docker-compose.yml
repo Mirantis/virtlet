@@ -7,9 +7,10 @@ services:
     # ports:
     #   - "16509:16509"
     network_mode: host
+    restart: always
     volumes:
       - /lib/modules:/lib/modules:ro
-      - ./run:/run
+      - run:/run
       - /dev:/dev
       - /sys/fs/cgroup:/sys/fs/cgroup
       - ./libvirt.conf:/etc/libvirt/libvirtd.conf
@@ -35,8 +36,9 @@ services:
   virtlet:
     build: ../..
     network_mode: host
+    restart: always
     volumes:
-      - ./run:/run
+      - run:/run
     depends_on:
       - libvirt
     # links:
@@ -45,3 +47,4 @@ services:
 volumes:
   libvirtd: {}
   libvirt_qemu: {}
+  run: {}
