@@ -4,6 +4,9 @@
 
 Virtlet is a Kubernetes runtime server which allows you to run VM workloads, based on QCOW2 images.
 
+## Setting up Go project
+It's expected you place your project in $GOPATH/src/github.com/Mirantis/virtlet to have valid import paths.
+
 ## Running local environment
 
 To run local environment, please install [docker-compose](https://pypi.python.org/pypi/docker-compose)
