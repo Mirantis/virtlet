@@ -54,8 +54,8 @@ func main() {
 
 	imageSpec := &kubeapi.ImageSpec{Image: imageUrl}
 	in := &kubeapi.PullImageRequest{
-		Image: imageSpec,
-		Auth: &kubeapi.AuthConfig{},
+		Image:         imageSpec,
+		Auth:          &kubeapi.AuthConfig{},
 		SandboxConfig: &kubeapi.PodSandboxConfig{},
 	}
 
