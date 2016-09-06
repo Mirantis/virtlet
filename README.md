@@ -22,3 +22,32 @@ If you have docker-compose ready to use, you can set up the virtlet dev environm
 cd contrib/docker-compose
 docker-compose up
 ```
+
+## Manual building
+
+You can also build virtlet manually, without using containers. The whole process looks like in any
+other autotools-based project:
+
+```
+./autogen.sh
+./configure
+make
+```
+
+Then you will have all binaries available.
+
+You can also install them:
+
+```
+make install
+```
+
+## Unit tests
+
+To run unit tests, please do:
+
+```
+./autogen.sh
+./configure
+make check
+```
