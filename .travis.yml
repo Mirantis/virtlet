@@ -1,0 +1,18 @@
+language: go
+
+sudo: false
+
+go:
+  - 1.6
+  - tip
+
+addons:
+  apt:
+    packages:
+      - libglib2.0-dev
+      - libvirt-dev
+      - pkg-config
+
+install: ./autogen.sh
+script:
+  - go fmt $(go list ./... | grep -v /vendor/)
