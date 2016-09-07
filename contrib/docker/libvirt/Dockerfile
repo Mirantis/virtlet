@@ -7,6 +7,7 @@ RUN yum -y install \
 		libguestfs \
 		libvirt-daemon-driver-nwfilter \
 		libvirt-daemon-config-nwfilter \
+		qemu-kvm \
 		ceph-common \
 	&& yum clean all
 

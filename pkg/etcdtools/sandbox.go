@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strconv"
 
-	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
@@ -44,7 +43,7 @@ type sandboxConverter struct {
 	namespaceOptionsHostIpc     string
 }
 
-func newSandboxConverter(podId string) *sandboxConverter {
+func newSandboxConverter(tool *SandboxTool, podId string) *sandboxConverter {
 	// PodSandboxConfig
 	hostnameKey := fmt.Sprintf("/sandbox/%s/hostname", podId)
 	logDirectoryKey := fmt.Sprintf("/sandbox/%s/logDirectory", podId)
@@ -61,6 +60,7 @@ func newSandboxConverter(podId string) *sandboxConverter {
 	namespaceOptionsHostIpc := fmt.Sprintf("/sandbox/%s/linuxSandbox/namespaceOptions/hostIpc", podId)
 
 	return &sandboxConverter{
+		tool: tool,
 		// PodSandboxConfig
 		hostnameKey:     hostnameKey,
 		logDirectoryKey: logDirectoryKey,
@@ -79,56 +79,102 @@ func newSandboxConverter(podId string) *sandboxConverter {
 }
 
 func (c *sandboxConverter) sandboxConfigToEtcd(config *kubeapi.PodSandboxConfig) error {
-	// PodSandboxConfig
-	_, err := c.tool.kapi.Set(context.Background(), c.hostnameKey, *config.Hostname, nil)
+	kapi, err := c.tool.keysAPITool.newKeysAPI()
 	if err != nil {
 		return err
 	}
 
-	_, err = c.tool.kapi.Set(context.Background(), c.logDirectoryKey, *config.LogDirectory, nil)
+	// PodSandboxConfig
+	var hostname string
+	if config.Hostname != nil {
+		hostname = *config.Hostname
+	}
+	fmt.Printf("%#v %#v\n", c.tool)
+	_, err = kapi.Set(context.Background(), c.hostnameKey, hostname, nil)
+	if err != nil {
+		return err
+	}
+
+	var logDirectory string
+	if config.LogDirectory != nil {
+		logDirectory = *config.LogDirectory
+	}
+	_, err = kapi.Set(context.Background(), c.logDirectoryKey, logDirectory, nil)
 	if err != nil {
 		return err
 	}
 
 	// PodSandboxConfig.Metadata
-	_, err = c.tool.kapi.Set(context.Background(), c.metadataNameKey, *config.Metadata.Name, nil)
+	var metadataName string
+	if config.Metadata.Name != nil {
+		metadataName = *config.Metadata.Name
+	}
+	_, err = kapi.Set(context.Background(), c.metadataNameKey, metadataName, nil)
 	if err != nil {
 		return err
 	}
 
-	_, err = c.tool.kapi.Set(context.Background(), c.metadataUidKey, *config.Metadata.Uid, nil)
+	var metadataUid string
+	if config.Metadata.Uid != nil {
+		metadataUid = *config.Metadata.Name
+	}
+	_, err = kapi.Set(context.Background(), c.metadataUidKey, metadataUid, nil)
 	if err != nil {
 		return err
 	}
 
-	_, err = c.tool.kapi.Set(context.Background(), c.metadataNamespaceKey, *config.Metadata.Namespace, nil)
+	var metadataNamespace string
+	if config.Metadata.Namespace != nil {
+		metadataNamespace = *config.Metadata.Namespace
+	}
+	_, err = kapi.Set(context.Background(), c.metadataNamespaceKey, metadataNamespace, nil)
 	if err != nil {
 		return err
 	}
 
-	_, err = c.tool.kapi.Set(context.Background(), c.metadataAttemptKey, string(*config.Metadata.Attempt), nil)
+	var metadataAttempt string
+	if config.Metadata.Attempt != nil {
+		metadataAttempt = string(*config.Metadata.Attempt)
+	}
+	_, err = kapi.Set(context.Background(), c.metadataAttemptKey, metadataAttempt, nil)
 	if err != nil {
 		return err
 	}
 
 	// PodSandboxConfig.Linux
-	_, err = c.tool.kapi.Set(context.Background(), c.linuxCgroupParent, *config.Linux.CgroupParent, nil)
+	var cgroupParent string
+	if config.Linux.CgroupParent != nil {
+		cgroupParent = *config.Linux.CgroupParent
+	}
+	_, err = kapi.Set(context.Background(), c.linuxCgroupParent, cgroupParent, nil)
 	if err != nil {
 		return err
 	}
 
 	// PodSandboxConfig.Linux.NamespaceOptions
-	_, err = c.tool.kapi.Set(context.Background(), c.namespaceOptionsHostNetwork, strconv.FormatBool(*config.Linux.NamespaceOptions.HostNetwork), nil)
+	var hostNetwork string
+	if config.Linux.NamespaceOptions.HostNetwork != nil {
+		hostNetwork = strconv.FormatBool(*config.Linux.NamespaceOptions.HostNetwork)
+	}
+	_, err = kapi.Set(context.Background(), c.namespaceOptionsHostNetwork, hostNetwork, nil)
 	if err != nil {
 		return err
 	}
 
-	_, err = c.tool.kapi.Set(context.Background(), c.namespaceOptionsHostPid, strconv.FormatBool(*config.Linux.NamespaceOptions.HostPid), nil)
+	var hostPid string
+	if config.Linux.NamespaceOptions.HostPid != nil {
+		hostPid = strconv.FormatBool(*config.Linux.NamespaceOptions.HostPid)
+	}
+	_, err = kapi.Set(context.Background(), c.namespaceOptionsHostPid, hostPid, nil)
 	if err != nil {
 		return err
 	}
 
-	_, err = c.tool.kapi.Set(context.Background(), c.namespaceOptionsHostIpc, strconv.FormatBool(*config.Linux.NamespaceOptions.HostIpc), nil)
+	var hostIpc string
+	if config.Linux.NamespaceOptions.HostIpc != nil {
+		hostIpc = strconv.FormatBool(*config.Linux.NamespaceOptions.HostIpc)
+	}
+	_, err = kapi.Set(context.Background(), c.namespaceOptionsHostIpc, hostIpc, nil)
 	if err != nil {
 		return err
 	}
@@ -137,25 +183,30 @@ func (c *sandboxConverter) sandboxConfigToEtcd(config *kubeapi.PodSandboxConfig)
 }
 
 func (c *sandboxConverter) etcdToSandboxMetadata() (*kubeapi.PodSandboxMetadata, error) {
-	resp, err := c.tool.kapi.Get(context.Background(), c.metadataNameKey, nil)
+	kapi, err := c.tool.keysAPITool.newKeysAPI()
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := kapi.Get(context.Background(), c.metadataNameKey, nil)
 	if err != nil {
 		return nil, err
 	}
 	metadataName := resp.Node.Value
 
-	resp, err = c.tool.kapi.Get(context.Background(), c.metadataUidKey, nil)
+	resp, err = kapi.Get(context.Background(), c.metadataUidKey, nil)
 	if err != nil {
 		return nil, err
 	}
 	metadataUid := resp.Node.Value
 
-	resp, err = c.tool.kapi.Get(context.Background(), c.metadataNamespaceKey, nil)
+	resp, err = kapi.Get(context.Background(), c.metadataNamespaceKey, nil)
 	if err != nil {
 		return nil, err
 	}
 	metadataNamespace := resp.Node.Value
 
-	resp, err = c.tool.kapi.Get(context.Background(), c.metadataAttemptKey, nil)
+	resp, err = kapi.Get(context.Background(), c.metadataAttemptKey, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -174,8 +225,13 @@ func (c *sandboxConverter) etcdToSandboxMetadata() (*kubeapi.PodSandboxMetadata,
 }
 
 func (c *sandboxConverter) etcdToSandboxStatus() (*kubeapi.PodSandboxStatus, error) {
+	kapi, err := c.tool.keysAPITool.newKeysAPI()
+	if err != nil {
+		return nil, err
+	}
+
 	// PodSandboxStatus.Linux.Namespace.Options
-	resp, err := c.tool.kapi.Get(context.Background(), c.namespaceOptionsHostNetwork, nil)
+	resp, err := kapi.Get(context.Background(), c.namespaceOptionsHostNetwork, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +240,7 @@ func (c *sandboxConverter) etcdToSandboxStatus() (*kubeapi.PodSandboxStatus, err
 		return nil, err
 	}
 
-	resp, err = c.tool.kapi.Get(context.Background(), c.namespaceOptionsHostPid, nil)
+	resp, err = kapi.Get(context.Background(), c.namespaceOptionsHostPid, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +249,7 @@ func (c *sandboxConverter) etcdToSandboxStatus() (*kubeapi.PodSandboxStatus, err
 		return nil, err
 	}
 
-	resp, err = c.tool.kapi.Get(context.Background(), c.namespaceOptionsHostIpc, nil)
+	resp, err = kapi.Get(context.Background(), c.namespaceOptionsHostIpc, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -268,15 +324,15 @@ func (c *sandboxConverter) etcdToSandbox() (*kubeapi.PodSandbox, error) {
 }
 
 type SandboxTool struct {
-	kapi etcd.KeysAPI
+	keysAPITool *KeysAPITool
 }
 
-func NewSandboxTool(kapi etcd.KeysAPI) *SandboxTool {
-	return &SandboxTool{kapi: kapi}
+func NewSandboxTool(keysAPITool *KeysAPITool) *SandboxTool {
+	return &SandboxTool{keysAPITool: keysAPITool}
 }
 
 func (s *SandboxTool) CreatePodSandbox(podId string, config *kubeapi.PodSandboxConfig) error {
-	c := newSandboxConverter(podId)
+	c := newSandboxConverter(s, podId)
 	if err := c.sandboxConfigToEtcd(config); err != nil {
 		return err
 	}
@@ -284,7 +340,7 @@ func (s *SandboxTool) CreatePodSandbox(podId string, config *kubeapi.PodSandboxC
 }
 
 func (s *SandboxTool) PodSandboxStatus(podId string) (*kubeapi.PodSandboxStatus, error) {
-	c := newSandboxConverter(podId)
+	c := newSandboxConverter(s, podId)
 	status, err := c.etcdToSandboxStatus()
 	if err != nil {
 		return nil, err
@@ -293,15 +349,20 @@ func (s *SandboxTool) PodSandboxStatus(podId string) (*kubeapi.PodSandboxStatus,
 }
 
 func (s *SandboxTool) ListPodSandbox() ([]*kubeapi.PodSandbox, error) {
-	resp, err := s.kapi.Get(context.Background(), "/sandbox", nil)
+	kapi, err := s.keysAPITool.newKeysAPI()
 	if err != nil {
-		return []*kubeapi.PodSandbox{}, nil
+		return []*kubeapi.PodSandbox{}, err
+	}
+
+	resp, err := kapi.Get(context.Background(), "/sandbox", nil)
+	if err != nil {
+		return []*kubeapi.PodSandbox{}, err
 	}
 
 	podSandboxList := make([]*kubeapi.PodSandbox, 0, resp.Node.Nodes.Len())
 	for _, node := range resp.Node.Nodes {
 		podId := node.Key
-		c := newSandboxConverter(podId)
+		c := newSandboxConverter(s, podId)
 		podSandbox, err := c.etcdToSandbox()
 		if err != nil {
 			return nil, err

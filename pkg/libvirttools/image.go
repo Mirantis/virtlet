@@ -41,27 +41,27 @@ import (
 )
 
 type StorageBackend interface {
-	GenerateVolXML(pool C.virStoragePoolPtr, shortName string, capacity int, capacityUnit string) string
+	GenerateVolXML(pool C.virStoragePoolPtr, shortName string, capacity int, capacityUnit, libvirtFilepath string) string
 }
 
 type LocalFilesystemBackend struct{}
 
-func (LocalFilesystemBackend) GenerateVolXML(pool C.virStoragePoolPtr, shortName string, capacity int, capacityUnit string) string {
+func (LocalFilesystemBackend) GenerateVolXML(pool C.virStoragePoolPtr, shortName string, capacity int, capacityUnit, libvirtFilepath string) string {
 	volXML := `
 <volume>
     <name>%s</name>
     <allocation>0</allocation>
     <capacity unit="%s">%d</capacity>
     <target>
-        <path>%s/%s.img</path>
+        <path>%s</path>
     </target>
 </volume>`
-	return fmt.Sprintf(volXML, shortName, capacityUnit, capacity, "/var/lib/libvirt/images", shortName)
+	return fmt.Sprintf(volXML, shortName, capacityUnit, capacity, libvirtFilepath)
 }
 
 type RBDBackend struct{}
 
-func (RBDBackend) GenerateVolXML(pool C.virStoragePoolPtr, shortName string, capacity int, capacityUnit string) string {
+func (RBDBackend) GenerateVolXML(pool C.virStoragePoolPtr, shortName string, capacity int, capacityUnit, libvirtFilepath string) string {
 	return ""
 }
 
@@ -212,14 +212,14 @@ func (i *ImageTool) ImageStatus(in *kubeapi.ImageStatusRequest) (*kubeapi.ImageS
 	return &kubeapi.ImageStatusResponse{Image: image}, nil
 }
 
-func (i *ImageTool) PullImage(in *kubeapi.PullImageRequest) (*kubeapi.PullImageResponse, error) {
+func (i *ImageTool) PullImage(name string) (string, error) {
 	// TODO(nhlfr): Handle AuthConfig from PullImageRequest.
-	name := *in.Image.Image
 	filepath, shortName, err := download.DownloadFile(name)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	volXML := i.storageBackend.GenerateVolXML(i.pool, shortName, 5, "G")
+	libvirtFilepath := fmt.Sprintf("/var/lib/libvirt/images/%s", shortName)
+	volXML := i.storageBackend.GenerateVolXML(i.pool, shortName, 5, "G", libvirtFilepath)
 
 	cShortName := C.CString(shortName)
 	defer C.free(unsafe.Pointer(cShortName))
@@ -230,13 +230,13 @@ func (i *ImageTool) PullImage(in *kubeapi.PullImageRequest) (*kubeapi.PullImageR
 
 	status := C.pullImage(i.conn, i.pool, cShortName, cFilepath, cVolXML)
 	if status < 0 {
-		return nil, GetLastError()
+		return "", GetLastError()
 	}
 	if status > 0 {
-		return nil, syscall.Errno(status)
+		return "", syscall.Errno(status)
 	}
 
-	return &kubeapi.PullImageResponse{}, nil
+	return libvirtFilepath, nil
 }
 
 func (i *ImageTool) RemoveImage(in *kubeapi.RemoveImageRequest) (*kubeapi.RemoveImageResponse, error) {
