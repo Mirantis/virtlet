@@ -39,6 +39,8 @@ func ParseShortName(fileUrl string) (string, error) {
 }
 
 func DownloadFile(fileUrl string) (string, string, error) {
+	// TODO(nhlfr): Use SSL.
+	fileUrl = fmt.Sprintf("http://%s", fileUrl)
 	shortName, err := ParseShortName(fileUrl)
 	if err != nil {
 		return "", "", err

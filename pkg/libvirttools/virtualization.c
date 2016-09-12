@@ -20,16 +20,71 @@ limitations under the License.
 #include "virtualization.h"
 
 int
-createDomain(virConnectPtr conn, char *domXML)
+defineDomain(virConnectPtr conn, char *domXML)
 {
 	int result = 0;
 	virDomainPtr domain = NULL;
 
-	if (!(domain = virDomainCreateXML(conn, (const char*) domXML, 0))) {
+	if (!(domain = virDomainDefineXML(conn, (const char*) domXML))) {
 		result = -1;
 	}
 
-	virDomainFree(domain);
+	if (domain) {
+		virDomainFree(domain);
+	}
 
 	return result;
+}
+
+int
+createDomain(virConnectPtr conn, char *uuid)
+{
+	int result = 0;
+	virDomainPtr domain = NULL;
+
+	if (!(domain = virDomainLookupByUUIDString(conn, (const char*) uuid)) ||
+	    virDomainCreate(domain) < 0) {
+		result = -1;
+	}
+
+	if (domain) {
+		virDomainFree(domain);
+	}
+
+	return result;
+}
+
+int
+stopDomain(virConnectPtr conn, char *uuid)
+{
+	int result = 0;
+	virDomainPtr domain = NULL;
+
+	if (!(domain = virDomainLookupByUUIDString(conn, (const char*) uuid)) ||
+	    virDomainShutdown(domain) < 0) {
+		result = -1;
+	}
+
+	if (domain) {
+		virDomainFree(domain);
+	}
+
+	return result;
+}
+
+int
+destroyAndUndefineDomain(virConnectPtr conn, char *uuid)
+{
+	int result = 0;
+	virDomainPtr domain = NULL;
+
+	if (!(domain = virDomainLookupByUUIDString(conn, (const char*) uuid)) ||
+	    virDomainDestroy(domain) < 0 ||
+	    virDomainUndefine(domain) < 0) {
+		result = -1;
+	}
+
+	if (domain) {
+		virDomainFree(domain);
+	}
 }

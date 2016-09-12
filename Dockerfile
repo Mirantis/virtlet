@@ -19,4 +19,4 @@ RUN ./autogen.sh \
 	&& make install \
 	&& make clean
 
-CMD ["/usr/local/bin/virtlet", "-logtostderr=true", "-libvirt-uri=qemu+tcp://0.0.0.0/system", "-etcd-endpoint=http://0.0.0.0:2379"]
+CMD ["/usr/local/bin/virtlet", "-logtostderr=true", "-libvirt-uri=qemu+tcp://libvirt/system", "-etcd-endpoint=http://etcd:2379"]
