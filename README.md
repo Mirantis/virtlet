@@ -48,4 +48,9 @@ After that, you can run a local cluster which will talk to virtlet:
 export KUBERNETES_PROVIDER=local
 export CONTAINER_RUNTIME_ENDPOINT=/run/virtlet.sock
 ./hack/local-up-cluster.sh
+
+Flannel network requires additional settings to be prepared in host `etcd` database. They can be set from command line using:
+
+```sh
+$ etcdctl set /coreos.com/network/config '{ "Network": "10.1.0.0/16", "Backend": { "Type": "host-gw" } }'
 ```
