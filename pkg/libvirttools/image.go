@@ -192,8 +192,7 @@ func (i *ImageTool) ListImages() (*kubeapi.ListImagesResponse, error) {
 	return response, nil
 }
 
-func (i *ImageTool) ImageStatus(in *kubeapi.ImageStatusRequest) (*kubeapi.ImageStatusResponse, error) {
-	name := *in.Image.Image
+func (i *ImageTool) ImageStatus(name string) (*kubeapi.Image, error) {
 	vol, err := i.lookupVol(name)
 	if err != nil {
 		return nil, err
@@ -209,7 +208,7 @@ func (i *ImageTool) ImageStatus(in *kubeapi.ImageStatusRequest) (*kubeapi.ImageS
 		RepoTags: []string{name},
 		Size_:    &size,
 	}
-	return &kubeapi.ImageStatusResponse{Image: image}, nil
+	return image, nil
 }
 
 func (i *ImageTool) PullImage(name string) (string, error) {
@@ -239,14 +238,13 @@ func (i *ImageTool) PullImage(name string) (string, error) {
 	return libvirtFilepath, nil
 }
 
-func (i *ImageTool) RemoveImage(in *kubeapi.RemoveImageRequest) (*kubeapi.RemoveImageResponse, error) {
-	name := *in.Image.Image
+func (i *ImageTool) RemoveImage(name string) error {
 	vol, err := i.lookupVol(name)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if status := C.virStorageVolDelete(vol, 0); status != 0 {
-		return nil, GetLastError()
+		return GetLastError()
 	}
-	return &kubeapi.RemoveImageResponse{}, nil
+	return nil
 }

@@ -17,6 +17,9 @@ limitations under the License.
 #ifndef VIRTLET_VIRTUALIZATION_H
 #define VIRTLET_VIRTUALIZATION_H
 
-int createDomain(virConnectPtr conn, char *domXML);
+int defineDomain(virConnectPtr conn, char *domXML);
+int createDomain(virConnectPtr conn, char *uuid);
+int stopDomain(virConnectPtr conn, char *uuid);
+int destroyAndUndefineDomain(virConnectPtr conn, char *uuid);
 
 #endif /* VIRTLET_VIRTUALIZATION_H */

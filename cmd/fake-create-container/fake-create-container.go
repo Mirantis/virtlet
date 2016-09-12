@@ -79,9 +79,9 @@ func main() {
 		Hostname: &podSandboxHostname,
 		Linux:    linuxPodSandboxConfig,
 	}
-	sandboxIn := &kubeapi.CreatePodSandboxRequest{Config: podSandboxConfig}
+	sandboxIn := &kubeapi.RunPodSandboxRequest{Config: podSandboxConfig}
 
-	sandboxOut, err := c.CreatePodSandbox(context.Background(), sandboxIn)
+	sandboxOut, err := c.RunPodSandbox(context.Background(), sandboxIn)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Cannot create pod sandbox: %#v", err)
 		os.Exit(1)
@@ -105,4 +105,5 @@ func main() {
 	}
 
 	fmt.Printf("Got response: %#v\n", containerOut)
+	fmt.Printf("Created container with ID: %s\n", *containerOut.ContainerId)
 }
