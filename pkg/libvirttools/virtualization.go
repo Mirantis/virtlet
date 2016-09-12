@@ -71,6 +71,9 @@ func generateDomXML(name string, memory int64, uuid string, vcpu int64, imageFil
         <video>
             <model type='cirrus'/>
         </video>
+	<interface type='network'>
+	    <source network='virtlet'>
+	</interface>
     </devices>
 </domain>`
 	return fmt.Sprintf(domXML, name, memory, uuid, vcpu, imageFilepath)

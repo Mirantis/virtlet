@@ -42,6 +42,7 @@ type VirtletManager struct {
 	// libvirt
 	libvirtConnTool           *libvirttools.ConnectionTool
 	libvirtImageTool          *libvirttools.ImageTool
+	libvirtNetworkingTool     *libvirttools.NetworkingTool
 	libvirtVirtualizationTool *libvirttools.VirtualizationTool
 	// etcd
 	etcdKeysAPITool        *etcdtools.KeysAPITool
@@ -59,6 +60,7 @@ func NewVirtletManager(libvirtUri string, poolName string, storageBackend string
 	if err != nil {
 		return nil, err
 	}
+	libvirtNetworkingTool := libvirttools.NewNetworkingTool(libvirtConnTool.Conn)
 	libvirtVirtualizationTool := libvirttools.NewVirtualizationTool(libvirtConnTool.Conn)
 	// TODO(nhlfr): Use many endpoints of etcd.
 	etcdKeysAPITool, err := etcdtools.NewKeysAPITool([]string{etcdEndpoint})
@@ -82,6 +84,7 @@ func NewVirtletManager(libvirtUri string, poolName string, storageBackend string
 		server:                    grpc.NewServer(),
 		libvirtConnTool:           libvirtConnTool,
 		libvirtImageTool:          libvirtImageTool,
+		libvirtNetworkingTool:     libvirtNetworkingTool,
 		libvirtVirtualizationTool: libvirtVirtualizationTool,
 		etcdKeysAPITool:           etcdKeysAPITool,
 		etcdImageTool:             etcdImageTool,
@@ -93,6 +96,16 @@ func NewVirtletManager(libvirtUri string, poolName string, storageBackend string
 	kubeapi.RegisterImageServiceServer(virtletManager.server, virtletManager)
 
 	return virtletManager, nil
+}
+
+func (v *VirtletManager) PrepareNetworking(subnet string) error {
+	// TODO: compute default route device (by vishvananda/netlink?)
+	device := "eth0"
+	// TODO: fail on missing flannel subnet or failback to next networking option (calico?)
+	if subnet == "" {
+		subnet = "192.168.122.1/24"
+	}
+	return v.libvirtNetworkingTool.EnsureVirtletNetwork(subnet, device)
 }
 
 func (v *VirtletManager) Serve(addr string) error {
