@@ -1,5 +1,11 @@
 version: '2'
 services:
+  flannel:
+    image: quay.io/coreos/flannel-git
+    network_mode: host
+    restart: always
+    volumes:
+      - /run:/run
   libvirt:
     build: ../docker/libvirt/
     pid: host
@@ -41,10 +47,11 @@ services:
       - /run:/run
     depends_on:
       - libvirt
+      - flannel
     links:
       - "libvirt:libvirt"
       - "etcd:etcd"
 volumes:
   libvirtd: {}
   libvirt_qemu: {}
-  run: {}
+  # run: {}
