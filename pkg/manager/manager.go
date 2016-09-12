@@ -162,30 +162,52 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 
 	uuid, err := v.libvirtVirtualizationTool.CreateContainer(in, imageFilepath)
 	if err != nil {
-		glog.Errorf("Error when creating container: %#v:, err")
+		glog.Errorf("Error when creating container: %#v", err)
 		return nil, err
 	}
 	return &kubeapi.CreateContainerResponse{ContainerId: &uuid}, nil
 }
 
 func (v *VirtletManager) StartContainer(ctx context.Context, in *kubeapi.StartContainerRequest) (*kubeapi.StartContainerResponse, error) {
+	if err := v.libvirtVirtualizationTool.StartContainer(*in.ContainerId); err != nil {
+		glog.Errorf("Error when starting container: %#v", err)
+		return nil, err
+	}
 	return &kubeapi.StartContainerResponse{}, nil
 }
 
 func (v *VirtletManager) StopContainer(ctx context.Context, in *kubeapi.StopContainerRequest) (*kubeapi.StopContainerResponse, error) {
+	if err := v.libvirtVirtualizationTool.StopContainer(*in.ContainerId); err != nil {
+		glog.Errorf("Error when stopping container: %#v", err)
+		return nil, err
+	}
 	return &kubeapi.StopContainerResponse{}, nil
 }
 
 func (v *VirtletManager) RemoveContainer(ctx context.Context, in *kubeapi.RemoveContainerRequest) (*kubeapi.RemoveContainerResponse, error) {
+	if err := v.libvirtVirtualizationTool.RemoveContainer(*in.ContainerId); err != nil {
+		glog.Errorf("Error when removing container: %#v", err)
+		return nil, err
+	}
 	return &kubeapi.RemoveContainerResponse{}, nil
 }
 
 func (v *VirtletManager) ListContainers(ctx context.Context, in *kubeapi.ListContainersRequest) (*kubeapi.ListContainersResponse, error) {
-	return &kubeapi.ListContainersResponse{}, nil
+	containers, err := v.libvirtVirtualizationTool.ListContainers()
+	if err != nil {
+		glog.Errorf("Error when listing containers: %#v", err)
+		return nil, err
+	}
+	return &kubeapi.ListContainersResponse{Containers: containers}, nil
 }
 
 func (v *VirtletManager) ContainerStatus(ctx context.Context, in *kubeapi.ContainerStatusRequest) (*kubeapi.ContainerStatusResponse, error) {
-	return &kubeapi.ContainerStatusResponse{}, nil
+	status, err := v.libvirtVirtualizationTool.ContainerStatus(*in.ContainerId)
+	if err != nil {
+		glog.Errorf("Error when getting container status: %#v", err)
+		return nil, err
+	}
+	return &kubeapi.ContainerStatusResponse{Status: status}, nil
 }
 
 func (v *VirtletManager) Exec(kubeapi.RuntimeService_ExecServer) error {

@@ -105,4 +105,5 @@ func main() {
 	}
 
 	fmt.Printf("Got response: %#v\n", containerOut)
+	fmt.Printf("Created container with ID: %s\n", *containerOut.ContainerId)
 }
