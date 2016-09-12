@@ -20,16 +20,64 @@ limitations under the License.
 #include "virtualization.h"
 
 int
-createDomain(virConnectPtr conn, char *domXML)
+defineAndCreateDomain(virConnectPtr conn, char *domXML)
 {
 	int result = 0;
 	virDomainPtr domain = NULL;
 
-	if (!(domain = virDomainCreateXML(conn, (const char*) domXML, 0))) {
+	if (!(domain = virDomainDefineXML(conn, (const char*) domXML)) ||
+	    virDomainCreate(domain) < 0) {
 		result = -1;
 	}
 
 	virDomainFree(domain);
 
 	return result;
+}
+
+int
+createDomain(virConnectPtr conn, char *name)
+{
+	int result = 0;
+	virDomainPtr domain = NULL;
+
+	if (!(domain = virDomainLookupByName(conn, (const char*) name)) ||
+	    virDomainCreate(domain) < 0) {
+		result = -1;
+	}
+
+	virDomainFree(domain);
+
+	return result;
+}
+
+int
+stopDomain(virConnectPtr conn, char *name)
+{
+	int result = 0;
+	virDomainPtr domain = NULL;
+
+	if (!(domain = virDomainLookupByName(conn, (const char*) name)) ||
+	    virDomainShutdown(domain) < 0) {
+		result = -1;
+	}
+
+	virDomainFree(domain);
+
+	return result;
+}
+
+int
+destroyAndUndefineDomain(virConnectPtr conn, char *name)
+{
+	int result = 0;
+	virDomainPtr domain = NULL;
+
+	if (!(domain = virDomainLookupByName(conn, (const char*) name)) ||
+	    virDomainDestroy(domain) < 0 ||
+	    virDomainUndefine(domain) < 0) {
+		result = -1;
+	}
+
+	virDomainFree(domain);
 }

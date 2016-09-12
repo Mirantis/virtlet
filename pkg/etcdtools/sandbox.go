@@ -19,7 +19,10 @@ package etcdtools
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
+	etcd "github.com/coreos/etcd/client"
+	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
@@ -134,7 +137,7 @@ func (c *sandboxConverter) sandboxConfigToEtcd(config *kubeapi.PodSandboxConfig)
 
 	var metadataAttempt string
 	if config.Metadata.Attempt != nil {
-		metadataAttempt = string(*config.Metadata.Attempt)
+		metadataAttempt = strconv.FormatUint(uint64(*config.Metadata.Attempt), 32)
 	}
 	_, err = kapi.Set(context.Background(), c.metadataAttemptKey, metadataAttempt, nil)
 	if err != nil {
@@ -327,8 +330,20 @@ type SandboxTool struct {
 	keysAPITool *KeysAPITool
 }
 
-func NewSandboxTool(keysAPITool *KeysAPITool) *SandboxTool {
-	return &SandboxTool{keysAPITool: keysAPITool}
+func NewSandboxTool(keysAPITool *KeysAPITool) (*SandboxTool, error) {
+	kapi, err := keysAPITool.newKeysAPI()
+	if err != nil {
+		return nil, err
+	}
+	if _, err = kapi.Set(context.Background(), "/sandbox", "", &etcd.SetOptions{Dir: true}); err != nil {
+		// 102 "Not a file error" means that the dir node already exists.
+		// There is no way to tell etcd client to ignore this fact.
+		// TODO(nhlfr): Report a bug in etcd about that.
+		if !strings.Contains(err.Error(), "102") {
+			return nil, err
+		}
+	}
+	return &SandboxTool{keysAPITool: keysAPITool}, nil
 }
 
 func (s *SandboxTool) CreatePodSandbox(podId string, config *kubeapi.PodSandboxConfig) error {
@@ -361,7 +376,9 @@ func (s *SandboxTool) ListPodSandbox() ([]*kubeapi.PodSandbox, error) {
 
 	podSandboxList := make([]*kubeapi.PodSandbox, 0, resp.Node.Nodes.Len())
 	for _, node := range resp.Node.Nodes {
-		podId := node.Key
+		keyPath := strings.Split(node.Key, "/")
+		podId := keyPath[len(keyPath)-1]
+		glog.Infof(podId)
 		c := newSandboxConverter(s, podId)
 		podSandbox, err := c.etcdToSandbox()
 		if err != nil {

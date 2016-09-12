@@ -10,7 +10,7 @@ services:
     restart: always
     volumes:
       - /lib/modules:/lib/modules:ro
-      - run:/run
+      - /run:/run
       - /dev:/dev
       - /sys/fs/cgroup:/sys/fs/cgroup
       - ./libvirt.conf:/etc/libvirt/libvirtd.conf
@@ -38,7 +38,7 @@ services:
     network_mode: host
     restart: always
     volumes:
-      - run:/run
+      - /run:/run
     depends_on:
       - libvirt
     # links:

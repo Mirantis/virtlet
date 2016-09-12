@@ -39,6 +39,7 @@ func ParseShortName(fileUrl string) (string, error) {
 }
 
 func DownloadFile(fileUrl string) (string, string, error) {
+	fileUrl = fmt.Sprintf("https://%s", fileUrl)
 	shortName, err := ParseShortName(fileUrl)
 	if err != nil {
 		return "", "", err

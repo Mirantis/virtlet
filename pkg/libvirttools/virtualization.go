@@ -26,6 +26,7 @@ import "C"
 
 import (
 	"fmt"
+	"reflect"
 	"unsafe"
 
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
@@ -45,13 +46,16 @@ func generateDomXML(name string, memory int64, uuid string, vcpu int64, imageFil
     <memory>%d</memory>
     <uuid>%s</uuid>
     <features>
-        <acpi/><apic/><pae/>
+        <acpi/><apic/>
     </features>
     <vcpu>%d</vcpu>
     <os>
         <type>hvm</type>
         <boot dev='hd'/>
     </os>
+    <on_poweroff>destroy</on_poweroff>
+    <on_reboot>restart</on_reboot>
+    <on_crash>restart</on_crash>
     <devices>
         <emulator>/usr/libexec/qemu-kvm</emulator>
         <disk type='file' device='disk'>
@@ -112,9 +116,84 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 	cDomXML := C.CString(domXML)
 	defer C.free(unsafe.Pointer(cDomXML))
 
-	if status := C.createDomain(v.conn, cDomXML); status < 0 {
+	if status := C.defineAndCreateDomain(v.conn, cDomXML); status < 0 {
 		return "", GetLastError()
 	}
 
 	return uuid, nil
+}
+
+func (v *VirtualizationTool) StartContainer(containerId string) error {
+	cContainerId := C.CString(containerId)
+	defer C.free(unsafe.Pointer(cContainerId))
+
+	if status := C.createDomain(v.conn, cContainerId); status < 0 {
+		return GetLastError()
+	}
+
+	return nil
+}
+
+func (v *VirtualizationTool) StopContainer(containerId string) error {
+	cContainerId := C.CString(containerId)
+	defer C.free(unsafe.Pointer(cContainerId))
+
+	if status := C.stopDomain(v.conn, cContainerId); status < 0 {
+		return GetLastError()
+	}
+
+	return nil
+}
+
+func (v *VirtualizationTool) RemoveContainer(containerId string) error {
+	v.StopContainer(containerId)
+
+	cContainerId := C.CString(containerId)
+	defer C.free(unsafe.Pointer(cContainerId))
+
+	if status := C.destroyAndUndefineDomain(v.conn, cContainerId); status < 0 {
+		return GetLastError()
+	}
+
+	return nil
+}
+
+func (v *VirtualizationTool) ListContainers() ([]*kubeapi.Container, error) {
+	var cList *C.virDomainPtr
+	count := C.virConnectListAllDomains(v.conn, (**C.virDomainPtr)(&cList), 0)
+	if count < 0 {
+		return nil, GetLastError()
+	}
+	header := reflect.SliceHeader{
+		Data: uintptr(unsafe.Pointer(cList)),
+		Len:  int(count),
+		Cap:  int(count),
+	}
+	domains := *(*[]C.virDomainPtr)(unsafe.Pointer(&header))
+
+	containers := make([]*kubeapi.Container, 0, count)
+
+	for _, domain := range domains {
+		id := C.GoString(C.virDomainGetName(domain))
+
+		containers = append(containers, &kubeapi.Container{
+			Id: &id,
+		})
+	}
+
+	return containers, nil
+}
+
+func (v *VirtualizationTool) ContainerStatus(containerId string) (*kubeapi.ContainerStatus, error) {
+	cContainerId := C.CString(containerId)
+	defer C.free(unsafe.Pointer(cContainerId))
+
+	domain := C.virDomainLookupByName(v.conn, cContainerId)
+	defer C.virDomainFree(domain)
+
+	id := C.GoString(C.virDomainGetName(domain))
+
+	return &kubeapi.ContainerStatus{
+		Id: &id,
+	}, nil
 }

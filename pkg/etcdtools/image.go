@@ -20,7 +20,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"strings"
 
+	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
 )
 
@@ -35,8 +37,20 @@ type ImageTool struct {
 	keysAPITool *KeysAPITool
 }
 
-func NewImageEtcdTool(keysAPITool *KeysAPITool) *ImageTool {
-	return &ImageTool{keysAPITool: keysAPITool}
+func NewImageEtcdTool(keysAPITool *KeysAPITool) (*ImageTool, error) {
+	kapi, err := keysAPITool.newKeysAPI()
+	if err != nil {
+		return nil, err
+	}
+	if _, err = kapi.Set(context.Background(), "/image", "", &etcd.SetOptions{Dir: true}); err != nil {
+		// 102 "Not a file error" means that the dir node already exists.
+		// There is no way to tell etcd client to ignore this fact.
+		// TODO(nhlfr): Report a bug in etcd about that.
+		if !strings.Contains(err.Error(), "102") {
+			return nil, err
+		}
+	}
+	return &ImageTool{keysAPITool: keysAPITool}, nil
 }
 
 func (i *ImageTool) SetImageFilepath(name, filepath string) error {
