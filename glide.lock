@@ -1,8 +1,8 @@
-hash: 13d3d389cb159f3678d45494ddea5d0802d023c50caabd3e9d051ded4094c893
-updated: 2016-08-30T10:41:28.405050667+02:00
+hash: f9d8b64ab5e46d25b3ee7a894e1d5902dc2c25744dbce0299dc6ab5ecda448b8
+updated: 2016-09-13T18:08:21.173355425+02:00
 imports:
 - name: github.com/coreos/etcd
-  version: 9e9bbb829ef25181e5178138af6349f7971cba59
+  version: e6a7f2506519f462234a69d170993cfa409f4feb
   subpackages:
   - client
   - pkg/pathutil
@@ -20,7 +20,7 @@ imports:
 - name: github.com/nu7hatch/gouuid
   version: 179d4d0c4d8d407a32af483c2354df1d2c91e6c3
 - name: github.com/ugorji/go
-  version: 5cd0f2b3b6cca8e3a0a4101821e41a73cb59bed6
+  version: 98ef79d6c615fa258e892ed0b11c6e013712693e
   subpackages:
   - codec
 - name: golang.org/x/net
@@ -44,8 +44,10 @@ imports:
   - peer
   - transport
 - name: k8s.io/kubernetes
-  version: 8705a41c56a946875dc0601363a79e7718a03d86
+  version: ac8aae584d3fd1f14398e1ede499b568e9993068
+  repo: git@github.com:kubernetes/kubernetes.git
+  vcs: git
   subpackages:
-  - pkg/kubelet/api
+  - api/v1alpha/runtime
   - pkg/kubelet/api/v1alpha1/runtime
 testImports: []

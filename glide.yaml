@@ -6,5 +6,8 @@ import:
   - context
 - package: google.golang.org/grpc
 - package: k8s.io/kubernetes
+  vcs: git
+  repo: git@github.com:kubernetes/kubernetes.git
   subpackages:
   - pkg/kubelet/api/v1alpha1/runtime
+  - api/v1alpha/runtime
