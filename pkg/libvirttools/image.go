@@ -34,75 +34,15 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/golang/glog"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
 	"github.com/Mirantis/virtlet/pkg/download"
 )
 
-type StorageBackend interface {
-	GenerateVolXML(pool C.virStoragePoolPtr, shortName string, capacity int, capacityUnit, libvirtFilepath string) string
-}
-
-type LocalFilesystemBackend struct{}
-
-func (LocalFilesystemBackend) GenerateVolXML(pool C.virStoragePoolPtr, shortName string, capacity int, capacityUnit, libvirtFilepath string) string {
-	volXML := `
-<volume>
-    <name>%s</name>
-    <allocation>0</allocation>
-    <capacity unit="%s">%d</capacity>
-    <target>
-        <path>%s</path>
-    </target>
-</volume>`
-	return fmt.Sprintf(volXML, shortName, capacityUnit, capacity, libvirtFilepath)
-}
-
-type RBDBackend struct{}
-
-func (RBDBackend) GenerateVolXML(pool C.virStoragePoolPtr, shortName string, capacity int, capacityUnit, libvirtFilepath string) string {
-	return ""
-}
-
 type ImageTool struct {
 	conn           C.virConnectPtr
 	pool           C.virStoragePoolPtr
 	storageBackend StorageBackend
-}
-
-func createDefaultPool(conn C.virConnectPtr) error {
-	poolXML := `
-<pool type="dir">
-    <name>default</name>
-    <target>
-	<path>/var/lib/libvirt/images</path>
-    </target>
-</pool>`
-	bPoolXML := []byte(poolXML)
-	cPoolXML := (*C.char)(unsafe.Pointer(&bPoolXML[0]))
-
-	glog.Infof("Creating default storage pool")
-	if pool := C.virStoragePoolCreateXML(conn, cPoolXML, 0); pool == nil {
-		return GetLastError()
-	}
-	return nil
-}
-
-func lookupStoragePool(conn C.virConnectPtr, name string) (C.virStoragePoolPtr, error) {
-	cName := C.CString(name)
-	defer C.free(unsafe.Pointer(cName))
-	storagePool := C.virStoragePoolLookupByName(conn, cName)
-	if storagePool == nil {
-		if name == "default" {
-			if err := createDefaultPool(conn); err != nil {
-				return nil, err
-			}
-		} else {
-			return nil, GetLastError()
-		}
-	}
-	return storagePool, nil
 }
 
 func cleanURIImageName(name string) string {
@@ -114,22 +54,12 @@ func cleanURIImageName(name string) string {
 	return segments[len(segments)-1]
 }
 
-func getStorageBackend(name string) (StorageBackend, error) {
-	switch name {
-	case "local":
-		return &LocalFilesystemBackend{}, nil
-	case "rbd":
-		return &RBDBackend{}, nil
-	}
-	return nil, fmt.Errorf("There is no such a storage backend: %s", name)
-}
-
 func NewImageTool(conn C.virConnectPtr, poolName string, storageBackendName string) (*ImageTool, error) {
-	pool, err := lookupStoragePool(conn, poolName)
+	pool, err := LookupStoragePool(conn, poolName)
 	if err != nil {
 		return nil, err
 	}
-	storageBackend, err := getStorageBackend(storageBackendName)
+	storageBackend, err := GetStorageBackend(storageBackendName)
 	if err != nil {
 		return nil, err
 	}
@@ -138,24 +68,6 @@ func NewImageTool(conn C.virConnectPtr, poolName string, storageBackendName stri
 		pool:           pool,
 		storageBackend: storageBackend,
 	}, nil
-}
-
-func (i *ImageTool) lookupVol(name string) (C.virStorageVolPtr, error) {
-	cName := C.CString(name)
-	defer C.free(unsafe.Pointer(cName))
-	vol := C.virStorageVolLookupByName(i.pool, cName)
-	if vol == nil {
-		return nil, GetLastError()
-	}
-	return vol, nil
-}
-
-func (i *ImageTool) volGetInfo(vol C.virStorageVolPtr) (C.virStorageVolInfoPtr, error) {
-	var volInfo C.virStorageVolInfo
-	if status := C.virStorageVolGetInfo(vol, &volInfo); status != 0 {
-		return nil, GetLastError()
-	}
-	return &volInfo, nil
 }
 
 func (i *ImageTool) ListImages() (*kubeapi.ListImagesResponse, error) {
@@ -175,7 +87,7 @@ func (i *ImageTool) ListImages() (*kubeapi.ListImagesResponse, error) {
 
 	for _, volume := range volumes {
 		id := C.GoString(C.virStorageVolGetName(volume))
-		volInfo, err := i.volGetInfo(volume)
+		volInfo, err := VolGetInfo(volume)
 		if err != nil {
 			return nil, err
 		}
@@ -193,11 +105,11 @@ func (i *ImageTool) ListImages() (*kubeapi.ListImagesResponse, error) {
 }
 
 func (i *ImageTool) ImageStatus(name string) (*kubeapi.Image, error) {
-	vol, err := i.lookupVol(name)
+	vol, err := LookupVol(name, i.pool)
 	if err != nil {
 		return nil, err
 	}
-	volInfo, err := i.volGetInfo(vol)
+	volInfo, err := VolGetInfo(vol)
 	if err != nil {
 		return nil, err
 	}
@@ -239,12 +151,6 @@ func (i *ImageTool) PullImage(name string) (string, error) {
 }
 
 func (i *ImageTool) RemoveImage(name string) error {
-	vol, err := i.lookupVol(name)
-	if err != nil {
-		return err
-	}
-	if status := C.virStorageVolDelete(vol, 0); status != 0 {
-		return GetLastError()
-	}
-	return nil
+	return RemoveVol(name, i.pool)
 }
+
