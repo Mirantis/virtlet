@@ -17,6 +17,12 @@ go get github.com/sgotti/glide-vc
 
 ## Running local environment
 
+Flannel network requires additional settings to be prepared in host `etcd` database. They can be set from command line using:
+
+```sh
+$ etcdctl set /coreos.com/network/config '{ "Network": "10.1.0.0/16", "Backend": { "Type": "host-gw" } }'
+```
+
 To run local environment, please install [docker-compose](https://pypi.python.org/pypi/docker-compose)
 at least in 1.8.0 version. If your Linux distribution is providing an older version, we suggest to
 use Python virtualenv(wrapper):
@@ -31,8 +37,10 @@ If you have docker-compose ready to use, you can set up the virtlet dev environm
 
 ```sh
 cd contrib/docker-compose
-docker-compose up
+docker-compose up -e IFACE=eth0
 ```
+
+where `eth0` will be interface used for inter node communication.
 
 Then please go to the sources of Kubernetes:
 

@@ -26,6 +26,7 @@ import "C"
 
 import (
 	"fmt"
+	"net"
 	"unsafe"
 )
 
@@ -35,13 +36,61 @@ const (
 	defaultDevice = "eth0"
 )
 
-func getAddressingFromSubnet(subnet string) (string, string, string, string) {
-	// TODO: replace fake data with computed from subnet
-	return "192.168.122.1", "192.168.122.2", "192.168.122.254", "255.255.255.0"
+func dottedMask(mask net.IPMask) string {
+	return fmt.Sprintf("%d.%d.%d.%d", mask[0], mask[1], mask[2], mask[3])
 }
 
-func generateNetworkXML(subnet string, device string) string {
-	address, rangeStart, rangeEnd, netmask := getAddressingFromSubnet(subnet)
+func nextIP(ip net.IP) {
+	for bytePos := len(ip) - 1; bytePos > 0; bytePos-- {
+		ip[bytePos] += 1
+		if ip[bytePos] != 0 {
+			break
+		}
+	}
+}
+
+// addressesInSubnet returns full list of ip addresses in given subnet without net/broadcast ones
+func addressesInSubnet(net net.IPNet) []string {
+	var addresses []string
+	for ip := net.IP.Mask(net.Mask); net.Contains(ip); nextIP(ip) {
+		addresses = append(addresses, ip.String())
+	}
+	return addresses[1 : len(addresses)-1]
+}
+
+type networkingData struct {
+	address    string
+	rangeStart string
+	rangeEnd   string
+	netmask    string
+}
+
+func getAddressingFromSubnet(subnet string) (networkingData, error) {
+	_, ipnet, err := net.ParseCIDR(subnet)
+	if err != nil {
+		return networkingData{}, err
+	}
+
+	ones, _ := ipnet.Mask.Size()
+	if ones < 3 {
+		return networkingData{}, fmt.Errorf("too tiny subnet '/%d' - expected greater than /3")
+	}
+
+	addresses := addressesInSubnet(*ipnet)
+	return networkingData{
+		address:    addresses[0],
+		rangeStart: addresses[1],
+		rangeEnd:   addresses[len(addresses)-1],
+		netmask:    dottedMask(ipnet.Mask),
+	}, nil
+}
+
+func generateNetworkXML(subnet string, iface string) (string, error) {
+	nd, err := getAddressingFromSubnet(subnet)
+	if err != nil {
+		return "", err
+	}
+
 	xml := `
 <network>
     <name>%s</name>
@@ -53,7 +102,10 @@ func generateNetworkXML(subnet string, device string) string {
 	</dhcp>
     </ip>
 </network>`
-	return fmt.Sprintf(xml, defaultName, defaultName, defaultBridge, device, address, netmask, rangeStart, rangeEnd)
+
+	return fmt.Sprintf(
+		xml, defaultName, defaultName, defaultBridge, iface,
+		nd.address, nd.netmask, nd.rangeStart, nd.rangeEnd), nil
 }
 
 type NetworkingTool struct {
@@ -69,7 +121,10 @@ func (n *NetworkingTool) EnsureVirtletNetwork(subnet string, device string) erro
 	defer C.free(unsafe.Pointer(cNetName))
 
 	if status := C.hasNetwork(n.conn, cNetName); status < 0 {
-		XML := generateNetworkXML(subnet, device)
+		XML, err := generateNetworkXML(subnet, device)
+		if err != nil {
+			return err
+		}
 		cXML := C.CString(XML)
 		defer C.free(unsafe.Pointer(cXML))
 
