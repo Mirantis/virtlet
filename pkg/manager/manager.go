@@ -17,6 +17,7 @@ limitations under the License.
 package manager
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -98,14 +99,15 @@ func NewVirtletManager(libvirtUri string, poolName string, storageBackend string
 	return virtletManager, nil
 }
 
-func (v *VirtletManager) PrepareNetworking(subnet string) error {
-	// TODO: compute default route device (by vishvananda/netlink?)
-	device := "eth0"
-	// TODO: fail on missing flannel subnet or failback to next networking option (calico?)
+func (v *VirtletManager) PrepareNetworking(subnet string, iface string) error {
+	// TODO: failback to next networking option (calico) ?
 	if subnet == "" {
-		subnet = "192.168.122.1/24"
+		return errors.New("subnet not set")
 	}
-	return v.libvirtNetworkingTool.EnsureVirtletNetwork(subnet, device)
+	if iface == "" {
+		return errors.New("default networking interface not set")
+	}
+	return v.libvirtNetworkingTool.EnsureVirtletNetwork(subnet, iface)
 }
 
 func (v *VirtletManager) Serve(addr string) error {

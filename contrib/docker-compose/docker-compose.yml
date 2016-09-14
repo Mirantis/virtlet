@@ -44,6 +44,9 @@ services:
   virtlet:
     build: ../..
     # network_mode: host
+    # network interface
+    environment:
+      - IFACE
     restart: always
     volumes:
       - /run:/run

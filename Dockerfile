@@ -10,6 +10,7 @@ RUN apk --no-cache add \
 
 RUN mkdir -p /go/src/github.com/Mirantis/virtlet
 COPY . /go/src/github.com/Mirantis/virtlet
+COPY ./virtlet_start.sh /
 
 WORKDIR /go/src/github.com/Mirantis/virtlet
 
