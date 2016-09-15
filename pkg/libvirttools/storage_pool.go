@@ -57,16 +57,17 @@ func generatePoolXML(name string, path string, poolType string) string {
 	return fmt.Sprintf(poolXML, poolType, name, path)
 }
 
-func createPool(conn C.virConnectPtr, name string, path string, poolType string) error {
+func createPool(conn C.virConnectPtr, name string, path string, poolType string) (C.virStoragePoolPtr, error) {
 	poolXML := generatePoolXML(name, path, poolType)
 	bPoolXML := []byte(poolXML)
 	cPoolXML := (*C.char)(unsafe.Pointer(&bPoolXML[0]))
 
 	glog.Infof("Creating storage pool (name: %s, path: %s)", name, path)
-	if pool := C.virStoragePoolCreateXML(conn, cPoolXML, 0); pool == nil {
-		return GetLastError()
+	var pool C.virStoragePoolPtr
+	if pool = C.virStoragePoolCreateXML(conn, cPoolXML, 0); pool == nil {
+		return nil, GetLastError()
 	}
-	return nil
+	return pool, nil
 }
 
 func LookupStoragePool(conn C.virConnectPtr, name string) (C.virStoragePoolPtr, error) {
@@ -75,7 +76,8 @@ func LookupStoragePool(conn C.virConnectPtr, name string) (C.virStoragePoolPtr, 
 	storagePool := C.virStoragePoolLookupByName(conn, cName)
 	if storagePool == nil {
 		if poolInfo, exist := DefaultPools[name]; exist {
-			if err := createPool(conn, name, poolInfo.volumesPoolDir, poolInfo.poolType); err != nil {
+			var err error
+			if storagePool, err = createPool(conn, name, poolInfo.volumesPoolDir, poolInfo.poolType); err != nil {
 				return nil, err
 			}
 		} else {

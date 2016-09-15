@@ -153,4 +153,3 @@ func (i *ImageTool) PullImage(name string) (string, error) {
 func (i *ImageTool) RemoveImage(name string) error {
 	return RemoveVol(name, i.pool)
 }
-

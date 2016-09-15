@@ -64,25 +64,64 @@ type Disk struct {
 	Target Target `xml:"target"`
 }
 
-type Extra struct {
-    Items []Tag `xml:",any"`
+type Devices struct {
+	DiskList []Disk `xml:"disk"`
+	Inpt Input `xml:"input"`
+	Graph Graphics `xml:"graphics"`
+        Serial Serial `xml:"serial"`
+	Consl Console `xml:"console"`
+	Snd Sound `xml:"sound"`
+	Items []Tag `xml:",any"`
 }
 
 type Tag struct {
-    XMLName xml.Name
-    Content string `xml:",innerxml"`
+	XMLName xml.Name
+	Content string `xml:",innerxml"`
 }
 
 type Domain struct {
 	XMLName xml.Name `xml:"domain"`
 	DomType string `xml:"type,attr"`
-	DiskList []Disk `xml:"devices>disk"`
+	Devs Devices `xml:"devices"`
 	Items []Tag `xml:",any"`
+}
+
+type Input struct {
+	Type string `xml:"type,attr"`
+	Bus string `xml:"bus,attr"`
+}
+
+type Graphics struct {
+	Type string `xml:"type,attr"`
+	Port string `xml:"port,attr"`
+}
+
+type Console struct {
+	Type string `xml:"type,attr"`
+	Target TargetConsole `xml:"target"`
+}
+
+type TargetConsole struct {
+	Type string `xml:"type,attr"`
+	Port string `xml:"port,attr"`
+}
+
+type Serial struct {
+	Type string `xml:"type,attr"`
+	Target TargetSerial `xml:"target"` 
+}
+
+type TargetSerial struct {
+	Port string `xml:"port,attr"`
+}
+
+type Sound struct {
+	Model string `xml:"model,attr"`
 }
 
 var volXML string = `
 <disk type='file' device='disk'>
-    <drive name='qemu' type='qcow2'/>
+    <drive name='qemu' type='raw'/>
     <source file='%s'/>
     <target dev='vda' bus='virtio'/>
 </disk>`
@@ -92,7 +131,7 @@ func (v *VirtualizationTool) processVolumes (mounts []*kubeapi.Mount, domXML str
 	if len(mounts) == 0 {
 		return domXML, nil
 	}
-
+	glog.Infof("INPUT domain:\n%s\n\n", domXML)
 	domainXML := &Domain{}
 	err := xml.Unmarshal([]byte(domXML), domainXML)
 	if err != nil {
@@ -106,6 +145,13 @@ func (v *VirtualizationTool) processVolumes (mounts []*kubeapi.Mount, domXML str
 				return domXML, err
 			}
 			path, err := VolGetPath(vol)
+			if err != nil {
+				return copyDomXML, err
+			}
+			err = utils.FormatDisk(path)
+			if err != nil {
+				return copyDomXML, err
+			}
 			volXML = fmt.Sprintf(volXML, path)
 			disk:= &Disk{}
 			err = xml.Unmarshal([]byte(volXML), disk)
@@ -113,13 +159,13 @@ func (v *VirtualizationTool) processVolumes (mounts []*kubeapi.Mount, domXML str
 			if err != nil {
 				return domXML, err
 			}
-			domainXML.DiskList = append(domainXML.DiskList, *disk)
+			domainXML.Devs.DiskList = append(domainXML.Devs.DiskList, *disk)
 			outArr, err := xml.MarshalIndent(domainXML, " ", "  ")
 			if err != nil {
 				return copyDomXML, err
 			}
 			domXML = string(outArr[:])
-			glog.Infof("Creating domain: %s", domXML)
+			glog.Infof("Creating domain:\n%s", domXML)
 			break
 		}
 	}
@@ -152,7 +198,12 @@ func generateDomXML(name string, memory int64, uuid string, vcpu int64, imageFil
         </disk>
         <input type='tablet' bus='usb'/>
         <graphics type='vnc' port='-1'/>
-        <console type='pty'/>
+        <serial type='pty'>
+            <target port='0'/>
+        </serial>
+        <console type='pty'>
+            <target type='serial' port='0'/>
+        </console>
         <sound model='ac97'/>
         <video>
             <model type='cirrus'/>
