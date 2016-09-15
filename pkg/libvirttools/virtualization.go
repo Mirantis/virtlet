@@ -31,6 +31,7 @@ import (
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
 	"github.com/Mirantis/virtlet/pkg/utils"
+	"github.com/Mirantis/virtlet/pkg/utils/disk_image"
 	"encoding/xml"
 	"github.com/golang/glog"
 )
@@ -80,7 +81,7 @@ type Domain struct {
 
 var volXML string = `
 <disk type='file' device='disk'>
-    <drive name='qemu' type='qcow2'/>
+    <drive name='qemu' type='raw'/>
     <source file='%s'/>
     <target dev='vda' bus='virtio'/>
 </disk>`
@@ -104,6 +105,13 @@ func (v *VirtualizationTool) processVolumes (mounts []*kubeapi.Mount, domXML str
 				return domXML, err
 			}
 			path, err := VolGetPath(vol)
+			if err != nil {
+				return copyDomXML, err
+			}
+			err = disk_utils.FormatDisk(path)
+			if err != nil {
+				return copyDomXML, err
+			}
 			volXML = fmt.Sprintf(volXML, path)
 			disk:= &Disk{}
 			err = xml.Unmarshal([]byte(volXML), disk)
