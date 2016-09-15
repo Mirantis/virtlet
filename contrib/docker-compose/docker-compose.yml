@@ -41,6 +41,9 @@ services:
     # network_mode: host
     restart: always
     volumes:
+      - /var/lib/virtlet:/var/lib/virtlet
+      - /lib/modules:/lib/modules:ro
+      - /boot:/boot:ro
       - /run:/run
     depends_on:
       - libvirt

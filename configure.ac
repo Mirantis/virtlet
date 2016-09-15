@@ -6,6 +6,7 @@ AC_CHECK_PROG([GO], [go], [go])
 
 PKG_CHECK_MODULES([glib], [glib-2.0])
 PKG_CHECK_MODULES([libvirt], [libvirt])
+PKG_CHECK_MODULES([libguestfs], [libguestfs])
 
 CFLAGS="$CFLAGS $glib_CFLAGS $libvirt_CFLAGS"
 LDFLAGS="$LDFLAGS $glib_LIBS $libvirt_LIBS"

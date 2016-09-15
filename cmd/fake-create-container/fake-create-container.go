@@ -30,7 +30,7 @@ import (
 
 var (
 	imageUrl = flag.String("image-url",
-		"http://ftp.ps.pl/pub/Linux/fedora-linux/releases/24/CloudImages/x86_64/images/Fedora-Cloud-Base-24-1.2.x86_64.qcow2",
+		"ftp.ps.pl/pub/Linux/fedora-linux/releases/24/CloudImages/x86_64/images/Fedora-Cloud-Base-24-1.2.x86_64.qcow2",
 		"Image URL to pull")
 	virtletSocket = flag.String("virtlet-socket",
 		"/run/virtlet.sock",
