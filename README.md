@@ -48,6 +48,6 @@ After that, you can run a local cluster which will talk to virtlet:
 
 ```sh
 export KUBERNETES_PROVIDER=local
-export CONTAINER_RUNTIME_ENDPOINT=/run/virt
+export CONTAINER_RUNTIME_ENDPOINT=/run/virtlet.sock
 ./hack/local-up-cluster.sh
 ```
