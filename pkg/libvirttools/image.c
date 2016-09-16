@@ -45,6 +45,10 @@ pullImage(virConnectPtr conn, virStoragePoolPtr pool, char *shortName, char *fil
 	int fd = -1;
 	virStreamPtr stream = NULL;
 
+	if ((vol = virStorageVolLookupByName(pool, (const char*) shortName)) != NULL) {
+		goto cleanup;
+	}
+
 	if ((fd = open(filepath, O_RDONLY)) < 0) {
 		result = errno;
 		goto cleanup;
