@@ -4,6 +4,7 @@ MAINTAINER Michal Rostecki <mrostecki@mirantis.com>
 RUN yum -y install \
 		openssl \
 		libvirt-daemon \
+		libvirt-python \
 		libguestfs \
 		libvirt-daemon-driver-nwfilter \
 		libvirt-daemon-config-nwfilter \
@@ -11,6 +12,7 @@ RUN yum -y install \
 		ceph-common \
 	&& yum clean all
 
+COPY cleanup.py /cleanup.py
 COPY start.sh /start.sh
 
 CMD ["/start.sh"]
