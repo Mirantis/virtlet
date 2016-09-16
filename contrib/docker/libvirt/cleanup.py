@@ -22,25 +22,39 @@ import libvirt
 
 def main():
     conn = libvirt.open("qemu:///system")
-    domain_ids = conn.listDomainsID()
+    domains = conn.listAllDomains()
 
     print("Cleaning up VMs")
 
-    for domain_id in domain_ids:
-        domain = conn.lookupByID(domain_id)
-        name = domain.name()
+    for domain in domains:
+        domain_name = domain.name()
 
-        print("Destroying VM", name)
+        print("Destroying VM", domain_name)
         if domain.destroy() < 0:
-            sys.stderr.write("Failed to destroy VM %s\n" % name)
+            sys.stderr.write("Failed to destroy VM %s\n" % domain_name)
             sys.exit(1)
 
-        print("Undefining VM", name)
+        print("Undefining VM", domain_name)
         if domain.undefine() < 0:
-            sys.stderr.write("Failed to undefine VM %s\n" % name)
+            sys.stderr.write("Failed to undefine VM %s\n" % domain_name)
             sys.exit(1)
 
     print("All VMs cleaned")
+
+    pool = conn.storagePoolLookupByName("default")
+    volumes = pool.listAllVolumes()
+
+    print("Cleaning up volumes")
+
+    for volume in volumes:
+        volume_name = volume.name()
+
+        print("Deleting volume", volume_name)
+        if volume.delete() < 0:
+            sys.stderr.write("Failed to remove volume %s\n" % volume_name)
+            sys.exit(1)
+
+    print("All volumes cleaned")
 
 
 if __name__ == "__main__":
