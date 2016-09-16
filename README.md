@@ -33,3 +33,21 @@ If you have docker-compose ready to use, you can set up the virtlet dev environm
 cd contrib/docker-compose
 docker-compose up
 ```
+
+Then please go to the sources of Kubernetes:
+
+```sh
+cd $GOPATH/k8s.io/kubernetes
+```
+
+You will need to checkout the following [branch and fork](https://github.com/nhlfr/kubernetes/tree/syncpod-virtlet).
+Unfortunately, it contains the needed codebase which is still in review in upstream. As soon as these
+commits will be merged, we will suggest you to use upstream Kubernetes code.
+
+After that, you can run a local cluster which will talk to virtlet:
+
+```sh
+export KUBERNETES_PROVIDER=local
+export CONTAINER_RUNTIME_ENDPOINT=/run/virt
+./hack/local-up-cluster.sh
+```
