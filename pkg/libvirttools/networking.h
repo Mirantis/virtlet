@@ -19,5 +19,6 @@ limitations under the License.
 
 int hasNetwork(virConnectPtr conn, char *name);
 int createNetwork(virConnectPtr conn, char *xml);
+int getDomIfAddr(virConnectPtr conn, char *podId, char **ip);
 
 #endif /* VIRTLET_NETWORKING_H */

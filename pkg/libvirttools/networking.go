@@ -135,3 +135,20 @@ func (n *NetworkingTool) EnsureVirtletNetwork(subnet string, device string) erro
 
 	return nil
 }
+
+func (n *NetworkingTool) PodIP(id string) (string, error) {
+	cId := C.CString(id)
+	defer C.free(unsafe.Pointer(cId))
+
+	var ipPointer *C.char = nil
+	defer C.free(unsafe.Pointer(ipPointer))
+
+	if status := C.getDomIfAddr(n.conn, cId, &ipPointer); status < 0 {
+		return "", GetLastError()
+	}
+	if ipPointer != nil {
+		return C.GoString(ipPointer), nil
+	}
+	// TODO: get rid of this fake data
+	return "10.0.0.2", nil
+}
