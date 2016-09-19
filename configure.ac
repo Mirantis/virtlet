@@ -10,6 +10,6 @@ PKG_CHECK_MODULES([libvirt], [libvirt])
 CFLAGS="$CFLAGS $glib_CFLAGS $libvirt_CFLAGS"
 LDFLAGS="$LDFLAGS $glib_LIBS $libvirt_LIBS"
 
-AC_CONFIG_FILES([Makefile pkg/download/Makefile pkg/etcdtools/Makefile pkg/libvirttools/Makefile pkg/manager/Makefile pkg/sandbox/Makefile])
+AC_CONFIG_FILES([Makefile pkg/download/Makefile pkg/etcdtools/Makefile pkg/libvirttools/Makefile pkg/manager/Makefile])
 
 AC_OUTPUT
