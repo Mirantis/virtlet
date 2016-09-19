@@ -163,12 +163,24 @@ func (v *VirtletManager) RemovePodSandbox(ctx context.Context, in *kubeapi.Remov
 }
 
 func (v *VirtletManager) PodSandboxStatus(ctx context.Context, in *kubeapi.PodSandboxStatusRequest) (*kubeapi.PodSandboxStatusResponse, error) {
-	status, err := v.etcdSandboxTool.PodSandboxStatus(in.GetPodSandboxId())
+	podId := in.GetPodSandboxId()
+	status, err := v.etcdSandboxTool.PodSandboxStatus(podId)
 	if err != nil {
 		glog.Errorf("Error when getting pod sandbox status: %#v", err)
 		return nil, err
 	}
 	response := &kubeapi.PodSandboxStatusResponse{Status: status}
+	containerId, err := v.etcdSandboxTool.GetContainerIdFromSandbox(podId)
+	if err != nil {
+		glog.Errorf("Error when getting pod sandbox status: %#v", err)
+		return nil, err
+	}
+	ip, err := v.libvirtNetworkingTool.ContainerIP(containerId)
+	if err != nil {
+		glog.Errorf("Error when getting pod sandbox ip: %#v", err)
+		return nil, err
+	}
+	response.Status.Network.Ip = &ip
 	glog.Infof("PodSandboxStatus response: %#v", response)
 	return response, nil
 }

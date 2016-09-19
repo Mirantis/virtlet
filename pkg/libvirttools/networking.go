@@ -135,3 +135,25 @@ func (n *NetworkingTool) EnsureVirtletNetwork(subnet string, device string) erro
 
 	return nil
 }
+
+func (n *NetworkingTool) ContainerIP(containerId string) (string, error) {
+	if containerId == "" {
+		// TODO: get rid of this fake data - sandbox does not have container
+		return "1.1.1.1", nil
+	}
+	cId := C.CString(containerId)
+	defer C.free(unsafe.Pointer(cId))
+
+	var ipPointer *C.char = nil
+	defer C.free(unsafe.Pointer(ipPointer))
+
+	if status := C.getDomIfAddr(n.conn, cId, &ipPointer); status < 0 {
+		// TODO: get rid of this fake data - domain not found
+		return "1.1.1.2", nil
+	}
+	if ipPointer != nil {
+		return C.GoString(ipPointer), nil
+	}
+	// TODO: get rid of this fake data
+	return "10.0.0.2", nil
+}
