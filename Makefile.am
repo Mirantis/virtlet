@@ -16,7 +16,7 @@ export GO15VENDOREXPERIMENT=1
 export CGO_CFLAGS=$(CFLAGS)
 export CGO_LDFLAGS=$(LDFLAGS)
 
-SUBDIRS = pkg/download pkg/etcdtools pkg/libvirttools pkg/manager pkg/sandbox
+SUBDIRS = pkg/download pkg/etcdtools pkg/libvirttools pkg/manager
 
 .PHONY: all vendor
 
