@@ -11,6 +11,6 @@ PKG_CHECK_MODULES([libguestfs], [libguestfs])
 CFLAGS="$CFLAGS $glib_CFLAGS $libvirt_CFLAGS"
 LDFLAGS="$LDFLAGS $glib_LIBS $libvirt_LIBS"
 
-AC_CONFIG_FILES([Makefile pkg/download/Makefile pkg/etcdtools/Makefile pkg/libvirttools/Makefile pkg/manager/Makefile])
+AC_CONFIG_FILES([Makefile pkg/bolttools/Makefile pkg/download/Makefile pkg/libvirttools/Makefile pkg/manager/Makefile])
 
 AC_OUTPUT

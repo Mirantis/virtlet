@@ -32,7 +32,7 @@ import (
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
 	"encoding/xml"
-	"github.com/Mirantis/virtlet/pkg/etcdtools"
+	"github.com/Mirantis/virtlet/pkg/bolttools"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/golang/glog"
 )
@@ -354,7 +354,7 @@ func filterContainer(container *kubeapi.Container, filter *kubeapi.ContainerFilt
 	return true
 }
 
-func (v *VirtualizationTool) ListContainers(etcdTool *etcdtools.VirtualizationTool, filter *kubeapi.ContainerFilter) ([]*kubeapi.Container, error) {
+func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, filter *kubeapi.ContainerFilter) ([]*kubeapi.Container, error) {
 	var domainInfo C.virDomainInfo
 	var cList *C.virDomainPtr
 	count := C.virConnectListAllDomains(v.conn, (**C.virDomainPtr)(&cList), 0)
@@ -383,11 +383,11 @@ func (v *VirtualizationTool) ListContainers(etcdTool *etcdtools.VirtualizationTo
 			Name: &id,
 		}
 
-		labels, err := etcdTool.GetLabels(id)
+		labels, err := boltClient.GetLabels(id)
 		if err != nil {
 			return nil, err
 		}
-		annotations, err := etcdTool.GetAnnotations(id)
+		annotations, err := boltClient.GetAnnotations(id)
 		if err != nil {
 			return nil, err
 		}
