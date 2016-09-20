@@ -16,7 +16,7 @@ export GO15VENDOREXPERIMENT=1
 export CGO_CFLAGS=$(CFLAGS)
 export CGO_LDFLAGS=$(LDFLAGS)
 
-SUBDIRS = pkg/download pkg/etcdtools pkg/libvirttools pkg/manager
+SUBDIRS = pkg/bolttools pkg/download pkg/libvirttools pkg/manager
 
 check_SCRIPTS = cpplint.test gofmt.test
 TESTS = $(check_SCRIPTS)

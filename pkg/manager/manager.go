@@ -27,7 +27,7 @@ import (
 	"google.golang.org/grpc"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
-	"github.com/Mirantis/virtlet/pkg/etcdtools"
+	"github.com/Mirantis/virtlet/pkg/bolttools"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
 )
 
@@ -43,14 +43,11 @@ type VirtletManager struct {
 	libvirtConnTool           *libvirttools.ConnectionTool
 	libvirtImageTool          *libvirttools.ImageTool
 	libvirtVirtualizationTool *libvirttools.VirtualizationTool
-	// etcd
-	etcdKeysAPITool        *etcdtools.KeysAPITool
-	etcdImageTool          *etcdtools.ImageTool
-	etcdVirtualizationTool *etcdtools.VirtualizationTool
-	etcdSandboxTool        *etcdtools.SandboxTool
+	// bolt
+	boltClient *bolttools.BoltClient
 }
 
-func NewVirtletManager(libvirtUri string, poolName string, storageBackend string, etcdEndpoint string) (*VirtletManager, error) {
+func NewVirtletManager(libvirtUri string, poolName string, storageBackend string, boltEndpoint string) (*VirtletManager, error) {
 	libvirtConnTool, err := libvirttools.NewConnectionTool(libvirtUri)
 	if err != nil {
 		return nil, err
@@ -63,20 +60,7 @@ func NewVirtletManager(libvirtUri string, poolName string, storageBackend string
 	if err != nil {
 		return nil, err
 	}
-	// TODO(nhlfr): Use many endpoints of etcd.
-	etcdKeysAPITool, err := etcdtools.NewKeysAPITool([]string{etcdEndpoint})
-	if err != nil {
-		return nil, err
-	}
-	etcdImageTool, err := etcdtools.NewImageEtcdTool(etcdKeysAPITool)
-	if err != nil {
-		return nil, err
-	}
-	etcdVirtualizationTool, err := etcdtools.NewVirtualizationTool(etcdKeysAPITool)
-	if err != nil {
-		return nil, err
-	}
-	etcdSandboxTool, err := etcdtools.NewSandboxTool(etcdKeysAPITool)
+	boltClient, err := bolttools.NewBoltClient()
 	if err != nil {
 		return nil, err
 	}
@@ -86,10 +70,7 @@ func NewVirtletManager(libvirtUri string, poolName string, storageBackend string
 		libvirtConnTool:           libvirtConnTool,
 		libvirtImageTool:          libvirtImageTool,
 		libvirtVirtualizationTool: libvirtVirtualizationTool,
-		etcdKeysAPITool:           etcdKeysAPITool,
-		etcdImageTool:             etcdImageTool,
-		etcdVirtualizationTool:    etcdVirtualizationTool,
-		etcdSandboxTool:           etcdSandboxTool,
+		boltClient:                boltClient,
 	}
 
 	kubeapi.RegisterRuntimeServiceServer(virtletManager.server, virtletManager)
@@ -125,8 +106,8 @@ func (v *VirtletManager) Version(ctx context.Context, in *kubeapi.VersionRequest
 func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSandboxRequest) (*kubeapi.RunPodSandboxResponse, error) {
 	glog.Infof("Sandbox config labels: %#v", in.Config.Labels)
 	glog.Infof("Sandbox config annotations: %#v", in.Config.Annotations)
-	// podId, err := sandbox.CreatePodSandbox(v.etcdSandboxTool, in.Config)
-	if err := v.etcdSandboxTool.CreatePodSandbox(in.Config); err != nil {
+	// podId, err := sandbox.CreatePodSandbox(v.boltSandboxTool, in.Config)
+	if err := v.boltClient.SetPodSandbox(in.Config); err != nil {
 		glog.Errorf("Error when creating pod sandbox: %#v", err)
 		return nil, err
 	}
@@ -151,7 +132,7 @@ func (v *VirtletManager) RemovePodSandbox(ctx context.Context, in *kubeapi.Remov
 }
 
 func (v *VirtletManager) PodSandboxStatus(ctx context.Context, in *kubeapi.PodSandboxStatusRequest) (*kubeapi.PodSandboxStatusResponse, error) {
-	status, err := v.etcdSandboxTool.PodSandboxStatus(in.GetPodSandboxId())
+	status, err := v.boltClient.GetPodSandboxStatus(in.GetPodSandboxId())
 	if err != nil {
 		glog.Errorf("Error when getting pod sandbox status: %#v", err)
 		return nil, err
@@ -163,7 +144,7 @@ func (v *VirtletManager) PodSandboxStatus(ctx context.Context, in *kubeapi.PodSa
 
 func (v *VirtletManager) ListPodSandbox(ctx context.Context, in *kubeapi.ListPodSandboxRequest) (*kubeapi.ListPodSandboxResponse, error) {
 	glog.Infof("Listing sandboxes with filter: %#v", in.Filter)
-	podSandboxList, err := v.etcdSandboxTool.ListPodSandbox(in.Filter)
+	podSandboxList, err := v.boltClient.ListPodSandbox(in.Filter)
 	if err != nil {
 		glog.Errorf("Error when listing pod sandboxes: %#v", err)
 		return nil, err
@@ -179,7 +160,7 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 		imageName = *in.Config.Image.Image
 	}
 
-	imageFilepath, err := v.etcdImageTool.GetImageFilepath(imageName)
+	imageFilepath, err := v.boltClient.GetImageFilepath(imageName)
 	if err != nil {
 		return nil, err
 	}
@@ -190,10 +171,10 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 		return nil, err
 	}
 
-	if err := v.etcdVirtualizationTool.SetLabels(in.Config.Metadata.GetName(), in.Config.Labels); err != nil {
+	if err := v.boltClient.SetLabels(in.Config.Metadata.GetName(), in.Config.Labels); err != nil {
 		return nil, err
 	}
-	if err := v.etcdVirtualizationTool.SetAnnotations(in.Config.Metadata.GetName(), in.Config.Annotations); err != nil {
+	if err := v.boltClient.SetAnnotations(in.Config.Metadata.GetName(), in.Config.Annotations); err != nil {
 		return nil, err
 	}
 
@@ -234,7 +215,7 @@ func (v *VirtletManager) RemoveContainer(ctx context.Context, in *kubeapi.Remove
 
 func (v *VirtletManager) ListContainers(ctx context.Context, in *kubeapi.ListContainersRequest) (*kubeapi.ListContainersResponse, error) {
 	glog.Infof("Listing containers with filter: %#v", in.Filter)
-	containers, err := v.libvirtVirtualizationTool.ListContainers(v.etcdVirtualizationTool, in.Filter)
+	containers, err := v.libvirtVirtualizationTool.ListContainers(v.boltClient, in.Filter)
 	if err != nil {
 		glog.Errorf("Error when listing containers: %#v", err)
 		return nil, err
@@ -251,14 +232,14 @@ func (v *VirtletManager) ContainerStatus(ctx context.Context, in *kubeapi.Contai
 		return nil, err
 	}
 
-	labels, err := v.etcdVirtualizationTool.GetLabels(*in.ContainerId)
+	labels, err := v.boltClient.GetLabels(*in.ContainerId)
 	if err != nil {
 		glog.Errorf("Error when getting container status: %#v", err)
 		return nil, err
 	}
 	status.Labels = labels
 
-	annotations, err := v.etcdVirtualizationTool.GetAnnotations(*in.ContainerId)
+	annotations, err := v.boltClient.GetAnnotations(*in.ContainerId)
 	if err != nil {
 		glog.Errorf("Error when getting container status: %#v", err)
 		return nil, err
@@ -289,7 +270,7 @@ func (v *VirtletManager) ImageStatus(ctx context.Context, in *kubeapi.ImageStatu
 		name = *in.Image.Image
 	}
 
-	filepath, err := v.etcdImageTool.GetImageFilepath(name)
+	filepath, err := v.boltClient.GetImageFilepath(name)
 	if err != nil {
 		glog.Errorf("Error when getting image status: %#v", err)
 		return nil, err
@@ -316,7 +297,7 @@ func (v *VirtletManager) PullImage(ctx context.Context, in *kubeapi.PullImageReq
 		glog.Errorf("Error when pulling image: %#v", err)
 		return nil, err
 	}
-	err = v.etcdImageTool.SetImageFilepath(name, filepath)
+	err = v.boltClient.SetImageFilepath(name, filepath)
 	if err != nil {
 		glog.Errorf("Error when pulling image: %#v", err)
 		return nil, err
@@ -333,7 +314,7 @@ func (v *VirtletManager) RemoveImage(ctx context.Context, in *kubeapi.RemoveImag
 		name = *in.Image.Image
 	}
 
-	filepath, err := v.etcdImageTool.GetImageFilepath(name)
+	filepath, err := v.boltClient.GetImageFilepath(name)
 	if err != nil {
 		glog.Errorf("Error when removing image: %#v", err)
 		return nil, err

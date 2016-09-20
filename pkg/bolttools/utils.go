@@ -14,33 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package etcdtools
+package bolttools
 
 import (
-	"time"
+	"fmt"
 
-	etcd "github.com/coreos/etcd/client"
+	"github.com/boltdb/bolt"
 )
 
-type KeysAPITool struct {
-	Config *etcd.Config
-}
-
-func NewKeysAPITool(endpoints []string) (*KeysAPITool, error) {
-	cfg := &etcd.Config{
-		Endpoints:               endpoints,
-		Transport:               etcd.DefaultTransport,
-		HeaderTimeoutPerRequest: time.Second,
+func get(bucket *bolt.Bucket, key []byte) ([]byte, error) {
+	value := bucket.Get(key)
+	if value == nil {
+		return nil, fmt.Errorf("Key '%s' doesn't exist in the bucket: %#v", key, bucket)
 	}
-	return &KeysAPITool{Config: cfg}, nil
+
+	return value, nil
 }
 
-func (k *KeysAPITool) newKeysAPI() (etcd.KeysAPI, error) {
-	c, err := etcd.New(*k.Config)
+func getString(bucket *bolt.Bucket, key string) (string, error) {
+	value, err := get(bucket, []byte(key))
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	kapi := etcd.NewKeysAPI(c)
 
-	return kapi, nil
+	return string(value), nil
 }
