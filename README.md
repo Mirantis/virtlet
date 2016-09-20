@@ -1,6 +1,5 @@
 # virtlet
 
-[![Join the chat at https://gitter.im/Mirantis/virtlet](https://badges.gitter.im/Mirantis/virtlet.svg)](https://gitter.im/Mirantis/virtlet?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 Virtlet is a Kubernetes runtime server which allows you to run VM workloads, based on QCOW2 images.
 
