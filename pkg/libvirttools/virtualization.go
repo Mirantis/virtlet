@@ -31,9 +31,9 @@ import (
 
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
+	"encoding/xml"
 	"github.com/Mirantis/virtlet/pkg/etcdtools"
 	"github.com/Mirantis/virtlet/pkg/utils"
-	"encoding/xml"
 	"github.com/golang/glog"
 )
 
@@ -57,21 +57,21 @@ type Target struct {
 }
 
 type Disk struct {
-	DiskType string `xml:"type,attr"`
+	DiskType   string `xml:"type,attr"`
 	DiskDevice string `xml:"device,attr"`
-	Drive Drive `xml:"drive"`
-	Src Source `xml:"source"`
-	Target Target `xml:"target"`
+	Drive      Drive  `xml:"drive"`
+	Src        Source `xml:"source"`
+	Target     Target `xml:"target"`
 }
 
 type Devices struct {
-	DiskList []Disk `xml:"disk"`
-	Inpt Input `xml:"input"`
-	Graph Graphics `xml:"graphics"`
-        Serial Serial `xml:"serial"`
-	Consl Console `xml:"console"`
-	Snd Sound `xml:"sound"`
-	Items []Tag `xml:",any"`
+	DiskList []Disk   `xml:"disk"`
+	Inpt     Input    `xml:"input"`
+	Graph    Graphics `xml:"graphics"`
+	Serial   Serial   `xml:"serial"`
+	Consl    Console  `xml:"console"`
+	Snd      Sound    `xml:"sound"`
+	Items    []Tag    `xml:",any"`
 }
 
 type Tag struct {
@@ -81,14 +81,14 @@ type Tag struct {
 
 type Domain struct {
 	XMLName xml.Name `xml:"domain"`
-	DomType string `xml:"type,attr"`
-	Devs Devices `xml:"devices"`
-	Items []Tag `xml:",any"`
+	DomType string   `xml:"type,attr"`
+	Devs    Devices  `xml:"devices"`
+	Items   []Tag    `xml:",any"`
 }
 
 type Input struct {
 	Type string `xml:"type,attr"`
-	Bus string `xml:"bus,attr"`
+	Bus  string `xml:"bus,attr"`
 }
 
 type Graphics struct {
@@ -97,7 +97,7 @@ type Graphics struct {
 }
 
 type Console struct {
-	Type string `xml:"type,attr"`
+	Type   string        `xml:"type,attr"`
 	Target TargetConsole `xml:"target"`
 }
 
@@ -107,8 +107,8 @@ type TargetConsole struct {
 }
 
 type Serial struct {
-	Type string `xml:"type,attr"`
-	Target TargetSerial `xml:"target"` 
+	Type   string       `xml:"type,attr"`
+	Target TargetSerial `xml:"target"`
 }
 
 type TargetSerial struct {
@@ -126,7 +126,7 @@ var volXML string = `
     <target dev='vda' bus='virtio'/>
 </disk>`
 
-func (v *VirtualizationTool) processVolumes (mounts []*kubeapi.Mount, domXML string) (string, error) {
+func (v *VirtualizationTool) processVolumes(mounts []*kubeapi.Mount, domXML string) (string, error) {
 	copyDomXML := domXML
 	if len(mounts) == 0 {
 		return domXML, nil
@@ -153,7 +153,7 @@ func (v *VirtualizationTool) processVolumes (mounts []*kubeapi.Mount, domXML str
 				return copyDomXML, err
 			}
 			volXML = fmt.Sprintf(volXML, path)
-			disk:= &Disk{}
+			disk := &Disk{}
 			err = xml.Unmarshal([]byte(volXML), disk)
 			disk.Target.TargetDev = "vdc"
 			if err != nil {
@@ -214,13 +214,13 @@ func generateDomXML(name string, memory int64, uuid string, vcpu int64, imageFil
 }
 
 type VirtualizationTool struct {
-	conn C.virConnectPtr
-	volumeStorage StorageBackend
-	volumePool C.virStoragePoolPtr
+	conn           C.virConnectPtr
+	volumeStorage  StorageBackend
+	volumePool     C.virStoragePoolPtr
 	volumePoolName string
 }
 
-func NewVirtualizationTool(conn C.virConnectPtr, poolName string, storageBackendName string) (*VirtualizationTool, error){
+func NewVirtualizationTool(conn C.virConnectPtr, poolName string, storageBackendName string) (*VirtualizationTool, error) {
 	pool, err := LookupStoragePool(conn, poolName)
 	if err != nil {
 		return nil, err

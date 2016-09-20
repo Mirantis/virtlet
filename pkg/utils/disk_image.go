@@ -16,62 +16,61 @@ limitations under the License.
 
 package utils
 
-
 import (
-	"github.com/Mirantis/virtlet/pkg/utils/guestfs"
 	"errors"
+	"github.com/Mirantis/virtlet/pkg/utils/guestfs"
 )
 
 func InitLibForImage(path string) (*guestfs.Guestfs, error) {
-	g, err := guestfs.Create ()
+	g, err := guestfs.Create()
 	if err != nil {
 		return nil, err
 	}
 
 	/* Set the trace flag so that we can see each libguestfs call. */
-	g.Set_trace (true)
+	g.Set_trace(true)
 
 	return g, nil
 }
 
-func FormatDisk (path string) error {
+func FormatDisk(path string) error {
 	g, err := InitLibForImage(path)
 	if err != nil {
 		return err
-        }
-	defer g.Close ()
+	}
+	defer g.Close()
 
 	/* Attach the disk image to libguestfs. */
 	optargs := guestfs.OptargsAdd_drive{
-		Format_is_set: true,
-		Format: "raw",
+		Format_is_set:   true,
+		Format:          "raw",
 		Readonly_is_set: true,
-		Readonly: false,
+		Readonly:        false,
 	}
 
-	if gErr := g.Add_drive (path, &optargs); gErr != nil {
+	if gErr := g.Add_drive(path, &optargs); gErr != nil {
 		return errors.New(gErr.String())
 	}
 
 	/* Run the libguestfs back-end. */
-	if gErr := g.Launch (); gErr != nil {
+	if gErr := g.Launch(); gErr != nil {
 		return errors.New(gErr.String())
 	}
 
-        /* Get the list of devices.  Because we only added one drive
-         * above, we expect that this list should contain a single
-         * element.
-         */
-        devices, gErr := g.List_devices ()
-        if err != nil {
-                return errors.New(gErr.String())
-        }
-        if len(devices) != 1 {
-                return errors.New("expected a single device from list-devices")
-        }
+	/* Get the list of devices.  Because we only added one drive
+	 * above, we expect that this list should contain a single
+	 * element.
+	 */
+	devices, gErr := g.List_devices()
+	if err != nil {
+		return errors.New(gErr.String())
+	}
+	if len(devices) != 1 {
+		return errors.New("expected a single device from list-devices")
+	}
 
 	/* Partition the disk as one single MBR partition. */
-	gErr = g.Part_disk (devices[0], "mbr")
+	gErr = g.Part_disk(devices[0], "mbr")
 	if gErr != nil {
 		return errors.New(gErr.String())
 	}
@@ -79,16 +78,16 @@ func FormatDisk (path string) error {
 	/* Get the list of partitions.  We expect a single element, which
 	 * is the partition we have just created.
 	 */
-	partitions, gErr := g.List_partitions ()
+	partitions, gErr := g.List_partitions()
 	if gErr != nil {
 		return errors.New(gErr.String())
 	}
 	if len(partitions) != 1 {
-		errors.New ("expected a single partition from list-partitions")
+		errors.New("expected a single partition from list-partitions")
 	}
 
 	/* Create a filesystem on the partition. */
-	gErr = g.Mkfs ("ext4", partitions[0], nil)
+	gErr = g.Mkfs("ext4", partitions[0], nil)
 	if gErr != nil {
 		return errors.New(gErr.String())
 	}

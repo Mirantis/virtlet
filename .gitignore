@@ -71,8 +71,11 @@ Makefile.in
 # Tests
 *.log
 *.test
+!cpplint.test
+!gofmt.test
 !go.test
 *.trs
 .deps
 .dirstamp
+cpplint.py
 test-driver

@@ -24,10 +24,8 @@ limitations under the License.
 #include <unistd.h>
 #include "image.h"
 
-int
-virtletVolUploadSource(virStreamPtr stream, char *bytes, size_t nbytes,
-                       void *opaque)
-{
+int virtletVolUploadSource(virStreamPtr stream, char *bytes, size_t nbytes,
+			   void *opaque) {
 	if (opaque == NULL) {
 		return -1;
 	}
@@ -36,10 +34,8 @@ virtletVolUploadSource(virStreamPtr stream, char *bytes, size_t nbytes,
 	return read(*fd, bytes, nbytes);
 }
 
-int
-pullImage(virConnectPtr conn, virStoragePoolPtr pool, char *shortName, char *filepath,
-	  char *volXML)
-{
+int pullImage(virConnectPtr conn, virStoragePoolPtr pool, char *shortName,
+	      char *filepath, char *volXML) {
 	int result = 0;
 	virStorageVolPtr vol = NULL;
 	int fd = -1;

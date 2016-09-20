@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-#ifndef VIRTLET_IMAGE_H
-#define VIRTLET_IMAGE_H
+#ifndef PKG_LIBVIRTTOOLS_IMAGE_H_
+#define PKG_LIBVIRTTOOLS_IMAGE_H_
 
 #include <stdbool.h>
 
 int virtletVolUploadSource(virStreamPtr stream, char *bytes, size_t nbytes,
-				  void *opaque);
-int pullImage(virConnectPtr conn, virStoragePoolPtr pool, char *shortName, char *filepath,
-	       char *volXML);
+			   void *opaque);
+int pullImage(virConnectPtr conn, virStoragePoolPtr pool, char *shortName,
+	      char *filepath, char *volXML);
 
-#endif /* VIRTLET_IMAGE_H */
+#endif  // PKG_LIBVIRTTOOLS_IMAGE_H_

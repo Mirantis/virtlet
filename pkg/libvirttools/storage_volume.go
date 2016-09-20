@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 package libvirttools
+
 /*
 #include <libvirt/libvirt.h>
 #include <libvirt/virterror.h>
@@ -24,18 +25,18 @@ import "C"
 
 import (
 	"fmt"
-	"unsafe"
 	"github.com/golang/glog"
+	"unsafe"
 )
 
 const (
-	defaultCapacity = 1024
+	defaultCapacity     = 1024
 	defaultCapacityUnit = "MB"
 )
 
 type StorageBackend interface {
 	GenerateVolXML(pool C.virStoragePoolPtr, shortName string, capacity int, capacityUnit, libvirtFilepath string) string
-	CreateVol (pool C.virStoragePoolPtr, volName string, capacity int, capacityUnit string) (C.virStorageVolPtr, error)
+	CreateVol(pool C.virStoragePoolPtr, volName string, capacity int, capacityUnit string) (C.virStorageVolPtr, error)
 }
 
 func GetStorageBackend(name string) (StorageBackend, error) {
@@ -50,7 +51,7 @@ func GetStorageBackend(name string) (StorageBackend, error) {
 
 type LocalFilesystemBackend struct{}
 
-func (LocalFilesystemBackend) GenerateVolXML(pool C.virStoragePoolPtr,shortName string, capacity int, capacityUnit string, path string) string {
+func (LocalFilesystemBackend) GenerateVolXML(pool C.virStoragePoolPtr, shortName string, capacity int, capacityUnit string, path string) string {
 	volXML := `
 <volume>
     <name>%s</name>
@@ -69,7 +70,7 @@ func (RBDBackend) GenerateVolXML(pool C.virStoragePoolPtr, shortName string, cap
 	return ""
 }
 
-func (LocalFilesystemBackend) CreateVol (pool C.virStoragePoolPtr, volName string, capacity int, capacityUnit string) (C.virStorageVolPtr, error) {
+func (LocalFilesystemBackend) CreateVol(pool C.virStoragePoolPtr, volName string, capacity int, capacityUnit string) (C.virStorageVolPtr, error) {
 	volXML := `
 <volume>
     <name>%s</name>
@@ -87,7 +88,7 @@ func (LocalFilesystemBackend) CreateVol (pool C.virStoragePoolPtr, volName strin
 	return vol, nil
 }
 
-func (RBDBackend) CreateVol (pool C.virStoragePoolPtr, volName string, capacity int, capacityUnit string) (C.virStorageVolPtr, error) {
+func (RBDBackend) CreateVol(pool C.virStoragePoolPtr, volName string, capacity int, capacityUnit string) (C.virStorageVolPtr, error) {
 	return nil, nil
 }
 
@@ -117,7 +118,6 @@ func LookupVol(name string, pool C.virStoragePoolPtr) (C.virStorageVolPtr, error
 	}
 	return vol, nil
 }
-
 
 func RemoveVol(name string, pool C.virStoragePoolPtr) error {
 	vol, err := LookupVol(name, pool)

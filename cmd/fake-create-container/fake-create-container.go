@@ -92,8 +92,8 @@ func main() {
 	mountName := "TestImg.img"
 	hostPath := "/var/lib/virtlet"
 	config := &kubeapi.ContainerConfig{
-		Image: imageSpec,
-		Mounts: []*kubeapi.Mount{&kubeapi.Mount{Name:&mountName, HostPath: &hostPath}},
+		Image:  imageSpec,
+		Mounts: []*kubeapi.Mount{&kubeapi.Mount{Name: &mountName, HostPath: &hostPath}},
 	}
 	containerIn := &kubeapi.CreateContainerRequest{
 		PodSandboxId:  sandboxOut.PodSandboxId,

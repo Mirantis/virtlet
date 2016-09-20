@@ -19,8 +19,7 @@ limitations under the License.
 #include <libvirt/libvirt.h>
 #include "image.h"
 
-void testVirtletVolUploadSourceNullOpaque()
-{
+void testVirtletVolUploadSourceNullOpaque() {
 	virConnectPtr conn;
 	virStreamPtr stream;
 	int result;
@@ -43,11 +42,10 @@ void testVirtletVolUploadSourceNullOpaque()
 	}
 }
 
-int
-main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
 	g_test_init(&argc, &argv, NULL);
-	g_test_add_func("/virtletVolUploadSourceNullOpaque", &testVirtletVolUploadSourceNullOpaque);
+	g_test_add_func("/virtletVolUploadSourceNullOpaque",
+			&testVirtletVolUploadSourceNullOpaque);
 
 	return g_test_run();
 }
