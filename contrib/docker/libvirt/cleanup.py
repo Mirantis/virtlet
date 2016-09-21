@@ -16,8 +16,30 @@
 
 from __future__ import print_function
 import sys
+import traceback
 
 import libvirt
+
+
+def destroy_domain(domain):
+    if domain.state() != libvirt.VIR_DOMAIN_RUNNING:
+        return
+
+    try:
+        domain.destroy()
+    except libvirt.libvirtError:
+        sys.stderr.write("Failed to destroy VM %s\n" % domain.name())
+        traceback.print_exc(file=sys.stderr)
+        sys.exit(1)
+
+
+def undefine_domain(domain):
+    try:
+        domain.undefine()
+    except libvirt.libvirtError:
+        sys.stderr.write("Failed to undefine VM %s\n" % domain.name())
+        traceback.print_exc(file=sys.stderr)
+        sys.exit(1)
 
 
 def main():
@@ -27,17 +49,11 @@ def main():
     print("Cleaning up VMs")
 
     for domain in domains:
-        domain_name = domain.name()
+        print("Destroying VM", domain.name())
+        destroy_domain(domain)
 
-        print("Destroying VM", domain_name)
-        if domain.destroy() < 0:
-            sys.stderr.write("Failed to destroy VM %s\n" % domain_name)
-            sys.exit(1)
-
-        print("Undefining VM", domain_name)
-        if domain.undefine() < 0:
-            sys.stderr.write("Failed to undefine VM %s\n" % domain_name)
-            sys.exit(1)
+        print("Undefining VM", domain.name())
+        undefine_domain(domain)
 
     print("All VMs cleaned")
 
