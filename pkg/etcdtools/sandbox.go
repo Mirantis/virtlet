@@ -320,7 +320,8 @@ func (c *sandboxConverter) etcdToSandboxStatus() (*kubeapi.PodSandboxStatus, err
 	}
 
 	// PodSandboxStatus.Network
-	ip := "10.0.0.2"
+	// TODO: get rid of fake ip, it's marker for "lack of libvirt domain" state
+	ip := "1.1.1.1"
 	podSandboxNetworkStatus := &kubeapi.PodSandboxNetworkStatus{
 		Ip: &ip,
 	}

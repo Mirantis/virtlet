@@ -154,6 +154,6 @@ func (n *NetworkingTool) ContainerIP(containerId string) (string, error) {
 	if ipPointer != nil {
 		return C.GoString(ipPointer), nil
 	}
-	// TODO: get rid of this fake data
-	return "10.0.0.2", nil
+	// TODO: get rid of this fake data - error situation
+	return "1.1.1.1", nil
 }
