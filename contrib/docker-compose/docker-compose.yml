@@ -8,6 +8,8 @@ services:
     #   - "16509:16509"
     # network_mode: host
     restart: always
+    environment:
+      - LIBVIRT_CLEANUP=""
     volumes:
       - /lib/modules:/lib/modules:ro
       - /run:/run
