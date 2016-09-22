@@ -10,6 +10,7 @@ RUN apk --no-cache add \
 
 RUN mkdir -p /go/src/github.com/Mirantis/virtlet
 COPY . /go/src/github.com/Mirantis/virtlet
+COPY ./virtlet_start.sh /
 
 WORKDIR /go/src/github.com/Mirantis/virtlet
 
@@ -19,4 +20,4 @@ RUN ./autogen.sh \
 	&& make install \
 	&& make clean
 
-CMD ["/usr/local/bin/virtlet", "-logtostderr=true", "-libvirt-uri=qemu+tcp://libvirt/system", "-etcd-endpoint=http://etcd:2379"]
+CMD ["/virtlet_start.sh"]

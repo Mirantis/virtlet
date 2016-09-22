@@ -17,6 +17,7 @@ limitations under the License.
 package manager
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -42,6 +43,7 @@ type VirtletManager struct {
 	// libvirt
 	libvirtConnTool           *libvirttools.ConnectionTool
 	libvirtImageTool          *libvirttools.ImageTool
+	libvirtNetworkingTool     *libvirttools.NetworkingTool
 	libvirtVirtualizationTool *libvirttools.VirtualizationTool
 	// etcd
 	etcdKeysAPITool        *etcdtools.KeysAPITool
@@ -59,6 +61,7 @@ func NewVirtletManager(libvirtUri string, poolName string, storageBackend string
 	if err != nil {
 		return nil, err
 	}
+	libvirtNetworkingTool := libvirttools.NewNetworkingTool(libvirtConnTool.Conn)
 	libvirtVirtualizationTool := libvirttools.NewVirtualizationTool(libvirtConnTool.Conn)
 	// TODO(nhlfr): Use many endpoints of etcd.
 	etcdKeysAPITool, err := etcdtools.NewKeysAPITool([]string{etcdEndpoint})
@@ -82,6 +85,7 @@ func NewVirtletManager(libvirtUri string, poolName string, storageBackend string
 		server:                    grpc.NewServer(),
 		libvirtConnTool:           libvirtConnTool,
 		libvirtImageTool:          libvirtImageTool,
+		libvirtNetworkingTool:     libvirtNetworkingTool,
 		libvirtVirtualizationTool: libvirtVirtualizationTool,
 		etcdKeysAPITool:           etcdKeysAPITool,
 		etcdImageTool:             etcdImageTool,
@@ -93,6 +97,17 @@ func NewVirtletManager(libvirtUri string, poolName string, storageBackend string
 	kubeapi.RegisterImageServiceServer(virtletManager.server, virtletManager)
 
 	return virtletManager, nil
+}
+
+func (v *VirtletManager) PrepareNetworking(subnet string, iface string) error {
+	// TODO: failback to next networking option (calico) ?
+	if subnet == "" {
+		return errors.New("subnet not set")
+	}
+	if iface == "" {
+		return errors.New("default networking interface not set")
+	}
+	return v.libvirtNetworkingTool.EnsureVirtletNetwork(subnet, iface)
 }
 
 func (v *VirtletManager) Serve(addr string) error {
@@ -148,12 +163,24 @@ func (v *VirtletManager) RemovePodSandbox(ctx context.Context, in *kubeapi.Remov
 }
 
 func (v *VirtletManager) PodSandboxStatus(ctx context.Context, in *kubeapi.PodSandboxStatusRequest) (*kubeapi.PodSandboxStatusResponse, error) {
-	status, err := v.etcdSandboxTool.PodSandboxStatus(in.GetPodSandboxId())
+	podId := in.GetPodSandboxId()
+	status, err := v.etcdSandboxTool.PodSandboxStatus(podId)
 	if err != nil {
 		glog.Errorf("Error when getting pod sandbox status: %#v", err)
 		return nil, err
 	}
 	response := &kubeapi.PodSandboxStatusResponse{Status: status}
+	containerId, err := v.etcdSandboxTool.GetContainerIdFromSandbox(podId)
+	if err != nil {
+		glog.Errorf("Error when getting pod sandbox status: %#v", err)
+		return nil, err
+	}
+	ip, err := v.libvirtNetworkingTool.ContainerIP(containerId)
+	if err != nil {
+		glog.Errorf("Error when getting pod sandbox ip: %#v", err)
+		return nil, err
+	}
+	response.Status.Network.Ip = &ip
 	glog.Infof("PodSandboxStatus response: %#v", response)
 	return response, nil
 }
@@ -193,6 +220,9 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 		return nil, err
 	}
 
+	if err := v.etcdSandboxTool.SaveContainerIdInSandbox(*in.PodSandboxId, uuid); err != nil {
+		return nil, err
+	}
 	response := &kubeapi.CreateContainerResponse{ContainerId: &uuid}
 	glog.Infof("CreateContainer response: %#v", response)
 	return response, nil
