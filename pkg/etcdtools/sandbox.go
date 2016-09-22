@@ -48,6 +48,8 @@ type sandboxConverter struct {
 	labelsKey string
 	// PodSandboxConfig.Annotations
 	annotationsKey string
+	// containerid - out of k8s sandbox data
+	containerIdKey string
 }
 
 func newSandboxConverter(tool *SandboxTool, podId string) *sandboxConverter {
@@ -69,6 +71,7 @@ func newSandboxConverter(tool *SandboxTool, podId string) *sandboxConverter {
 	labelsKey := fmt.Sprintf("/sandbox/%s/labels", podId)
 	// PodSandboxConfig.Annotations
 	annotationsKey := fmt.Sprintf("/sandbox/%s/annotations", podId)
+	containerIdKey := fmt.Sprintf("/sandbox/%s/containerId", podId)
 
 	return &sandboxConverter{
 		tool:  tool,
@@ -91,6 +94,8 @@ func newSandboxConverter(tool *SandboxTool, podId string) *sandboxConverter {
 		labelsKey: labelsKey,
 		// PodSandboxConfig.Annotations
 		annotationsKey: annotationsKey,
+		// containerid - out of k8s sandbox data
+		containerIdKey: containerIdKey,
 	}
 }
 
@@ -422,7 +427,7 @@ func (s *SandboxTool) CreatePodSandbox(config *kubeapi.PodSandboxConfig) error {
 	if err := c.sandboxConfigToEtcd(config); err != nil {
 		return err
 	}
-	return nil
+	return s.SaveContainerIdInSandbox(podId, "")
 }
 
 func (s *SandboxTool) PodSandboxStatus(podId string) (*kubeapi.PodSandboxStatus, error) {
@@ -471,4 +476,30 @@ func (s *SandboxTool) ListPodSandbox(filter *kubeapi.PodSandboxFilter) ([]*kubea
 	}
 
 	return podSandboxList, nil
+}
+
+func (s *SandboxTool) SaveContainerIdInSandbox(podId, containerId string) error {
+	kapi, err := s.keysAPITool.newKeysAPI()
+	if err != nil {
+		return err
+	}
+	c := newSandboxConverter(s, podId)
+	_, err = kapi.Set(context.Background(), c.containerIdKey, containerId, nil)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *SandboxTool) GetContainerIdFromSandbox(podId string) (string, error) {
+	kapi, err := s.keysAPITool.newKeysAPI()
+	if err != nil {
+		return "", err
+	}
+	c := newSandboxConverter(s, podId)
+	resp, err := kapi.Get(context.Background(), c.containerIdKey, nil)
+	if err != nil {
+		return "", nil
+	}
+	return resp.Node.Value, nil
 }

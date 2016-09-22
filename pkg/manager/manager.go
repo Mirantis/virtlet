@@ -193,6 +193,9 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 		return nil, err
 	}
 
+	if err := v.etcdSandboxTool.SaveContainerIdInSandbox(*in.PodSandboxId, uuid); err != nil {
+		return nil, err
+	}
 	response := &kubeapi.CreateContainerResponse{ContainerId: &uuid}
 	glog.Infof("CreateContainer response: %#v", response)
 	return response, nil
