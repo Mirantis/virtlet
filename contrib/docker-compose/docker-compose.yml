@@ -14,6 +14,7 @@ services:
       - /lib/modules:/lib/modules:ro
       - /run:/run
       - /dev:/dev
+      - /var/lib/virtlet:/var/lib/virtlet
       - /sys/fs/cgroup:/sys/fs/cgroup
       - ./libvirt.conf:/etc/libvirt/libvirtd.conf
       - ./qemu.conf:/etc/libvirt/qemu.conf
@@ -40,6 +41,9 @@ services:
     # network_mode: host
     restart: always
     volumes:
+      - /var/lib/virtlet:/var/lib/virtlet
+      - /lib/modules:/lib/modules:ro
+      - /boot:/boot:ro
       - /run:/run
     depends_on:
       - libvirt

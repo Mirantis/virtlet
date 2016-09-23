@@ -30,7 +30,7 @@ import (
 
 var (
 	imageUrl = flag.String("image-url",
-		"http://ftp.ps.pl/pub/Linux/fedora-linux/releases/24/CloudImages/x86_64/images/Fedora-Cloud-Base-24-1.2.x86_64.qcow2",
+		"ftp.ps.pl/pub/Linux/fedora-linux/releases/24/CloudImages/x86_64/images/Fedora-Cloud-Base-24-1.2.x86_64.qcow2",
 		"Image URL to pull")
 	virtletSocket = flag.String("virtlet-socket",
 		"/run/virtlet.sock",
@@ -89,8 +89,11 @@ func main() {
 
 	// Container request
 	imageSpec := &kubeapi.ImageSpec{Image: imageUrl}
+	mountName := "TestImg.img"
+	hostPath := "/var/lib/virtlet"
 	config := &kubeapi.ContainerConfig{
 		Image: imageSpec,
+		Mounts: []*kubeapi.Mount{&kubeapi.Mount{Name:&mountName, HostPath: &hostPath}},
 	}
 	containerIn := &kubeapi.CreateContainerRequest{
 		PodSandboxId:  sandboxOut.PodSandboxId,

@@ -59,7 +59,10 @@ func NewVirtletManager(libvirtUri string, poolName string, storageBackend string
 	if err != nil {
 		return nil, err
 	}
-	libvirtVirtualizationTool := libvirttools.NewVirtualizationTool(libvirtConnTool.Conn)
+	libvirtVirtualizationTool, err := libvirttools.NewVirtualizationTool(libvirtConnTool.Conn, "volumes", "dir")
+	if err != nil {
+		return nil, err
+	}
 	// TODO(nhlfr): Use many endpoints of etcd.
 	etcdKeysAPITool, err := etcdtools.NewKeysAPITool([]string{etcdEndpoint})
 	if err != nil {
@@ -175,6 +178,7 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 	if in.Config.Image.Image != nil {
 		imageName = *in.Config.Image.Image
 	}
+
 	imageFilepath, err := v.etcdImageTool.GetImageFilepath(imageName)
 	if err != nil {
 		return nil, err

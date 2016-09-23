@@ -29,7 +29,7 @@ var (
 		"Libvirt connection URI")
 	pool = flag.String("pool", "default",
 		"Storage pool in which the images should be stored")
-	storageBackend = flag.String("storage-backend", "local",
+	storageBackend = flag.String("storage-backend", "dir",
 		"Libvirt storage pool type/backend")
 	etcdEndpoint = flag.String("etcd-endpoint", "http://0.0.0.0:2379",
 		"etcd endpoint for client communication")
