@@ -1,39 +1,46 @@
 hash: f9d8b64ab5e46d25b3ee7a894e1d5902dc2c25744dbce0299dc6ab5ecda448b8
-updated: 2016-09-15T13:25:15.75679636+02:00
+updated: 2016-09-26T19:24:59.827970432+02:00
 imports:
+- name: github.com/boltdb/bolt
+  version: fff57c100f4dea1905678da7e90d92429dff2904
 - name: github.com/coreos/etcd
-  version: e6a7f2506519f462234a69d170993cfa409f4feb
+  version: e1efdd591e0aa7dfeebb03435703661d4e360e95
   subpackages:
   - client
   - pkg/pathutil
   - pkg/types
 - name: github.com/gogo/protobuf
-  version: 966a6f4b3274f2692aa2f30df2ea5c7172c832ca
+  version: 0394392b81058a7f972029451f06e528bb18ba50
   subpackages:
   - proto
 - name: github.com/golang/glog
   version: 23def4e6c14b4da8ac2ed8007337bc5eb5007998
 - name: github.com/golang/protobuf
-  version: 888eb0692c857ec880338addf316bd662d5e630e
+  version: 1f49d83d9aa00e6ce4fc8258c71cc7786aec968a
   subpackages:
   - proto
 - name: github.com/nu7hatch/gouuid
   version: 179d4d0c4d8d407a32af483c2354df1d2c91e6c3
 - name: github.com/ugorji/go
-  version: 98ef79d6c615fa258e892ed0b11c6e013712693e
+  version: b7eff9abce531d6aeda923e759ae668e56601d21
   subpackages:
   - codec
 - name: golang.org/x/net
-  version: 6c89f9617983ee917132513a791d8b5850fe90c5
+  version: f09c4662a0bd6bd8943ac7b4931e185df9471da4
   subpackages:
   - context
   - http2
   - http2/hpack
+  - idna
   - internal/timeseries
   - lex/httplex
   - trace
+- name: golang.org/x/sys
+  version: 8f0908ab3b2457e2e15403d3697c9ef5cb4b57a9
+  subpackages:
+  - unix
 - name: google.golang.org/grpc
-  version: 0032a855ba5c8a3c8e0d71c2deef354b70af1584
+  version: 71d2ea4f75286a63b606aca2422cd17ff37fd5b8
   subpackages:
   - codes
   - credentials
@@ -44,7 +51,7 @@ imports:
   - peer
   - transport
 - name: k8s.io/kubernetes
-  version: dbdaf2c22b355393b56fed4dc84e569ee4c5c3bf
+  version: 2a740120529279aa69e683b30be209b7550f52bc
   repo: git@github.com:kubernetes/kubernetes.git
   vcs: git
   subpackages:
