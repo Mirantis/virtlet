@@ -18,6 +18,9 @@ export CGO_LDFLAGS=$(LDFLAGS)
 
 SUBDIRS = pkg/download pkg/etcdtools pkg/libvirttools pkg/manager
 
+check_SCRIPTS = cpplint.test gofmt.test
+TESTS = $(check_SCRIPTS)
+
 .PHONY: all vendor
 
 all:

@@ -19,9 +19,7 @@ limitations under the License.
 #include <stdlib.h>
 #include "virtualization.h"
 
-int
-defineDomain(virConnectPtr conn, char *domXML)
-{
+int defineDomain(virConnectPtr conn, char *domXML) {
 	int result = 0;
 	virDomainPtr domain = NULL;
 
@@ -36,9 +34,7 @@ defineDomain(virConnectPtr conn, char *domXML)
 	return result;
 }
 
-int
-createDomain(virConnectPtr conn, char *uuid)
-{
+int createDomain(virConnectPtr conn, char *uuid) {
 	int result = 0;
 	virDomainPtr domain = NULL;
 
@@ -54,9 +50,7 @@ createDomain(virConnectPtr conn, char *uuid)
 	return result;
 }
 
-int
-stopDomain(virConnectPtr conn, char *uuid)
-{
+int stopDomain(virConnectPtr conn, char *uuid) {
 	int result = 0;
 	virDomainPtr domain = NULL;
 
@@ -72,9 +66,7 @@ stopDomain(virConnectPtr conn, char *uuid)
 	return result;
 }
 
-int
-destroyAndUndefineDomain(virConnectPtr conn, char *uuid)
-{
+int destroyAndUndefineDomain(virConnectPtr conn, char *uuid) {
 	int result = 0;
 	virDomainPtr domain = NULL;
 

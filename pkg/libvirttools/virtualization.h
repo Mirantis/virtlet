@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-#ifndef VIRTLET_VIRTUALIZATION_H
-#define VIRTLET_VIRTUALIZATION_H
+#ifndef PKG_LIBVIRTTOOLS_VIRTUALIZATION_H_
+#define PKG_LIBVIRTTOOLS_VIRTUALIZATION_H_
 
 int defineDomain(virConnectPtr conn, char *domXML);
 int createDomain(virConnectPtr conn, char *uuid);
 int stopDomain(virConnectPtr conn, char *uuid);
 int destroyAndUndefineDomain(virConnectPtr conn, char *uuid);
 
-#endif /* VIRTLET_VIRTUALIZATION_H */
+#endif  // PKG_LIBVIRTTOOLS_VIRTUALIZATION_H_

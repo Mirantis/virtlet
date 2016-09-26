@@ -24,9 +24,9 @@ package libvirttools
 import "C"
 
 import (
+	"fmt"
 	"github.com/golang/glog"
 	"unsafe"
-	"fmt"
 )
 
 const (
@@ -36,14 +36,14 @@ const (
 
 type Pool struct {
 	volumesPoolDir string
-	poolType string
+	poolType       string
 }
 
 type PoolSet map[string]*Pool
 
 var DefaultPools PoolSet = PoolSet{
-	"default": &Pool {volumesPoolDir: "/var/lib/libvirt/images", poolType: poolTypeDir},
-	"volumes": &Pool {volumesPoolDir: "/var/lib/virtlet", poolType: poolTypeDir},
+	"default": &Pool{volumesPoolDir: "/var/lib/libvirt/images", poolType: poolTypeDir},
+	"volumes": &Pool{volumesPoolDir: "/var/lib/virtlet", poolType: poolTypeDir},
 }
 
 func generatePoolXML(name string, path string, poolType string) string {
