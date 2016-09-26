@@ -12,9 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-check_PROGRAMS = image.test
+check_PROGRAMS = image.test virtualization.test
 check_SCRIPTS = go.test
 TESTS = $(check_PROGRAMS) $(check_SCRIPTS)
 
 image_test_CFLAGS = $(CFLAGS) -I.
 image_test_SOURCES = tests/test_image.c image.h image.c
+
+virtualization_test_CFLAGS = $(CFLAGS) -I.
+virtualization_test_SOURCES = tests/test_virtualization.c virtualization.h virtualization.c
