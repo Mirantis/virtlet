@@ -1,4 +1,4 @@
-FROM ubuntu:14.04
+FROM ubuntu:16.04
 MAINTAINER Michal Rostecki <mrostecki@mirantis.com>
 
 RUN apt-get update && apt-get install -y software-properties-common
@@ -11,7 +11,7 @@ ENV PATH $GOPATH/bin:/usr/local/go/bin:$PATH
 RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" && chmod -R 777 "$GOPATH"
 WORKDIR $GOPATH
 
-RUN apt-get update && apt-get install -y  \
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y  \
 	make \
 	autoconf \
 	automake \
@@ -31,7 +31,5 @@ RUN ./autogen.sh \
 	&& make \
 	&& make install \
 	&& make clean
-
-RUN update-guestfs-appliance
 
 CMD ["/usr/local/bin/virtlet", "-logtostderr=true", "-libvirt-uri=qemu+tcp://libvirt/system", "-etcd-endpoint=http://etcd:2379"]

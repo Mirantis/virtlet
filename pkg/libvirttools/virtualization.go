@@ -190,7 +190,7 @@ func generateDomXML(name string, memory int64, uuid string, vcpu int64, imageFil
     <on_reboot>restart</on_reboot>
     <on_crash>restart</on_crash>
     <devices>
-        <emulator>/usr/libexec/qemu-kvm</emulator>
+        <emulator>/usr/bin/kvm</emulator>
         <disk type='file' device='disk'>
             <drive name='qemu' type='qcow2'/>
             <source file='%s'/>

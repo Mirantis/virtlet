@@ -1,16 +1,13 @@
-FROM centos:7
+FROM ubuntu:16.04
 MAINTAINER Michal Rostecki <mrostecki@mirantis.com>
 
-RUN yum -y install \
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+		iproute2 \
 		openssl \
-		libvirt-daemon \
-		libvirt-python \
-		libguestfs \
-		libvirt-daemon-driver-nwfilter \
-		libvirt-daemon-config-nwfilter \
 		qemu-kvm \
-		ceph-common \
-	&& yum clean all
+		libvirt-bin \
+		python-libvirt \
+		ceph-common
 
 COPY cleanup.py /cleanup.py
 COPY start.sh /start.sh

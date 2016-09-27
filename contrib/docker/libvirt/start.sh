@@ -20,4 +20,5 @@ if [[ "${!LIBVIRT_CLEANUP[@]}" ]]; then
 	kill -9 $(cat /var/run/libvirtd.pid)
 fi
 
+chown root:kvm /dev/kvm
 exec /usr/sbin/libvirtd --listen
