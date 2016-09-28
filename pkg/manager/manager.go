@@ -29,6 +29,7 @@ import (
 
 	"github.com/Mirantis/virtlet/pkg/bolttools"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 const (
@@ -129,6 +130,16 @@ func (v *VirtletManager) RemovePodSandbox(ctx context.Context, in *kubeapi.Remov
 	podId := in.GetPodSandboxId()
 
 	if err := v.boltClient.RemovePodSandbox(podId); err != nil {
+		return nil, err
+	}
+
+	devName, err := v.boltClient.RetrieveTapDevFromSandbox(podId)
+	if err != nil {
+		glog.Errorf("Error when getting tapdev from pod sandbox: %#v", err)
+		return nil, err
+	}
+	if err := utils.RemovePersistentIface(devName, utils.Tap); err != nil {
+		glog.Errorf("Error when removing tapdev %s: %#v", devName, err)
 		return nil, err
 	}
 
