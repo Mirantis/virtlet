@@ -29,6 +29,7 @@ import (
 
 	"github.com/Mirantis/virtlet/pkg/etcdtools"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 const (
@@ -145,6 +146,15 @@ func (v *VirtletManager) StopPodSandbox(ctx context.Context, in *kubeapi.StopPod
 }
 
 func (v *VirtletManager) RemovePodSandbox(ctx context.Context, in *kubeapi.RemovePodSandboxRequest) (*kubeapi.RemovePodSandboxResponse, error) {
+	devName, err := v.etcdSandboxTool.RetrieveTapDevFromSandbox(in.GetPodSandboxId())
+	if err != nil {
+		glog.Errorf("Error when getting tapdev from pod sandbox: %#v", err)
+		return nil, err
+	}
+	if err := utils.RemovePersistentIface(devName, utils.Tap); err != nil {
+		glog.Errorf("Error when removing tapdev %s: %#v", devName, err)
+		return nil, err
+	}
 	response := &kubeapi.RemovePodSandboxResponse{}
 	glog.Infof("RemovePodSandbox response: %#v", response)
 	return response, nil

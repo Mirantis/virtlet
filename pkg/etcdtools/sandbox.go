@@ -25,6 +25,8 @@ import (
 	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 type sandboxConverter struct {
@@ -48,6 +50,8 @@ type sandboxConverter struct {
 	labelsKey string
 	// PodSandboxConfig.Annotations
 	annotationsKey string
+
+	tapDevice string
 }
 
 func newSandboxConverter(tool *SandboxTool, podId string) *sandboxConverter {
@@ -70,6 +74,8 @@ func newSandboxConverter(tool *SandboxTool, podId string) *sandboxConverter {
 	// PodSandboxConfig.Annotations
 	annotationsKey := fmt.Sprintf("/sandbox/%s/annotations", podId)
 
+	tapDevice := fmt.Sprintf("/sandbox/%s/tapDevice", podId)
+
 	return &sandboxConverter{
 		tool:  tool,
 		podId: podId,
@@ -91,10 +97,11 @@ func newSandboxConverter(tool *SandboxTool, podId string) *sandboxConverter {
 		labelsKey: labelsKey,
 		// PodSandboxConfig.Annotations
 		annotationsKey: annotationsKey,
+		tapDevice:      tapDevice,
 	}
 }
 
-func (c *sandboxConverter) sandboxConfigToEtcd(config *kubeapi.PodSandboxConfig) error {
+func (c *sandboxConverter) sandboxConfigToEtcd(config *kubeapi.PodSandboxConfig, tapDevice string) error {
 	kapi, err := c.tool.keysAPITool.newKeysAPI()
 	if err != nil {
 		return err
@@ -211,6 +218,11 @@ func (c *sandboxConverter) sandboxConfigToEtcd(config *kubeapi.PodSandboxConfig)
 		return err
 	}
 	_, err = kapi.Set(context.Background(), c.annotationsKey, string(annotations), nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = kapi.Set(context.Background(), c.tapDevice, tapDevice, nil)
 	if err != nil {
 		return err
 	}
@@ -417,9 +429,14 @@ func NewSandboxTool(keysAPITool *KeysAPITool) (*SandboxTool, error) {
 }
 
 func (s *SandboxTool) CreatePodSandbox(config *kubeapi.PodSandboxConfig) error {
+	devName, err := utils.CreatePersistentIface("virtlet%d", utils.Tap)
+	if err != nil {
+		return err
+	}
+
 	podId := config.Metadata.GetUid()
 	c := newSandboxConverter(s, podId)
-	if err := c.sandboxConfigToEtcd(config); err != nil {
+	if err := c.sandboxConfigToEtcd(config, devName); err != nil {
 		return err
 	}
 	return nil
@@ -471,4 +488,19 @@ func (s *SandboxTool) ListPodSandbox(filter *kubeapi.PodSandboxFilter) ([]*kubea
 	}
 
 	return podSandboxList, nil
+}
+
+func (s *SandboxTool) RetrieveTapDevFromSandbox(podId string) (string, error) {
+	kapi, err := s.keysAPITool.newKeysAPI()
+	if err != nil {
+		return "", err
+	}
+
+	c := newSandboxConverter(s, podId)
+	resp, err := kapi.Get(context.Background(), c.tapDevice, nil)
+	if err != nil {
+		return "", err
+	}
+
+	return resp.Node.Value, nil
 }
