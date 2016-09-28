@@ -18,9 +18,7 @@ limitations under the License.
 #include <libvirt/libvirt.h>
 #include "virtualization.h"
 
-void
-testDefineDomain(gconstpointer gConn)
-{
+void testDefineDomain(gconstpointer gConn) {
 	virConnectPtr conn = (virConnectPtr) gConn;
 	char *domXML = "<domain type='test'>"
 		"    <name>test-vm</name>"
@@ -50,9 +48,7 @@ testDefineDomain(gconstpointer gConn)
 	g_assert_cmpint(result, ==, 0);
 }
 
-void
-testCreateDomain(gconstpointer gConn)
-{
+void testCreateDomain(gconstpointer gConn) {
 	virConnectPtr conn = (virConnectPtr) gConn;
 	int result;
 
@@ -60,9 +56,7 @@ testCreateDomain(gconstpointer gConn)
 	g_assert_cmpint(result, ==, 0);
 }
 
-void
-testStopDomain(gconstpointer gConn)
-{
+void testStopDomain(gconstpointer gConn) {
 	virConnectPtr conn = (virConnectPtr) gConn;
 	int result;
 
@@ -70,19 +64,16 @@ testStopDomain(gconstpointer gConn)
 	g_assert_cmpint(result, ==, 0);
 }
 
-void
-testDestroyAndUndefineDomain(gconstpointer gConn)
-{
+void testDestroyAndUndefineDomain(gconstpointer gConn) {
 	virConnectPtr conn = (virConnectPtr) gConn;
 	int result;
 
-	result = destroyAndUndefineDomain(conn, "e54e628a-2f8d-49c1-89b5-0b269debb9f1");
+	result = destroyAndUndefineDomain(conn,
+					  "e54e628a-2f8d-49c1-89b5-0b269debb9f1");
 	g_assert_cmpint(result, ==, 0);
 }
 
-int
-main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
 	virConnectPtr conn;
 	gconstpointer gConn;
 	int result;
@@ -98,7 +89,8 @@ main(int argc, char **argv)
 	g_test_add_data_func("/defineDomain", gConn, &testDefineDomain);
 	g_test_add_data_func("/createDomain", gConn, &testCreateDomain);
 	g_test_add_data_func("/stopDomain", gConn, &testStopDomain);
-	g_test_add_data_func("/destroyAndUndefineDomain", gConn, &testDestroyAndUndefineDomain);
+	g_test_add_data_func("/destroyAndUndefineDomain", gConn,
+			     &testDestroyAndUndefineDomain);
 
 	result = g_test_run();
 
