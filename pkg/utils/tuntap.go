@@ -12,17 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package tuntap
+package utils
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"os"
 	"syscall"
 	"unsafe"
-
-	"github.com/hashicorp/errwrap"
 )
 
 const (
@@ -80,12 +77,9 @@ func operateOnIface(name string, kind uint16, persistency uintptr) (string, erro
 	if err != nil {
 		return "", err
 	}
+	defer iface.Close()
 
 	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, iface.file.Fd(), uintptr(syscall.TUNSETPERSIST), persistency)
-	err = iface.Close()
-	if err != nil {
-		return "", errwrap.Wrap(errors.New("iface close error "), err)
-	}
 
 	if errno != 0 {
 		return "", fmt.Errorf("ioctl failed (TUNSETPERSIST): %v", errno)
