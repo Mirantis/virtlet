@@ -13,6 +13,13 @@ curl https://glide.sh/get | sh
 go get github.com/sgotti/glide-vc
 ```
 
+## Calico networking
+
+Virtlet requires that it's running on nodes in properly configured [Calico](https://www.projectcalico.org/) environment, having (calico/node)[https://github.com/projectcalico/calico-containers/blob/master/docs/Components.md] container running on each of them.
+
+There are at least two methods if kubernetes integration with calico. It's up to operator which one is preffered.
+Both of mentioned two methods are described (there)[https://github.com/projectcalico/calico-containers/blob/master/docs/cni/kubernetes/KubernetesIntegration.md].
+
 ## Running local environment
 
 To run local environment, please install [docker-compose](https://pypi.python.org/pypi/docker-compose)
