@@ -25,6 +25,8 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/davecgh/go-spew/spew"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 func (b *BoltClient) VerifySandboxSchema() error {
@@ -67,6 +69,12 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig) error {
 		return fmt.Errorf("Linux sandbox config is missing Namespaces attribute: %s", spew.Sdump(config))
 	}
 
+	// leave decision about suffix to kernel - it will assing next free index
+	devName, err := utils.CreatePersistentIface("virtlet%d", utils.Tap)
+	if err != nil {
+		return err
+	}
+
 	err = b.db.Batch(func(tx *bolt.Tx) error {
 		parentBucket := tx.Bucket([]byte("sandbox"))
 		if parentBucket == nil {
@@ -95,6 +103,10 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig) error {
 		}
 
 		if err := sandboxBucket.Put([]byte("annotations"), []byte(strAnnotations)); err != nil {
+			return err
+		}
+
+		if err := sandboxBucket.Put([]byte("tapDevice"), []byte(devName)); err != nil {
 			return err
 		}
 
@@ -486,4 +498,32 @@ func (b *BoltClient) ListPodSandbox(filter *kubeapi.PodSandboxFilter) ([]*kubeap
 	}
 
 	return sandboxes, nil
+}
+
+func (b *BoltClient) RetrieveTapDevFromSandbox(podId string) (string, error) {
+	var tapDevice string
+	err := b.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte("sandbox"))
+		if bucket == nil {
+			return fmt.Errorf("Bucket 'sandbox' doesn't exist")
+		}
+
+		sandboxBucket := bucket.Bucket([]byte(podId))
+		if sandboxBucket == nil {
+			return fmt.Errorf("Bucket '%s' doesn't exist", podId)
+		}
+
+		tmpTapDevice, err := getString(sandboxBucket, "tapDevice")
+		if err != nil {
+			return err
+		}
+		tapDevice = tmpTapDevice
+
+		return nil
+	})
+	if err != nil {
+		return "", nil
+	}
+
+	return tapDevice, nil
 }
