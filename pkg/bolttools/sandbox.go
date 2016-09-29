@@ -41,7 +41,7 @@ func (b *BoltClient) VerifySandboxSchema() error {
 	return err
 }
 
-func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig) error {
+func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, calicoClient *utils.CalicoClient) error {
 	podId := config.Metadata.GetUid()
 
 	strLabels, err := json.Marshal(config.GetLabels())
@@ -71,6 +71,11 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig) error {
 
 	// leave decision about suffix to kernel - it will assing next free index
 	devName, err := utils.CreatePersistentIface("virtlet%d", utils.Tap)
+	if err != nil {
+		return err
+	}
+
+	ipv4, err := calicoClient.AssignIPv4(podId)
 	if err != nil {
 		return err
 	}
@@ -154,6 +159,15 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig) error {
 		}
 
 		if err := namespaceOptionsBucket.Put([]byte("hostIpc"), []byte(strconv.FormatBool(namespaceOptions.GetHostIpc()))); err != nil {
+			return err
+		}
+
+		networkStatusBucket, err := sandboxBucket.CreateBucketIfNotExists([]byte("networkStatus"))
+		if err != nil {
+			return err
+		}
+
+		if err := networkStatusBucket.Put([]byte("IPv4"), []byte(ipv4)); err != nil {
 			return err
 		}
 
@@ -297,6 +311,16 @@ func (b *BoltClient) GetPodSandboxStatus(podId string) (*kubeapi.PodSandboxStatu
 			return err
 		}
 
+		networkStatusBucket := sandboxBucket.Bucket([]byte("networkStatus"))
+		if networkStatusBucket == nil {
+			return fmt.Errorf("Bucket 'networkStatus' doesn't exist")
+		}
+
+		ipv4, err := getString(networkStatusBucket, "IPv4")
+		if err != nil {
+			return err
+		}
+
 		metadata := &kubeapi.PodSandboxMetadata{
 			Name:      &metadataName,
 			Uid:       &metadataUid,
@@ -320,11 +344,16 @@ func (b *BoltClient) GetPodSandboxStatus(podId string) (*kubeapi.PodSandboxStatu
 			Namespaces: namespace,
 		}
 
+		networkStatus := &kubeapi.PodSandboxNetworkStatus{
+			Ip: &ipv4,
+		}
+
 		podSandboxStatus = &kubeapi.PodSandboxStatus{
 			Id:          &podId,
 			Metadata:    metadata,
 			State:       &state,
 			CreatedAt:   &createdAt,
+			Network:     networkStatus,
 			Linux:       linuxSandbox,
 			Labels:      labels,
 			Annotations: annotations,

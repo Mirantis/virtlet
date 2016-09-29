@@ -17,6 +17,7 @@ limitations under the License.
 package utils
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/tigera/libcalico-go/lib/client"
@@ -45,4 +46,23 @@ func NewCalicoClient(etcdEndpoints string) (*CalicoClient, error) {
 	}
 
 	return &CalicoClient{client: *client}, nil
+}
+
+func (c *CalicoClient) AssignIPv4(podId string) (string, error) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		return "", err
+	}
+	assignArgs := client.AutoAssignArgs{Num4: 1, Num6: 0, HandleID: &podId, Hostname: hostname}
+	ipv4, _, err := c.client.IPAM().AutoAssign(assignArgs)
+	num4 := len(ipv4)
+	if num4 != 1 {
+		return "", fmt.Errorf("Calico IPAM returned %d IPv4 addresses", num4)
+	}
+
+	return ipv4[0].String(), err
+}
+
+func (c *CalicoClient) ReleaseByPodId(podId string) error {
+	return c.client.IPAM().ReleaseByHandle(podId)
 }
