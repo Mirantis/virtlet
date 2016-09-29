@@ -31,8 +31,8 @@ var (
 		"Storage pool in which the images should be stored")
 	storageBackend = flag.String("storage-backend", "dir",
 		"Libvirt storage pool type/backend")
-	etcdEndpoint = flag.String("etcd-endpoint", "http://0.0.0.0:2379",
-		"etcd endpoint for client communication")
+	etcdEndpoints = flag.String("etcd-endpoints", "http://0.0.0.0:2379",
+		"comma separated list of etcd endpoints for client communication")
 	listen = flag.String("listen", "/run/virtlet.sock",
 		"The unix socket to listen on, e.g. /run/virtlet.sock")
 )
@@ -40,7 +40,7 @@ var (
 func main() {
 	flag.Parse()
 
-	server, err := manager.NewVirtletManager(*libvirtUri, *pool, *storageBackend, *etcdEndpoint)
+	server, err := manager.NewVirtletManager(*libvirtUri, *pool, *storageBackend, *etcdEndpoints)
 	if err != nil {
 		glog.Errorf("Initializing server failed: %v", err)
 		os.Exit(1)

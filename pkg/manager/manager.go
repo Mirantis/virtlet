@@ -48,9 +48,11 @@ type VirtletManager struct {
 	libvirtVirtualizationTool *libvirttools.VirtualizationTool
 	// bolt
 	boltClient *bolttools.BoltClient
+	// calico
+	calicoClient *utils.CalicoClient
 }
 
-func NewVirtletManager(libvirtUri string, poolName string, storageBackend string, boltEndpoint string) (*VirtletManager, error) {
+func NewVirtletManager(libvirtUri string, poolName string, storageBackend string, etcdEndpoints string) (*VirtletManager, error) {
 	libvirtConnTool, err := libvirttools.NewConnectionTool(libvirtUri)
 	if err != nil {
 		return nil, err
@@ -67,6 +69,10 @@ func NewVirtletManager(libvirtUri string, poolName string, storageBackend string
 	if err != nil {
 		return nil, err
 	}
+	calicoClient, err := utils.NewCalicoClient(etcdEndpoints)
+	if err != nil {
+		return nil, err
+	}
 
 	virtletManager := &VirtletManager{
 		server:                    grpc.NewServer(),
@@ -74,6 +80,7 @@ func NewVirtletManager(libvirtUri string, poolName string, storageBackend string
 		libvirtImageTool:          libvirtImageTool,
 		libvirtVirtualizationTool: libvirtVirtualizationTool,
 		boltClient:                boltClient,
+		calicoClient:              calicoClient,
 	}
 
 	kubeapi.RegisterRuntimeServiceServer(virtletManager.server, virtletManager)
