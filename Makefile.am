@@ -29,7 +29,7 @@ all:
 	go build -o $(builddir)/virtlet-fake-image-pull ./cmd/fake-image-pull
 
 vendor:
-	glide update --strip-vcs --strip-vendor --update-vendored --delete
+	glide update --strip-vendor
 	glide-vc --only-code --no-tests --keep="**/*.json.in"
 
 clean-local:
