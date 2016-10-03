@@ -7,7 +7,8 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
 		qemu-kvm \
 		libvirt-bin \
 		python-libvirt \
-		ceph-common
+		ceph-common \
+	&& apt-get clean
 
 COPY cleanup.py /cleanup.py
 COPY start.sh /start.sh
