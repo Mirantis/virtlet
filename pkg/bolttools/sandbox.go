@@ -533,8 +533,9 @@ func (b *BoltClient) ListPodSandbox(filter *kubeapi.PodSandboxFilter) ([]*kubeap
 	return sandboxes, nil
 }
 
-func (b *BoltClient) RetrieveTapDevFromSandbox(podId string) (string, error) {
+func (b *BoltClient) RetrieveNetworkInfoFromSandbox(podId string) (string, string, error) {
 	var tapDevice string
+	var ipv4 string
 	err := b.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte("sandbox"))
 		if bucket == nil {
@@ -552,11 +553,22 @@ func (b *BoltClient) RetrieveTapDevFromSandbox(podId string) (string, error) {
 		}
 		tapDevice = tmpTapDevice
 
+		networkStatusBucket := sandboxBucket.Bucket([]byte("networkStatus"))
+		if networkStatusBucket == nil {
+			return fmt.Errorf("Bucket 'networkStatus' doesn't exist")
+		}
+
+		tmpipv4, err := getString(networkStatusBucket, "IPv4")
+		if err != nil {
+			return err
+		}
+		ipv4 = tmpipv4
+
 		return nil
 	})
 	if err != nil {
-		return "", nil
+		return "", "", err
 	}
 
-	return tapDevice, nil
+	return tapDevice, ipv4, nil
 }

@@ -31,10 +31,22 @@ At this stage Virtlet have following requirements:
 
 ### Calico networking
 
-Virtlet requires that it's running on nodes in properly configured [Calico](https://www.projectcalico.org/) environment, having (calico/node)[https://github.com/projectcalico/calico-containers/blob/master/docs/Components.md] container running on each of them.
+Virtlet requires that it's running on nodes in properly configured [Calico](https://www.projectcalico.org/) environment, having [calico/node](https://github.com/projectcalico/calico-containers/blob/master/docs/Components.md) container running on each of them.
 
 There are at least two methods if kubernetes integration with calico. It's up to operator which one is preffered.
 Both of mentioned two methods are described [there](https://github.com/projectcalico/calico-containers/blob/master/docs/cni/kubernetes/KubernetesIntegration.md).
+
+The simpliest way to configure this is to start local kubernetes cluster, then do as root:
+```sh
+brctl addbr virtlet
+ifconfig virtlet 10.111.0.1/8
+wget http://www.projectcalico.org/latest/calicoctl
+chmod +x calicoctl
+./calicoctl node
+./calicoctl pool add 10.111.0.0/24
+```
+
+Note: each restart of local kubernetes cluster will clear calico settings in its etcd database so local cluster restart should be followed by `./calicoctl node stop && ./calicoctl node && ./calicoctl pool add 10.111.0.0./24`.
 
 ### Running docker-compose environment
 

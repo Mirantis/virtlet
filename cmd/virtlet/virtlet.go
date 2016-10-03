@@ -45,7 +45,15 @@ func main() {
 		glog.Errorf("Initializing server failed: %v", err)
 		os.Exit(1)
 	}
+
+	err = server.PrepareNetworking()
+	if err != nil {
+		glog.Errorf("Failed to prepare networking: %v", err)
+		os.Exit(1)
+	}
+
 	glog.V(1).Infof("Starting server on socket %s", *listen)
+
 	if err = server.Serve(*listen); err != nil {
 		glog.Errorf("Serving failed: %v", err)
 	}

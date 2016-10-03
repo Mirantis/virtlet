@@ -182,7 +182,7 @@ func (v *VirtualizationTool) createVolumes(containerName string, mounts []*kubea
 	return domXML, nil
 }
 
-func generateDomXML(name string, memory int64, memoryUnit string, uuid string, cpuNum int, cpuShare int64, cpuPeriod int64, cpuQuota int64, imageFilepath string) string {
+func generateDomXML(name string, memoryUnit string, memory int64, uuid string, cpuNum int, cpuShare int64, cpuPeriod int64, cpuQuota int64, imageFilepath, devName, ipv4 string) string {
 	domXML := `
 <domain type='kvm'>
     <name>%s</name>
@@ -223,9 +223,15 @@ func generateDomXML(name string, memory int64, memoryUnit string, uuid string, c
         <video>
             <model type='cirrus'/>
         </video>
+	<interface type='network'>
+	    <source network='virtlet' />
+	    <target dev='%s' />
+	    <ip address='%s' prefix='32' peer='169.254.1.1' />
+	    <route family='ipv4' address='0.0.0.0' prefix='0' gateway='168.254.1.1' />
+	</interface>
     </devices>
 </domain>`
-	return fmt.Sprintf(domXML, name, uuid, memoryUnit, memory, cpuNum, cpuShare, cpuPeriod, cpuQuota, imageFilepath)
+	return fmt.Sprintf(domXML, name, uuid, memoryUnit, memory, cpuNum, cpuShare, cpuPeriod, cpuQuota, imageFilepath, devName, ipv4)
 }
 
 type VirtualizationTool struct {
@@ -248,7 +254,7 @@ func NewVirtualizationTool(conn C.virConnectPtr, poolName string, storageBackend
 	return &VirtualizationTool{conn: conn, volumeStorage: storageBackend, volumePool: pool, volumePoolName: poolName}, nil
 }
 
-func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, in *kubeapi.CreateContainerRequest, imageFilepath string) (string, error) {
+func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, in *kubeapi.CreateContainerRequest, imageFilepath, devName, ipv4 string) (string, error) {
 	uuid, err := utils.NewUuid()
 	if err != nil {
 		return "", err
@@ -294,7 +300,7 @@ func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, i
 	cpuPeriod := config.GetLinux().GetResources().GetCpuPeriod()
 	cpuQuota := config.GetLinux().GetResources().GetCpuQuota()
 
-	domXML := generateDomXML(name, memory, memoryUnit, uuid, cpuNum, cpuShares, cpuPeriod, cpuQuota, imageFilepath)
+	domXML := generateDomXML(name, memoryUnit, memory, uuid, cpuNum, cpuShares, cpuPeriod, cpuQuota, imageFilepath, devName, ipv4)
 	domXML, err = v.createVolumes(name, in.Config.Mounts, domXML)
 	if err != nil {
 		return "", err

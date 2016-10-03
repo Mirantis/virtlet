@@ -45,6 +45,7 @@ type VirtletManager struct {
 	// libvirt
 	libvirtConnTool           *libvirttools.ConnectionTool
 	libvirtImageTool          *libvirttools.ImageTool
+	libvirtNetworkingTool     *libvirttools.NetworkingTool
 	libvirtVirtualizationTool *libvirttools.VirtualizationTool
 	// bolt
 	boltClient *bolttools.BoltClient
@@ -78,6 +79,7 @@ func NewVirtletManager(libvirtUri string, poolName string, storageBackend string
 		server:                    grpc.NewServer(),
 		libvirtConnTool:           libvirtConnTool,
 		libvirtImageTool:          libvirtImageTool,
+		libvirtNetworkingTool:     libvirttools.NewNetworkingTool(libvirtConnTool.Conn),
 		libvirtVirtualizationTool: libvirtVirtualizationTool,
 		boltClient:                boltClient,
 		calicoClient:              calicoClient,
@@ -87,6 +89,10 @@ func NewVirtletManager(libvirtUri string, poolName string, storageBackend string
 	kubeapi.RegisterImageServiceServer(virtletManager.server, virtletManager)
 
 	return virtletManager, nil
+}
+
+func (v *VirtletManager) PrepareNetworking() error {
+	return v.libvirtNetworkingTool.EnsureVirtletNetwork()
 }
 
 func (v *VirtletManager) Serve(addr string) error {
@@ -147,7 +153,7 @@ func (v *VirtletManager) RemovePodSandbox(ctx context.Context, in *kubeapi.Remov
 		return nil, err
 	}
 
-	devName, err := v.boltClient.RetrieveTapDevFromSandbox(podId)
+	devName, _, err := v.boltClient.RetrieveNetworkInfoFromSandbox(podSandboxId)
 	if err != nil {
 		glog.Errorf("Error when getting tapdev from pod sandbox: %#v", err)
 		return nil, err
@@ -157,12 +163,12 @@ func (v *VirtletManager) RemovePodSandbox(ctx context.Context, in *kubeapi.Remov
 		return nil, err
 	}
 
-	if err := v.calicoClient.RemoveEndpoint(podId); err != nil {
+	if err := v.calicoClient.RemoveEndpoint(podSandboxId); err != nil {
 		glog.Errorf("Error when removing calico endpoint: %#v", err)
 		return nil, err
 	}
 
-	if err := v.calicoClient.ReleaseByPodId(podId); err != nil {
+	if err := v.calicoClient.ReleaseByPodId(podSandboxId); err != nil {
 		glog.Errorf("Error when removing calico IPAM settings: %#v", err)
 		return nil, err
 	}
@@ -212,9 +218,15 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 		return nil, err
 	}
 
+	devName, ipv4, err := v.boltClient.RetrieveNetworkInfoFromSandbox(*in.PodSandboxId)
+	if err != nil {
+		glog.Errorf("Error when retrieving network settings from sandbox %s: %#v", *in.PodSandboxId, err)
+		return nil, err
+	}
+
 	// TODO: we should not pass whole "in" to CreateContainer - we should pass there only needed info for CreateContainer
 	// without whole data container
-	uuid, err := v.libvirtVirtualizationTool.CreateContainer(v.boltClient, in, imageFilepath)
+	uuid, err := v.libvirtVirtualizationTool.CreateContainer(v.boltClient, in, imageFilepath, devName, ipv4)
 	if err != nil {
 		glog.Errorf("Error when creating container %s: %v", name, err)
 		return nil, err
