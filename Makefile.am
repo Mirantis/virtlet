@@ -18,7 +18,7 @@ export CGO_LDFLAGS=$(LDFLAGS)
 
 SUBDIRS = pkg/bolttools pkg/download pkg/libvirttools pkg/manager
 
-check_SCRIPTS = cpplint.test gofmt.test
+check_SCRIPTS = cpplint.test dockerfilelint.test gofmt.test
 TESTS = $(check_SCRIPTS)
 
 .PHONY: all vendor
