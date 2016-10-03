@@ -42,6 +42,27 @@ def undefine_domain(domain):
         sys.exit(1)
 
 
+def cleanup_volumes(conn):
+    try:
+        pool = conn.storagePoolLookupByName("default")
+    except libvirt.libvirtError:
+        return
+
+    volumes = pool.listAllVolumes()
+
+    print("Cleaning up volumes")
+
+    for volume in volumes:
+        volume_name = volume.name()
+
+        print("Deleting volume", volume_name)
+        if volume.delete() < 0:
+            sys.stderr.write("Failed to remove volume %s\n" % volume_name)
+            sys.exit(1)
+
+    print("All volumes cleaned")
+
+
 def main():
     conn = libvirt.open("qemu:///system")
     domains = conn.listAllDomains()
@@ -57,20 +78,9 @@ def main():
 
     print("All VMs cleaned")
 
-    pool = conn.storagePoolLookupByName("default")
-    volumes = pool.listAllVolumes()
+    cleanup_volumes(conn)
 
-    print("Cleaning up volumes")
-
-    for volume in volumes:
-        volume_name = volume.name()
-
-        print("Deleting volume", volume_name)
-        if volume.delete() < 0:
-            sys.stderr.write("Failed to remove volume %s\n" % volume_name)
-            sys.exit(1)
-
-    print("All volumes cleaned")
+    conn.close()
 
 
 if __name__ == "__main__":
