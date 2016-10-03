@@ -443,7 +443,8 @@ func (b *BoltClient) ListPodSandbox(filter *kubeapi.PodSandboxFilter) ([]*kubeap
 	err := b.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte("sandbox"))
 		if bucket == nil {
-			return fmt.Errorf("Bucket 'sandbox' doesn't exist")
+			// there is no sanbox bucket, so there are no pods
+			return nil
 		}
 
 		bucket.ForEach(func(k, v []byte) error {
