@@ -1,0 +1,3 @@
+#!/bin/sh
+
+docker run -it --rm -v `pwd`:/root/ projectatomic/dockerfile-lint dockerfile_lint -f $(find . -name Dockerfile)

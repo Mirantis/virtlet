@@ -72,6 +72,7 @@ Makefile.in
 *.log
 *.test
 !cpplint.test
+!dockerfilelint.test
 !gofmt.test
 !go.test
 *.trs
