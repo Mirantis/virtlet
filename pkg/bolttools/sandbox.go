@@ -80,6 +80,10 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, calicoClien
 		return err
 	}
 
+	if err := calicoClient.ConfigureEndpoint(podId, devName, ipv4); err != nil {
+		return err
+	}
+
 	err = b.db.Batch(func(tx *bolt.Tx) error {
 		parentBucket := tx.Bucket([]byte("sandbox"))
 		if parentBucket == nil {
@@ -167,7 +171,7 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, calicoClien
 			return err
 		}
 
-		if err := networkStatusBucket.Put([]byte("IPv4"), []byte(ipv4)); err != nil {
+		if err := networkStatusBucket.Put([]byte("IPv4"), []byte(ipv4.String())); err != nil {
 			return err
 		}
 

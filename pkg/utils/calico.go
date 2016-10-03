@@ -18,9 +18,13 @@ package utils
 
 import (
 	"fmt"
+	"net"
 	"os"
 
+	"github.com/tigera/libcalico-go/lib/api"
 	"github.com/tigera/libcalico-go/lib/client"
+	cnet "github.com/tigera/libcalico-go/lib/net"
+	"github.com/vishvananda/netlink"
 )
 
 type CalicoClient struct {
@@ -48,21 +52,79 @@ func NewCalicoClient(etcdEndpoints string) (*CalicoClient, error) {
 	return &CalicoClient{client: *client}, nil
 }
 
-func (c *CalicoClient) AssignIPv4(podId string) (string, error) {
+func (c *CalicoClient) AssignIPv4(podId string) (net.IP, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
-		return "", err
+		return net.IP{}, err
 	}
 	assignArgs := client.AutoAssignArgs{Num4: 1, Num6: 0, HandleID: &podId, Hostname: hostname}
 	ipv4, _, err := c.client.IPAM().AutoAssign(assignArgs)
 	num4 := len(ipv4)
 	if num4 != 1 {
-		return "", fmt.Errorf("Calico IPAM returned %d IPv4 addresses", num4)
+		return net.IP{}, fmt.Errorf("Calico IPAM returned %d IPv4 addresses", num4)
 	}
 
-	return ipv4[0].String(), err
+	return ipv4[0].IP, err
 }
 
 func (c *CalicoClient) ReleaseByPodId(podId string) error {
 	return c.client.IPAM().ReleaseByHandle(podId)
+}
+
+func (c *CalicoClient) ConfigureEndpoint(podId string, devName string, ip net.IP) error {
+	link, err := netlink.LinkByName(devName)
+	if err != nil {
+		return err
+	}
+	hostname, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+
+	endpoint := api.NewWorkloadEndpoint()
+	endpoint.Metadata.Name = devName
+	endpoint.Metadata.Node = hostname
+
+	// TODO: verify if there should be "cni" instead of "k8s" and what this changes
+	endpoint.Metadata.Orchestrator = "k8s"
+
+	endpoint.Metadata.Workload = podId
+
+	// TODO: think about setting there pod labels
+	// https://github.com/projectcalico/calico-cni/blob/72cc93bc12c6225efc64d584aa877df91aa621bc/k8s/k8s.go#L216
+	// we have this in PodSandboxConfig as GetLables()
+	endpoint.Metadata.Labels = make(map[string]string)
+
+	// TODO: verify if there should be other data in profiles - now we are using hardcoded network name
+	// https://github.com/projectcalico/calico-cni/blob/72cc93bc12c6225efc64d584aa877df91aa621bc/k8s/k8s.go#L110
+	endpoint.Spec.Profiles = []string{"virtlet"}
+
+	endpoint.Spec.InterfaceName = devName
+	endpoint.Spec.MAC = cnet.MAC{HardwareAddr: link.Attrs().HardwareAddr}
+
+	net := cnet.IPNet{net.IPNet{IP: ip, Mask: net.CIDRMask(32, 32)}}
+	endpoint.Spec.IPNetworks = append(endpoint.Spec.IPNetworks, net)
+
+	if _, err := c.client.WorkloadEndpoints().Apply(endpoint); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *CalicoClient) RemoveEndpoint(podId string) error {
+	hostname, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+
+	if err := c.client.WorkloadEndpoints().Delete(api.WorkloadEndpointMetadata{
+		Node:         hostname,
+		Orchestrator: "k8s",
+		Workload:     podId}); err != nil {
+
+		return err
+	}
+
+	return nil
 }

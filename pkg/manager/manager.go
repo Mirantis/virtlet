@@ -157,6 +157,11 @@ func (v *VirtletManager) RemovePodSandbox(ctx context.Context, in *kubeapi.Remov
 		return nil, err
 	}
 
+	if err := v.calicoClient.RemoveEndpoint(podId); err != nil {
+		glog.Errorf("Error when removing calico endpoint: %#v", err)
+		return nil, err
+	}
+
 	if err := v.calicoClient.ReleaseByPodId(podId); err != nil {
 		glog.Errorf("Error when removing calico IPAM settings: %#v", err)
 		return nil, err
