@@ -1,25 +1,27 @@
 FROM ubuntu:16.04
 MAINTAINER Michal Rostecki <mrostecki@mirantis.com>
 
-RUN apt-get update && apt-get install -y software-properties-common
+RUN apt-get update \
+	&& apt-get install -y software-properties-common \
+	&& apt-get clean
 RUN add-apt-repository ppa:ubuntu-lxc/lxd-stable
-RUN apt-get update && apt-get install -y golang
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -y  \
+		golang \
+		make \
+		autoconf \
+		automake \
+		libglib2.0-dev \
+		libvirt-dev \
+		libguestfs-dev \
+		libguestfs0-dbg \
+		libguestfs-tools \
+	&& apt-get clean
 
 ENV GOPATH /go
 ENV PATH $GOPATH/bin:/usr/local/go/bin:$PATH
 
 RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" && chmod -R 777 "$GOPATH"
 WORKDIR $GOPATH
-
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y  \
-	make \
-	autoconf \
-	automake \
-	libglib2.0-dev \
-	libvirt-dev \
-	libguestfs-dev \
-	libguestfs0-dbg \
-	libguestfs-tools
 
 RUN mkdir -p /go/src/github.com/Mirantis/virtlet
 COPY . /go/src/github.com/Mirantis/virtlet
