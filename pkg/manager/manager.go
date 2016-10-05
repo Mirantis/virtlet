@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"syscall"
 
 	"github.com/golang/glog"
@@ -161,10 +162,7 @@ func (v *VirtletManager) ListPodSandbox(ctx context.Context, in *kubeapi.ListPod
 }
 
 func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.CreateContainerRequest) (*kubeapi.CreateContainerResponse, error) {
-	var imageName string
-	if in.Config.Image.Image != nil {
-		imageName = *in.Config.Image.Image
-	}
+	imageName := in.GetConfig().GetImage().GetImage()
 
 	imageFilepath, err := v.boltClient.GetImageFilepath(imageName)
 	if err != nil {
@@ -293,9 +291,9 @@ func (v *VirtletManager) ImageStatus(ctx context.Context, in *kubeapi.ImageStatu
 }
 
 func (v *VirtletManager) PullImage(ctx context.Context, in *kubeapi.PullImageRequest) (*kubeapi.PullImageResponse, error) {
-	var name string
-	if in.Image.Image != nil {
-		name = *in.Image.Image
+	name := in.GetImage().GetImage()
+	if name != "" {
+		name = strings.Split(name, ":")[0]
 	}
 
 	filepath, err := v.libvirtImageTool.PullImage(name)
