@@ -249,13 +249,13 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 		name = uuid
 	}
 
-	if in.Config.Linux != nil && in.Config.Linux.Resources != nil && in.Config.Linux.Resources.MemoryLimitInBytes != nil {
+	if in.Config.Linux != nil && in.Config.Linux.Resources != nil && in.Config.Linux.Resources.MemoryLimitInBytes != nil && *in.Config.Linux.Resources.MemoryLimitInBytes > 0 {
 		memory = *in.Config.Linux.Resources.MemoryLimitInBytes
 	} else {
 		memory = defaultMemory
 	}
 
-	if in.Config.Linux != nil && in.Config.Linux.Resources != nil && in.Config.Linux.Resources.CpuPeriod != nil {
+	if in.Config.Linux != nil && in.Config.Linux.Resources != nil && in.Config.Linux.Resources.CpuPeriod != nil && *in.Config.Linux.Resources.CpuPeriod > 0 {
 		vcpu = *in.Config.Linux.Resources.CpuPeriod
 	} else {
 		vcpu = defaultVcpu
