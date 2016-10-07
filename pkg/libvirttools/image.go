@@ -70,7 +70,7 @@ func NewImageTool(conn C.virConnectPtr, poolName string, storageBackendName stri
 	}, nil
 }
 
-func (i *ImageTool) ListImages() (*kubeapi.ListImagesResponse, error) {
+func (i *ImageTool) ListImages() ([]*kubeapi.Image, error) {
 	var cList *C.virStorageVolPtr
 	count := C.virStoragePoolListAllVolumes(i.pool, (**C.virStorageVolPtr)(&cList), 0)
 	if count < 0 {
@@ -100,8 +100,7 @@ func (i *ImageTool) ListImages() (*kubeapi.ListImagesResponse, error) {
 		})
 	}
 
-	response := &kubeapi.ListImagesResponse{Images: images}
-	return response, nil
+	return images, nil
 }
 
 func (i *ImageTool) ImageStatus(name string) (*kubeapi.Image, error) {
