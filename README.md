@@ -63,19 +63,13 @@ Now you can follow instructions from next section.
 
 ### Kubernetes environment
 
-Then please go to the sources of Kubernetes:
+Minimal supported by Virtlet revision of Kubernetes should be based on master branch containing all changes at last up to Thu Sep 9 2016.
+It is assummed that Virtlet master branch should be working correctly with up to date master branch of Kubernetes.
+
+Assuming standard configuration for Kubernetes sources location, use following commands:
 
 ```sh
 cd $GOPATH/k8s.io/kubernetes
-```
-
-You will need to checkout the following [branch from fork](https://github.com/nhlfr/kubernetes/tree/syncpod-virtlet).
-It contains the needed codebase which is still in review in upstream. As soon as these
-commits will be merged, we will suggest you to use upstream Kubernetes code.
-
-After that, you can run a local cluster which will talk to Virtlet:
-
-```sh
 export KUBERNETES_PROVIDER=local
 export CONTAINER_RUNTIME_ENDPOINT=/run/virtlet.sock
 ./hack/local-up-cluster.sh
