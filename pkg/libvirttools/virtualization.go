@@ -40,7 +40,6 @@ import (
 
 const (
 	defaultMemory = 1024
-	defaultVcpu   = 1
 )
 
 type Drive struct {
@@ -173,7 +172,7 @@ func (v *VirtualizationTool) processVolumes(containerName string, mounts []*kube
 	return domXML, nil
 }
 
-func generateDomXML(name string, memory int64, uuid string, vcpu int64, imageFilepath string) string {
+func generateDomXML(name string, memory int64, uuid string, cpuNum int, cpuShare int64, cpuPeriod int64, cpuQuota int64, imageFilepath string) string {
 	domXML := `
 <domain type='kvm'>
     <name>%s</name>
@@ -183,6 +182,11 @@ func generateDomXML(name string, memory int64, uuid string, vcpu int64, imageFil
         <acpi/><apic/>
     </features>
     <vcpu>%d</vcpu>
+    <cputune>
+        <shares>%d</shares>
+        <period>%d</period>
+        <quota>%d</quota>
+    </cputune>
     <os>
         <type>hvm</type>
         <boot dev='hd'/>
@@ -211,7 +215,7 @@ func generateDomXML(name string, memory int64, uuid string, vcpu int64, imageFil
         </video>
     </devices>
 </domain>`
-	return fmt.Sprintf(domXML, name, memory, uuid, vcpu, imageFilepath)
+	return fmt.Sprintf(domXML, name, memory, uuid, cpuNum, cpuShare, cpuPeriod, cpuQuota, imageFilepath)
 }
 
 type VirtualizationTool struct {
@@ -251,12 +255,17 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 		memory = defaultMemory
 	}
 
-	vcpu := config.GetLinux().GetResources().GetCpuPeriod()
-	if vcpu == 0 {
-		vcpu = defaultVcpu
+	cpuNum, err := utils.GetvCPUsNum()
+	if err != nil {
+		return "", err
 	}
 
-	domXML := generateDomXML(name, memory, uuid, vcpu, imageFilepath)
+	cpuShares := config.GetLinux().GetResources().GetCpuShares()
+	cpuPeriod := config.GetLinux().GetResources().GetCpuPeriod()
+	cpuQuota := config.GetLinux().GetResources().GetCpuQuota()
+
+
+	domXML := generateDomXML(name, memory, uuid, cpuNum, cpuShares, cpuPeriod, cpuQuota, imageFilepath)
 	domXML, err = v.processVolumes(name, in.Config.Mounts, domXML)
 	if err != nil {
 		return "", err
