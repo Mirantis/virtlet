@@ -7,6 +7,7 @@ RUN apt-get update \
 	&& apt-get clean
 RUN add-apt-repository ppa:ubuntu-lxc/lxd-stable
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y  \
+		git \
 		golang \
 		make \
 		autoconf \
@@ -23,6 +24,8 @@ ENV PATH $GOPATH/bin:/usr/local/go/bin:$PATH
 
 RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" && chmod -R 777 "$GOPATH"
 WORKDIR $GOPATH
+
+RUN go get github.com/LK4D4/vndr
 
 RUN mkdir -p /go/src/github.com/Mirantis/virtlet
 COPY . /go/src/github.com/Mirantis/virtlet
