@@ -241,7 +241,7 @@ func NewVirtualizationTool(conn C.virConnectPtr, poolName string, storageBackend
 	return &VirtualizationTool{conn: conn, volumeStorage: storageBackend, volumePool: pool, volumePoolName: poolName}, nil
 }
 
-func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest, imageFilepath string) (string, error) {
+func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, in *kubeapi.CreateContainerRequest, imageFilepath string) (string, error) {
 	uuid, err := utils.NewUuid()
 	if err != nil {
 		return "", err
@@ -268,6 +268,8 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 		}
 
 	}
+
+	boltClient.SetContainer(uuid, in.GetPodSandboxId(), config.GetImage().GetImage(), config.Labels, config.Annotations)
 
 	memory := config.GetLinux().GetResources().GetMemoryLimitInBytes()
 	if memory == 0 {
@@ -416,31 +418,39 @@ func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, fi
 	for _, domain := range domains {
 		id := C.GoString(C.virDomainGetName(domain))
 
+		containerInfo, err := boltClient.GetContainerInfo(id)
+		if err != nil {
+			return nil, err
+		}
+
+		podSandboxId := containerInfo.SandboxId
+
 		if status := C.virDomainGetInfo(domain, &domainInfo); status < 0 {
 			return nil, GetLastError()
 		}
-
-		containerState := libvirtToKubeState(domainInfo)
 
 		metadata := &kubeapi.ContainerMetadata{
 			Name: &id,
 		}
 
-		labels, err := boltClient.GetLabels(id)
-		if err != nil {
-			return nil, err
-		}
-		annotations, err := boltClient.GetAnnotations(id)
-		if err != nil {
-			return nil, err
-		}
+		image := &kubeapi.ImageSpec{Image: &containerInfo.Image}
+
+		imageRef := containerInfo.Image
+
+		containerState := libvirtToKubeState(domainInfo)
+
+		createdAt := containerInfo.CreatedAt
 
 		container := &kubeapi.Container{
-			Id:          &id,
-			State:       &containerState,
-			Metadata:    metadata,
-			Labels:      labels,
-			Annotations: annotations,
+			Id:           &id,
+			PodSandboxId: &podSandboxId,
+			Metadata:     metadata,
+			Image:        image,
+			ImageRef:     &imageRef,
+			State:        &containerState,
+			CreatedAt:    &createdAt,
+			Labels:       containerInfo.Labels,
+			Annotations:  containerInfo.Annotations,
 		}
 
 		if filterContainer(container, filter) {

@@ -19,44 +19,32 @@ package bolttools
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"time"
 
 	"github.com/boltdb/bolt"
 )
 
-func (b *BoltClient) SetLabels(containerId string, labels map[string]string) error {
+type ContainerInfo struct {
+	CreatedAt   int64
+	SandboxId   string
+	Image       string
+	Labels      map[string]string
+	Annotations map[string]string
+}
+
+func (b *BoltClient) SetContainer(containerId, sandboxId, image string, labels, annotations map[string]string) error {
 	strLabels, err := json.Marshal(labels)
 	if err != nil {
 		return err
 	}
 
-	err = b.db.Batch(func(tx *bolt.Tx) error {
-		parentBucket, err := tx.CreateBucketIfNotExists([]byte("virtualization"))
-		if err != nil {
-			return err
-		}
-
-		bucket, err := parentBucket.CreateBucketIfNotExists([]byte(containerId))
-		if err != nil {
-			return err
-		}
-
-		if err := bucket.Put([]byte("labels"), []byte(strLabels)); err != nil {
-			return err
-		}
-
-		return nil
-	})
-
-	return err
-}
-
-func (b *BoltClient) SetAnnotations(containerId string, annotations map[string]string) error {
 	strAnnotations, err := json.Marshal(annotations)
 	if err != nil {
 		return err
 	}
 
-	err = b.db.Batch(func(tx *bolt.Tx) error {
+	err = b.db.Update(func(tx *bolt.Tx) error {
 		parentBucket, err := tx.CreateBucketIfNotExists([]byte("virtualization"))
 		if err != nil {
 			return err
@@ -64,6 +52,22 @@ func (b *BoltClient) SetAnnotations(containerId string, annotations map[string]s
 
 		bucket, err := parentBucket.CreateBucketIfNotExists([]byte(containerId))
 		if err != nil {
+			return err
+		}
+
+		if err := bucket.Put([]byte("createdAt"), []byte(strconv.FormatInt(time.Now().Unix(), 10))); err != nil {
+			return err
+		}
+
+		if err := bucket.Put([]byte("sandboxId"), []byte(sandboxId)); err != nil {
+			return err
+		}
+
+		if err := bucket.Put([]byte("image"), []byte(image)); err != nil {
+			return err
+		}
+
+		if err := bucket.Put([]byte("labels"), []byte(strLabels)); err != nil {
 			return err
 		}
 
@@ -77,10 +81,10 @@ func (b *BoltClient) SetAnnotations(containerId string, annotations map[string]s
 	return err
 }
 
-func (b *BoltClient) GetLabels(containerId string) (map[string]string, error) {
-	var labels map[string]string
+func (b *BoltClient) GetContainerInfo(containerId string) (*ContainerInfo, error) {
+	var containerInfo *ContainerInfo
 
-	err := b.db.View(func(tx *bolt.Tx) error {
+	if err := b.db.View(func(tx *bolt.Tx) error {
 		parentBucket := tx.Bucket([]byte("virtualization"))
 		if parentBucket == nil {
 			return fmt.Errorf("Bucket 'virtualization' doesn't exist")
@@ -91,46 +95,58 @@ func (b *BoltClient) GetLabels(containerId string) (map[string]string, error) {
 			return fmt.Errorf("Bucket '%s' doesn't exist", containerId)
 		}
 
+		strCreatedAt, err := getString(bucket, "createdAt")
+		if err != nil {
+			return err
+		}
+
+		createdAt, err := strconv.ParseInt(strCreatedAt, 10, 64)
+		if err != nil {
+			return err
+		}
+
+		sandboxId, err := getString(bucket, "sandboxId")
+		if err != nil {
+			return err
+		}
+
+		image, err := getString(bucket, "image")
+		if err != nil {
+			return err
+		}
+
 		byteLabels, err := get(bucket, []byte("labels"))
 		if err != nil {
 			return err
 		}
 
+		var labels map[string]string
 		if err := json.Unmarshal(byteLabels, &labels); err != nil {
 			return err
 		}
 
-		return nil
-	})
-
-	return labels, err
-}
-
-func (b *BoltClient) GetAnnotations(containerId string) (map[string]string, error) {
-	var annotations map[string]string
-
-	err := b.db.View(func(tx *bolt.Tx) error {
-		parentBucket := tx.Bucket([]byte("virtualization"))
-		if parentBucket == nil {
-			return fmt.Errorf("Bucket 'virtualization' doesn't exist")
-		}
-
-		bucket := parentBucket.Bucket([]byte(containerId))
-		if b == nil {
-			return fmt.Errorf("Bucket '%s' doesn't exist", containerId)
-		}
-
-		byteAnnotations, err := get(bucket, []byte("labels"))
+		byteAnnotations, err := get(bucket, []byte("annotations"))
 		if err != nil {
 			return err
 		}
 
+		var annotations map[string]string
 		if err := json.Unmarshal(byteAnnotations, &annotations); err != nil {
 			return err
 		}
 
-		return nil
-	})
+		containerInfo = &ContainerInfo{
+			CreatedAt:   createdAt,
+			SandboxId:   sandboxId,
+			Image:       image,
+			Labels:      labels,
+			Annotations: annotations,
+		}
 
-	return annotations, err
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return containerInfo, nil
 }

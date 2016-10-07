@@ -17,8 +17,8 @@ limitations under the License.
 package utils
 
 import (
-	"os"
 	"io/ioutil"
+	"os"
 	"regexp"
 )
 

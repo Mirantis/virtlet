@@ -24,24 +24,45 @@ import (
 	"github.com/boltdb/bolt"
 )
 
-func TestSetLabels(t *testing.T) {
+func TestSetContainer(t *testing.T) {
 	tests := []struct {
-		containerId  string
-		labels       map[string]string
-		expectedJson string
+		containerId         string
+		sandboxId           string
+		image               string
+		labels              map[string]string
+		annotations         map[string]string
+		expectedLabels      string
+		expectedAnnotations string
 	}{
 		{
-			containerId: "571454b9-89d4-4a32-bc2c-9c0c44492b3c",
+			containerId: "5d5fcd9d-c964-4db6-a86a-c92a6951275d",
+			sandboxId:   "39f56df5-6c8a-44e3-8ae3-2736549637a9",
+			image:       "cirros",
 			labels: map[string]string{
 				"foo":  "bar",
 				"fizz": "buzz",
 			},
-			expectedJson: "{\"fizz\":\"buzz\",\"foo\":\"bar\"}",
+			annotations: map[string]string{
+				"fizz": "buzz",
+				"virt": "let",
+			},
+			expectedLabels:      "{\"fizz\":\"buzz\",\"foo\":\"bar\"}",
+			expectedAnnotations: "{\"fizz\":\"buzz\",\"virt\":\"let\"}",
 		},
 		{
-			containerId:  "8808803f-2957-43f7-a5d1-4b9bf0d9f20c",
-			labels:       nil,
-			expectedJson: "null",
+			containerId: "a4ff0553-dbbd-4114-a9b6-8522eb66ef91",
+			sandboxId:   "f9aa2197-2b77-4495-90f0-167963b07eb3",
+			image:       "fedora",
+			labels: map[string]string{
+				"test":  "testing",
+				"hello": "world",
+			},
+			annotations: map[string]string{
+				"hello": "world",
+				"test":  "testing",
+			},
+			expectedLabels:      "{\"hello\":\"world\",\"test\":\"testing\"}",
+			expectedAnnotations: "{\"hello\":\"world\",\"test\":\"testing\"}",
 		},
 	}
 
@@ -51,8 +72,7 @@ func TestSetLabels(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = b.SetLabels(tc.containerId, tc.labels)
-		if err != nil {
+		if err := b.SetContainer(tc.containerId, tc.sandboxId, tc.image, tc.labels, tc.annotations); err != nil {
 			t.Fatal(err)
 		}
 
@@ -67,13 +87,40 @@ func TestSetLabels(t *testing.T) {
 				return fmt.Errorf("Bucket '%s' doesn't exist", tc.containerId)
 			}
 
+			sandboxId, err := getString(bucket, "sandboxId")
+			if err != nil {
+				return err
+			}
+
+			if sandboxId != tc.sandboxId {
+				t.Errorf("Expected %s, instead got %s", tc.sandboxId, sandboxId)
+			}
+
+			image, err := getString(bucket, "image")
+			if err != nil {
+				return err
+			}
+
+			if image != tc.image {
+				t.Errorf("Expected %s, instead got %s", tc.image, image)
+			}
+
 			labels, err := getString(bucket, "labels")
 			if err != nil {
 				return err
 			}
 
-			if labels != tc.expectedJson {
-				t.Errorf("Expected %s, instead got %s", tc.expectedJson, labels)
+			if labels != tc.expectedLabels {
+				t.Errorf("Expected %s, instead got %s", tc.expectedLabels, labels)
+			}
+
+			annotations, err := getString(bucket, "annotations")
+			if err != nil {
+				return err
+			}
+
+			if annotations != tc.expectedAnnotations {
+				t.Errorf("Expected %s, instead got %s", tc.expectedAnnotations, annotations)
 			}
 
 			return nil
@@ -83,21 +130,39 @@ func TestSetLabels(t *testing.T) {
 	}
 }
 
-func TestGetLabels(t *testing.T) {
+func TestGetContainerInfo(t *testing.T) {
 	tests := []struct {
 		containerId string
+		sandboxId   string
+		image       string
 		labels      map[string]string
+		annotations map[string]string
 	}{
 		{
-			containerId: "6c566b6d-73ed-4a45-b09b-abe89d116174",
+			containerId: "e05d74ac-6d22-406a-ab1c-5e99c0d6529f",
+			sandboxId:   "92ac4008-bc31-457a-b598-735d9970515b",
+			image:       "cirros",
 			labels: map[string]string{
+				"foo":  "bar",
+				"fizz": "buzz",
+			},
+			annotations: map[string]string{
 				"fizz": "buzz",
 				"virt": "let",
 			},
 		},
 		{
-			containerId: "802d756b-efab-4a06-9f7a-a3a207618e5c",
-			labels:      nil,
+			containerId: "369f2409-8272-491a-8731-c7e4711ac93d",
+			sandboxId:   "a417cbea-306a-41a4-aa3b-eae8d68e43ac",
+			image:       "fedora",
+			labels: map[string]string{
+				"test":  "testing",
+				"hello": "world",
+			},
+			annotations: map[string]string{
+				"hello": "world",
+				"test":  "testing",
+			},
 		},
 	}
 
@@ -107,18 +172,29 @@ func TestGetLabels(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = b.SetLabels(tc.containerId, tc.labels)
+		if err := b.SetContainer(tc.containerId, tc.sandboxId, tc.image, tc.labels, tc.annotations); err != nil {
+			t.Fatal(err)
+		}
+
+		containerInfo, err := b.GetContainerInfo(tc.containerId)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		labels, err := b.GetLabels(tc.containerId)
-		if err != nil {
-			t.Fatal(err)
+		if containerInfo.SandboxId != tc.sandboxId {
+			t.Errorf("Expected %s, instead got %s", tc.sandboxId, containerInfo.SandboxId)
 		}
 
-		if !reflect.DeepEqual(labels, tc.labels) {
-			t.Errorf("Expected %#v, instead got %#v", tc.labels, labels)
+		if containerInfo.Image != tc.image {
+			t.Errorf("Expected %s, instead got %s", tc.image, containerInfo.Image)
+		}
+
+		if !reflect.DeepEqual(containerInfo.Labels, tc.labels) {
+			t.Errorf("Expected %#v, instead got %#v", tc.labels, containerInfo.Labels)
+		}
+
+		if !reflect.DeepEqual(containerInfo.Annotations, tc.annotations) {
+			t.Errorf("Expected %#v, instead got %#v", tc.annotations, containerInfo.Annotations)
 		}
 	}
 }
