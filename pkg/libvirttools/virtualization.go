@@ -27,8 +27,8 @@ import "C"
 import (
 	"fmt"
 	"reflect"
-	"unsafe"
 	"strings"
+	"unsafe"
 
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
@@ -141,7 +141,7 @@ func (v *VirtualizationTool) processVolumes(containerName string, mounts []*kube
 
 	for _, mount := range mounts {
 		volumeName := containerName + "_" + strings.Replace(mount.GetContainerPath(), "/", "_", -1)
-		if mount.HostPath != nil {
+		if mount.GetHostPath() != "" {
 			vol, err := v.volumeStorage.CreateVol(v.volumePool, volumeName, defaultCapacity, defaultCapacityUnit)
 			if err != nil {
 				return domXML, err
@@ -167,7 +167,6 @@ func (v *VirtualizationTool) processVolumes(containerName string, mounts []*kube
 				return copyDomXML, err
 			}
 			domXML = string(outArr[:])
-			glog.Infof("Creating domain:\n%s", domXML)
 			break
 		}
 	}
@@ -236,30 +235,24 @@ func NewVirtualizationTool(conn C.virConnectPtr, poolName string, storageBackend
 }
 
 func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest, imageFilepath string) (string, error) {
-	var name string
-	var memory int64
-	var vcpu int64
-
 	uuid, err := utils.NewUuid()
 	if err != nil {
 		return "", err
 	}
 
-	if in.Config.Metadata != nil && in.Config.Metadata.Name != nil {
-		name = *in.Config.Metadata.Name
-	} else {
+	config := in.GetConfig()
+	name := config.GetMetadata().GetName()
+	if name == "" {
 		name = uuid
 	}
 
-	if in.Config.Linux != nil && in.Config.Linux.Resources != nil && in.Config.Linux.Resources.MemoryLimitInBytes != nil && *in.Config.Linux.Resources.MemoryLimitInBytes > 0 {
-		memory = *in.Config.Linux.Resources.MemoryLimitInBytes
-	} else {
+	memory := config.GetLinux().GetResources().GetMemoryLimitInBytes()
+	if memory == 0 {
 		memory = defaultMemory
 	}
 
-	if in.Config.Linux != nil && in.Config.Linux.Resources != nil && in.Config.Linux.Resources.CpuPeriod != nil && *in.Config.Linux.Resources.CpuPeriod > 0 {
-		vcpu = *in.Config.Linux.Resources.CpuPeriod
-	} else {
+	vcpu := config.GetLinux().GetResources().GetCpuPeriod()
+	if vcpu == 0 {
 		vcpu = defaultVcpu
 	}
 
@@ -269,6 +262,7 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 		return "", err
 	}
 
+	glog.Infof("Creating domain:\n%s", domXML)
 	cDomXML := C.CString(domXML)
 	defer C.free(unsafe.Pointer(cDomXML))
 
@@ -350,10 +344,7 @@ func libvirtToKubeState(domainInfo C.virDomainInfo) kubeapi.ContainerState {
 }
 
 func filterContainer(container *kubeapi.Container, filter *kubeapi.ContainerFilter) bool {
-	if filter.State != nil && *container.State != *filter.State {
-		return false
-	}
-	return true
+	return container.GetState() == filter.GetState()
 }
 
 func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, filter *kubeapi.ContainerFilter) ([]*kubeapi.Container, error) {

@@ -65,5 +65,6 @@ func DownloadFile(fileUrl string) (string, string, error) {
 	if err != nil {
 		return "", "", err
 	}
+	glog.Infof("Data from url %s saved in %s", fileUrl, filepath)
 	return filepath, shortName, nil
 }
