@@ -150,3 +150,18 @@ func (b *BoltClient) GetContainerInfo(containerId string) (*ContainerInfo, error
 
 	return containerInfo, nil
 }
+
+func (b *BoltClient) RemoveContainer(containerId string) error {
+	return b.db.Batch(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte("virtualization"))
+		if bucket == nil {
+			return fmt.Errorf("Bucket 'virtualization' doesn't exist")
+		}
+
+		if err := bucket.DeleteBucket([]byte(containerId)); err != nil {
+			return err
+		}
+
+		return nil
+	})
+}

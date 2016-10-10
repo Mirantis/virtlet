@@ -217,6 +217,11 @@ func (v *VirtletManager) RemoveContainer(ctx context.Context, in *kubeapi.Remove
 		glog.Errorf("Error when removing container '%s': %#v", containerId, err)
 		return nil, err
 	}
+
+	if err := v.boltClient.RemoveContainer(containerId); err != nil {
+		return nil, err
+	}
+
 	response := &kubeapi.RemoveContainerResponse{}
 	return response, nil
 }

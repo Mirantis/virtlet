@@ -198,3 +198,55 @@ func TestGetContainerInfo(t *testing.T) {
 		}
 	}
 }
+
+func TestRemoveContainer(t *testing.T) {
+	tests := []struct {
+		containerId string
+		sandboxId   string
+		image       string
+		labels      map[string]string
+		annotations map[string]string
+	}{
+		{
+			containerId: "93bee424-56cb-4a83-93cf-96e825c54c87",
+			sandboxId:   "721a5297-200e-4b1e-8495-3065404cedbc",
+			image:       "cirros",
+			labels: map[string]string{
+				"foo":  "bar",
+				"fizz": "buzz",
+			},
+			annotations: map[string]string{
+				"fizz": "buzz",
+				"virt": "let",
+			},
+		},
+		{
+			containerId: "7547f814-3492-4434-bbd7-50f6de170559",
+			sandboxId:   "78986a75-0b23-46f0-b317-652c2ba22f08",
+			image:       "fedora",
+			labels: map[string]string{
+				"foo":  "bar",
+				"fizz": "buzz",
+			},
+			annotations: map[string]string{
+				"fizz": "buzz",
+				"virt": "let",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		b, err := NewFakeBoltClient()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := b.SetContainer(tc.containerId, tc.sandboxId, tc.image, tc.labels, tc.annotations); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := b.RemoveContainer(tc.containerId); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
