@@ -1,32 +1,46 @@
 hash: f9d8b64ab5e46d25b3ee7a894e1d5902dc2c25744dbce0299dc6ab5ecda448b8
-updated: 2016-09-26T19:24:59.827970432+02:00
+updated: 2016-10-10T15:44:26.637306462+02:00
 imports:
 - name: github.com/boltdb/bolt
-  version: fff57c100f4dea1905678da7e90d92429dff2904
-- name: github.com/coreos/etcd
-  version: e1efdd591e0aa7dfeebb03435703661d4e360e95
-  subpackages:
-  - client
-  - pkg/pathutil
-  - pkg/types
+  version: dfb21201d9270c1082d5fb0f07f500311ff72f18
 - name: github.com/gogo/protobuf
-  version: 0394392b81058a7f972029451f06e528bb18ba50
+  version: e18d7aa8f8c624c915db340349aad4c49b10d173
   subpackages:
+  - gogoproto
+  - plugin/compare
+  - plugin/defaultcheck
+  - plugin/description
+  - plugin/embedcheck
+  - plugin/enumstringer
+  - plugin/equal
+  - plugin/face
+  - plugin/gostring
+  - plugin/marshalto
+  - plugin/oneofcheck
+  - plugin/populate
+  - plugin/size
+  - plugin/stringer
+  - plugin/testgen
+  - plugin/union
+  - plugin/unmarshal
   - proto
+  - protoc-gen-gogo/descriptor
+  - protoc-gen-gogo/generator
+  - protoc-gen-gogo/grpc
+  - protoc-gen-gogo/plugin
+  - sortkeys
+  - vanity
+  - vanity/command
 - name: github.com/golang/glog
   version: 23def4e6c14b4da8ac2ed8007337bc5eb5007998
 - name: github.com/golang/protobuf
-  version: 1f49d83d9aa00e6ce4fc8258c71cc7786aec968a
+  version: df1d3ca07d2d07bba352d5b73c4313b4e2a6203e
   subpackages:
   - proto
 - name: github.com/nu7hatch/gouuid
   version: 179d4d0c4d8d407a32af483c2354df1d2c91e6c3
-- name: github.com/ugorji/go
-  version: b7eff9abce531d6aeda923e759ae668e56601d21
-  subpackages:
-  - codec
 - name: golang.org/x/net
-  version: f09c4662a0bd6bd8943ac7b4931e185df9471da4
+  version: e90d6d0afc4c315a0d87a568ae68577cc15149a0
   subpackages:
   - context
   - http2
@@ -40,7 +54,7 @@ imports:
   subpackages:
   - unix
 - name: google.golang.org/grpc
-  version: 71d2ea4f75286a63b606aca2422cd17ff37fd5b8
+  version: 231b4cfea0e79843053a33f5fe90bd4d84b23cd3
   subpackages:
   - codes
   - credentials
@@ -51,7 +65,7 @@ imports:
   - peer
   - transport
 - name: k8s.io/kubernetes
-  version: 2a740120529279aa69e683b30be209b7550f52bc
+  version: 074891749bd41e3190e265aeb91cbc5d9c755a78
   repo: git@github.com:kubernetes/kubernetes.git
   vcs: git
   subpackages:
