@@ -175,16 +175,9 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 
 	// TODO: we should not pass whole "in" to CreateContainer - we should pass there only needed info for CreateContainer
 	// without whole data container
-	uuid, err := v.libvirtVirtualizationTool.CreateContainer(in, imageFilepath)
+	uuid, err := v.libvirtVirtualizationTool.CreateContainer(v.boltClient, in, imageFilepath)
 	if err != nil {
 		glog.Errorf("Error when creating container %s: %#v", name, err)
-		return nil, err
-	}
-
-	if err := v.boltClient.SetLabels(name, config.GetLabels()); err != nil {
-		return nil, err
-	}
-	if err := v.boltClient.SetAnnotations(name, config.GetAnnotations()); err != nil {
 		return nil, err
 	}
 
@@ -224,6 +217,11 @@ func (v *VirtletManager) RemoveContainer(ctx context.Context, in *kubeapi.Remove
 		glog.Errorf("Error when removing container '%s': %#v", containerId, err)
 		return nil, err
 	}
+
+	if err := v.boltClient.RemoveContainer(containerId); err != nil {
+		return nil, err
+	}
+
 	response := &kubeapi.RemoveContainerResponse{}
 	return response, nil
 }
@@ -246,20 +244,6 @@ func (v *VirtletManager) ContainerStatus(ctx context.Context, in *kubeapi.Contai
 		glog.Errorf("Error when getting container '%s' status: %#v", containerId, err)
 		return nil, err
 	}
-
-	labels, err := v.boltClient.GetLabels(containerId)
-	if err != nil {
-		glog.Errorf("Error when getting container '%s' labels: %#v", containerId, err)
-		return nil, err
-	}
-	status.Labels = labels
-
-	annotations, err := v.boltClient.GetAnnotations(containerId)
-	if err != nil {
-		glog.Errorf("Error when getting container '%s' annotations: %#v", containerId, err)
-		return nil, err
-	}
-	status.Annotations = annotations
 
 	response := &kubeapi.ContainerStatusResponse{Status: status}
 	return response, nil

@@ -85,7 +85,7 @@ func NewServerHandlerTransport(w http.ResponseWriter, r *http.Request) (ServerTr
 	if v := r.Header.Get("grpc-timeout"); v != "" {
 		to, err := decodeTimeout(v)
 		if err != nil {
-			return nil, streamErrorf(codes.Internal, "malformed time-out: %v", err)
+			return nil, StreamErrorf(codes.Internal, "malformed time-out: %v", err)
 		}
 		st.timeoutSet = true
 		st.timeout = to
@@ -393,5 +393,5 @@ func mapRecvMsgError(err error) error {
 			}
 		}
 	}
-	return connectionErrorf(true, err, err.Error())
+	return ConnectionError{Desc: err.Error()}
 }

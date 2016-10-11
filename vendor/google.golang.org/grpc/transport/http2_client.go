@@ -114,42 +114,14 @@ func dial(fn func(context.Context, string) (net.Conn, error), ctx context.Contex
 	return dialContext(ctx, "tcp", addr)
 }
 
-func isTemporary(err error) bool {
-	switch err {
-	case io.EOF:
-		// Connection closures may be resolved upon retry, and are thus
-		// treated as temporary.
-		return true
-	case context.DeadlineExceeded:
-		// In Go 1.7, context.DeadlineExceeded implements Timeout(), and this
-		// special case is not needed. Until then, we need to keep this
-		// clause.
-		return true
-	}
-
-	switch err := err.(type) {
-	case interface {
-		Temporary() bool
-	}:
-		return err.Temporary()
-	case interface {
-		Timeout() bool
-	}:
-		// Timeouts may be resolved upon retry, and are thus treated as
-		// temporary.
-		return err.Timeout()
-	}
-	return false
-}
-
 // newHTTP2Client constructs a connected ClientTransport to addr based on HTTP2
 // and starts to receive messages on it. Non-nil error returns if construction
 // fails.
 func newHTTP2Client(ctx context.Context, addr string, opts ConnectOptions) (_ ClientTransport, err error) {
 	scheme := "http"
-	conn, err := dial(opts.Dialer, ctx, addr)
-	if err != nil {
-		return nil, connectionErrorf(true, err, "transport: %v", err)
+	conn, connErr := dial(opts.Dialer, ctx, addr)
+	if connErr != nil {
+		return nil, ConnectionErrorf(true, connErr, "transport: %v", connErr)
 	}
 	// Any further errors will close the underlying connection
 	defer func(conn net.Conn) {
@@ -160,13 +132,12 @@ func newHTTP2Client(ctx context.Context, addr string, opts ConnectOptions) (_ Cl
 	var authInfo credentials.AuthInfo
 	if creds := opts.TransportCredentials; creds != nil {
 		scheme = "https"
-		conn, authInfo, err = creds.ClientHandshake(ctx, addr, conn)
-		if err != nil {
-			// Credentials handshake errors are typically considered permanent
-			// to avoid retrying on e.g. bad certificates.
-			temp := isTemporary(err)
-			return nil, connectionErrorf(temp, err, "transport: %v", err)
-		}
+		conn, authInfo, connErr = creds.ClientHandshake(ctx, addr, conn)
+	}
+	if connErr != nil {
+		// Credentials handshake error is not a temporary error (unless the error
+		// was the connection closing).
+		return nil, ConnectionErrorf(connErr == io.EOF, connErr, "transport: %v", connErr)
 	}
 	ua := primaryUA
 	if opts.UserAgent != "" {
@@ -205,11 +176,11 @@ func newHTTP2Client(ctx context.Context, addr string, opts ConnectOptions) (_ Cl
 	n, err := t.conn.Write(clientPreface)
 	if err != nil {
 		t.Close()
-		return nil, connectionErrorf(true, err, "transport: %v", err)
+		return nil, ConnectionErrorf(true, err, "transport: %v", err)
 	}
 	if n != len(clientPreface) {
 		t.Close()
-		return nil, connectionErrorf(true, err, "transport: preface mismatch, wrote %d bytes; want %d", n, len(clientPreface))
+		return nil, ConnectionErrorf(true, err, "transport: preface mismatch, wrote %d bytes; want %d", n, len(clientPreface))
 	}
 	if initialWindowSize != defaultWindowSize {
 		err = t.framer.writeSettings(true, http2.Setting{
@@ -221,13 +192,13 @@ func newHTTP2Client(ctx context.Context, addr string, opts ConnectOptions) (_ Cl
 	}
 	if err != nil {
 		t.Close()
-		return nil, connectionErrorf(true, err, "transport: %v", err)
+		return nil, ConnectionErrorf(true, err, "transport: %v", err)
 	}
 	// Adjust the connection flow control window if needed.
 	if delta := uint32(initialConnWindowSize - defaultWindowSize); delta > 0 {
 		if err := t.framer.writeWindowUpdate(true, 0, delta); err != nil {
 			t.Close()
-			return nil, connectionErrorf(true, err, "transport: %v", err)
+			return nil, ConnectionErrorf(true, err, "transport: %v", err)
 		}
 	}
 	go t.controller()
@@ -252,10 +223,8 @@ func (t *http2Client) newStream(ctx context.Context, callHdr *CallHdr) *Stream {
 	s.windowHandler = func(n int) {
 		t.updateWindow(s, uint32(n))
 	}
-	// The client side stream context should have exactly the same life cycle with the user provided context.
-	// That means, s.ctx should be read-only. And s.ctx is done iff ctx is done.
-	// So we use the original context here instead of creating a copy.
-	s.ctx = ctx
+	// Make a stream be able to cancel the pending operations by itself.
+	s.ctx, s.cancel = context.WithCancel(ctx)
 	s.dec = &recvBufferReader{
 		ctx:    s.ctx,
 		goAway: s.goAway,
@@ -297,12 +266,12 @@ func (t *http2Client) NewStream(ctx context.Context, callHdr *CallHdr) (_ *Strea
 		}
 		pos := strings.LastIndex(callHdr.Method, "/")
 		if pos == -1 {
-			return nil, streamErrorf(codes.InvalidArgument, "transport: malformed method name: %q", callHdr.Method)
+			return nil, StreamErrorf(codes.InvalidArgument, "transport: malformed method name: %q", callHdr.Method)
 		}
 		audience := "https://" + callHdr.Host + port + callHdr.Method[:pos]
 		data, err := c.GetRequestMetadata(ctx, audience)
 		if err != nil {
-			return nil, streamErrorf(codes.InvalidArgument, "transport: %v", err)
+			return nil, StreamErrorf(codes.InvalidArgument, "transport: %v", err)
 		}
 		for k, v := range data {
 			authData[k] = v
@@ -439,7 +408,7 @@ func (t *http2Client) NewStream(ctx context.Context, callHdr *CallHdr) (_ *Strea
 		}
 		if err != nil {
 			t.notifyError(err)
-			return nil, connectionErrorf(true, err, "transport: %v", err)
+			return nil, ConnectionErrorf(true, err, "transport: %v", err)
 		}
 	}
 	t.writableChan <- 0
@@ -485,7 +454,7 @@ func (t *http2Client) CloseStream(s *Stream, err error) {
 	}
 	s.state = streamDone
 	s.mu.Unlock()
-	if se, ok := err.(StreamError); ok && se.Code != codes.DeadlineExceeded {
+	if _, ok := err.(StreamError); ok {
 		t.controlBuf.put(&resetStream{s.id, http2.ErrCodeCancel})
 	}
 }
@@ -653,7 +622,7 @@ func (t *http2Client) Write(s *Stream, data []byte, opts *Options) error {
 		// invoked.
 		if err := t.framer.writeData(forceFlush, s.id, endStream, p); err != nil {
 			t.notifyError(err)
-			return connectionErrorf(true, err, "transport: %v", err)
+			return ConnectionErrorf(true, err, "transport: %v", err)
 		}
 		if t.framer.adjustNumWriters(-1) == 0 {
 			t.framer.flushWrite()
@@ -701,7 +670,7 @@ func (t *http2Client) updateWindow(s *Stream, n uint32) {
 func (t *http2Client) handleData(f *http2.DataFrame) {
 	size := len(f.Data())
 	if err := t.fc.onData(uint32(size)); err != nil {
-		t.notifyError(connectionErrorf(true, err, "%v", err))
+		t.notifyError(ConnectionErrorf(true, err, "%v", err))
 		return
 	}
 	// Select the right stream to dispatch.
@@ -807,7 +776,7 @@ func (t *http2Client) handleGoAway(f *http2.GoAwayFrame) {
 	if t.state == reachable || t.state == draining {
 		if f.LastStreamID > 0 && f.LastStreamID%2 != 1 {
 			t.mu.Unlock()
-			t.notifyError(connectionErrorf(true, nil, "received illegal http2 GOAWAY frame: stream ID %d is even", f.LastStreamID))
+			t.notifyError(ConnectionErrorf(true, nil, "received illegal http2 GOAWAY frame: stream ID %d is even", f.LastStreamID))
 			return
 		}
 		select {
@@ -816,7 +785,7 @@ func (t *http2Client) handleGoAway(f *http2.GoAwayFrame) {
 			// t.goAway has been closed (i.e.,multiple GoAways).
 			if id < f.LastStreamID {
 				t.mu.Unlock()
-				t.notifyError(connectionErrorf(true, nil, "received illegal http2 GOAWAY frame: previously recv GOAWAY frame with LastStramID %d, currently recv %d", id, f.LastStreamID))
+				t.notifyError(ConnectionErrorf(true, nil, "received illegal http2 GOAWAY frame: previously recv GOAWAY frame with LastStramID %d, currently recv %d", id, f.LastStreamID))
 				return
 			}
 			t.prevGoAwayID = id
@@ -854,12 +823,6 @@ func (t *http2Client) operateHeaders(frame *http2.MetaHeadersFrame) {
 		state.processHeaderField(hf)
 	}
 	if state.err != nil {
-		s.mu.Lock()
-		if !s.headerDone {
-			close(s.headerChan)
-			s.headerDone = true
-		}
-		s.mu.Unlock()
 		s.write(recvMsg{err: state.err})
 		// Something wrong. Stops reading even when there is remaining.
 		return
@@ -937,7 +900,7 @@ func (t *http2Client) reader() {
 				t.mu.Unlock()
 				if s != nil {
 					// use error detail to provide better err message
-					handleMalformedHTTP2(s, streamErrorf(http2ErrConvTab[se.Code], "%v", t.framer.errorDetail()))
+					handleMalformedHTTP2(s, StreamErrorf(http2ErrConvTab[se.Code], "%v", t.framer.errorDetail()))
 				}
 				continue
 			} else {
