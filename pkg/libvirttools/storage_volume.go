@@ -127,5 +127,5 @@ func RemoveVol(name string, pool C.virStoragePoolPtr) error {
 	if status := C.virStorageVolDelete(vol, 0); status != 0 {
 		return GetLastError()
 	}
-	return nil
+	return RemoveVol(name, pool)
 }
