@@ -4,4 +4,4 @@ if [ ! -f cpplint.py ]; then
 	curl -O https://raw.githubusercontent.com/google/styleguide/gh-pages/cpplint/cpplint.py
 fi
 chmod +x cpplint.py
-./cpplint.py --extensions=c,h --filter=-build/include,-whitespace/tab $(find . -regextype posix-egrep -regex "\./pkg.*\.(c|h)$")
+./cpplint.py --extensions=c,h --filter=-build/include,-whitespace/tab,-readability/casting $(find . -regextype posix-egrep -regex "\./pkg.*\.(c|h)$")

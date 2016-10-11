@@ -416,7 +416,10 @@ func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, fi
 	containers := make([]*kubeapi.Container, 0, count)
 
 	for _, domain := range domains {
-		id := C.GoString(C.virDomainGetName(domain))
+		id, err := v.GetDomainUUID(domain)
+		if err != nil {
+			return nil, err
+		}
 
 		containerInfo, err := boltClient.GetContainerInfo(id)
 		if err != nil {
