@@ -334,7 +334,7 @@ func (v *VirtualizationTool) GetDomainUUID(domain C.virDomainPtr) (string, error
 		return "", GetLastError()
 	}
 
-	return string(uuid[:]), nil
+	return string(uuid[:len(uuid)-1]), nil
 }
 
 func (v *VirtualizationTool) StartContainer(containerId string) error {
