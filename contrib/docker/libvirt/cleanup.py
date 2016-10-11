@@ -42,13 +42,15 @@ def undefine_domain(domain):
         sys.exit(1)
 
 
-def cleanup_volumes(conn, pool_name):
+def cleanup_volumes(conn):
     try:
-        pool = conn.storagePoolLookupByName(pool_name)
+        pool = conn.storagePoolLookupByName("default")
     except libvirt.libvirtError:
         return
 
     volumes = pool.listAllVolumes()
+
+    print("Cleaning up volumes")
 
     for volume in volumes:
         volume_name = volume.name()
@@ -57,15 +59,6 @@ def cleanup_volumes(conn, pool_name):
         if volume.delete() < 0:
             sys.stderr.write("Failed to remove volume %s\n" % volume_name)
             sys.exit(1)
-
-
-def cleanup_all_volumes(conn):
-    pools = ["default", "volume"]
-
-    print("Cleaning up volumes")
-
-    for pool_name in pools:
-        cleanup_volumes(conn, pool_name)
 
     print("All volumes cleaned")
 
