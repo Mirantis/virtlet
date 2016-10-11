@@ -126,7 +126,7 @@ var volXML string = `
     <target dev='vda' bus='virtio'/>
 </disk>`
 
-func (v *VirtualizationTool) processVolumes(containerName string, mounts []*kubeapi.Mount, domXML string) (string, error) {
+func (v *VirtualizationTool) createVolumes(containerName string, mounts []*kubeapi.Mount, domXML string) (string, error) {
 	copyDomXML := domXML
 	if len(mounts) == 0 {
 		return domXML, nil
@@ -141,7 +141,10 @@ func (v *VirtualizationTool) processVolumes(containerName string, mounts []*kube
 	for _, mount := range mounts {
 		volumeName := containerName + "_" + strings.Replace(mount.GetContainerPath(), "/", "_", -1)
 		if mount.GetHostPath() != "" {
-			vol, err := v.volumeStorage.CreateVol(v.volumePool, volumeName, defaultCapacity, defaultCapacityUnit)
+			vol, err := LookupVol(volumeName, v.volumePool)
+			if vol == nil {
+				vol, err = v.volumeStorage.CreateVol(v.volumePool, volumeName, defaultCapacity, defaultCapacityUnit)
+			}
 			if err != nil {
 				return domXML, err
 			}
@@ -266,7 +269,7 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 
 
 	domXML := generateDomXML(name, memory, uuid, cpuNum, cpuShares, cpuPeriod, cpuQuota, imageFilepath)
-	domXML, err = v.processVolumes(name, in.Config.Mounts, domXML)
+	domXML, err = v.createVolumes(name, in.Config.Mounts, domXML)
 	if err != nil {
 		return "", err
 	}
