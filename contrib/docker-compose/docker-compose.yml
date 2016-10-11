@@ -9,7 +9,7 @@ services:
     # network_mode: host
     restart: always
     environment:
-      - LIBVIRT_CLEANUP=""
+      - LIBVIRT_CLEANUP
     volumes:
       - /lib/modules:/lib/modules:ro
       - /run:/run
