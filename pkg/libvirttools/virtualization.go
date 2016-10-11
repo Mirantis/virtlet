@@ -252,14 +252,12 @@ func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, i
 	if name == "" {
 		name = uuid
 	} else {
-		//check whether the domain with such name already exists, need to stop&destroy&undefine it then
+		// check whether the domain with such name already exists, need to stop&destroy&undefine it then
 		domain, err := v.GetDomainByName(name)
 		if domain != nil {
 			if domainID, err := v.GetDomainUUID(domain); err == nil {
-				//TODO: This is temp workaround for returning existent domain on create container call to overcome SyncPod issues
-				return domainID, nil
-				//glog.Infof("Removing domain with name: %s and id: %s", name, domainID)
-				//v.RemoveContainer(domainID)
+				glog.Infof("Removing domain with name: %s and id: %s", name, domainID)
+				v.RemoveContainer(domainID)
 			} else {
 				glog.Errorf("Failed to get UUID for domain with name: %s due to %v", name, err)
 			}
