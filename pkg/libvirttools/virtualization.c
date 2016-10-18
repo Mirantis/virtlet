@@ -17,66 +17,49 @@ limitations under the License.
 #include <libvirt/libvirt.h>
 #include <libvirt/virterror.h>
 #include <stdlib.h>
+#include "alloc-util.h"
 #include "virtualization.h"
 
 int defineDomain(virConnectPtr conn, char *domXML) {
-	int result = 0;
-	virDomainPtr domain = NULL;
+	DEFINE_VIR_DOMAIN(domain);
 
 	if (!(domain = virDomainDefineXML(conn, (const char*) domXML))) {
-		result = -1;
+		return -1;
 	}
 
-	if (domain) {
-		virDomainFree(domain);
-	}
-
-	return result;
+	return 0;
 }
 
 int createDomain(virConnectPtr conn, char *uuid) {
-	int result = 0;
-	virDomainPtr domain = NULL;
+	DEFINE_VIR_DOMAIN(domain);
 
 	if (!(domain = virDomainLookupByUUIDString(conn, (const char*) uuid)) ||
 	    virDomainCreate(domain) < 0) {
-		result = -1;
+		return -1;
 	}
 
-	if (domain) {
-		virDomainFree(domain);
-	}
-
-	return result;
+	return 0;
 }
 
 int stopDomain(virConnectPtr conn, char *uuid) {
-	int result = 0;
-	virDomainPtr domain = NULL;
+	DEFINE_VIR_DOMAIN(domain);
 
 	if (!(domain = virDomainLookupByUUIDString(conn, (const char*) uuid)) ||
 	    virDomainShutdown(domain) < 0) {
-		result = -1;
+		return -1;
 	}
 
-	if (domain) {
-		virDomainFree(domain);
-	}
-
-	return result;
+	return 0;
 }
 
 int destroyAndUndefineDomain(virConnectPtr conn, char *uuid) {
-	int result = 0;
-	virDomainPtr domain = NULL;
+	DEFINE_VIR_DOMAIN(domain);
 
 	if (!(domain = virDomainLookupByUUIDString(conn, (const char*) uuid)) ||
 	    virDomainDestroy(domain) < 0 ||
 	    virDomainUndefine(domain) < 0) {
-		result = -1;
+		return -1;
 	}
 
-	if (domain) {
-		virDomainFree(domain);
-	}
+	return 0;
 }
