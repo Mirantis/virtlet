@@ -17,29 +17,21 @@ limitations under the License.
 #include <fcntl.h>
 #include <glib.h>
 #include <libvirt/libvirt.h>
+#include "alloc-util.h"
 #include "image.h"
 
 void testVirtletVolUploadSourceNullOpaque() {
-	virConnectPtr conn;
-	virStreamPtr stream;
 	int result;
+	DEFINE_VIR_CONNECT(conn);
+	DEFINE_VIR_STREAM(stream);
 
 	if (!(conn = virConnectOpen("test:///default")) ||
 	    !(stream = virStreamNew(conn, 0))) {
 		g_test_fail();
-		goto cleanup;
 	}
 
 	result = virtletVolUploadSource(stream, "", 0, NULL);
 	g_assert_cmpint(result, ==, -1);
-
- cleanup:
-	if (stream) {
-		virStreamFree(stream);
-	}
-	if (conn) {
-		virConnectClose(conn);
-	}
 }
 
 int main(int argc, char **argv) {

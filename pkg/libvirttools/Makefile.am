@@ -17,7 +17,7 @@ check_SCRIPTS = go.test
 TESTS = $(check_PROGRAMS) $(check_SCRIPTS)
 
 image_test_CFLAGS = $(CFLAGS) -I.
-image_test_SOURCES = tests/test_image.c image.h image.c
+image_test_SOURCES = tests/test_image.c alloc-util.h image.h image.c
 
 virtualization_test_CFLAGS = $(CFLAGS) -I.
-virtualization_test_SOURCES = tests/test_virtualization.c virtualization.h virtualization.c
+virtualization_test_SOURCES = tests/test_virtualization.c alloc-util.h virtualization.h virtualization.c
