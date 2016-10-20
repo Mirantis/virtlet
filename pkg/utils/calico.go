@@ -21,9 +21,9 @@ import (
 	"net"
 	"os"
 
-	"github.com/tigera/libcalico-go/lib/api"
-	"github.com/tigera/libcalico-go/lib/client"
-	cnet "github.com/tigera/libcalico-go/lib/net"
+	"github.com/projectcalico/libcalico-go/lib/api"
+	"github.com/projectcalico/libcalico-go/lib/client"
+	cnet "github.com/projectcalico/libcalico-go/lib/net"
 	"github.com/vishvananda/netlink"
 )
 
