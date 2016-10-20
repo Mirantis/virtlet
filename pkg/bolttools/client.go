@@ -24,8 +24,8 @@ type BoltClient struct {
 	db *bolt.DB
 }
 
-func NewBoltClient() (*BoltClient, error) {
-	db, err := bolt.Open("/var/data/virtlet/virtlet.db", 0600, nil)
+func NewBoltClient(path string) (*BoltClient, error) {
+	db, err := bolt.Open(path, 0600, nil)
 	if err != nil {
 		return nil, err
 	}
