@@ -26,6 +26,18 @@ import (
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
+func (b *BoltClient) VerifySandboxSchema() error {
+	err := b.db.Update(func(tx *bolt.Tx) error {
+		if _, err := tx.CreateBucketIfNotExists([]byte("sandbox")); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return err
+}
+
 func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig) error {
 	podId := config.Metadata.GetUid()
 
@@ -55,9 +67,9 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig) error {
 	}
 
 	err = b.db.Batch(func(tx *bolt.Tx) error {
-		parentBucket, err := tx.CreateBucketIfNotExists([]byte("sandbox"))
-		if err != nil {
-			return err
+		parentBucket := tx.Bucket([]byte("sandbox"))
+		if parentBucket == nil {
+			return fmt.Errorf("Bucket 'sandbox' doesn't exist")
 		}
 
 		sandboxBucket, err := parentBucket.CreateBucketIfNotExists([]byte(podId))

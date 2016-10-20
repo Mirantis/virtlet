@@ -33,6 +33,18 @@ type ContainerInfo struct {
 	Annotations map[string]string
 }
 
+func (b *BoltClient) VerifyVirtualizationSchema() error {
+	err := b.db.Update(func(tx *bolt.Tx) error {
+		if _, err := tx.CreateBucketIfNotExists([]byte("virtualization")); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return err
+}
+
 func (b *BoltClient) SetContainer(containerId, sandboxId, image string, labels, annotations map[string]string) error {
 	strLabels, err := json.Marshal(labels)
 	if err != nil {
@@ -45,9 +57,9 @@ func (b *BoltClient) SetContainer(containerId, sandboxId, image string, labels, 
 	}
 
 	err = b.db.Update(func(tx *bolt.Tx) error {
-		parentBucket, err := tx.CreateBucketIfNotExists([]byte("virtualization"))
-		if err != nil {
-			return err
+		parentBucket := tx.Bucket([]byte("virtualization"))
+		if parentBucket == nil {
+			return fmt.Errorf("Bucket 'virtualization' doesn't exist")
 		}
 
 		bucket, err := parentBucket.CreateBucketIfNotExists([]byte(containerId))

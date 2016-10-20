@@ -32,13 +32,25 @@ func getKey(name string) string {
 	return sum
 }
 
+func (b *BoltClient) VerifyImagesSchema() error {
+	err := b.db.Update(func(tx *bolt.Tx) error {
+		if _, err := tx.CreateBucketIfNotExists([]byte("images")); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return err
+}
+
 func (b *BoltClient) SetImageFilepath(name, filepath string) error {
 	key := getKey(name)
 
 	err := b.db.Update(func(tx *bolt.Tx) error {
-		bucket, err := tx.CreateBucketIfNotExists([]byte("images"))
-		if err != nil {
-			return err
+		bucket := tx.Bucket([]byte("images"))
+		if bucket == nil {
+			return fmt.Errorf("Bucket 'images' doesn't exist")
 		}
 
 		if err := bucket.Put([]byte(key), []byte(filepath)); err != nil {
