@@ -74,11 +74,8 @@ func (b *BoltClient) GetImageFilepath(name string) (string, error) {
 			return fmt.Errorf("Bucket 'images' doesn't exist")
 		}
 
-		fp, err := getString(bucket, key)
-		if err != nil {
-			return err
-		}
-		filepath = fp
+		fp := bucket.Get([]byte(key))
+		filepath = string(fp)
 
 		return nil
 	})
