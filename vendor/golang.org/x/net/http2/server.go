@@ -390,7 +390,6 @@ type serverConn struct {
 	goAwayCode            ErrCode
 	shutdownTimerCh       <-chan time.Time // nil until used
 	shutdownTimer         *time.Timer      // nil until used
-	freeRequestBodyBuf    []byte           // if non-nil, a free initialWindowSize buffer for getRequestBodyBuf
 
 	// Owned by the writeFrameAsync goroutine:
 	headerWriteBuf bytes.Buffer
@@ -434,11 +433,11 @@ type stream struct {
 	numTrailerValues int64
 	weight           uint8
 	state            streamState
-	sentReset        bool // only true once detached from streams map
-	gotReset         bool // only true once detacted from streams map
-	gotTrailerHeader bool // HEADER frame for trailers was seen
-	wroteHeaders     bool // whether we wrote headers (not status 100)
-	reqBuf           []byte
+	sentReset        bool   // only true once detached from streams map
+	gotReset         bool   // only true once detacted from streams map
+	gotTrailerHeader bool   // HEADER frame for trailers was seen
+	wroteHeaders     bool   // whether we wrote headers (not status 100)
+	reqBuf           []byte // if non-nil, body pipe buffer to return later at EOF
 
 	trailer    http.Header // accumulated trailers
 	reqTrailer http.Header // handler's Request.Trailer
@@ -916,13 +915,13 @@ func (sc *serverConn) wroteFrame(res frameWriteResult) {
 			// Here we would go to stateHalfClosedLocal in
 			// theory, but since our handler is done and
 			// the net/http package provides no mechanism
-			// for finishing writing to a ResponseWriter
-			// while still reading data (see possible TODO
-			// at top of this file), we go into closed
-			// state here anyway, after telling the peer
-			// we're hanging up on them.
+			// for closing a ResponseWriter while still
+			// reading data (see possible TODO at top of
+			// this file), we go into closed state here
+			// anyway, after telling the peer we're
+			// hanging up on them.
 			st.state = stateHalfClosedLocal // won't last long, but necessary for closeStream via resetStream
-			errCancel := StreamError{st.id, ErrCodeCancel}
+			errCancel := streamError(st.id, ErrCodeCancel)
 			sc.resetStream(errCancel)
 		case stateHalfClosedRemote:
 			sc.closeStream(st, errHandlerComplete)
@@ -1133,7 +1132,7 @@ func (sc *serverConn) processWindowUpdate(f *WindowUpdateFrame) error {
 			return nil
 		}
 		if !st.flow.add(int32(f.Increment)) {
-			return StreamError{f.StreamID, ErrCodeFlowControl}
+			return streamError(f.StreamID, ErrCodeFlowControl)
 		}
 	default: // connection-level flow control
 		if !sc.flow.add(int32(f.Increment)) {
@@ -1159,7 +1158,7 @@ func (sc *serverConn) processResetStream(f *RSTStreamFrame) error {
 	if st != nil {
 		st.gotReset = true
 		st.cancelCtx()
-		sc.closeStream(st, StreamError{f.StreamID, f.ErrCode})
+		sc.closeStream(st, streamError(f.StreamID, f.ErrCode))
 	}
 	return nil
 }
@@ -1176,22 +1175,14 @@ func (sc *serverConn) closeStream(st *stream, err error) {
 	}
 	delete(sc.streams, st.id)
 	if p := st.body; p != nil {
+		// Return any buffered unread bytes worth of conn-level flow control.
+		// See golang.org/issue/16481
+		sc.sendWindowUpdate(nil, p.Len())
+
 		p.CloseWithError(err)
 	}
 	st.cw.Close() // signals Handler's CloseNotifier, unblocks writes, etc
 	sc.writeSched.forgetStream(st.id)
-	if st.reqBuf != nil {
-		// Stash this request body buffer (64k) away for reuse
-		// by a future POST/PUT/etc.
-		//
-		// TODO(bradfitz): share on the server? sync.Pool?
-		// Server requires locks and might hurt contention.
-		// sync.Pool might work, or might be worse, depending
-		// on goroutine CPU migrations. (get and put on
-		// separate CPUs).  Maybe a mix of strategies. But
-		// this is an easy win for now.
-		sc.freeRequestBodyBuf = st.reqBuf
-	}
 }
 
 func (sc *serverConn) processSettings(f *SettingsFrame) error {
@@ -1277,6 +1268,8 @@ func (sc *serverConn) processSettingInitialWindowSize(val uint32) error {
 
 func (sc *serverConn) processData(f *DataFrame) error {
 	sc.serveG.check()
+	data := f.Data()
+
 	// "If a DATA frame is received whose stream is not in "open"
 	// or "half closed (local)" state, the recipient MUST respond
 	// with a stream error (Section 5.4.2) of type STREAM_CLOSED."
@@ -1288,32 +1281,55 @@ func (sc *serverConn) processData(f *DataFrame) error {
 		// the http.Handler returned, so it's done reading &
 		// done writing). Try to stop the client from sending
 		// more DATA.
-		return StreamError{id, ErrCodeStreamClosed}
+
+		// But still enforce their connection-level flow control,
+		// and return any flow control bytes since we're not going
+		// to consume them.
+		if sc.inflow.available() < int32(f.Length) {
+			return streamError(id, ErrCodeFlowControl)
+		}
+		// Deduct the flow control from inflow, since we're
+		// going to immediately add it back in
+		// sendWindowUpdate, which also schedules sending the
+		// frames.
+		sc.inflow.take(int32(f.Length))
+		sc.sendWindowUpdate(nil, int(f.Length)) // conn-level
+
+		return streamError(id, ErrCodeStreamClosed)
 	}
 	if st.body == nil {
 		panic("internal error: should have a body in this state")
 	}
-	data := f.Data()
 
 	// Sender sending more than they'd declared?
 	if st.declBodyBytes != -1 && st.bodyBytes+int64(len(data)) > st.declBodyBytes {
 		st.body.CloseWithError(fmt.Errorf("sender tried to send more than declared Content-Length of %d bytes", st.declBodyBytes))
-		return StreamError{id, ErrCodeStreamClosed}
+		return streamError(id, ErrCodeStreamClosed)
 	}
-	if len(data) > 0 {
+	if f.Length > 0 {
 		// Check whether the client has flow control quota.
-		if int(st.inflow.available()) < len(data) {
-			return StreamError{id, ErrCodeFlowControl}
+		if st.inflow.available() < int32(f.Length) {
+			return streamError(id, ErrCodeFlowControl)
 		}
-		st.inflow.take(int32(len(data)))
-		wrote, err := st.body.Write(data)
-		if err != nil {
-			return StreamError{id, ErrCodeStreamClosed}
+		st.inflow.take(int32(f.Length))
+
+		if len(data) > 0 {
+			wrote, err := st.body.Write(data)
+			if err != nil {
+				return streamError(id, ErrCodeStreamClosed)
+			}
+			if wrote != len(data) {
+				panic("internal error: bad Writer")
+			}
+			st.bodyBytes += int64(len(data))
 		}
-		if wrote != len(data) {
-			panic("internal error: bad Writer")
+
+		// Return any padded flow control now, since we won't
+		// refund it later on body reads.
+		if pad := int32(f.Length) - int32(len(data)); pad > 0 {
+			sc.sendWindowUpdate32(nil, pad)
+			sc.sendWindowUpdate32(st, pad)
 		}
-		st.bodyBytes += int64(len(data))
 	}
 	if f.StreamEnded() {
 		st.endStream()
@@ -1417,14 +1433,14 @@ func (sc *serverConn) processHeaders(f *MetaHeadersFrame) error {
 		// REFUSED_STREAM."
 		if sc.unackedSettings == 0 {
 			// They should know better.
-			return StreamError{st.id, ErrCodeProtocol}
+			return streamError(st.id, ErrCodeProtocol)
 		}
 		// Assume it's a network race, where they just haven't
 		// received our last SETTINGS update. But actually
 		// this can't happen yet, because we don't yet provide
 		// a way for users to adjust server parameters at
 		// runtime.
-		return StreamError{st.id, ErrCodeRefusedStream}
+		return streamError(st.id, ErrCodeRefusedStream)
 	}
 
 	rw, req, err := sc.newWriterAndRequest(st, f)
@@ -1446,6 +1462,19 @@ func (sc *serverConn) processHeaders(f *MetaHeadersFrame) error {
 		handler = new400Handler(err)
 	}
 
+	// The net/http package sets the read deadline from the
+	// http.Server.ReadTimeout during the TLS handshake, but then
+	// passes the connection off to us with the deadline already
+	// set. Disarm it here after the request headers are read, similar
+	// to how the http1 server works.
+	// Unlike http1, though, we never re-arm it yet, though.
+	// TODO(bradfitz): figure out golang.org/issue/14204
+	// (IdleTimeout) and how this relates. Maybe the default
+	// IdleTimeout is ReadTimeout.
+	if sc.hs.ReadTimeout != 0 {
+		sc.conn.SetReadDeadline(time.Time{})
+	}
+
 	go sc.runHandler(rw, req, handler)
 	return nil
 }
@@ -1458,11 +1487,11 @@ func (st *stream) processTrailerHeaders(f *MetaHeadersFrame) error {
 	}
 	st.gotTrailerHeader = true
 	if !f.StreamEnded() {
-		return StreamError{st.id, ErrCodeProtocol}
+		return streamError(st.id, ErrCodeProtocol)
 	}
 
 	if len(f.PseudoFields()) > 0 {
-		return StreamError{st.id, ErrCodeProtocol}
+		return streamError(st.id, ErrCodeProtocol)
 	}
 	if st.trailer != nil {
 		for _, hf := range f.RegularFields() {
@@ -1471,7 +1500,7 @@ func (st *stream) processTrailerHeaders(f *MetaHeadersFrame) error {
 				// TODO: send more details to the peer somehow. But http2 has
 				// no way to send debug data at a stream level. Discuss with
 				// HTTP folk.
-				return StreamError{st.id, ErrCodeProtocol}
+				return streamError(st.id, ErrCodeProtocol)
 			}
 			st.trailer[key] = append(st.trailer[key], hf.Value)
 		}
@@ -1532,7 +1561,7 @@ func (sc *serverConn) newWriterAndRequest(st *stream, f *MetaHeadersFrame) (*res
 	isConnect := method == "CONNECT"
 	if isConnect {
 		if path != "" || scheme != "" || authority == "" {
-			return nil, nil, StreamError{f.StreamID, ErrCodeProtocol}
+			return nil, nil, streamError(f.StreamID, ErrCodeProtocol)
 		}
 	} else if method == "" || path == "" ||
 		(scheme != "https" && scheme != "http") {
@@ -1546,13 +1575,13 @@ func (sc *serverConn) newWriterAndRequest(st *stream, f *MetaHeadersFrame) (*res
 		// "All HTTP/2 requests MUST include exactly one valid
 		// value for the :method, :scheme, and :path
 		// pseudo-header fields"
-		return nil, nil, StreamError{f.StreamID, ErrCodeProtocol}
+		return nil, nil, streamError(f.StreamID, ErrCodeProtocol)
 	}
 
 	bodyOpen := !f.StreamEnded()
 	if method == "HEAD" && bodyOpen {
 		// HEAD requests can't have bodies
-		return nil, nil, StreamError{f.StreamID, ErrCodeProtocol}
+		return nil, nil, streamError(f.StreamID, ErrCodeProtocol)
 	}
 	var tlsState *tls.ConnectionState // nil if not scheme https
 
@@ -1610,7 +1639,7 @@ func (sc *serverConn) newWriterAndRequest(st *stream, f *MetaHeadersFrame) (*res
 		var err error
 		url_, err = url.ParseRequestURI(path)
 		if err != nil {
-			return nil, nil, StreamError{f.StreamID, ErrCodeProtocol}
+			return nil, nil, streamError(f.StreamID, ErrCodeProtocol)
 		}
 		requestURI = path
 	}
@@ -1630,13 +1659,9 @@ func (sc *serverConn) newWriterAndRequest(st *stream, f *MetaHeadersFrame) (*res
 	}
 	req = requestWithContext(req, st.ctx)
 	if bodyOpen {
-		// Disabled, per golang.org/issue/14960:
-		// st.reqBuf = sc.getRequestBodyBuf()
-		// TODO: remove this 64k of garbage per request (again, but without a data race):
-		buf := make([]byte, initialWindowSize)
-
+		st.reqBuf = getRequestBodyBuf()
 		body.pipe = &pipe{
-			b: &fixedBuffer{buf: buf},
+			b: &fixedBuffer{buf: st.reqBuf},
 		}
 
 		if vv, ok := header["Content-Length"]; ok {
@@ -1660,13 +1685,22 @@ func (sc *serverConn) newWriterAndRequest(st *stream, f *MetaHeadersFrame) (*res
 	return rw, req, nil
 }
 
-func (sc *serverConn) getRequestBodyBuf() []byte {
-	sc.serveG.check()
-	if buf := sc.freeRequestBodyBuf; buf != nil {
-		sc.freeRequestBodyBuf = nil
-		return buf
+var reqBodyCache = make(chan []byte, 8)
+
+func getRequestBodyBuf() []byte {
+	select {
+	case b := <-reqBodyCache:
+		return b
+	default:
+		return make([]byte, initialWindowSize)
 	}
-	return make([]byte, initialWindowSize)
+}
+
+func putRequestBodyBuf(b []byte) {
+	select {
+	case reqBodyCache <- b:
+	default:
+	}
 }
 
 // Run on its own goroutine.
@@ -1754,11 +1788,19 @@ type bodyReadMsg struct {
 // called from handler goroutines.
 // Notes that the handler for the given stream ID read n bytes of its body
 // and schedules flow control tokens to be sent.
-func (sc *serverConn) noteBodyReadFromHandler(st *stream, n int) {
+func (sc *serverConn) noteBodyReadFromHandler(st *stream, n int, err error) {
 	sc.serveG.checkNotOn() // NOT on
-	select {
-	case sc.bodyReadCh <- bodyReadMsg{st, n}:
-	case <-sc.doneServing:
+	if n > 0 {
+		select {
+		case sc.bodyReadCh <- bodyReadMsg{st, n}:
+		case <-sc.doneServing:
+		}
+	}
+	if err == io.EOF {
+		if buf := st.reqBuf; buf != nil {
+			st.reqBuf = nil // shouldn't matter; field unused by other
+			putRequestBodyBuf(buf)
+		}
 	}
 }
 
@@ -1841,9 +1883,10 @@ func (b *requestBody) Read(p []byte) (n int, err error) {
 		return 0, io.EOF
 	}
 	n, err = b.pipe.Read(p)
-	if n > 0 {
-		b.conn.noteBodyReadFromHandler(b.stream, n)
+	if err == io.EOF {
+		b.pipe = nil
 	}
+	b.conn.noteBodyReadFromHandler(b.stream, n, err)
 	return
 }
 
