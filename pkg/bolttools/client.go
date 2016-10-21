@@ -30,7 +30,18 @@ func NewBoltClient() (*BoltClient, error) {
 		return nil, err
 	}
 
-	return &BoltClient{db: db}, nil
+	client := &BoltClient{db: db}
+	if err := client.VerifyImagesSchema(); err != nil {
+		return nil, err
+	}
+	if err := client.VerifySandboxSchema(); err != nil {
+		return nil, err
+	}
+	if err := client.VerifyVirtualizationSchema(); err != nil {
+		return nil, err
+	}
+
+	return client, nil
 }
 
 func (b *BoltClient) Close() error {
