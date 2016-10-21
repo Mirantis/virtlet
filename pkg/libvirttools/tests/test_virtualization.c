@@ -16,6 +16,7 @@ limitations under the License.
 
 #include <glib.h>
 #include <libvirt/libvirt.h>
+#include "alloc-util.h"
 #include "virtualization.h"
 
 void testDefineDomain(gconstpointer gConn) {
@@ -74,13 +75,12 @@ void testDestroyAndUndefineDomain(gconstpointer gConn) {
 }
 
 int main(int argc, char **argv) {
-	virConnectPtr conn;
 	gconstpointer gConn;
 	int result;
+	DEFINE_VIR_CONNECT(conn);
 
 	if (!(conn = virConnectOpen("test:///default"))) {
-		result = -1;
-		goto cleanup;
+		return -1;
 	}
 
 	gConn = (gconstpointer) conn;
@@ -92,12 +92,5 @@ int main(int argc, char **argv) {
 	g_test_add_data_func("/destroyAndUndefineDomain", gConn,
 			     &testDestroyAndUndefineDomain);
 
-	result = g_test_run();
-
- cleanup:
-	if (conn) {
-		virConnectClose(conn);
-	}
-
-	return result;
+	return g_test_run();
 }

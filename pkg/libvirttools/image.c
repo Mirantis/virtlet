@@ -22,6 +22,7 @@ limitations under the License.
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include "alloc-util.h"
 #include "image.h"
 
 int virtletVolUploadSource(virStreamPtr stream, char *bytes, size_t nbytes,
@@ -36,18 +37,16 @@ int virtletVolUploadSource(virStreamPtr stream, char *bytes, size_t nbytes,
 
 int pullImage(virConnectPtr conn, virStoragePoolPtr pool, char *shortName,
 	      char *filepath, char *volXML) {
-	int result = 0;
-	virStorageVolPtr vol = NULL;
-	int fd = -1;
-	virStreamPtr stream = NULL;
+	DEFINE_FD(fd);
+	DEFINE_VIR_STORAGE_VOL(vol);
+	DEFINE_VIR_STREAM(stream);
 
 	if ((vol = virStorageVolLookupByName(pool, (const char*) shortName)) != NULL) {
-		goto cleanup;
+		return -1;
 	}
 
 	if ((fd = open(filepath, O_RDONLY)) < 0) {
-		result = errno;
-		goto cleanup;
+		return errno;
 	}
 
 	if (!(vol = virStorageVolCreateXML(pool, (const char*) volXML, 0)) ||
@@ -55,18 +54,8 @@ int pullImage(virConnectPtr conn, virStoragePoolPtr pool, char *shortName,
 	    virStorageVolUpload(vol, stream, 0, 0, 0) < 0 ||
 	    virStreamSendAll(stream, virtletVolUploadSource, &fd) < 0 ||
 	    virStreamFinish(stream) < 0) {
-		result = -1;
+		return -1;
 	}
 
- cleanup:
-	if (vol) {
-		virStorageVolFree(vol);
-	}
-	if (fd) {
-		close(fd);
-	}
-	if (stream) {
-		virStreamFree(stream);
-	}
-	return result;
+	return 0;
 }
