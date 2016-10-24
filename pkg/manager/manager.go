@@ -291,7 +291,7 @@ func (v *VirtletManager) ImageStatus(ctx context.Context, in *kubeapi.ImageStatu
 		return nil, err
 	}
 	if filepath == "" {
-		return nil, nil
+		return &kubeapi.ImageStatusResponse{}, nil
 	}
 	image, err := v.libvirtImageTool.ImageStatus(filepath)
 	if err != nil {
