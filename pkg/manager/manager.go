@@ -249,28 +249,8 @@ func (v *VirtletManager) ContainerStatus(ctx context.Context, in *kubeapi.Contai
 	return response, nil
 }
 
-func (v *VirtletManager) ExecSync(ctx context.Context, in *kubeapi.ExecSyncRequest) (*kubeapi.ExecSyncResponse, error) {
-	return nil, fmt.Errorf("Not implemented")
-}
-
-func (v *VirtletManager) Exec(ctx context.Context, in *kubeapi.ExecRequest) (*kubeapi.ExecResponse, error) {
-	return nil, fmt.Errorf("Not implemented")
-}
-
-func (v *VirtletManager) Attach(ctx context.Context, in *kubeapi.AttachRequest) (*kubeapi.AttachResponse, error) {
-	return nil, fmt.Errorf("Not implemented")
-}
-
-func (v *VirtletManager) PortForward(ctx context.Context, in *kubeapi.PortForwardRequest) (*kubeapi.PortForwardResponse, error) {
-	// TODO: this is only dummy implementation - there should be added some iptables entries
-	response := &kubeapi.PortForwardResponse{}
-	return response, nil
-}
-
-func (v *VirtletManager) UpdateRuntimeConfig(ctx context.Context, in *kubeapi.UpdateRuntimeConfigRequest) (*kubeapi.UpdateRuntimeConfigResponse, error) {
-	// TODO: this is only dummy implementation - we do not anything with requested changes
-	response := &kubeapi.UpdateRuntimeConfigResponse{}
-	return response, nil
+func (v *VirtletManager) Exec(kubeapi.RuntimeService_ExecServer) error {
+	return fmt.Errorf("Not implemented")
 }
 
 func (v *VirtletManager) ListImages(ctx context.Context, in *kubeapi.ListImagesRequest) (*kubeapi.ListImagesResponse, error) {
