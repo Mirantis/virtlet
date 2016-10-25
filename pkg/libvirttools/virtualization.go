@@ -470,13 +470,11 @@ func (v *VirtualizationTool) ContainerStatus(containerId string) (*kubeapi.Conta
 	cContainerId := C.CString(containerId)
 	defer C.free(unsafe.Pointer(cContainerId))
 
-	domain := C.virDomainLookupByName(v.conn, cContainerId)
+	domain := C.virDomainLookupByUUIDString(v.conn, cContainerId)
 	if domain == nil {
 		return nil, GetLastError()
 	}
 	defer C.virDomainFree(domain)
-
-	id := C.GoString(C.virDomainGetName(domain))
 
 	if status := C.virDomainGetInfo(domain, &domainInfo); status < 0 {
 		return nil, GetLastError()
@@ -485,7 +483,7 @@ func (v *VirtualizationTool) ContainerStatus(containerId string) (*kubeapi.Conta
 	containerState := libvirtToKubeState(domainInfo)
 
 	return &kubeapi.ContainerStatus{
-		Id:       &id,
+		Id:       &containerId,
 		Metadata: &kubeapi.ContainerMetadata{},
 		State:    &containerState,
 	}, nil
