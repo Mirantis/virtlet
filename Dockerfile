@@ -7,6 +7,7 @@ RUN apt-get update \
 	&& apt-get clean
 RUN add-apt-repository ppa:ubuntu-lxc/lxd-stable
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y  \
+		git \
 		golang \
 		make \
 		autoconf \
@@ -28,6 +29,9 @@ RUN mkdir -p /go/src/github.com/Mirantis/virtlet
 COPY . /go/src/github.com/Mirantis/virtlet
 
 WORKDIR /go/src/github.com/Mirantis/virtlet
+
+RUN mkdir -p ~/.ssh \
+	&& ssh-keyscan github.com >> ~/.ssh/known_hosts
 
 RUN ./autogen.sh \
 	&& ./configure \

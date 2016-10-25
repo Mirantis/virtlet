@@ -24,13 +24,19 @@ TESTS = $(check_SCRIPTS)
 .PHONY: all vendor
 
 all:
+	if [ ! -d vendor ]; then $(MAKE) install-vendor; fi
 	go build -o $(builddir)/virtlet ./cmd/virtlet
 	go build -o $(builddir)/virtlet-fake-create-container ./cmd/fake-create-container
 	go build -o $(builddir)/virtlet-fake-image-pull ./cmd/fake-image-pull
 
-vendor:
+verify-glide-installation:
+	@which glide || go get github.com/Masterminds/glide
+
+install-vendor: verify-glide-installation
+	glide install --strip-vendor
+
+update-vendor: verify-glide-installation
 	glide update --strip-vendor
-	glide-vc --only-code --no-tests --keep="**/*.json.in"
 
 clean-local:
 	rm -f $(builddir)/virtlet $(builddir)/virtlet-fake-create-container $(builddir)/virtlet-fake-image-pull

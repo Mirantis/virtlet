@@ -1,12 +1,36 @@
-hash: f9d8b64ab5e46d25b3ee7a894e1d5902dc2c25744dbce0299dc6ab5ecda448b8
-updated: 2016-10-21T11:50:03.871063568+02:00
+hash: 9c189db1c90365a5ad2ad4cbfdf4378bd1a4abd15d7059eb80f080772939288a
+updated: 2016-10-24T15:51:57.064460849+02:00
 imports:
 - name: github.com/boltdb/bolt
-  version: 074dffcc83e9f421e261526d297cd93f22a34080
+  version: dfb21201d9270c1082d5fb0f07f500311ff72f18
 - name: github.com/gogo/protobuf
-  version: 50d1bd39ce4e7a96b75e3e040be9caf79dbb4c61
+  version: e18d7aa8f8c624c915db340349aad4c49b10d173
   subpackages:
+  - gogoproto
+  - plugin/compare
+  - plugin/defaultcheck
+  - plugin/description
+  - plugin/embedcheck
+  - plugin/enumstringer
+  - plugin/equal
+  - plugin/face
+  - plugin/gostring
+  - plugin/marshalto
+  - plugin/oneofcheck
+  - plugin/populate
+  - plugin/size
+  - plugin/stringer
+  - plugin/testgen
+  - plugin/union
+  - plugin/unmarshal
   - proto
+  - protoc-gen-gogo/descriptor
+  - protoc-gen-gogo/generator
+  - protoc-gen-gogo/grpc
+  - protoc-gen-gogo/plugin
+  - sortkeys
+  - vanity
+  - vanity/command
 - name: github.com/golang/glog
   version: 23def4e6c14b4da8ac2ed8007337bc5eb5007998
 - name: github.com/golang/protobuf
@@ -16,21 +40,20 @@ imports:
 - name: github.com/nu7hatch/gouuid
   version: 179d4d0c4d8d407a32af483c2354df1d2c91e6c3
 - name: golang.org/x/net
-  version: daba796358cd2742b75aae05761f1b898c9f6a5c
+  version: e90d6d0afc4c315a0d87a568ae68577cc15149a0
   subpackages:
   - context
   - http2
   - http2/hpack
-  - idna
   - internal/timeseries
   - lex/httplex
   - trace
 - name: golang.org/x/sys
-  version: 002cbb5f952456d0c50e0d2aff17ea5eca716979
+  version: 8f0908ab3b2457e2e15403d3697c9ef5cb4b57a9
   subpackages:
   - unix
 - name: google.golang.org/grpc
-  version: 2b7e876a2eb64e93cb8140f497d3ea9d8882279c
+  version: 231b4cfea0e79843053a33f5fe90bd4d84b23cd3
   subpackages:
   - codes
   - credentials
@@ -41,8 +64,8 @@ imports:
   - peer
   - transport
 - name: k8s.io/kubernetes
-  version: 64d20455149b149ee79cf60fd3191c9bc48a0645
-  repo: git@github.com:kubernetes/kubernetes.git
+  version: e72f26a3fff4f521d1da9f52b3ce82d4d0d5a401
+  repo: git://github.com/kubernetes/kubernetes.git
   vcs: git
   subpackages:
   - api/v1alpha/runtime
