@@ -1,46 +1,75 @@
 hash: 5e230f8db6c71b0b4bce4f48faa46378f9fac9303dedc008704cfe14f66cec58
-updated: 2016-11-15T09:09:36.121742285+01:00
+updated: 2016-11-17T10:21:10.086525842+01:00
 imports:
 - name: github.com/boltdb/bolt
   version: dfb21201d9270c1082d5fb0f07f500311ff72f18
+- name: github.com/coreos/etcd
+  version: c58ae95429092492b282351e1b0c3db4584617d0
+  subpackages:
+  - client
+  - pkg/fileutil
+  - pkg/pathutil
+  - pkg/tlsutil
+  - pkg/transport
+  - pkg/types
+- name: github.com/coreos/go-systemd
+  version: 61c7ee68bddeb1e66b491c3e1045c4f72b2cd6e3
+  subpackages:
+  - journal
+- name: github.com/coreos/pkg
+  version: 3ac0863d7acf3bc44daf49afef8919af12f704ef
+  subpackages:
+  - capnslog
 - name: github.com/davecgh/go-spew
   version: 6cf5744a041a0022271cefed95ba843f6d87fd51
+  subpackages:
+  - spew
+- name: github.com/ghodss/yaml
+  version: bea76d6a4713e18b7f5321a2b020738552def3ea
 - name: github.com/gogo/protobuf
   version: e18d7aa8f8c624c915db340349aad4c49b10d173
   subpackages:
-  - gogoproto
-  - plugin/compare
-  - plugin/defaultcheck
-  - plugin/description
-  - plugin/embedcheck
-  - plugin/enumstringer
-  - plugin/equal
-  - plugin/face
-  - plugin/gostring
-  - plugin/marshalto
-  - plugin/oneofcheck
-  - plugin/populate
-  - plugin/size
-  - plugin/stringer
-  - plugin/testgen
-  - plugin/union
-  - plugin/unmarshal
   - proto
-  - protoc-gen-gogo/descriptor
-  - protoc-gen-gogo/generator
-  - protoc-gen-gogo/grpc
-  - protoc-gen-gogo/plugin
-  - sortkeys
-  - vanity
-  - vanity/command
 - name: github.com/golang/glog
   version: 23def4e6c14b4da8ac2ed8007337bc5eb5007998
 - name: github.com/golang/protobuf
   version: 98fa357170587e470c5f27d3c3ea0947b71eb455
   subpackages:
   - proto
+- name: github.com/kelseyhightower/envconfig
+  version: 9aca109c9aec4633fced9717c4a09ecab3d33111
 - name: github.com/nu7hatch/gouuid
   version: 179d4d0c4d8d407a32af483c2354df1d2c91e6c3
+- name: github.com/projectcalico/libcalico-go
+  version: 8d9b190889cae2f87081ec7e95a9720ec62c4ccf
+  subpackages:
+  - lib/api
+  - lib/api/unversioned
+  - lib/backend
+  - lib/backend/api
+  - lib/backend/compat
+  - lib/backend/etcd
+  - lib/backend/model
+  - lib/client
+  - lib/errors
+  - lib/hwm
+  - lib/net
+  - lib/numorstring
+  - lib/scope
+- name: github.com/satori/go.uuid
+  version: b061729afc07e77a8aa4fad0a2fd840958f1942a
+- name: github.com/Sirupsen/logrus
+  version: 3ec0642a7fb6488f65b06f9040adc67e3990296a
+- name: github.com/ugorji/go
+  version: faddd6128c66c4708f45fdc007f575f75e592a3c
+  subpackages:
+  - codec
+- name: github.com/vishvananda/netlink
+  version: da7420cab5e209195f5f7387fccd4c7f48758d30
+  subpackages:
+  - nl
+- name: github.com/vishvananda/netns
+  version: 8ba1072b58e0c2a240eb5f6120165c7776c3e7b8
 - name: go.universe.tf/netboot
   version: 57a1c9bea27f5d542444c409a768b331fc5e0cb9
   subpackages:
@@ -72,6 +101,12 @@ imports:
   - naming
   - peer
   - transport
+- name: gopkg.in/tchap/go-patricia.v2
+  version: 666120de432aea38ab06bd5c818f04f4129882c9
+  subpackages:
+  - patricia
+- name: gopkg.in/yaml.v2
+  version: a5b47d31c556af34a302ce5d659e6fea44d90de0
 - name: k8s.io/kubernetes
   version: 1837914d8e219f54631131c7b3c59b8844df5b2c
   repo: git://github.com/kubernetes/kubernetes.git
