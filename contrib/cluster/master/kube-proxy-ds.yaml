@@ -1,0 +1,24 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: k8s-proxy-v1
+  labels:
+    k8s-app: k8s-proxy
+    version: v1
+    kubernetes.io/cluster-service: "true"
+spec:
+  template:
+    metadata:
+      labels:
+        k8s-app: k8s-proxy
+        version: v1
+        kubernetes.io/cluster-service: "true"
+    spec:
+      hostNetwork: true
+      containers:
+      - name: kube-proxy
+        image: gcr.io/google_containers/kube-proxy
+        command:
+        - /usr/local/bin/kube-proxy $PROXY_OPTS
+        securityContext:
+          privileged: true
