@@ -47,6 +47,10 @@ func TestSetImageFilepath(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		if err := b.VerifyImagesSchema(); err != nil {
+			t.Fatal(err)
+		}
+
 		err = b.SetImageFilepath(tc.name, tc.filepath)
 		if err != nil {
 			t.Fatal(err)
@@ -92,6 +96,10 @@ func TestGetImageFilepath(t *testing.T) {
 	for _, tc := range tests {
 		b, err := NewFakeBoltClient()
 		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := b.VerifyImagesSchema(); err != nil {
 			t.Fatal(err)
 		}
 
