@@ -40,11 +40,12 @@ import (
 
 const (
 	defaultMemory = 1024
+	defaultMemoryUnit = "MiB"
 )
 
-type Drive struct {
-	DriveName string `xml:"name,attr"`
-	DriveType string `xml:"type,attr"`
+type Driver struct {
+	DriverName string `xml:"name,attr"`
+	DriverType string `xml:"type,attr"`
 }
 
 type Source struct {
@@ -59,7 +60,7 @@ type Target struct {
 type Disk struct {
 	DiskType   string `xml:"type,attr"`
 	DiskDevice string `xml:"device,attr"`
-	Drive      Drive  `xml:"drive"`
+	Driver     Driver `xml:"driver"`
 	Src        Source `xml:"source"`
 	Target     Target `xml:"target"`
 }
@@ -79,9 +80,15 @@ type Tag struct {
 	Content string `xml:",innerxml"`
 }
 
+type Memory struct {
+	Memory  string   `xml:",chardata"`
+	Unit    string   `xml:"unit,attr"`
+}
+
 type Domain struct {
 	XMLName xml.Name `xml:"domain"`
 	DomType string   `xml:"type,attr"`
+	Memory  Memory   `xml:"memory"`
 	Devs    Devices  `xml:"devices"`
 	Items   []Tag    `xml:",any"`
 }
@@ -121,7 +128,7 @@ type Sound struct {
 
 var volXML string = `
 <disk type='file' device='disk'>
-    <drive name='qemu' type='raw'/>
+    <driver name='qemu' type='raw'/>
     <source file='%s'/>
     <target dev='vda' bus='virtio'/>
 </disk>`
@@ -175,15 +182,12 @@ func (v *VirtualizationTool) createVolumes(containerName string, mounts []*kubea
 	return domXML, nil
 }
 
-func generateDomXML(name string, memory int64, uuid string, cpuNum int, cpuShare int64, cpuPeriod int64, cpuQuota int64, imageFilepath string) string {
+func generateDomXML(name string, memory int64, memoryUnit string, uuid string, cpuNum int, cpuShare int64, cpuPeriod int64, cpuQuota int64, imageFilepath string) string {
 	domXML := `
 <domain type='kvm'>
     <name>%s</name>
-    <memory>%d</memory>
     <uuid>%s</uuid>
-    <features>
-        <acpi/><apic/>
-    </features>
+    <memory unit='%s'>%d</memory>
     <vcpu>%d</vcpu>
     <cputune>
         <shares>%d</shares>
@@ -194,13 +198,16 @@ func generateDomXML(name string, memory int64, uuid string, cpuNum int, cpuShare
         <type>hvm</type>
         <boot dev='hd'/>
     </os>
+    <features>
+        <acpi/><apic/>
+    </features>
     <on_poweroff>destroy</on_poweroff>
     <on_reboot>restart</on_reboot>
     <on_crash>restart</on_crash>
     <devices>
         <emulator>/usr/bin/kvm</emulator>
         <disk type='file' device='disk'>
-            <drive name='qemu' type='qcow2'/>
+            <driver name='qemu' type='qcow2'/>
             <source file='%s'/>
             <target dev='vda' bus='virtio'/>
         </disk>
@@ -218,7 +225,7 @@ func generateDomXML(name string, memory int64, uuid string, cpuNum int, cpuShare
         </video>
     </devices>
 </domain>`
-	return fmt.Sprintf(domXML, name, memory, uuid, cpuNum, cpuShare, cpuPeriod, cpuQuota, imageFilepath)
+	return fmt.Sprintf(domXML, name, uuid, memoryUnit, memory, cpuNum, cpuShare, cpuPeriod, cpuQuota, imageFilepath)
 }
 
 type VirtualizationTool struct {
@@ -272,8 +279,10 @@ func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, i
 	boltClient.SetContainer(uuid, in.GetPodSandboxId(), config.GetImage().GetImage(), config.Labels, config.Annotations)
 
 	memory := config.GetLinux().GetResources().GetMemoryLimitInBytes()
+	memoryUnit := "b"
 	if memory == 0 {
 		memory = defaultMemory
+		memoryUnit = defaultMemoryUnit
 	}
 
 	cpuNum, err := utils.GetvCPUsNum()
@@ -285,12 +294,13 @@ func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, i
 	cpuPeriod := config.GetLinux().GetResources().GetCpuPeriod()
 	cpuQuota := config.GetLinux().GetResources().GetCpuQuota()
 
-	domXML := generateDomXML(name, memory, uuid, cpuNum, cpuShares, cpuPeriod, cpuQuota, imageFilepath)
+	domXML := generateDomXML(name, memory, memoryUnit, uuid, cpuNum, cpuShares, cpuPeriod, cpuQuota, imageFilepath)
 	domXML, err = v.createVolumes(name, in.Config.Mounts, domXML)
 	if err != nil {
 		return "", err
 	}
 
+	domXML = strings.Replace(domXML, "\"", "'", -1)
 	glog.Infof("Creating domain:\n%s", domXML)
 	cDomXML := C.CString(domXML)
 	defer C.free(unsafe.Pointer(cDomXML))
