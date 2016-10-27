@@ -93,6 +93,10 @@ func TestSetPodSandbox(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		if err := b.VerifySandboxSchema(); err != nil {
+			t.Fatal(err)
+		}
+
 		if err := b.SetPodSandbox(tc.config); err != nil {
 			if tc.error {
 				continue
@@ -236,6 +240,10 @@ func TestRemovePodSandbox(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		if err := b.VerifySandboxSchema(); err != nil {
+			t.Fatal(err)
+		}
+
 		if tc.sandbox != nil {
 			if err := b.SetPodSandbox(tc.sandbox); err != nil {
 				t.Fatal(err)
@@ -307,6 +315,10 @@ func TestGetPodSandboxStatus(t *testing.T) {
 	for _, tc := range tests {
 		b, err := NewFakeBoltClient()
 		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := b.VerifySandboxSchema(); err != nil {
 			t.Fatal(err)
 		}
 
@@ -497,6 +509,10 @@ func TestListPodSandbox(t *testing.T) {
 	for _, tc := range tests {
 		b, err := NewFakeBoltClient()
 		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := b.VerifySandboxSchema(); err != nil {
 			t.Fatal(err)
 		}
 

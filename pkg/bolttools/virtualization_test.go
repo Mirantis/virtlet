@@ -72,6 +72,10 @@ func TestSetContainer(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		if err := b.VerifyVirtualizationSchema(); err != nil {
+			t.Fatal(err)
+		}
+
 		if err := b.SetContainer(tc.containerId, tc.sandboxId, tc.image, tc.labels, tc.annotations); err != nil {
 			t.Fatal(err)
 		}
@@ -172,6 +176,10 @@ func TestGetContainerInfo(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		if err := b.VerifyVirtualizationSchema(); err != nil {
+			t.Fatal(err)
+		}
+
 		if err := b.SetContainer(tc.containerId, tc.sandboxId, tc.image, tc.labels, tc.annotations); err != nil {
 			t.Fatal(err)
 		}
@@ -238,6 +246,10 @@ func TestRemoveContainer(t *testing.T) {
 	for _, tc := range tests {
 		b, err := NewFakeBoltClient()
 		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := b.VerifyVirtualizationSchema(); err != nil {
 			t.Fatal(err)
 		}
 
