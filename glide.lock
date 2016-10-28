@@ -64,7 +64,7 @@ imports:
   - peer
   - transport
 - name: k8s.io/kubernetes
-  version: e72f26a3fff4f521d1da9f52b3ce82d4d0d5a401
+  version: v1.5.0-alpha.1
   repo: git://github.com/kubernetes/kubernetes.git
   vcs: git
   subpackages:
