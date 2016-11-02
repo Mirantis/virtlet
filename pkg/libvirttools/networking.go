@@ -29,9 +29,11 @@ import (
 	"unsafe"
 )
 
+// TODO: set brigde name using cmdline parameteres
+
 const (
-	defaultName   = "virtlet"
-	defaultBridge = "virtbr0"
+	defaultNetName = "virtlet"
+	defaultBridge  = "virtbr0"
 )
 
 func generateNetworkXML() string {
@@ -41,7 +43,7 @@ func generateNetworkXML() string {
     <bridge name="%s" />
     <forward mode="bridge" />
 </network>`
-	return fmt.Sprintf(xml, defaultName, defaultBridge)
+	return fmt.Sprintf(xml, defaultNetName, defaultBridge)
 }
 
 type NetworkingTool struct {
@@ -53,7 +55,7 @@ func NewNetworkingTool(conn C.virConnectPtr) *NetworkingTool {
 }
 
 func (n *NetworkingTool) EnsureVirtletNetwork() error {
-	cNetName := C.CString(defaultName)
+	cNetName := C.CString(defaultNetName)
 	defer C.free(unsafe.Pointer(cNetName))
 
 	if status := C.hasNetwork(n.conn, cNetName); status < 0 {

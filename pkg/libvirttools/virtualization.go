@@ -66,13 +66,14 @@ type Disk struct {
 }
 
 type Devices struct {
-	DiskList []Disk   `xml:"disk"`
-	Inpt     Input    `xml:"input"`
-	Graph    Graphics `xml:"graphics"`
-	Serial   Serial   `xml:"serial"`
-	Consl    Console  `xml:"console"`
-	Snd      Sound    `xml:"sound"`
-	Items    []Tag    `xml:",any"`
+	DiskList      []Disk         `xml:"disk"`
+	Input         Input          `xml:"input"`
+	Graphics      Graphics       `xml:"graphics"`
+	Serial        Serial         `xml:"serial"`
+	Console       Console        `xml:"console"`
+	Sonud         Sound          `xml:"sound"`
+	InterfaceList []NetInterface `xml:"interface"`
+	Items         []Tag          `xml:",any"`
 }
 
 type Tag struct {
@@ -124,6 +125,40 @@ type TargetSerial struct {
 
 type Sound struct {
 	Model string `xml:"model,attr"`
+}
+
+type NetInterface struct {
+	Type   string          `xml:"type,attr"`
+	Model  InterfaceModel  `xml:"model"`
+	Source InterfaceSource `xml:"source"`
+	Target InterfaceTarget `xml:"target"`
+	IP     InterfaceIP     `xml:"ip"`
+	Route  InterfaceRoute  `xml:"route"`
+}
+
+type InterfaceModel struct {
+	Type string `xml:"type,attr"`
+}
+
+type InterfaceTarget struct {
+	Device string `xml:"dev,attr"`
+}
+
+type InterfaceSource struct {
+	Network string `xml:"network,attr"`
+}
+
+type InterfaceIP struct {
+	Address string `xml:"address,attr"`
+	Prefix  string `xml:"prefix,attr"`
+	Peer    string `xml:"peer,attr"`
+}
+
+type InterfaceRoute struct {
+	Family  string `xml:"family,attr"`
+	Address string `xml:"address,attr"`
+	Prefix  string `xml:"prefix,attr"`
+	Gateway string `xml:"gateway,attr"`
 }
 
 var volXML string = `
@@ -223,15 +258,16 @@ func generateDomXML(name string, memoryUnit string, memory int64, uuid string, c
         <video>
             <model type='cirrus'/>
         </video>
-	<interface type='network'>
-	    <source network='virtlet' />
-	    <target dev='%s' />
-	    <ip address='%s' prefix='32' peer='169.254.1.1' />
-	    <route family='ipv4' address='0.0.0.0' prefix='0' gateway='168.254.1.1' />
-	</interface>
+        <interface type='network'>
+            <model type='virtio' />
+            <target dev='%s' />
+            <source network='%s' />
+            <ip address='%s' prefix='32' peer='169.254.1.1' />
+            <route family='ipv4' address='0.0.0.0' prefix='0' gateway='168.254.1.1' />
+        </interface>
     </devices>
 </domain>`
-	return fmt.Sprintf(domXML, name, uuid, memoryUnit, memory, cpuNum, cpuShare, cpuPeriod, cpuQuota, imageFilepath, devName, ipv4)
+	return fmt.Sprintf(domXML, name, uuid, memoryUnit, memory, cpuNum, cpuShare, cpuPeriod, cpuQuota, imageFilepath, devName, defaultNetName, ipv4)
 }
 
 type VirtualizationTool struct {
