@@ -26,8 +26,6 @@ TESTS = $(check_SCRIPTS)
 all:
 	if [ ! -d vendor ]; then $(MAKE) install-vendor; fi
 	go build -o $(builddir)/virtlet ./cmd/virtlet
-	go build -o $(builddir)/virtlet-fake-create-container ./cmd/fake-create-container
-	go build -o $(builddir)/virtlet-fake-image-pull ./cmd/fake-image-pull
 
 verify-glide-installation:
 	@which glide || go get github.com/Masterminds/glide
