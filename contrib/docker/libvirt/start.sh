@@ -14,7 +14,7 @@ chown root:root /etc/libvirt/qemu.conf
 chmod 644 /etc/libvirt/libvirtd.conf
 chmod 644 /etc/libvirt/qemu.conf
 
-if [[ -z "$LIBVIRT_CLEANUP" ]]; then
+if [[ -n "$LIBVIRT_CLEANUP" ]]; then
 	/usr/sbin/libvirtd -d
 	/cleanup.py
 	kill -9 $(cat /var/run/libvirtd.pid)
