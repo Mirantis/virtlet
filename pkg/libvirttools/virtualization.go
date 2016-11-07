@@ -39,7 +39,7 @@ import (
 )
 
 const (
-	defaultMemory = 1024
+	defaultMemory     = 1024
 	defaultMemoryUnit = "MiB"
 )
 
@@ -81,8 +81,8 @@ type Tag struct {
 }
 
 type Memory struct {
-	Memory  string   `xml:",chardata"`
-	Unit    string   `xml:"unit,attr"`
+	Memory string `xml:",chardata"`
+	Unit   string `xml:"unit,attr"`
 }
 
 type Domain struct {
@@ -434,6 +434,9 @@ func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, fi
 		containerInfo, err := boltClient.GetContainerInfo(id)
 		if err != nil {
 			return nil, err
+		}
+		if containerInfo == nil {
+			continue
 		}
 
 		podSandboxId := containerInfo.SandboxId
