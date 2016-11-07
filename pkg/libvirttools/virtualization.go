@@ -435,6 +435,9 @@ func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, fi
 		if err != nil {
 			return nil, err
 		}
+		if containerInfo == nil {
+			continue
+		}
 
 		podSandboxId := containerInfo.SandboxId
 

@@ -104,7 +104,8 @@ func (b *BoltClient) GetContainerInfo(containerId string) (*ContainerInfo, error
 
 		bucket := parentBucket.Bucket([]byte(containerId))
 		if bucket == nil {
-			return fmt.Errorf("Bucket '%s' doesn't exist", containerId)
+			// Container info removed, but sandbox still exists
+			return nil
 		}
 
 		strCreatedAt, err := getString(bucket, "createdAt")
