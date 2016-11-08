@@ -27,7 +27,7 @@ At this stage Virtlet have following requirements:
 * if host have libvirt installed - it should be stopped when working with Virtlet,
 * [docker](https://www.docker.com) should be installed on host and user account on which Virtlet will be built and run - should be properly configured to use this docker installation (possibly adding user's account into group in which docker deamon is running should be enough, but please follow docker documentation for your host Linux distribution),
 * host should have `python` environment in version which is compatible with `docker-compose` (installation instructions in later section of this doc),
-* at the moment Virtlet requires particular patches added into kubernetes, so follow next section to setup it.
+* you need a kubernetes cluster with specified version which is pinned in glide.lock file
 
 ### Running docker-compose environment
 
@@ -63,8 +63,7 @@ Now you can follow instructions from next section.
 
 ### Kubernetes environment
 
-Minimal supported by Virtlet revision of Kubernetes should be based on master branch containing all changes at last up to Thu Sep 9 2016.
-It is assummed that Virtlet master branch should be working correctly with up to date master branch of Kubernetes.
+Currently the only supported version of Kubernetes is specified in glide.lock file, Virtlet may work with different version though.
 
 Assuming standard configuration for Kubernetes sources location, use following commands:
 
