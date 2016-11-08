@@ -36,7 +36,7 @@ func NewConnectionTool(uri string) (*ConnectionTool, error) {
 	defer C.free(unsafe.Pointer(cUri))
 	conn := C.virConnectOpen(cUri)
 	if conn == nil {
-		return nil, GetLastError()
+		return nil, GetLibvirtLastError()
 	}
 	return &ConnectionTool{Conn: conn}, nil
 }

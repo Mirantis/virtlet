@@ -65,7 +65,7 @@ func createPool(conn C.virConnectPtr, name string, path string, poolType string)
 	glog.Infof("Creating storage pool (name: %s, path: %s)", name, path)
 	var pool C.virStoragePoolPtr
 	if pool = C.virStoragePoolCreateXML(conn, cPoolXML, 0); pool == nil {
-		return nil, GetLastError()
+		return nil, GetLibvirtLastError()
 	}
 	return pool, nil
 }
@@ -81,7 +81,7 @@ func LookupStoragePool(conn C.virConnectPtr, name string) (C.virStoragePoolPtr, 
 				return nil, err
 			}
 		} else {
-			return nil, GetLastError()
+			return nil, GetLibvirtLastError()
 		}
 	}
 	return storagePool, nil
