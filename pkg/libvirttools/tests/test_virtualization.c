@@ -17,6 +17,7 @@ limitations under the License.
 #include <glib.h>
 #include <libvirt/libvirt.h>
 #include "alloc-util.h"
+#include "error.h"
 #include "virtualization.h"
 
 void testDefineDomain(gconstpointer gConn) {
@@ -46,7 +47,7 @@ void testDefineDomain(gconstpointer gConn) {
 	int result;
 
 	result = defineDomain(conn, domXML);
-	g_assert_cmpint(result, ==, VIRTLET_VIRTUALIZATION_OK);
+	g_assert_cmpint(result, ==, VIRTLET_OK);
 }
 
 void testCreateDomain(gconstpointer gConn) {
@@ -54,7 +55,7 @@ void testCreateDomain(gconstpointer gConn) {
 	int result;
 
 	result = createDomain(conn, "e54e628a-2f8d-49c1-89b5-0b269debb9f1");
-	g_assert_cmpint(result, ==, VIRTLET_VIRTUALIZATION_OK);
+	g_assert_cmpint(result, ==, VIRTLET_OK);
 }
 
 void testStopDomain(gconstpointer gConn) {
@@ -62,7 +63,7 @@ void testStopDomain(gconstpointer gConn) {
 	int result;
 
 	result = stopDomain(conn, "e54e628a-2f8d-49c1-89b5-0b269debb9f1");
-	g_assert_cmpint(result, ==, VIRTLET_VIRTUALIZATION_OK);
+	g_assert_cmpint(result, ==, VIRTLET_OK);
 }
 
 void testDestroyAndUndefineDomain(gconstpointer gConn) {
@@ -71,7 +72,7 @@ void testDestroyAndUndefineDomain(gconstpointer gConn) {
 
 	result = destroyAndUndefineDomain(conn,
 					  "e54e628a-2f8d-49c1-89b5-0b269debb9f1");
-	g_assert_cmpint(result, ==, VIRTLET_VIRTUALIZATION_OK);
+	g_assert_cmpint(result, ==, VIRTLET_OK);
 }
 
 int main(int argc, char **argv) {

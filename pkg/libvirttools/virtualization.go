@@ -305,20 +305,21 @@ func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, i
 	cDomXML := C.CString(domXML)
 	defer C.free(unsafe.Pointer(cDomXML))
 
-	if status := C.defineDomain(v.conn, cDomXML); status < 0 {
-		return "", GetLastError()
+	status := C.defineDomain(v.conn, cDomXML)
+	if err := cErrorHandler.Convert(status); err != nil {
+		return "", err
 	}
 
 	cContainerId := C.CString(uuid)
 	defer C.free(unsafe.Pointer(cContainerId))
 	domain := C.virDomainLookupByUUIDString(v.conn, cContainerId)
 	if domain == nil {
-		return "", GetLastError()
+		return "", GetLibvirtLastError()
 	}
 	defer C.virDomainFree(domain)
 	var domainInfo C.virDomainInfo
 	if status := C.virDomainGetInfo(domain, &domainInfo); status < 0 {
-		return "", GetLastError()
+		return "", GetLibvirtLastError()
 	}
 
 	return uuid, nil
@@ -331,7 +332,7 @@ func (v *VirtualizationTool) GetDomainByName(name string) (C.virDomainPtr, error
 	domain := C.virDomainLookupByName(v.conn, cName)
 
 	if domain == nil {
-		return nil, GetLastError()
+		return nil, GetLibvirtLastError()
 	}
 
 	return domain, nil
@@ -341,7 +342,7 @@ func (v *VirtualizationTool) GetDomainUUID(domain C.virDomainPtr) (string, error
 	uuid := make([]byte, C.VIR_UUID_STRING_BUFLEN)
 
 	if status := C.virDomainGetUUIDString(domain, (*C.char)(unsafe.Pointer(&uuid[0]))); status < 0 {
-		return "", GetLastError()
+		return "", GetLibvirtLastError()
 	}
 
 	return string(uuid[:len(uuid)-1]), nil
@@ -351,8 +352,9 @@ func (v *VirtualizationTool) StartContainer(containerId string) error {
 	cContainerId := C.CString(containerId)
 	defer C.free(unsafe.Pointer(cContainerId))
 
-	if status := C.createDomain(v.conn, cContainerId); status < 0 {
-		return GetLastError()
+	status := C.createDomain(v.conn, cContainerId)
+	if err := cErrorHandler.Convert(status); err != nil {
+		return err
 	}
 
 	return nil
@@ -362,8 +364,9 @@ func (v *VirtualizationTool) StopContainer(containerId string) error {
 	cContainerId := C.CString(containerId)
 	defer C.free(unsafe.Pointer(cContainerId))
 
-	if status := C.stopDomain(v.conn, cContainerId); status < 0 {
-		return GetLastError()
+	status := C.stopDomain(v.conn, cContainerId)
+	if err := cErrorHandler.Convert(status); err != nil {
+		return err
 	}
 
 	return nil
@@ -375,8 +378,9 @@ func (v *VirtualizationTool) RemoveContainer(containerId string) error {
 	cContainerId := C.CString(containerId)
 	defer C.free(unsafe.Pointer(cContainerId))
 
-	if status := C.destroyAndUndefineDomain(v.conn, cContainerId); status < 0 {
-		return GetLastError()
+	status := C.destroyAndUndefineDomain(v.conn, cContainerId)
+	if err := cErrorHandler.Convert(status); err != nil {
+		return err
 	}
 
 	return nil
@@ -414,7 +418,7 @@ func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, fi
 	var cList *C.virDomainPtr
 	count := C.virConnectListAllDomains(v.conn, (**C.virDomainPtr)(&cList), 0)
 	if count < 0 {
-		return nil, GetLastError()
+		return nil, GetLibvirtLastError()
 	}
 	header := reflect.SliceHeader{
 		Data: uintptr(unsafe.Pointer(cList)),
@@ -442,7 +446,7 @@ func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, fi
 		podSandboxId := containerInfo.SandboxId
 
 		if status := C.virDomainGetInfo(domain, &domainInfo); status < 0 {
-			return nil, GetLastError()
+			return nil, GetLibvirtLastError()
 		}
 
 		metadata := &kubeapi.ContainerMetadata{
@@ -485,12 +489,12 @@ func (v *VirtualizationTool) ContainerStatus(containerId string) (*kubeapi.Conta
 
 	domain := C.virDomainLookupByUUIDString(v.conn, cContainerId)
 	if domain == nil {
-		return nil, GetLastError()
+		return nil, GetLibvirtLastError()
 	}
 	defer C.virDomainFree(domain)
 
 	if status := C.virDomainGetInfo(domain, &domainInfo); status < 0 {
-		return nil, GetLastError()
+		return nil, GetLibvirtLastError()
 	}
 
 	containerState := libvirtToKubeState(domainInfo)

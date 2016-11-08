@@ -18,6 +18,7 @@ limitations under the License.
 #include <libvirt/virterror.h>
 #include <stdlib.h>
 #include "alloc-util.h"
+#include "error.h"
 #include "virtualization.h"
 
 int defineDomain(virConnectPtr conn, char *domXML) {
@@ -27,7 +28,7 @@ int defineDomain(virConnectPtr conn, char *domXML) {
 		return VIRTLET_VIRTUALIZATION_ERR_LIBVIRT;
 	}
 
-	return VIRTLET_VIRTUALIZATION_OK;
+	return VIRTLET_OK;
 }
 
 int createDomain(virConnectPtr conn, char *uuid) {
@@ -38,7 +39,7 @@ int createDomain(virConnectPtr conn, char *uuid) {
 		return VIRTLET_VIRTUALIZATION_ERR_LIBVIRT;
 	}
 
-	return VIRTLET_VIRTUALIZATION_OK;
+	return VIRTLET_OK;
 }
 
 int stopDomain(virConnectPtr conn, char *uuid) {
@@ -49,7 +50,7 @@ int stopDomain(virConnectPtr conn, char *uuid) {
 		return VIRTLET_VIRTUALIZATION_ERR_LIBVIRT;
 	}
 
-	return VIRTLET_VIRTUALIZATION_OK;
+	return VIRTLET_OK;
 }
 
 int destroyAndUndefineDomain(virConnectPtr conn, char *uuid) {
@@ -61,5 +62,5 @@ int destroyAndUndefineDomain(virConnectPtr conn, char *uuid) {
 		return VIRTLET_VIRTUALIZATION_ERR_LIBVIRT;
 	}
 
-	return VIRTLET_VIRTUALIZATION_OK;
+	return VIRTLET_OK;
 }

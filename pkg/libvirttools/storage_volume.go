@@ -83,7 +83,7 @@ func (LocalFilesystemBackend) CreateVol(pool C.virStoragePoolPtr, volName string
 	defer C.free(unsafe.Pointer(cVolXML))
 	vol := C.virStorageVolCreateXML(pool, cVolXML, 0)
 	if vol == nil {
-		return nil, GetLastError()
+		return nil, GetLibvirtLastError()
 	}
 	return vol, nil
 }
@@ -95,7 +95,7 @@ func (RBDBackend) CreateVol(pool C.virStoragePoolPtr, volName string, capacity i
 func VolGetInfo(vol C.virStorageVolPtr) (C.virStorageVolInfoPtr, error) {
 	var volInfo C.virStorageVolInfo
 	if status := C.virStorageVolGetInfo(vol, &volInfo); status != 0 {
-		return nil, GetLastError()
+		return nil, GetLibvirtLastError()
 	}
 	return &volInfo, nil
 }
@@ -103,7 +103,7 @@ func VolGetInfo(vol C.virStorageVolPtr) (C.virStorageVolInfoPtr, error) {
 func VolGetPath(vol C.virStorageVolPtr) (string, error) {
 	cPath := C.virStorageVolGetPath(vol)
 	if cPath == nil {
-		return "", GetLastError()
+		return "", GetLibvirtLastError()
 	}
 	return C.GoString(cPath), nil
 
@@ -114,7 +114,7 @@ func LookupVol(name string, pool C.virStoragePoolPtr) (C.virStorageVolPtr, error
 	defer C.free(unsafe.Pointer(cName))
 	vol := C.virStorageVolLookupByName(pool, cName)
 	if vol == nil {
-		return nil, GetLastError()
+		return nil, GetLibvirtLastError()
 	}
 	return vol, nil
 }
@@ -125,7 +125,7 @@ func RemoveVol(name string, pool C.virStoragePoolPtr) error {
 		return err
 	}
 	if status := C.virStorageVolDelete(vol, 0); status != 0 {
-		return GetLastError()
+		return GetLibvirtLastError()
 	}
 	return nil
 }
