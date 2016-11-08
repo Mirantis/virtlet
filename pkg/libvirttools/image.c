@@ -23,6 +23,7 @@ limitations under the License.
 #include <string.h>
 #include <unistd.h>
 #include "alloc-util.h"
+#include "error.h"
 #include "image.h"
 
 int virtletVolUploadSource(virStreamPtr stream, char *bytes, size_t nbytes,
@@ -57,5 +58,5 @@ int pullImage(virConnectPtr conn, virStoragePoolPtr pool, char *shortName,
 		return VIRTLET_IMAGE_ERR_LIBVIRT;
 	}
 
-	return VIRTLET_IMAGE_OK;
+	return VIRTLET_OK;
 }
