@@ -19,6 +19,16 @@ limitations under the License.
 
 #include <stdbool.h>
 
+#define VIRTLET_IMAGE_ERR_BASE 1000
+
+enum virtletImageErr {
+	VIRTLET_IMAGE_OK = 0,
+
+	VIRTLET_IMAGE_ERR_SEND_STREAM = VIRTLET_IMAGE_ERR_BASE + 1,
+	VIRTLET_IMAGE_ERR_ALREADY_EXISTS = VIRTLET_IMAGE_ERR_BASE + 2,
+	VIRTLET_IMAGE_ERR_LIBVIRT = VIRTLET_IMAGE_ERR_BASE + 3,
+};
+
 int virtletVolUploadSource(virStreamPtr stream, char *bytes, size_t nbytes,
 			   void *opaque);
 int pullImage(virConnectPtr conn, virStoragePoolPtr pool, char *shortName,

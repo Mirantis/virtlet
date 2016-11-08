@@ -28,7 +28,7 @@ limitations under the License.
 int virtletVolUploadSource(virStreamPtr stream, char *bytes, size_t nbytes,
 			   void *opaque) {
 	if (opaque == NULL) {
-		return -1;
+		return VIRTLET_IMAGE_ERR_SEND_STREAM;
 	}
 
 	int *fd = opaque;
@@ -42,7 +42,7 @@ int pullImage(virConnectPtr conn, virStoragePoolPtr pool, char *shortName,
 	DEFINE_VIR_STREAM(stream);
 
 	if ((vol = virStorageVolLookupByName(pool, (const char*) shortName)) != NULL) {
-		return -1;
+		return VIRTLET_IMAGE_ERR_ALREADY_EXISTS;
 	}
 
 	if ((fd = open(filepath, O_RDONLY)) < 0) {
@@ -54,8 +54,8 @@ int pullImage(virConnectPtr conn, virStoragePoolPtr pool, char *shortName,
 	    virStorageVolUpload(vol, stream, 0, 0, 0) < 0 ||
 	    virStreamSendAll(stream, virtletVolUploadSource, &fd) < 0 ||
 	    virStreamFinish(stream) < 0) {
-		return -1;
+		return VIRTLET_IMAGE_ERR_LIBVIRT;
 	}
 
-	return 0;
+	return VIRTLET_IMAGE_OK;
 }
