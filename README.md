@@ -70,6 +70,7 @@ Assuming standard configuration for Kubernetes sources location, use following c
 ```sh
 cd $GOPATH/k8s.io/kubernetes
 export KUBERNETES_PROVIDER=local
+export CONTAINER_RUNTIME=remote
 export CONTAINER_RUNTIME_ENDPOINT=/run/virtlet.sock
 ./hack/local-up-cluster.sh
 ```
