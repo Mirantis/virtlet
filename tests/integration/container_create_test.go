@@ -14,39 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package integration
 
 import (
-	"flag"
-	"fmt"
-	"os"
+	"testing"
 
 	"golang.org/x/net/context"
-	"google.golang.org/grpc"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-
-	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
-var (
-	imageUrl = flag.String("image-url",
-		"ftp.ps.pl/pub/Linux/fedora-linux/releases/24/CloudImages/x86_64/images/Fedora-Cloud-Base-24-1.2.x86_64.qcow2",
-		"Image URL to pull")
-	virtletSocket = flag.String("virtlet-socket",
-		"/run/virtlet.sock",
-		"The unix socket to connect, e.g. /run/virtlet.sock")
-)
-
-func main() {
-	flag.Parse()
-
-	conn, err := grpc.Dial(*virtletSocket, grpc.WithInsecure(), grpc.WithDialer(utils.Dial))
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Cannot connect: %#v", err)
-		os.Exit(1)
+func TestContainerCreate(t *testing.T) {
+	manager := NewVirtletManager()
+	if err := manager.Run(); err != nil {
+		t.Fatal(err)
 	}
-	defer conn.Close()
-	c := kubeapi.NewRuntimeServiceClient(conn)
+	defer manager.Close()
+
+	runtimeServiceClient := kubeapi.NewRuntimeServiceClient(manager.conn)
 
 	// Sandbox request
 	hostNetwork := false
@@ -65,10 +49,11 @@ func main() {
 	}
 
 	podSandboxName := "foo"
-	// podSandboxUid := ""
+	podSandboxUid := "c8e21c1b-8008-4337-ac16-f70f2dfaf101"
 	podSandboxNamespace := "default"
 	podSandboxMetadata := &kubeapi.PodSandboxMetadata{
 		Name:      &podSandboxName,
+		Uid:       &podSandboxUid,
 		Namespace: &podSandboxNamespace,
 	}
 
@@ -81,14 +66,13 @@ func main() {
 	}
 	sandboxIn := &kubeapi.RunPodSandboxRequest{Config: podSandboxConfig}
 
-	sandboxOut, err := c.RunPodSandbox(context.Background(), sandboxIn)
+	sandboxOut, err := runtimeServiceClient.RunPodSandbox(context.Background(), sandboxIn)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Cannot create pod sandbox: %#v", err)
-		os.Exit(1)
+		t.Fatal(err)
 	}
 
 	// Container request
-	imageSpec := &kubeapi.ImageSpec{Image: imageUrl}
+	imageSpec := &kubeapi.ImageSpec{Image: &imageUrl}
 	hostPath := "/var/lib/virtlet"
 	config := &kubeapi.ContainerConfig{
 		Image:  imageSpec,
@@ -100,12 +84,7 @@ func main() {
 		SandboxConfig: podSandboxConfig,
 	}
 
-	containerOut, err := c.CreateContainer(context.Background(), containerIn)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Cannot create container: %#v", err)
-		os.Exit(1)
+	if _, err := runtimeServiceClient.CreateContainer(context.Background(), containerIn); err != nil {
+		t.Fatal(err)
 	}
-
-	fmt.Printf("Got response: %#v\n", containerOut)
-	fmt.Printf("Created container with ID: %s\n", *containerOut.ContainerId)
 }

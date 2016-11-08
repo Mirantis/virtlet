@@ -48,7 +48,7 @@ type VirtletManager struct {
 	boltClient *bolttools.BoltClient
 }
 
-func NewVirtletManager(libvirtUri string, poolName string, storageBackend string, boltEndpoint string) (*VirtletManager, error) {
+func NewVirtletManager(libvirtUri string, poolName string, storageBackend string, boltPath string) (*VirtletManager, error) {
 	libvirtConnTool, err := libvirttools.NewConnectionTool(libvirtUri)
 	if err != nil {
 		return nil, err
@@ -61,7 +61,7 @@ func NewVirtletManager(libvirtUri string, poolName string, storageBackend string
 	if err != nil {
 		return nil, err
 	}
-	boltClient, err := bolttools.NewBoltClient()
+	boltClient, err := bolttools.NewBoltClient(boltPath)
 	if err != nil {
 		return nil, err
 	}

@@ -14,36 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package bolttools
+package integration
 
 import (
-	"github.com/boltdb/bolt"
+	"fmt"
+	"os"
+	"time"
 )
 
-type BoltClient struct {
-	db *bolt.DB
-}
+const (
+	maxTime = 60
+)
 
-func NewBoltClient(path string) (*BoltClient, error) {
-	db, err := bolt.Open(path, 0600, nil)
-	if err != nil {
-		return nil, err
+func waitForSocket(filepath string) error {
+	for i := 0; i < maxTime; i++ {
+		time.Sleep(1 * time.Second)
+		if _, err := os.Stat(filepath); err == nil {
+			return nil
+		}
 	}
 
-	client := &BoltClient{db: db}
-	if err := client.VerifyImagesSchema(); err != nil {
-		return nil, err
-	}
-	if err := client.VerifySandboxSchema(); err != nil {
-		return nil, err
-	}
-	if err := client.VerifyVirtualizationSchema(); err != nil {
-		return nil, err
-	}
-
-	return client, nil
-}
-
-func (b *BoltClient) Close() error {
-	return b.db.Close()
+	return fmt.Errorf("Socket %s doesn't exist", filepath)
 }
