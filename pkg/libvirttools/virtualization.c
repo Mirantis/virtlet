@@ -24,10 +24,10 @@ int defineDomain(virConnectPtr conn, char *domXML) {
 	DEFINE_VIR_DOMAIN(domain);
 
 	if (!(domain = virDomainDefineXML(conn, (const char*) domXML))) {
-		return -1;
+		return VIRTLET_VIRTUALIZATION_ERR_LIBVIRT;
 	}
 
-	return 0;
+	return VIRTLET_VIRTUALIZATION_OK;
 }
 
 int createDomain(virConnectPtr conn, char *uuid) {
@@ -35,10 +35,10 @@ int createDomain(virConnectPtr conn, char *uuid) {
 
 	if (!(domain = virDomainLookupByUUIDString(conn, (const char*) uuid)) ||
 	    virDomainCreate(domain) < 0) {
-		return -1;
+		return VIRTLET_VIRTUALIZATION_ERR_LIBVIRT;
 	}
 
-	return 0;
+	return VIRTLET_VIRTUALIZATION_OK;
 }
 
 int stopDomain(virConnectPtr conn, char *uuid) {
@@ -46,10 +46,10 @@ int stopDomain(virConnectPtr conn, char *uuid) {
 
 	if (!(domain = virDomainLookupByUUIDString(conn, (const char*) uuid)) ||
 	    virDomainShutdown(domain) < 0) {
-		return -1;
+		return VIRTLET_VIRTUALIZATION_ERR_LIBVIRT;
 	}
 
-	return 0;
+	return VIRTLET_VIRTUALIZATION_OK;
 }
 
 int destroyAndUndefineDomain(virConnectPtr conn, char *uuid) {
@@ -58,8 +58,8 @@ int destroyAndUndefineDomain(virConnectPtr conn, char *uuid) {
 	if (!(domain = virDomainLookupByUUIDString(conn, (const char*) uuid)) ||
 	    virDomainDestroy(domain) < 0 ||
 	    virDomainUndefine(domain) < 0) {
-		return -1;
+		return VIRTLET_VIRTUALIZATION_ERR_LIBVIRT;
 	}
 
-	return 0;
+	return VIRTLET_VIRTUALIZATION_OK;
 }
