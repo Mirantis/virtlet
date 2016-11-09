@@ -59,7 +59,7 @@ func TestSetImageFilepath(t *testing.T) {
 		if err := b.db.View(func(tx *bolt.Tx) error {
 			bucket := tx.Bucket([]byte("images"))
 			if bucket == nil {
-				return fmt.Errorf("Bucket 'images' doesn't exist")
+				return fmt.Errorf("bucket 'images' doesn't exist")
 			}
 
 			filepath, err := getString(bucket, tc.hash)

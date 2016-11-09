@@ -53,23 +53,23 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig) error {
 
 	metadata := config.GetMetadata()
 	if metadata == nil {
-		return fmt.Errorf("Sandbox config is missing Metadata attribute: %#v", config)
+		return fmt.Errorf("sandbox config is missing Metadata attribute: %#v", config)
 	}
 
 	linuxSandbox := config.GetLinux()
 	if linuxSandbox == nil {
-		return fmt.Errorf("Sandbox config is missing Linux attribute: %#v", config)
+		return fmt.Errorf("sandbox config is missing Linux attribute: %#v", config)
 	}
 
 	namespaceOptions := linuxSandbox.GetNamespaceOptions()
 	if namespaceOptions == nil {
-		return fmt.Errorf("Linux sandbox config is missint Namespaces attribute: %#v", linuxSandbox)
+		return fmt.Errorf("Linux sandbox config is missing Namespaces attribute: %#v", linuxSandbox)
 	}
 
 	err = b.db.Batch(func(tx *bolt.Tx) error {
 		parentBucket := tx.Bucket([]byte("sandbox"))
 		if parentBucket == nil {
-			return fmt.Errorf("Bucket 'sandbox' doesn't exist")
+			return fmt.Errorf("bucket 'sandbox' doesn't exist")
 		}
 
 		sandboxBucket, err := parentBucket.CreateBucketIfNotExists([]byte(podId))
@@ -154,7 +154,7 @@ func (b *BoltClient) RemovePodSandbox(podId string) error {
 	if err := b.db.Batch(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte("sandbox"))
 		if bucket == nil {
-			return fmt.Errorf("Bucket 'sandbox' doesn't exist")
+			return fmt.Errorf("bucket 'sandbox' doesn't exist")
 		}
 
 		if err := bucket.DeleteBucket([]byte(podId)); err != nil {
@@ -175,12 +175,12 @@ func (b *BoltClient) GetPodSandboxStatus(podId string) (*kubeapi.PodSandboxStatu
 	err := b.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte("sandbox"))
 		if bucket == nil {
-			return fmt.Errorf("Bucket 'sandbox' doesn't exist")
+			return fmt.Errorf("bucket 'sandbox' doesn't exist")
 		}
 
 		sandboxBucket := bucket.Bucket([]byte(podId))
 		if sandboxBucket == nil {
-			return fmt.Errorf("Bucket '%s' doesn't exist", podId)
+			return fmt.Errorf("bucket '%s' doesn't exist", podId)
 		}
 
 		byteCreatedAt, err := getString(sandboxBucket, "createdAt")
@@ -215,7 +215,7 @@ func (b *BoltClient) GetPodSandboxStatus(podId string) (*kubeapi.PodSandboxStatu
 
 		metadataBucket := sandboxBucket.Bucket([]byte("metadata"))
 		if metadataBucket == nil {
-			return fmt.Errorf("Bucket 'metadata' doesn't exist")
+			return fmt.Errorf("bucket 'metadata' doesn't exist")
 		}
 
 		metadataName, err := getString(metadataBucket, "name")
@@ -246,12 +246,12 @@ func (b *BoltClient) GetPodSandboxStatus(podId string) (*kubeapi.PodSandboxStatu
 
 		linuxSandboxBucket := sandboxBucket.Bucket([]byte("linuxSandbox"))
 		if linuxSandboxBucket == nil {
-			return fmt.Errorf("Bucket 'linuxSandbox' doesn't exist")
+			return fmt.Errorf("bucket 'linuxSandbox' doesn't exist")
 		}
 
 		namespaceOptionsBucket := linuxSandboxBucket.Bucket([]byte("namespaceOptions"))
 		if namespaceOptionsBucket == nil {
-			return fmt.Errorf("Bucket 'namespaceOptions' doesn't exist")
+			return fmt.Errorf("bucket 'namespaceOptions' doesn't exist")
 		}
 
 		strHostNetwork, err := getString(namespaceOptionsBucket, "hostNetwork")
@@ -359,12 +359,12 @@ func (b *BoltClient) getPodSandbox(sandboxId []byte, filter *kubeapi.PodSandboxF
 	err := b.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte("sandbox"))
 		if bucket == nil {
-			return fmt.Errorf("Bucket 'sandbox' doesn't exist")
+			return fmt.Errorf("bucket 'sandbox' doesn't exist")
 		}
 
 		sandboxBucket := bucket.Bucket(sandboxId)
 		if sandboxBucket == nil {
-			return fmt.Errorf("Bucket '%s' doesn't exist", sandboxId)
+			return fmt.Errorf("bucket '%s' doesn't exist", sandboxId)
 		}
 
 		strCreatedAt, err := getString(sandboxBucket, "createdAt")
@@ -389,7 +389,7 @@ func (b *BoltClient) getPodSandbox(sandboxId []byte, filter *kubeapi.PodSandboxF
 
 		metadataBucket := sandboxBucket.Bucket([]byte("metadata"))
 		if metadataBucket == nil {
-			return fmt.Errorf("Bucket 'metadata' doesn't exist")
+			return fmt.Errorf("bucket 'metadata' doesn't exist")
 		}
 
 		metadataName, err := getString(metadataBucket, "name")

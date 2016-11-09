@@ -50,7 +50,7 @@ func (b *BoltClient) SetImageFilepath(name, filepath string) error {
 	err := b.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte("images"))
 		if bucket == nil {
-			return fmt.Errorf("Bucket 'images' doesn't exist")
+			return fmt.Errorf("bucket 'images' doesn't exist")
 		}
 
 		if err := bucket.Put([]byte(key), []byte(filepath)); err != nil {
@@ -71,7 +71,7 @@ func (b *BoltClient) GetImageFilepath(name string) (string, error) {
 	err := b.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte("images"))
 		if bucket == nil {
-			return fmt.Errorf("Bucket 'images' doesn't exist")
+			return fmt.Errorf("bucket 'images' doesn't exist")
 		}
 
 		fp := bucket.Get([]byte(key))

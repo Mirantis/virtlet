@@ -42,7 +42,7 @@ func main() {
 
 	conn, err := grpc.Dial(*virtletSocket, grpc.WithInsecure(), grpc.WithDialer(utils.Dial))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Cannot connect: %#v", err)
+		fmt.Fprintf(os.Stderr, "Cannot connect: %v", err)
 		os.Exit(1)
 	}
 	defer conn.Close()
@@ -83,7 +83,7 @@ func main() {
 
 	sandboxOut, err := c.RunPodSandbox(context.Background(), sandboxIn)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Cannot create pod sandbox: %#v", err)
+		fmt.Fprintf(os.Stderr, "Cannot create pod sandbox: %v", err)
 		os.Exit(1)
 	}
 
@@ -102,7 +102,7 @@ func main() {
 
 	containerOut, err := c.CreateContainer(context.Background(), containerIn)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Cannot create container: %#v", err)
+		fmt.Fprintf(os.Stderr, "Cannot create container: %v", err)
 		os.Exit(1)
 	}
 

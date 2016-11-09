@@ -46,7 +46,7 @@ func GetStorageBackend(name string) (StorageBackend, error) {
 	case poolTypeRBD:
 		return &RBDBackend{}, nil
 	}
-	return nil, fmt.Errorf("There is no such a storage backend: %s", name)
+	return nil, fmt.Errorf("there is no such a storage backend: %s", name)
 }
 
 type LocalFilesystemBackend struct{}

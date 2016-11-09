@@ -42,7 +42,7 @@ func main() {
 
 	conn, err := grpc.Dial(*virtletSocket, grpc.WithInsecure(), grpc.WithDialer(utils.Dial))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Cannot connect: %#v", err)
+		fmt.Fprintf(os.Stderr, "Cannot connect: %v", err)
 		os.Exit(1)
 	}
 	defer conn.Close()
@@ -57,7 +57,7 @@ func main() {
 
 	out, err := c.PullImage(context.Background(), in)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Cannot pull image: %#v", err)
+		fmt.Fprintf(os.Stderr, "Cannot pull image: %v", err)
 		os.Exit(1)
 	}
 

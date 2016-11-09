@@ -76,7 +76,7 @@ func TestGet(t *testing.T) {
 		if err := b.db.View(func(tx *bolt.Tx) error {
 			bucket := tx.Bucket(tc.bucketName)
 			if bucket == nil {
-				return fmt.Errorf("Bucket '%s' doesn't exist", tc.bucketName)
+				return fmt.Errorf("bucket '%s' doesn't exist", tc.bucketName)
 			}
 
 			for _, k := range tc.valuesToGet {

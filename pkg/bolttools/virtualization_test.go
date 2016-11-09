@@ -83,12 +83,12 @@ func TestSetContainer(t *testing.T) {
 		if err := b.db.View(func(tx *bolt.Tx) error {
 			parentBucket := tx.Bucket([]byte("virtualization"))
 			if parentBucket == nil {
-				return fmt.Errorf("Bucket 'virtualization' doesn't exist")
+				return fmt.Errorf("bucket 'virtualization' doesn't exist")
 			}
 
 			bucket := parentBucket.Bucket([]byte(tc.containerId))
 			if bucket == nil {
-				return fmt.Errorf("Bucket '%s' doesn't exist", tc.containerId)
+				return fmt.Errorf("bucket '%s' doesn't exist", tc.containerId)
 			}
 
 			sandboxId, err := getString(bucket, "sandboxId")
@@ -198,11 +198,11 @@ func TestGetContainerInfo(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(containerInfo.Labels, tc.labels) {
-			t.Errorf("Expected %#v, instead got %#v", tc.labels, containerInfo.Labels)
+			t.Errorf("Expected %v, instead got %v", tc.labels, containerInfo.Labels)
 		}
 
 		if !reflect.DeepEqual(containerInfo.Annotations, tc.annotations) {
-			t.Errorf("Expected %#v, instead got %#v", tc.annotations, containerInfo.Annotations)
+			t.Errorf("Expected %v, instead got %v", tc.annotations, containerInfo.Annotations)
 		}
 	}
 }

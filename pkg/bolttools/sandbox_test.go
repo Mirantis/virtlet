@@ -108,12 +108,12 @@ func TestSetPodSandbox(t *testing.T) {
 		if err := b.db.View(func(tx *bolt.Tx) error {
 			parentBucket := tx.Bucket([]byte("sandbox"))
 			if parentBucket == nil {
-				return fmt.Errorf("Bucket 'sandbox' doesn't exist")
+				return fmt.Errorf("bucket 'sandbox' doesn't exist")
 			}
 
 			bucket := parentBucket.Bucket([]byte(tc.config.GetMetadata().GetUid()))
 			if bucket == nil {
-				return fmt.Errorf("Bucket '%s' doesn't exist", tc.config.GetMetadata().GetUid())
+				return fmt.Errorf("bucket '%s' doesn't exist", tc.config.GetMetadata().GetUid())
 			}
 
 			hostname, err := getString(bucket, "hostname")
@@ -142,7 +142,7 @@ func TestSetPodSandbox(t *testing.T) {
 
 			metadataBucket := bucket.Bucket([]byte("metadata"))
 			if metadataBucket == nil {
-				return fmt.Errorf("Bucket 'metadata' doesn't exist")
+				return fmt.Errorf("bucket 'metadata' doesn't exist")
 			}
 
 			name, err := getString(metadataBucket, "name")
@@ -336,15 +336,15 @@ func TestGetPodSandboxStatus(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(status.GetLabels(), tc.config.GetLabels()) {
-			t.Errorf("Expected %#v, instead got %#v", tc.config.GetLabels(), status.GetLabels())
+			t.Errorf("Expected %v, instead got %v", tc.config.GetLabels(), status.GetLabels())
 		}
 
 		if !reflect.DeepEqual(status.GetAnnotations(), tc.config.GetAnnotations()) {
-			t.Errorf("Expected %#v, instead got %#v", tc.config.GetAnnotations(), status.GetAnnotations())
+			t.Errorf("Expected %v, instead got %v", tc.config.GetAnnotations(), status.GetAnnotations())
 		}
 
 		if status.GetMetadata().GetName() != tc.config.GetMetadata().GetName() {
-			t.Errorf("Expected %s, instead got %#v", tc.config.GetMetadata().GetName(), status.GetMetadata().GetName())
+			t.Errorf("Expected %s, instead got %s", tc.config.GetMetadata().GetName(), status.GetMetadata().GetName())
 		}
 	}
 }
