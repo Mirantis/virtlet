@@ -20,6 +20,19 @@ services:
       - libvirt_volume_pool:/var/lib/virtlet
       - libvirtd:/var/lib/libvirt
       - libvirt_qemu:/etc/libvirt/qemu
+  virtlet-dhcp:
+    build: ../..
+    network_mode: host
+    restart: always
+    environment:
+      - VIRTLET_LOGLEVEL
+    volumes:
+      - /run:/run
+      - virtlet_data:/var/data/virtlet
+    entrypoint:
+      - /usr/local/bin/virtlet-dhcp
+      - -v=2
+      - -logtostderr=true
   virtlet:
     build: ../..
     # network_mode: host
@@ -34,6 +47,7 @@ services:
       - libvirt_volume_pool:/var/lib/virtlet
     depends_on:
       - libvirt
+      - virtlet-dhcp
     links:
       - "libvirt:libvirt"
 volumes:
