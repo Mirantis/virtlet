@@ -14,3 +14,6 @@ import:
   - api/v1alpha/runtime
 - package: github.com/davecgh/go-spew
   version: ~1.0.0
+- package: go.universe.tf/netboot
+  subpackages:
+  - dhcp4

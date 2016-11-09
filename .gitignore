@@ -44,6 +44,7 @@ _testmain.go
 /virtlet
 /virtlet-fake-create-container
 /virtlet-fake-image-pull
+/virtlet-dhcp
 
 # Autotools
 Makefile

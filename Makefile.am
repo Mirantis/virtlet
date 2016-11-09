@@ -28,6 +28,7 @@ all:
 	go build -o $(builddir)/virtlet ./cmd/virtlet
 	go build -o $(builddir)/virtlet-fake-create-container ./cmd/fake-create-container
 	go build -o $(builddir)/virtlet-fake-image-pull ./cmd/fake-image-pull
+	go build -o $(builddir)/virtlet-dhcp ./cmd/dhcpserver
 
 verify-glide-installation:
 	@which glide || go get github.com/Masterminds/glide
@@ -45,3 +46,4 @@ install-exec-local:
 	install $(builddir)/virtlet $(bindir)/virtlet
 	install $(builddir)/virtlet-fake-create-container $(bindir)/virtlet-fake-create-container
 	install $(builddir)/virtlet-fake-image-pull $(bindir)/virtlet-fake-image-pull
+	install $(builddir)/virtlet-dhcp $(bindir)/virtlet-dhcp
