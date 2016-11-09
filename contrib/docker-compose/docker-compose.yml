@@ -36,6 +36,17 @@ services:
       - libvirt
     links:
       - "libvirt:libvirt"
+  virtlet-dhcp:
+    build: ../..
+    network_mode: host
+    restart: always
+    environment:
+      - VIRTLET_LOGLEVEL
+    volumes:
+      - /run:/run
+      - virtlet_data:/var/data/virtlet
+    entrypoint:
+      - /usr/local/bin/virtlet-dhcp
 volumes:
   libvirtd: {}
   libvirt_qemu: {}
