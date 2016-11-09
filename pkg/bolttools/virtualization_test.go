@@ -198,11 +198,11 @@ func TestGetContainerInfo(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(containerInfo.Labels, tc.labels) {
-			t.Errorf("Expected %#v, instead got %#v", tc.labels, containerInfo.Labels)
+			t.Errorf("Expected %v, instead got %v", tc.labels, containerInfo.Labels)
 		}
 
 		if !reflect.DeepEqual(containerInfo.Annotations, tc.annotations) {
-			t.Errorf("Expected %#v, instead got %#v", tc.annotations, containerInfo.Annotations)
+			t.Errorf("Expected %v, instead got %v", tc.annotations, containerInfo.Annotations)
 		}
 	}
 }

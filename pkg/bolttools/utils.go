@@ -25,7 +25,7 @@ import (
 func get(bucket *bolt.Bucket, key []byte) ([]byte, error) {
 	value := bucket.Get(key)
 	if value == nil {
-		return nil, fmt.Errorf("Key '%s' doesn't exist in the bucket: %#v", key, bucket)
+		return nil, fmt.Errorf("Key '%s' doesn't exist in the bucket", key)
 	}
 
 	return value, nil

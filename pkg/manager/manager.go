@@ -109,10 +109,10 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 	podId := config.GetMetadata().GetUid()
 	name := config.GetMetadata().GetName()
 	glog.Infof("RunPodSandbox called for pod %s (%s)", name, podId)
-	glog.Infof("Sandbox config labels: %#v", config.GetLabels())
-	glog.Infof("Sandbox config annotations: %#v", config.GetAnnotations())
+	glog.Infof("Sandbox config labels: %v", config.GetLabels())
+	glog.Infof("Sandbox config annotations: %v", config.GetAnnotations())
 	if err := v.boltClient.SetPodSandbox(config); err != nil {
-		glog.Errorf("Error when creating pod sandbox for pod %s (%s): %#v", name, podId, err)
+		glog.Errorf("Error when creating pod sandbox for pod %s (%s): %v", name, podId, err)
 		return nil, err
 	}
 	response := &kubeapi.RunPodSandboxResponse{
@@ -143,7 +143,7 @@ func (v *VirtletManager) PodSandboxStatus(ctx context.Context, in *kubeapi.PodSa
 	podSandboxId := in.GetPodSandboxId()
 	status, err := v.boltClient.GetPodSandboxStatus(podSandboxId)
 	if err != nil {
-		glog.Errorf("Error when getting pod sandbox '%s' status: %#v", podSandboxId, err)
+		glog.Errorf("Error when getting pod sandbox '%s' status: %v", podSandboxId, err)
 		return nil, err
 	}
 	response := &kubeapi.PodSandboxStatusResponse{Status: status}
@@ -154,7 +154,7 @@ func (v *VirtletManager) ListPodSandbox(ctx context.Context, in *kubeapi.ListPod
 	filter := in.GetFilter()
 	podSandboxList, err := v.boltClient.ListPodSandbox(filter)
 	if err != nil {
-		glog.Errorf("Error when listing (with filter: %#v) pod sandboxes: %#v", filter, err)
+		glog.Errorf("Error when listing (with filter: %#v) pod sandboxes: %v", filter, err)
 		return nil, err
 	}
 	response := &kubeapi.ListPodSandboxResponse{Items: podSandboxList}
@@ -177,7 +177,7 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 	// without whole data container
 	uuid, err := v.libvirtVirtualizationTool.CreateContainer(v.boltClient, in, imageFilepath)
 	if err != nil {
-		glog.Errorf("Error when creating container %s: %#v", name, err)
+		glog.Errorf("Error when creating container %s: %v", name, err)
 		return nil, err
 	}
 
@@ -190,7 +190,7 @@ func (v *VirtletManager) StartContainer(ctx context.Context, in *kubeapi.StartCo
 	glog.Infof("StartContainer called for containerID: %s", containerId)
 
 	if err := v.libvirtVirtualizationTool.StartContainer(containerId); err != nil {
-		glog.Errorf("Error when starting container %s: %#v", containerId, err)
+		glog.Errorf("Error when starting container %s: %v", containerId, err)
 		return nil, err
 	}
 	response := &kubeapi.StartContainerResponse{}
@@ -202,7 +202,7 @@ func (v *VirtletManager) StopContainer(ctx context.Context, in *kubeapi.StopCont
 	glog.Infof("StopContainer called for containerID: %s", containerId)
 
 	if err := v.libvirtVirtualizationTool.StopContainer(containerId); err != nil {
-		glog.Errorf("Error when stopping container %s: %#v", containerId, err)
+		glog.Errorf("Error when stopping container %s: %v", containerId, err)
 		return nil, err
 	}
 	response := &kubeapi.StopContainerResponse{}
@@ -214,7 +214,7 @@ func (v *VirtletManager) RemoveContainer(ctx context.Context, in *kubeapi.Remove
 	glog.Infof("RemoveContainer called for containerID: %s", containerId)
 
 	if err := v.libvirtVirtualizationTool.RemoveContainer(*in.ContainerId); err != nil {
-		glog.Errorf("Error when removing container '%s': %#v", containerId, err)
+		glog.Errorf("Error when removing container '%s': %v", containerId, err)
 		return nil, err
 	}
 
@@ -230,7 +230,7 @@ func (v *VirtletManager) ListContainers(ctx context.Context, in *kubeapi.ListCon
 	filter := in.GetFilter()
 	containers, err := v.libvirtVirtualizationTool.ListContainers(v.boltClient, filter)
 	if err != nil {
-		glog.Errorf("Error when listing containers with filter %#v: %#v", filter, err)
+		glog.Errorf("Error when listing containers with filter %#v: %v", filter, err)
 		return nil, err
 	}
 	response := &kubeapi.ListContainersResponse{Containers: containers}
@@ -241,7 +241,7 @@ func (v *VirtletManager) ContainerStatus(ctx context.Context, in *kubeapi.Contai
 	containerId := in.GetContainerId()
 	status, err := v.libvirtVirtualizationTool.ContainerStatus(containerId)
 	if err != nil {
-		glog.Errorf("Error when getting container '%s' status: %#v", containerId, err)
+		glog.Errorf("Error when getting container '%s' status: %v", containerId, err)
 		return nil, err
 	}
 
@@ -256,7 +256,7 @@ func (v *VirtletManager) Exec(kubeapi.RuntimeService_ExecServer) error {
 func (v *VirtletManager) ListImages(ctx context.Context, in *kubeapi.ListImagesRequest) (*kubeapi.ListImagesResponse, error) {
 	images, err := v.libvirtImageTool.ListImages()
 	if err != nil {
-		glog.Errorf("Error when listing images: %#v", err)
+		glog.Errorf("Error when listing images: %v", err)
 	}
 	response := &kubeapi.ListImagesResponse{Images: images}
 	return response, err
@@ -267,7 +267,7 @@ func (v *VirtletManager) ImageStatus(ctx context.Context, in *kubeapi.ImageStatu
 
 	filepath, err := v.boltClient.GetImageFilepath(name)
 	if err != nil {
-		glog.Errorf("Error when getting image '%s' filepath: %#v", name, err)
+		glog.Errorf("Error when getting image '%s' filepath: %v", name, err)
 		return nil, err
 	}
 	if filepath == "" {
@@ -275,7 +275,7 @@ func (v *VirtletManager) ImageStatus(ctx context.Context, in *kubeapi.ImageStatu
 	}
 	image, err := v.libvirtImageTool.ImageStatus(filepath)
 	if err != nil {
-		glog.Errorf("Error when getting image '%s' in path '%s' status: %#v", name, filepath, err)
+		glog.Errorf("Error when getting image '%s' in path '%s' status: %v", name, filepath, err)
 		return nil, err
 	}
 
@@ -295,12 +295,12 @@ func (v *VirtletManager) PullImage(ctx context.Context, in *kubeapi.PullImageReq
 
 	filepath, err := v.libvirtImageTool.PullImage(name)
 	if err != nil {
-		glog.Errorf("Error when pulling image '%s': %#v", name, err)
+		glog.Errorf("Error when pulling image '%s': %v", name, err)
 		return nil, err
 	}
 	err = v.boltClient.SetImageFilepath(name, filepath)
 	if err != nil {
-		glog.Errorf("Error when setting filepath '%s' to image '%s': %#v", filepath, name, err)
+		glog.Errorf("Error when setting filepath '%s' to image '%s': %v", filepath, name, err)
 		return nil, err
 	}
 
@@ -314,7 +314,7 @@ func (v *VirtletManager) RemoveImage(ctx context.Context, in *kubeapi.RemoveImag
 
 	filepath, err := v.boltClient.GetImageFilepath(name)
 	if err != nil {
-		glog.Errorf("Error when getting filepath for image '%s': %#v", name, err)
+		glog.Errorf("Error when getting filepath for image '%s': %v", name, err)
 		return nil, err
 	}
 	if filepath == "" {
@@ -324,7 +324,7 @@ func (v *VirtletManager) RemoveImage(ctx context.Context, in *kubeapi.RemoveImag
 	}
 	err = v.libvirtImageTool.RemoveImage(filepath)
 	if err != nil {
-		glog.Errorf("Error when removing image '%s' with path '%s': %#v", name, filepath, err)
+		glog.Errorf("Error when removing image '%s' with path '%s': %v", name, filepath, err)
 		return nil, err
 	}
 

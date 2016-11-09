@@ -63,7 +63,7 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig) error {
 
 	namespaceOptions := linuxSandbox.GetNamespaceOptions()
 	if namespaceOptions == nil {
-		return fmt.Errorf("Linux sandbox config is missint Namespaces attribute: %#v", linuxSandbox)
+		return fmt.Errorf("Linux sandbox config is missing Namespaces attribute: %#v", linuxSandbox)
 	}
 
 	err = b.db.Batch(func(tx *bolt.Tx) error {
