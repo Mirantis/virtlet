@@ -59,7 +59,7 @@ func (b *BoltClient) SetContainer(containerId, sandboxId, image string, labels, 
 	err = b.db.Update(func(tx *bolt.Tx) error {
 		parentBucket := tx.Bucket([]byte("virtualization"))
 		if parentBucket == nil {
-			return fmt.Errorf("Bucket 'virtualization' doesn't exist")
+			return fmt.Errorf("bucket 'virtualization' doesn't exist")
 		}
 
 		bucket, err := parentBucket.CreateBucketIfNotExists([]byte(containerId))
@@ -99,7 +99,7 @@ func (b *BoltClient) GetContainerInfo(containerId string) (*ContainerInfo, error
 	if err := b.db.View(func(tx *bolt.Tx) error {
 		parentBucket := tx.Bucket([]byte("virtualization"))
 		if parentBucket == nil {
-			return fmt.Errorf("Bucket 'virtualization' doesn't exist")
+			return fmt.Errorf("bucket 'virtualization' doesn't exist")
 		}
 
 		bucket := parentBucket.Bucket([]byte(containerId))
@@ -168,7 +168,7 @@ func (b *BoltClient) RemoveContainer(containerId string) error {
 	return b.db.Batch(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte("virtualization"))
 		if bucket == nil {
-			return fmt.Errorf("Bucket 'virtualization' doesn't exist")
+			return fmt.Errorf("bucket 'virtualization' doesn't exist")
 		}
 
 		if err := bucket.DeleteBucket([]byte(containerId)); err != nil {
