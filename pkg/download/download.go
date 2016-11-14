@@ -53,7 +53,7 @@ func DownloadFile(fileUrl string) (string, string, error) {
 	}
 	defer fp.Close()
 
-	glog.Infof("Start downloading %s", fileUrl)
+	glog.V(2).Infof("Start downloading %s", fileUrl)
 
 	resp, err := http.Get(fileUrl)
 	if err != nil {
@@ -65,6 +65,6 @@ func DownloadFile(fileUrl string) (string, string, error) {
 	if err != nil {
 		return "", "", err
 	}
-	glog.Infof("Data from url %s saved in %s", fileUrl, filepath)
+	glog.V(2).Infof("Data from url %s saved in %s", fileUrl, filepath)
 	return filepath, shortName, nil
 }
