@@ -138,7 +138,7 @@ func (v *VirtualizationTool) createVolumes(containerName string, mounts []*kubea
 	if len(mounts) == 0 {
 		return domXML, nil
 	}
-	glog.Infof("INPUT domain:\n%s\n\n", domXML)
+	glog.V(2).Infof("INPUT domain:\n%s\n\n", domXML)
 	domainXML := &Domain{}
 	err := xml.Unmarshal([]byte(domXML), domainXML)
 	if err != nil {
@@ -265,7 +265,7 @@ func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, i
 			if domainID, err := v.GetDomainUUID(domain); err == nil {
 				//TODO: This is temp workaround for returning existent domain on create container call to overcome SyncPod issues
 				return domainID, nil
-				//glog.Infof("Removing domain with name: %s and id: %s", name, domainID)
+				//glog.V(2).Infof("Removing domain with name: %s and id: %s", name, domainID)
 				//v.RemoveContainer(domainID)
 			} else {
 				glog.Errorf("Failed to get UUID for domain with name: %s due to %v", name, err)
@@ -301,7 +301,7 @@ func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, i
 	}
 
 	domXML = strings.Replace(domXML, "\"", "'", -1)
-	glog.Infof("Creating domain:\n%s", domXML)
+	glog.V(2).Infof("Creating domain:\n%s", domXML)
 	cDomXML := C.CString(domXML)
 	defer C.free(unsafe.Pointer(cDomXML))
 

@@ -62,7 +62,7 @@ func createPool(conn C.virConnectPtr, name string, path string, poolType string)
 	bPoolXML := []byte(poolXML)
 	cPoolXML := (*C.char)(unsafe.Pointer(&bPoolXML[0]))
 
-	glog.Infof("Creating storage pool (name: %s, path: %s)", name, path)
+	glog.V(2).Infof("Creating storage pool (name: %s, path: %s)", name, path)
 	var pool C.virStoragePoolPtr
 	if pool = C.virStoragePoolCreateXML(conn, cPoolXML, 0); pool == nil {
 		return nil, GetLastError()

@@ -78,7 +78,7 @@ func (LocalFilesystemBackend) CreateVol(pool C.virStoragePoolPtr, volName string
     <capacity unit="%s">%d</capacity>
 </volume>`
 	volXML = fmt.Sprintf(volXML, volName, capacityUnit, capacity)
-	glog.Infof("Create volume using XML description: %s", volXML)
+	glog.V(2).Infof("Create volume using XML description: %s", volXML)
 	cVolXML := C.CString(volXML)
 	defer C.free(unsafe.Pointer(cVolXML))
 	vol := C.virStorageVolCreateXML(pool, cVolXML, 0)
