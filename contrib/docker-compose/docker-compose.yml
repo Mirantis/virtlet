@@ -24,6 +24,8 @@ services:
     build: ../..
     # network_mode: host
     restart: always
+    environment:
+      - VIRTLET_LOGLEVEL
     volumes:
       - virtlet_data:/var/data/virtlet
       - /var/lib/virtlet:/var/lib/virtlet
