@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/davecgh/go-spew/spew"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
@@ -53,17 +54,17 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig) error {
 
 	metadata := config.GetMetadata()
 	if metadata == nil {
-		return fmt.Errorf("sandbox config is missing Metadata attribute: %#v", config)
+		return fmt.Errorf("sandbox config is missing Metadata attribute: %s", spew.Sdump(config))
 	}
 
 	linuxSandbox := config.GetLinux()
 	if linuxSandbox == nil {
-		return fmt.Errorf("sandbox config is missing Linux attribute: %#v", config)
+		return fmt.Errorf("sandbox config is missing Linux attribute: %s", spew.Sdump(config))
 	}
 
 	namespaceOptions := linuxSandbox.GetNamespaceOptions()
 	if namespaceOptions == nil {
-		return fmt.Errorf("Linux sandbox config is missing Namespaces attribute: %#v", linuxSandbox)
+		return fmt.Errorf("Linux sandbox config is missing Namespaces attribute: %s", spew.Sdump(config))
 	}
 
 	err = b.db.Batch(func(tx *bolt.Tx) error {

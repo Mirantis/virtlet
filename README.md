@@ -59,6 +59,13 @@ cd $(REPOSITORY_BASE_DIR)/contrib/docker-compose
 docker-compose up
 ```
 
+To set log verbosity level, use
+```sh
+VIRTLET_LOGLEVEL=3 docker-compose up
+```
+
+3 is currently highest verbosity level, the default being 2.
+
 Now you can follow instructions from next section.
 
 ### Kubernetes environment

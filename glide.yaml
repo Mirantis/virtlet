@@ -6,9 +6,11 @@ import:
   - context
 - package: google.golang.org/grpc
 - package: k8s.io/kubernetes
-  vcs: git
-  repo: git://github.com/kubernetes/kubernetes.git
   version: e72f26a3fff4f521d1da9f52b3ce82d4d0d5a401
+  repo: git://github.com/kubernetes/kubernetes.git
+  vcs: git
   subpackages:
   - pkg/kubelet/api/v1alpha1/runtime
   - api/v1alpha/runtime
+- package: github.com/davecgh/go-spew
+  version: ~1.0.0
