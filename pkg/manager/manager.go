@@ -17,7 +17,7 @@ limitations under the License.
 package manager
 
 import (
-	"fmt"
+	"errors"
 	"net"
 	"os"
 	"strings"
