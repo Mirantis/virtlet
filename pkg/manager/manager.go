@@ -257,6 +257,7 @@ func (v *VirtletManager) ListImages(ctx context.Context, in *kubeapi.ListImagesR
 	images, err := v.libvirtImageTool.ListImages()
 	if err != nil {
 		glog.Errorf("Error when listing images: %v", err)
+		return nil, err
 	}
 	response := &kubeapi.ListImagesResponse{Images: images}
 	return response, err
