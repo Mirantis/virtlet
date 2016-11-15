@@ -6,6 +6,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
 		iproute2 \
 		openssl \
 		qemu-kvm \
+                qemu-system-x86 \
 		libvirt-bin \
 		python-libvirt \
 		ceph-common \

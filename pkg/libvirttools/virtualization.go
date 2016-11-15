@@ -26,6 +26,7 @@ import "C"
 
 import (
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 	"unsafe"
@@ -41,6 +42,10 @@ import (
 const (
 	defaultMemory     = 1024
 	defaultMemoryUnit = "MiB"
+	defaultDomainType = "kvm"
+	defaultEmulator   = "/usr/bin/kvm"
+	noKvmDomainType   = "qemu"
+	noKvmEmulator     = "/usr/bin/qemu-system-x86_64"
 )
 
 type Driver struct {
@@ -126,6 +131,66 @@ type Sound struct {
 	Model string `xml:"model,attr"`
 }
 
+func canUseKvm() bool {
+	if os.Getenv("VIRTLET_DISABLE_KVM") != "" {
+		glog.V(2).Infof("VIRTLET_DISABLE_KVM env var not empty, using plain qemu")
+		return false
+	}
+	return true
+}
+
+func generateDomXML(useKvm bool, name string, memory int64, memoryUnit string, uuid string, cpuNum int, cpuShare int64, cpuPeriod int64, cpuQuota int64, imageFilepath string) string {
+	domainType := defaultDomainType
+	emulator := defaultEmulator
+	if !useKvm {
+		domainType = noKvmDomainType
+		emulator = noKvmEmulator
+	}
+	domXML := `
+<domain type='%s'>
+    <name>%s</name>
+    <uuid>%s</uuid>
+    <memory unit='%s'>%d</memory>
+    <vcpu>%d</vcpu>
+    <cputune>
+        <shares>%d</shares>
+        <period>%d</period>
+        <quota>%d</quota>
+    </cputune>
+    <os>
+        <type>hvm</type>
+        <boot dev='hd'/>
+    </os>
+    <features>
+        <acpi/><apic/>
+    </features>
+    <on_poweroff>destroy</on_poweroff>
+    <on_reboot>restart</on_reboot>
+    <on_crash>restart</on_crash>
+    <devices>
+        <emulator>%s</emulator>
+        <disk type='file' device='disk'>
+            <driver name='qemu' type='qcow2'/>
+            <source file='%s'/>
+            <target dev='vda' bus='virtio'/>
+        </disk>
+        <input type='tablet' bus='usb'/>
+        <graphics type='vnc' port='-1'/>
+        <serial type='pty'>
+            <target port='0'/>
+        </serial>
+        <console type='pty'>
+            <target type='serial' port='0'/>
+        </console>
+        <sound model='ac97'/>
+        <video>
+            <model type='cirrus'/>
+        </video>
+    </devices>
+</domain>`
+	return fmt.Sprintf(domXML, domainType, name, uuid, memoryUnit, memory, cpuNum, cpuShare, cpuPeriod, cpuQuota, emulator, imageFilepath)
+}
+
 var volXML string = `
 <disk type='file' device='disk'>
     <driver name='qemu' type='raw'/>
@@ -180,52 +245,6 @@ func (v *VirtualizationTool) createVolumes(containerName string, mounts []*kubea
 		}
 	}
 	return domXML, nil
-}
-
-func generateDomXML(name string, memory int64, memoryUnit string, uuid string, cpuNum int, cpuShare int64, cpuPeriod int64, cpuQuota int64, imageFilepath string) string {
-	domXML := `
-<domain type='kvm'>
-    <name>%s</name>
-    <uuid>%s</uuid>
-    <memory unit='%s'>%d</memory>
-    <vcpu>%d</vcpu>
-    <cputune>
-        <shares>%d</shares>
-        <period>%d</period>
-        <quota>%d</quota>
-    </cputune>
-    <os>
-        <type>hvm</type>
-        <boot dev='hd'/>
-    </os>
-    <features>
-        <acpi/><apic/>
-    </features>
-    <on_poweroff>destroy</on_poweroff>
-    <on_reboot>restart</on_reboot>
-    <on_crash>restart</on_crash>
-    <devices>
-        <emulator>/usr/bin/kvm</emulator>
-        <disk type='file' device='disk'>
-            <driver name='qemu' type='qcow2'/>
-            <source file='%s'/>
-            <target dev='vda' bus='virtio'/>
-        </disk>
-        <input type='tablet' bus='usb'/>
-        <graphics type='vnc' port='-1'/>
-        <serial type='pty'>
-            <target port='0'/>
-        </serial>
-        <console type='pty'>
-            <target type='serial' port='0'/>
-        </console>
-        <sound model='ac97'/>
-        <video>
-            <model type='cirrus'/>
-        </video>
-    </devices>
-</domain>`
-	return fmt.Sprintf(domXML, name, uuid, memoryUnit, memory, cpuNum, cpuShare, cpuPeriod, cpuQuota, imageFilepath)
 }
 
 type VirtualizationTool struct {
@@ -294,7 +313,7 @@ func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, i
 	cpuPeriod := config.GetLinux().GetResources().GetCpuPeriod()
 	cpuQuota := config.GetLinux().GetResources().GetCpuQuota()
 
-	domXML := generateDomXML(name, memory, memoryUnit, uuid, cpuNum, cpuShares, cpuPeriod, cpuQuota, imageFilepath)
+	domXML := generateDomXML(canUseKvm(), name, memory, memoryUnit, uuid, cpuNum, cpuShares, cpuPeriod, cpuQuota, imageFilepath)
 	domXML, err = v.createVolumes(name, in.Config.Mounts, domXML)
 	if err != nil {
 		return "", err
