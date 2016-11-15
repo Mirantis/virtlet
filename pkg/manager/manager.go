@@ -173,11 +173,14 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 	name := config.GetMetadata().GetName()
 
 	glog.V(2).Infof("CreateContainer called for name: %s", name)
+	glog.V(3).Infof("CreateContainer config: %s", spew.Sdump(config))
 
 	imageFilepath, err := v.boltClient.GetImageFilepath(imageName)
 	if err != nil {
 		return nil, err
 	}
+
+	glog.V(2).Infof("CreateContainer: imageName %s, imageFilepath %s", imageName, imageFilepath)
 
 	// TODO: we should not pass whole "in" to CreateContainer - we should pass there only needed info for CreateContainer
 	// without whole data container
