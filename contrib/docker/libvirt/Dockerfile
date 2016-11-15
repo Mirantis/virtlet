@@ -14,5 +14,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
 
 COPY cleanup.py /cleanup.py
 COPY start.sh /start.sh
+COPY libvirt.conf /etc/libvirt/libvirtd.conf
+COPY qemu.conf /etc/libvirt/qemu.conf
 
 CMD ["/start.sh"]
