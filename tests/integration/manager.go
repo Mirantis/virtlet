@@ -80,10 +80,12 @@ func (v *VirtletManager) Run() error {
 		boltPathParam,
 		libvirtUriParam,
 		listenParam,
+		"-v=3",
+		"-logtostderr=true",
 	}, &syscall.ProcAttr{
 		Dir:   virtletDir,
 		Env:   createEnviron(),
-		Files: []uintptr{uintptr(syscall.Stdout), uintptr(syscall.Stderr)},
+		Files: []uintptr{0, 1, 2},
 		Sys:   &syscall.SysProcAttr{},
 	})
 	if err != nil {
