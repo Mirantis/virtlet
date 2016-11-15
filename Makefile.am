@@ -41,5 +41,3 @@ clean-local:
 
 install-exec-local:
 	install $(builddir)/virtlet $(bindir)/virtlet
-	install $(builddir)/virtlet-fake-create-container $(bindir)/virtlet-fake-create-container
-	install $(builddir)/virtlet-fake-image-pull $(bindir)/virtlet-fake-image-pull
