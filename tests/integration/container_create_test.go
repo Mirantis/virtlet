@@ -71,8 +71,20 @@ func TestContainerCreate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Container request
+	imageServiceClient := kubeapi.NewImageServiceClient(manager.conn)
+
 	imageSpec := &kubeapi.ImageSpec{Image: &imageUrl}
+	in := &kubeapi.PullImageRequest{
+		Image:         imageSpec,
+		Auth:          &kubeapi.AuthConfig{},
+		SandboxConfig: &kubeapi.PodSandboxConfig{},
+	}
+
+	if _, err := imageServiceClient.PullImage(context.Background(), in); err != nil {
+		t.Fatal(err)
+	}
+
+	// Container request
 	hostPath := "/var/lib/virtlet"
 	config := &kubeapi.ContainerConfig{
 		Image:  imageSpec,
