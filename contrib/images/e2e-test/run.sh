@@ -96,7 +96,7 @@ function e2e::wait-for-libvirt-domain {
 
 function e2e::chat-with-vm {
   expect -c '
-    set timeout 120
+    set timeout 240
     spawn virsh -c qemu+tcp://libvirt/system console cirros
     expect {
       timeout { puts "initial message timeout"; exit 1 }
