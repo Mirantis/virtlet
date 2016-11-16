@@ -5,7 +5,6 @@ LABEL Name="virtlet" Version="0.1"
 RUN apt-get update \
 	&& apt-get install -y software-properties-common \
 	&& apt-get clean
-RUN add-apt-repository ppa:ubuntu-lxc/lxd-stable
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y  \
 		git \
 		golang \
