@@ -14,7 +14,6 @@ Updating dependencies also needs additional tools which could be installed using
 
 ```sh
 curl https://glide.sh/get | sh
-go get github.com/sgotti/glide-vc
 ```
 
 ## Usage
