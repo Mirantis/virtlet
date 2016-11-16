@@ -80,3 +80,11 @@ export CONTAINER_RUNTIME=remote
 export CONTAINER_RUNTIME_ENDPOINT=/run/virtlet.sock
 ./hack/local-up-cluster.sh
 ```
+
+### Running tests
+
+To run integration & e2e tests, use
+
+```sh
+./test.sh
+```
