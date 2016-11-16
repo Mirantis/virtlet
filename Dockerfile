@@ -39,4 +39,6 @@ RUN ./autogen.sh \
 	&& make install \
 	&& make clean
 
+RUN mkdir -p /var/data/virtlet
+
 CMD ["/bin/bash", "-c", "/usr/local/bin/virtlet -v=${VIRTLET_LOGLEVEL:-2} -logtostderr=true -libvirt-uri=qemu+tcp://libvirt/system"]
