@@ -2,32 +2,19 @@ version: '2'
 services:
   libvirt:
     build: ../docker/libvirt/
-    pid: host
-    privileged: true
-    # ports:
-    #   - "16509:16509"
-    # network_mode: host
-    restart: always
     environment:
       - LIBVIRT_CLEANUP
       - VIRTLET_DISABLE_KVM=1
     volumes:
-      - /sys/fs/cgroup:/sys/fs/cgroup
-      - /lib/modules:/lib/modules:ro
-      - libvirt_run:/run
       - libvirt_volume_pool:/var/lib/virtlet
-      - libvirtd:/var/lib/libvirt
-      - libvirt_qemu:/etc/libvirt/qemu
   virtlet:
     build: ../..
     environment:
       - VIRTLET_LOGLEVEL
       - VIRTLET_DISABLE_KVM=1
     volumes:
-      - virtlet_data:/var/data/virtlet
       - /lib/modules:/lib/modules:ro
       - /boot:/boot:ro
-      - libvirt_run:/run
       - libvirt_volume_pool:/var/lib/virtlet
     depends_on:
       - libvirt
@@ -35,8 +22,4 @@ services:
       - "libvirt:libvirt"
     command: "/bin/bash -c 'cd tests/integration && go test'"
 volumes:
-  libvirtd: {}
-  libvirt_qemu: {}
   libvirt_volume_pool: {}
-  libvirt_run: {}
-  virtlet_data: {}
