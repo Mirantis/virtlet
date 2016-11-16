@@ -26,7 +26,4 @@ install: ./autogen.sh
 
 script:
   - go fmt $(go list ./... | grep -v /vendor/)
-  - docker-compose -f contrib/docker-compose-test/docker-compose.yml build
-  - docker-compose -f contrib/docker-compose-test/docker-compose.yml run virtlet_test
-  - docker-compose -f contrib/docker-compose-test/docker-compose.yml down -v
-  - docker-compose -f contrib/docker-compose-test/docker-compose.yml run e2e_test
+  - ./test.sh
