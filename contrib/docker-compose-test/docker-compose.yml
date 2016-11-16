@@ -1,13 +1,15 @@
 version: '2'
 services:
   libvirt:
+    privileged: true
     build: ../docker/libvirt/
     environment:
       - LIBVIRT_CLEANUP
       - VIRTLET_DISABLE_KVM=1
     volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup
       - libvirt_volume_pool:/var/lib/virtlet
-  virtlet:
+  virtlet_test:
     build: ../..
     environment:
       - VIRTLET_LOGLEVEL
@@ -21,5 +23,42 @@ services:
     links:
       - "libvirt:libvirt"
     command: "/bin/bash -c 'cd tests/integration && go test -v'"
+  virtlet:
+    build: ../..
+    environment:
+      - VIRTLET_LOGLEVEL
+      - VIRTLET_DISABLE_KVM=1
+    volumes:
+      - /lib/modules:/lib/modules:ro
+      - /boot:/boot:ro
+      - libvirt_volume_pool:/var/lib/virtlet
+      - virtlet_run:/run
+    depends_on:
+      - libvirt
+    links:
+      - "libvirt:libvirt"
+  local_cluster:
+    privileged: true
+    build: ../docker/local-cluster
+    volumes:
+      # for virtlet socket
+      - virtlet_run:/run
+    depends_on:
+      - virtlet
+  e2e_test:
+    build: ../docker/e2e-test
+    environment:
+      - APISERVER_HOST=local_cluster
+      - APISERVER_PORT=8080
+    volumes_from:
+      # we need /kubernetes here
+      - local_cluster
+    depends_on:
+      - local_cluster
+      - libvirt
+    links:
+      - "local_cluster:local_cluster"
+      - "libvirt:libvirt"
 volumes:
   libvirt_volume_pool: {}
+  virtlet_run: {}
