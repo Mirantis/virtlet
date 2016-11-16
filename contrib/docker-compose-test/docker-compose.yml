@@ -20,6 +20,6 @@ services:
       - libvirt
     links:
       - "libvirt:libvirt"
-    command: "/bin/bash -c 'cd tests/integration && go test'"
+    command: "/bin/bash -c 'cd tests/integration && go test -v'"
 volumes:
   libvirt_volume_pool: {}
