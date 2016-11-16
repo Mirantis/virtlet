@@ -1,4 +1,4 @@
-#!/bin/bash 
+#!/bin/bash
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -36,25 +36,33 @@ function e2e::setup-kubectl {
   cluster/kubectl.sh config use-context local
 }
 
-function e2e::wait-for-apiserver {
+function e2e::wait {
+  local attempts="$1"
+  local delay="$2"
+  local cmd="$3"
+  local what="$4"
   local ready=
-  e2e::setup-kubectl
-  e2e::step "Waiting for apiserver..."
-  for i in {1..50}; do
-    if timeout 2 cluster/kubectl.sh get nodes >&/dev/null; then
+  e2e::step "Waiting for ${what}..."
+  for (( i = 0; i < attempts; i++ )); do
+    if eval "$cmd"; then
       ready=1
       break
     fi
-    sleep 5
+    sleep ${delay}
     echo >&2 -n "."
   done
   echo >&2
   if [[ ! "${ready}" ]]; then
-      echo >&2 "Timed out waiting for apiserver"
+      echo >&2 "Timed out waiting for ${what}"
       exit 1
   fi
+  e2e::step "Done waiting for ${what}"
+}
+
+function e2e::wait-for-apiserver {
+  e2e::wait 50 5 "timeout 2 bash -c 'cluster/kubectl.sh get nodes|grep -q Ready' >&/dev/null" "apiserver"
+  e2e::wait 20 1 "cluster/kubectl.sh get sa | grep -q '^default'" "default service account"
   cluster/kubectl.sh get nodes
-  e2e::step "Apiserver ready"
 }
 
 function e2e::create-vm {
@@ -74,48 +82,21 @@ EOF
 }
 
 function e2e::wait-for-pod {
-  local ready=
-  e2e::step "Waiting for pod to come up"
-  for i in {1..30}; do
-    # FIXME: XXX: should wait for Running after #79 is fixed
-    if cluster/kubectl.sh get pod virtlet-example-cirros | grep -q ContainerCreating; then
-      ready=1
-      break
-    fi
-    sleep 1
-    echo >&2 -n "."
-  done
-  echo >&2
-  if [[ ! "${ready}" ]]; then
-    echo >&2 "Timed out waiting for the pod"
-    exit 1
-  fi
+  # FIXME: XXX: should wait for Running instead of ContainerCreating after #79 is fixed
+  e2e::wait 30 1 "cluster/kubectl.sh get pod virtlet-example-cirros | grep -q ContainerCreating" \
+            "pod to come up"
   cluster/kubectl.sh get pods
-  e2e::step "Pod active"
 }
 
 function e2e::wait-for-libvirt-domain {
-  local ready=
-  e2e::step "Waiting for libvirt domain to become running"
-  for i in {1..60}; do
-    if virsh -c qemu+tcp://libvirt/system list | grep -q 'cirros.*running'; then
-      ready=1
-      break
-    fi
-    sleep 1
-  done
-  echo >&2
-  if [[ ! "${ready}" ]]; then
-    echo >&2 "Timed out waiting for libvirt domain to become running"
-    exit 1
-  fi
-  cluster/kubectl.sh get pods
-  e2e::step "VM is running"
+  e2e::wait 60 1 "virsh -c qemu+tcp://libvirt/system list | grep -q 'cirros.*running'" \
+            "libvirt domain to become running"
+  virsh -c qemu+tcp://libvirt/system list
 }
 
 function e2e::chat-with-vm {
   expect -c '
-    set timeout 60
+    set timeout 120
     spawn virsh -c qemu+tcp://libvirt/system console cirros
     expect {
       timeout { puts "initial message timeout"; exit 1 }
@@ -129,6 +110,7 @@ function e2e::chat-with-vm {
     }
     send "cirros\r"
 
+    set timeout 20
     expect {
       timeout { puts "password prompt timeout"; exit 1 }
       "Password: "
@@ -155,6 +137,7 @@ function e2e::chat-with-vm {
 '
 }
 
+e2e::setup-kubectl
 e2e::serve-image
 e2e::wait-for-apiserver
 e2e::create-vm
