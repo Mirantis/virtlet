@@ -1,7 +1,7 @@
 version: '2'
 services:
   libvirt:
-    build: ../docker/libvirt/
+    build: ../images/libvirt/
     pid: host
     privileged: true
     # ports:
@@ -15,8 +15,8 @@ services:
       - /dev:/dev
       - /sys/fs/cgroup:/sys/fs/cgroup
       # Uncomment to mount config files from image dir
-      # - ../docker/libvirt/libvirt.conf:/etc/libvirt/libvirtd.conf
-      # - ../docker/libvirt/qemu.conf:/etc/libvirt/qemu.conf
+      # - ../images/libvirt/libvirt.conf:/etc/libvirt/libvirtd.conf
+      # - ../images/libvirt/qemu.conf:/etc/libvirt/qemu.conf
       - libvirt_volume_pool:/var/lib/virtlet
       - libvirtd:/var/lib/libvirt
       - libvirt_qemu:/etc/libvirt/qemu

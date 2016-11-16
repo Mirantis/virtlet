@@ -2,7 +2,7 @@ version: '2'
 services:
   libvirt:
     privileged: true
-    build: ../docker/libvirt/
+    build: ../images/libvirt/
     environment:
       - LIBVIRT_CLEANUP
       - VIRTLET_DISABLE_KVM=1
@@ -39,14 +39,14 @@ services:
       - "libvirt:libvirt"
   local_cluster:
     privileged: true
-    build: ../docker/local-cluster
+    build: ../images/local-cluster
     volumes:
       # for virtlet socket
       - virtlet_run:/run
     depends_on:
       - virtlet
   e2e_test:
-    build: ../docker/e2e-test
+    build: ../images/e2e-test
     environment:
       - APISERVER_HOST=local_cluster
       - APISERVER_PORT=8080
