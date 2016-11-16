@@ -17,5 +17,5 @@ limitations under the License.
 package integration
 
 var (
-	imageUrl = "ftp.ps.pl/pub/Linux/fedora-linux/releases/24/CloudImages/x86_64/images/Fedora-Cloud-Base-24-1.2.x86_64.qcow2"
+	imageUrl = "download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img"
 )
