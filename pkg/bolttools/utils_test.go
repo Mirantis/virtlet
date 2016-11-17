@@ -21,6 +21,8 @@ import (
 	"testing"
 
 	"github.com/boltdb/bolt"
+	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"github.com/Mirantis/virtlet/tests/criapi"
 )
 
 func TestGet(t *testing.T) {
@@ -112,4 +114,77 @@ func TestGet(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+}
+
+func dumpDB(t *testing.T, db *bolt.DB) error {
+	t.Log("=======Start DB content")
+	err := db.View(func(tx *bolt.Tx) error {
+		var iterateOverElements func(tx *bolt.Tx, bucket *bolt.Bucket, indent string)
+		iterateOverElements = func(tx *bolt.Tx, bucket *bolt.Bucket, indent string) {
+			var c *bolt.Cursor
+			if bucket == nil {
+				c = tx.Cursor()
+			} else {
+				c = bucket.Cursor()
+			}
+			for k, v := c.First(); k != nil; k, v = c.Next() {
+				if v == nil {
+					// SubBucket
+					t.Logf(" %s BUCKET: %s", indent, string(k))
+					if bucket == nil {
+						//root bucket
+						iterateOverElements(tx, tx.Bucket(k), "  "+indent)
+					} else {
+						iterateOverElements(tx, bucket.Bucket(k), "  "+indent)
+					}
+				} else {
+					t.Logf(" %s %s: %s\n", indent, string(k), string(v))
+				}
+			}
+		}
+		iterateOverElements(tx, nil, "|_")
+		return nil
+	})
+	t.Log("=======End DB content")
+
+	return err
+}
+
+func SetUpBolt(t *testing.T, sandboxConfigs []*kubeapi.PodSandboxConfig, containerConfigs []*criapi.ContainerTestConfigSet) *BoltClient {
+	b, err := NewFakeBoltClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	//Check filter on empty DB
+	sandboxList, err := b.ListPodSandbox(&kubeapi.PodSandboxFilter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sandboxList == nil || len(sandboxList) != 0 {
+		t.Errorf("Expected to recieve array of zero lenght as a result of list request against empty Bolt db.")
+	}
+
+	if err := b.VerifySandboxSchema(); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, sandbox := range sandboxConfigs {
+		if err := b.SetPodSandbox(sandbox); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := b.VerifyVirtualizationSchema(); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, container := range containerConfigs {
+		if err := b.SetContainer(container.ContainerId, container.SandboxId, container.Image, container.Labels, container.Annotations); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	dumpDB(t, b.db)
+
+	return b
 }

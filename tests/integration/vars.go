@@ -17,5 +17,6 @@ limitations under the License.
 package integration
 
 var (
-	imageUrl = "download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img"
+	imageCirrosUrl  = "download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img"
+	imageCirrosUrl2 = "download.cirros-cloud.net/0.3.3/cirros-0.3.3-x86_64-disk.img"
 )
