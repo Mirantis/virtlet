@@ -178,12 +178,15 @@ func (s *dhcpServer) prepareResponse(pkt *dhcp4.Packet, serverIP net.IP, mt dhcp
 	}
 
 	p.YourAddr = ip
-	p.Options[dhcp4.OptSubnetMask] = []byte(ipnet.Mask)
+	// TODO: pass real mask, temporarily set faked on
+	// p.Options[dhcp4.OptSubnetMask] = []byte(ipnet.Mask)
+	p.Options[dhcp4.OptSubnetMask] = []byte{255, 255, 255, 0}
 
 	defaultRouter := findDefaultRoute(conf, ipnet)
 	if defaultRouter != nil {
 		p.Options[dhcp4.OptRouters] = []byte(*defaultRouter)
 	}
+	/* TODO: pass real routes, now we have them broken
 	if conf.GetRoutes() != nil {
 		// option 121 is for static routes as defined in rfc3442
 		if data, err := s.getStaticRoutes(conf, ipnet); err != nil {
@@ -192,6 +195,7 @@ func (s *dhcpServer) prepareResponse(pkt *dhcp4.Packet, serverIP net.IP, mt dhcp
 			p.Options[121] = data
 		}
 	}
+	*/
 
 	// 86400 - full 24h
 	p.Options[dhcp4.OptLeaseTime] = []byte{0, 1, 81, 128}
