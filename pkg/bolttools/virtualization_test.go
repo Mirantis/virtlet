@@ -21,64 +21,23 @@ import (
 	"reflect"
 	"testing"
 
+	"encoding/json"
 	"github.com/boltdb/bolt"
 )
 
 func TestSetContainer(t *testing.T) {
-	tests := []struct {
-		containerId         string
-		sandboxId           string
-		image               string
-		labels              map[string]string
-		annotations         map[string]string
-		expectedLabels      string
-		expectedAnnotations string
-	}{
-		{
-			containerId: "5d5fcd9d-c964-4db6-a86a-c92a6951275d",
-			sandboxId:   "39f56df5-6c8a-44e3-8ae3-2736549637a9",
-			image:       "cirros",
-			labels: map[string]string{
-				"foo":  "bar",
-				"fizz": "buzz",
-			},
-			annotations: map[string]string{
-				"fizz": "buzz",
-				"virt": "let",
-			},
-			expectedLabels:      "{\"fizz\":\"buzz\",\"foo\":\"bar\"}",
-			expectedAnnotations: "{\"fizz\":\"buzz\",\"virt\":\"let\"}",
-		},
-		{
-			containerId: "a4ff0553-dbbd-4114-a9b6-8522eb66ef91",
-			sandboxId:   "f9aa2197-2b77-4495-90f0-167963b07eb3",
-			image:       "fedora",
-			labels: map[string]string{
-				"test":  "testing",
-				"hello": "world",
-			},
-			annotations: map[string]string{
-				"hello": "world",
-				"test":  "testing",
-			},
-			expectedLabels:      "{\"hello\":\"world\",\"test\":\"testing\"}",
-			expectedAnnotations: "{\"hello\":\"world\",\"test\":\"testing\"}",
-		},
+	sandboxes, err := GetSandboxes(2)
+	if err != nil {
+		t.Fatalf("Failed to generate array of sandbox configs: %v", err)
+	}
+	containers, err := GetContainersConfig(sandboxes)
+	if err != nil {
+		t.Fatalf("Failed to generate array of container configs: %v", err)
 	}
 
-	for _, tc := range tests {
-		b, err := NewFakeBoltClient()
-		if err != nil {
-			t.Fatal(err)
-		}
+	b := SetUpBolt(t, sandboxes, containers)
 
-		if err := b.VerifyVirtualizationSchema(); err != nil {
-			t.Fatal(err)
-		}
-
-		if err := b.SetContainer(tc.containerId, tc.sandboxId, tc.image, tc.labels, tc.annotations); err != nil {
-			t.Fatal(err)
-		}
+	for _, container := range containers {
 
 		if err := b.db.View(func(tx *bolt.Tx) error {
 			parentBucket := tx.Bucket([]byte("virtualization"))
@@ -86,9 +45,9 @@ func TestSetContainer(t *testing.T) {
 				return fmt.Errorf("bucket 'virtualization' doesn't exist")
 			}
 
-			bucket := parentBucket.Bucket([]byte(tc.containerId))
+			bucket := parentBucket.Bucket([]byte(container.ContainerId))
 			if bucket == nil {
-				return fmt.Errorf("bucket '%s' doesn't exist", tc.containerId)
+				return fmt.Errorf("bucket '%s' doesn't exist", container.ContainerId)
 			}
 
 			sandboxId, err := getString(bucket, "sandboxId")
@@ -96,8 +55,8 @@ func TestSetContainer(t *testing.T) {
 				return err
 			}
 
-			if sandboxId != tc.sandboxId {
-				t.Errorf("Expected %s, instead got %s", tc.sandboxId, sandboxId)
+			if sandboxId != container.SandboxId {
+				t.Errorf("Expected %s, instead got %s", container.SandboxId, sandboxId)
 			}
 
 			image, err := getString(bucket, "image")
@@ -105,8 +64,8 @@ func TestSetContainer(t *testing.T) {
 				return err
 			}
 
-			if image != tc.image {
-				t.Errorf("Expected %s, instead got %s", tc.image, image)
+			if image != container.Image {
+				t.Errorf("Expected %s, instead got %s", container.Image, image)
 			}
 
 			labels, err := getString(bucket, "labels")
@@ -114,8 +73,13 @@ func TestSetContainer(t *testing.T) {
 				return err
 			}
 
-			if labels != tc.expectedLabels {
-				t.Errorf("Expected %s, instead got %s", tc.expectedLabels, labels)
+			matchJson, err := json.Marshal(container.Labels)
+			if err != nil {
+				return err
+			}
+
+			if labels != string(matchJson) {
+				t.Errorf("Expected %s, instead got %s", matchJson, labels)
 			}
 
 			annotations, err := getString(bucket, "annotations")
@@ -123,142 +87,99 @@ func TestSetContainer(t *testing.T) {
 				return err
 			}
 
-			if annotations != tc.expectedAnnotations {
-				t.Errorf("Expected %s, instead got %s", tc.expectedAnnotations, annotations)
+			matchJson, err = json.Marshal(container.Annotations)
+			if err != nil {
+				return err
+			}
+
+			if annotations != string(matchJson) {
+				t.Errorf("Expected %s, instead got %s", matchJson, annotations)
 			}
 
 			return nil
 		}); err != nil {
 			t.Fatal(err)
 		}
+
+		contList, err := b.GetPodSandboxContainerList(container.SandboxId)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(contList) != 1 {
+			t.Errorf("Expected to have one element (containerID: '%s') in ContainersIDList: '%s' of PodSandbox:'%s'", container.ContainerId, contList, container.SandboxId)
+		} else if contList[0] != container.ContainerId {
+			t.Errorf("Expected to get containerID: '%s' in ContainersIDList: '%v' of PodSandbox:'%s'", container.ContainerId, contList, container.SandboxId)
+		}
 	}
 }
 
 func TestGetContainerInfo(t *testing.T) {
-	tests := []struct {
-		containerId string
-		sandboxId   string
-		image       string
-		labels      map[string]string
-		annotations map[string]string
-	}{
-		{
-			containerId: "e05d74ac-6d22-406a-ab1c-5e99c0d6529f",
-			sandboxId:   "92ac4008-bc31-457a-b598-735d9970515b",
-			image:       "cirros",
-			labels: map[string]string{
-				"foo":  "bar",
-				"fizz": "buzz",
-			},
-			annotations: map[string]string{
-				"fizz": "buzz",
-				"virt": "let",
-			},
-		},
-		{
-			containerId: "369f2409-8272-491a-8731-c7e4711ac93d",
-			sandboxId:   "a417cbea-306a-41a4-aa3b-eae8d68e43ac",
-			image:       "fedora",
-			labels: map[string]string{
-				"test":  "testing",
-				"hello": "world",
-			},
-			annotations: map[string]string{
-				"hello": "world",
-				"test":  "testing",
-			},
-		},
+	sandboxes, err := GetSandboxes(2)
+	if err != nil {
+		t.Fatalf("Failed to generate array of sandbox configs: %v", err)
+	}
+	containers, err := GetContainersConfig(sandboxes)
+	if err != nil {
+		t.Fatalf("Failed to generate array of container configs: %v", err)
 	}
 
-	for _, tc := range tests {
-		b, err := NewFakeBoltClient()
+	b := SetUpBolt(t, sandboxes, containers)
+
+	for _, container := range containers {
+		containerInfo, err := b.GetContainerInfo(container.ContainerId)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if err := b.VerifyVirtualizationSchema(); err != nil {
-			t.Fatal(err)
+		if containerInfo.SandboxId != container.SandboxId {
+			t.Errorf("Expected %s, instead got %s", container.SandboxId, containerInfo.SandboxId)
 		}
 
-		if err := b.SetContainer(tc.containerId, tc.sandboxId, tc.image, tc.labels, tc.annotations); err != nil {
-			t.Fatal(err)
+		if containerInfo.Image != container.Image {
+			t.Errorf("Expected %s, instead got %s", container.Image, containerInfo.Image)
 		}
 
-		containerInfo, err := b.GetContainerInfo(tc.containerId)
-		if err != nil {
-			t.Fatal(err)
+		if !reflect.DeepEqual(containerInfo.Labels, container.Labels) {
+			t.Errorf("Expected %v, instead got %v", container.Labels, containerInfo.Labels)
 		}
 
-		if containerInfo.SandboxId != tc.sandboxId {
-			t.Errorf("Expected %s, instead got %s", tc.sandboxId, containerInfo.SandboxId)
-		}
-
-		if containerInfo.Image != tc.image {
-			t.Errorf("Expected %s, instead got %s", tc.image, containerInfo.Image)
-		}
-
-		if !reflect.DeepEqual(containerInfo.Labels, tc.labels) {
-			t.Errorf("Expected %v, instead got %v", tc.labels, containerInfo.Labels)
-		}
-
-		if !reflect.DeepEqual(containerInfo.Annotations, tc.annotations) {
-			t.Errorf("Expected %v, instead got %v", tc.annotations, containerInfo.Annotations)
+		if !reflect.DeepEqual(containerInfo.Annotations, container.Annotations) {
+			t.Errorf("Expected %v, instead got %v", container.Annotations, containerInfo.Annotations)
 		}
 	}
 }
 
 func TestRemoveContainer(t *testing.T) {
-	tests := []struct {
-		containerId string
-		sandboxId   string
-		image       string
-		labels      map[string]string
-		annotations map[string]string
-	}{
-		{
-			containerId: "93bee424-56cb-4a83-93cf-96e825c54c87",
-			sandboxId:   "721a5297-200e-4b1e-8495-3065404cedbc",
-			image:       "cirros",
-			labels: map[string]string{
-				"foo":  "bar",
-				"fizz": "buzz",
-			},
-			annotations: map[string]string{
-				"fizz": "buzz",
-				"virt": "let",
-			},
-		},
-		{
-			containerId: "7547f814-3492-4434-bbd7-50f6de170559",
-			sandboxId:   "78986a75-0b23-46f0-b317-652c2ba22f08",
-			image:       "fedora",
-			labels: map[string]string{
-				"foo":  "bar",
-				"fizz": "buzz",
-			},
-			annotations: map[string]string{
-				"fizz": "buzz",
-				"virt": "let",
-			},
-		},
+	sandboxes, err := GetSandboxes(2)
+	if err != nil {
+		t.Fatalf("Failed to generate array of sandbox configs: %v", err)
+	}
+	containers, err := GetContainersConfig(sandboxes)
+	if err != nil {
+		t.Fatalf("Failed to generate array of container configs: %v", err)
 	}
 
-	for _, tc := range tests {
-		b, err := NewFakeBoltClient()
+	b := SetUpBolt(t, sandboxes, containers)
+
+	for _, container := range containers {
+		contList, err := b.GetPodSandboxContainerList(container.SandboxId)
 		if err != nil {
 			t.Fatal(err)
 		}
-
-		if err := b.VerifyVirtualizationSchema(); err != nil {
+		if len(contList) != 1 {
+			t.Errorf("Expected to have one element (containerID: '%s') in ContainersIDList: '%s' of PodSandbox:'%s'", container.ContainerId, contList, container.SandboxId)
+		} else if contList[0] != container.ContainerId {
+			t.Errorf("Expected to get containerID: '%s' in ContainersIDList: '%v' of PodSandbox:'%s'", container.ContainerId, contList, container.SandboxId)
+		}
+		if err := b.RemoveContainer(container.ContainerId); err != nil {
 			t.Fatal(err)
 		}
-
-		if err := b.SetContainer(tc.containerId, tc.sandboxId, tc.image, tc.labels, tc.annotations); err != nil {
+		contList, err = b.GetPodSandboxContainerList(container.SandboxId)
+		if err != nil {
 			t.Fatal(err)
 		}
-
-		if err := b.RemoveContainer(tc.containerId); err != nil {
-			t.Fatal(err)
+		if len(contList) != 0 {
+			t.Errorf("Expected to have empty list in ContainersIDList: '%s' of PodSandbox:'%s'", container.ContainerId, contList)
 		}
 	}
 }

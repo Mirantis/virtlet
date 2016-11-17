@@ -21,123 +21,94 @@ import (
 	"reflect"
 	"testing"
 
+	"encoding/json"
 	"github.com/boltdb/bolt"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
-func TestSetPodSandbox(t *testing.T) {
-	name := "testName"
-	uid := "f1836e9d-b386-432f-9d41-f34d8e5d6a59"
-	namespace := "testNamespace"
-	attempt := uint32(0)
-	metadata := &kubeapi.PodSandboxMetadata{
-		Name:      &name,
-		Uid:       &uid,
-		Namespace: &namespace,
-		Attempt:   &attempt,
+func TestSetSandBoxValidation(t *testing.T) {
+	invalidSandboxes, err := GetSandboxes(3)
+	if err != nil {
+		t.Fatalf("Failed to generate array of sandbox configs: %v", err)
 	}
 
-	hostNetwork := false
-	hostPid := false
-	hostIpc := false
-	namespaceOptions := &kubeapi.NamespaceOption{
-		HostNetwork: &hostNetwork,
-		HostPid:     &hostPid,
-		HostIpc:     &hostIpc,
+	//Now let's make generated configs to be invalid
+	invalidSandboxes[0].Metadata = nil
+	invalidSandboxes[1].Linux = nil
+	invalidSandboxes[2].Linux.NamespaceOptions = nil
+
+	b, err := NewFakeBoltClient()
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	cgroupParent := "testCgroupParent"
-	linuxSandbox := &kubeapi.LinuxPodSandboxConfig{
-		CgroupParent:     &cgroupParent,
-		NamespaceOptions: namespaceOptions,
+	if err := b.VerifySandboxSchema(); err != nil {
+		t.Fatal(err)
 	}
 
-	hostname := "testHostname"
-	logDirectory := "/var/log/test_log_directory"
-	validSandboxConfig := &kubeapi.PodSandboxConfig{
-		Metadata:     metadata,
-		Hostname:     &hostname,
-		LogDirectory: &logDirectory,
-		Labels: map[string]string{
-			"foo":  "bar",
-			"fizz": "buzz",
-		},
-		Annotations: map[string]string{
-			"hello": "world",
-			"virt":  "let",
-		},
-		Linux: linuxSandbox,
-	}
-
-	tests := []struct {
-		config              *kubeapi.PodSandboxConfig
-		expectedLabels      string
-		expectedAnnotations string
-		error               bool
-	}{
-		{
-			config:              validSandboxConfig,
-			expectedLabels:      "{\"fizz\":\"buzz\",\"foo\":\"bar\"}",
-			expectedAnnotations: "{\"hello\":\"world\",\"virt\":\"let\"}",
-			error:               false,
-		},
-		{
-			config: &kubeapi.PodSandboxConfig{},
-			error:  true,
-		},
-	}
-
-	for _, tc := range tests {
-		b, err := NewFakeBoltClient()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if err := b.VerifySandboxSchema(); err != nil {
-			t.Fatal(err)
-		}
-
-		if err := b.SetPodSandbox(tc.config); err != nil {
-			if tc.error {
-				continue
+	for _, sandbox := range invalidSandboxes {
+		if sandbox != nil {
+			if err := b.SetPodSandbox(sandbox); err == nil {
+				t.Fatalf("Expected to recieve error on attempt to set invalid sandbox %v", sandbox)
 			}
-
-			t.Fatal(err)
 		}
+	}
+}
 
+func TestSetPodSandbox(t *testing.T) {
+	sandboxes, err := GetSandboxes(2)
+	if err != nil {
+		t.Fatalf("Failed to generate array of sandbox configs: %v", err)
+	}
+
+	b := SetUpBolt(t, sandboxes, []*ContainerTestConfigSet{})
+
+	for _, sandbox := range sandboxes {
 		if err := b.db.View(func(tx *bolt.Tx) error {
 			parentBucket := tx.Bucket([]byte("sandbox"))
 			if parentBucket == nil {
 				return fmt.Errorf("bucket 'sandbox' doesn't exist")
 			}
 
-			bucket := parentBucket.Bucket([]byte(tc.config.GetMetadata().GetUid()))
+			bucket := parentBucket.Bucket([]byte(sandbox.GetMetadata().GetUid()))
 			if bucket == nil {
-				return fmt.Errorf("bucket '%s' doesn't exist", tc.config.GetMetadata().GetUid())
+				return fmt.Errorf("bucket '%s' doesn't exist", sandbox.GetMetadata().GetUid())
 			}
 
 			hostname, err := getString(bucket, "hostname")
 			if err != nil {
 				return err
 			}
-			if hostname != tc.config.GetHostname() {
-				t.Errorf("Expected %s, instead got %s", tc.config.GetHostname(), hostname)
+			if hostname != sandbox.GetHostname() {
+				t.Errorf("Expected %s, instead got %s", sandbox.GetHostname(), hostname)
 			}
 
 			strLabels, err := getString(bucket, "labels")
 			if err != nil {
 				return err
 			}
-			if strLabels != tc.expectedLabels {
-				t.Errorf("Expected %s, instead got %s", tc.expectedLabels, strLabels)
+
+			matchJson, err := json.Marshal(sandbox.GetLabels())
+			if err != nil {
+				return err
+			}
+
+			if strLabels != string(matchJson) {
+				t.Errorf("Expected %s, instead got %s", matchJson, strLabels)
+			}
+
+			matchJson, err = json.Marshal(sandbox.GetAnnotations())
+			if err != nil {
+				return err
 			}
 
 			strAnnotations, err := getString(bucket, "annotations")
 			if err != nil {
 				return err
 			}
-			if strAnnotations != tc.expectedAnnotations {
-				t.Errorf("Expected %s, instead got %s", tc.expectedAnnotations, strAnnotations)
+
+			if strAnnotations != string(matchJson) {
+				t.Errorf("Expected %s, instead got %s", matchJson, strAnnotations)
 			}
 
 			metadataBucket := bucket.Bucket([]byte("metadata"))
@@ -149,24 +120,24 @@ func TestSetPodSandbox(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			if name != tc.config.GetMetadata().GetName() {
-				t.Errorf("Expected %s, instead got %s", tc.config.GetMetadata().GetName(), name)
+			if name != sandbox.GetMetadata().GetName() {
+				t.Errorf("Expected %s, instead got %s", sandbox.GetMetadata().GetName(), name)
 			}
 
 			uid, err := getString(metadataBucket, "uid")
 			if err != nil {
 				return err
 			}
-			if uid != tc.config.GetMetadata().GetUid() {
-				t.Errorf("Expected %s, instead got %s", tc.config.GetMetadata().GetUid(), uid)
+			if uid != sandbox.GetMetadata().GetUid() {
+				t.Errorf("Expected %s, instead got %s", sandbox.GetMetadata().GetUid(), uid)
 			}
 
 			namespace, err := getString(metadataBucket, "namespace")
 			if err != nil {
 				return err
 			}
-			if namespace != tc.config.GetMetadata().GetNamespace() {
-				t.Errorf("Expected %s, instead got %s", tc.config.GetMetadata().GetNamespace(), namespace)
+			if namespace != sandbox.GetMetadata().GetNamespace() {
+				t.Errorf("Expected %s, instead got %s", sandbox.GetMetadata().GetNamespace(), namespace)
 			}
 
 			return nil
@@ -177,48 +148,12 @@ func TestSetPodSandbox(t *testing.T) {
 }
 
 func TestRemovePodSandbox(t *testing.T) {
-	name := "testName"
-	uid := "f1836e9d-b386-432f-9d41-f34d8e5d6a59"
-	namespace := "testNamespace"
-	attempt := uint32(0)
-	metadata := &kubeapi.PodSandboxMetadata{
-		Name:      &name,
-		Uid:       &uid,
-		Namespace: &namespace,
-		Attempt:   &attempt,
+	sandboxes, err := GetSandboxes(1)
+	if err != nil {
+		t.Fatalf("Failed to generate array of sandbox configs: %v", err)
 	}
 
-	hostNetwork := false
-	hostPid := false
-	hostIpc := false
-	namespaceOptions := &kubeapi.NamespaceOption{
-		HostNetwork: &hostNetwork,
-		HostPid:     &hostPid,
-		HostIpc:     &hostIpc,
-	}
-
-	cgroupParent := "testCgroupParent"
-	linuxSandbox := &kubeapi.LinuxPodSandboxConfig{
-		CgroupParent:     &cgroupParent,
-		NamespaceOptions: namespaceOptions,
-	}
-
-	hostname := "testHostname"
-	logDirectory := "/var/log/test_log_directory"
-	sandbox := &kubeapi.PodSandboxConfig{
-		Metadata:     metadata,
-		Hostname:     &hostname,
-		LogDirectory: &logDirectory,
-		Labels: map[string]string{
-			"foo":  "bar",
-			"fizz": "buzz",
-		},
-		Annotations: map[string]string{
-			"hello": "world",
-			"virt":  "let",
-		},
-		Linux: linuxSandbox,
-	}
+	sandbox := sandboxes[0]
 
 	tests := []struct {
 		sandbox *kubeapi.PodSandboxConfig
@@ -249,7 +184,7 @@ func TestRemovePodSandbox(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-
+		dumpDB(t, b.db)
 		if err := b.RemovePodSandbox(tc.sandbox.GetMetadata().GetUid()); err != nil {
 			if tc.error {
 				continue
@@ -261,72 +196,15 @@ func TestRemovePodSandbox(t *testing.T) {
 }
 
 func TestGetPodSandboxStatus(t *testing.T) {
-	name := "testName"
-	uid := "f1836e9d-b386-432f-9d41-f34d8e5d6a59"
-	namespace := "testNamespace"
-	attempt := uint32(0)
-	metadata := &kubeapi.PodSandboxMetadata{
-		Name:      &name,
-		Uid:       &uid,
-		Namespace: &namespace,
-		Attempt:   &attempt,
+	sandboxes, err := GetSandboxes(2)
+	if err != nil {
+		t.Fatalf("Failed to generate array of sandbox configs: %v", err)
 	}
 
-	hostNetwork := false
-	hostPid := false
-	hostIpc := false
-	namespaceOptions := &kubeapi.NamespaceOption{
-		HostNetwork: &hostNetwork,
-		HostPid:     &hostPid,
-		HostIpc:     &hostIpc,
-	}
+	b := SetUpBolt(t, sandboxes, []*ContainerTestConfigSet{})
 
-	cgroupParent := "testCgroupParent"
-	linuxSandbox := &kubeapi.LinuxPodSandboxConfig{
-		CgroupParent:     &cgroupParent,
-		NamespaceOptions: namespaceOptions,
-	}
-
-	hostname := "testHostname"
-	logDirectory := "/var/log/test_log_directory"
-	sandboxConfig := &kubeapi.PodSandboxConfig{
-		Metadata:     metadata,
-		Hostname:     &hostname,
-		LogDirectory: &logDirectory,
-		Labels: map[string]string{
-			"foo":  "bar",
-			"fizz": "buzz",
-		},
-		Annotations: map[string]string{
-			"hello": "world",
-			"virt":  "let",
-		},
-		Linux: linuxSandbox,
-	}
-
-	tests := []struct {
-		config *kubeapi.PodSandboxConfig
-	}{
-		{
-			config: sandboxConfig,
-		},
-	}
-
-	for _, tc := range tests {
-		b, err := NewFakeBoltClient()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if err := b.VerifySandboxSchema(); err != nil {
-			t.Fatal(err)
-		}
-
-		if err := b.SetPodSandbox(tc.config); err != nil {
-			t.Fatal(err)
-		}
-
-		status, err := b.GetPodSandboxStatus(tc.config.GetMetadata().GetUid())
+	for _, sandbox := range sandboxes {
+		status, err := b.GetPodSandboxStatus(sandbox.GetMetadata().GetUid())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -335,203 +213,126 @@ func TestGetPodSandboxStatus(t *testing.T) {
 			t.Errorf("Sandbox state not ready")
 		}
 
-		if !reflect.DeepEqual(status.GetLabels(), tc.config.GetLabels()) {
-			t.Errorf("Expected %v, instead got %v", tc.config.GetLabels(), status.GetLabels())
+		if !reflect.DeepEqual(status.GetLabels(), sandbox.GetLabels()) {
+			t.Errorf("Expected %v, instead got %v", sandbox.GetLabels(), status.GetLabels())
 		}
 
-		if !reflect.DeepEqual(status.GetAnnotations(), tc.config.GetAnnotations()) {
-			t.Errorf("Expected %v, instead got %v", tc.config.GetAnnotations(), status.GetAnnotations())
+		if !reflect.DeepEqual(status.GetAnnotations(), sandbox.GetAnnotations()) {
+			t.Errorf("Expected %v, instead got %v", sandbox.GetAnnotations(), status.GetAnnotations())
 		}
 
-		if status.GetMetadata().GetName() != tc.config.GetMetadata().GetName() {
-			t.Errorf("Expected %s, instead got %s", tc.config.GetMetadata().GetName(), status.GetMetadata().GetName())
+		if status.GetMetadata().GetName() != sandbox.GetMetadata().GetName() {
+			t.Errorf("Expected %s, instead got %s", sandbox.GetMetadata().GetName(), status.GetMetadata().GetName())
 		}
 	}
 }
 
 func TestListPodSandbox(t *testing.T) {
-	firstName := "testName"
-	firstUid := "f1836e9d-b386-432f-9d41-f34d8e5d6a59"
-	firstNamespace := "testNamespace"
-	firstAttempt := uint32(0)
-	firstMetadata := &kubeapi.PodSandboxMetadata{
-		Name:      &firstName,
-		Uid:       &firstUid,
-		Namespace: &firstNamespace,
-		Attempt:   &firstAttempt,
+	genSandboxes, err := GetSandboxes(2)
+	if err != nil {
+		t.Fatalf("Failed to generate array of sandbox configs: %v", err)
 	}
 
-	firstHostNetwork := false
-	firstHostPid := false
-	firstHostIpc := false
-	firstNamespaceOptions := &kubeapi.NamespaceOption{
-		HostNetwork: &firstHostNetwork,
-		HostPid:     &firstHostPid,
-		HostIpc:     &firstHostIpc,
-	}
+	firstSandboxConfig := genSandboxes[0]
+	secondSandboxConfig := genSandboxes[1]
 
-	firstCgroupParent := "testCgroupParent"
-	firstLinuxSandbox := &kubeapi.LinuxPodSandboxConfig{
-		CgroupParent:     &firstCgroupParent,
-		NamespaceOptions: firstNamespaceOptions,
-	}
+	firstSandboxConfig.Labels = map[string]string{"unique": "first", "common": "both"}
+	secondSandboxConfig.Labels = map[string]string{"unique": "second", "common": "both"}
 
-	firstHostname := "testHostname"
-	firstLogDirectory := "/var/log/test_log_directory"
-	firstSandboxConfig := &kubeapi.PodSandboxConfig{
-		Metadata:     firstMetadata,
-		Hostname:     &firstHostname,
-		LogDirectory: &firstLogDirectory,
-		Labels: map[string]string{
-			"foo": "bar",
-		},
-		Annotations: map[string]string{
-			"hello": "world",
-			"virt":  "let",
-		},
-		Linux: firstLinuxSandbox,
-	}
-
-	secondName := "anotherTestName"
-	secondUid := "cefda818-cc0b-4ff5-b6f9-759d3da96d63"
-	secondNamespace := "testNamespace"
-	secondAttempt := uint32(0)
-	secondMetadata := &kubeapi.PodSandboxMetadata{
-		Name:      &secondName,
-		Uid:       &secondUid,
-		Namespace: &secondNamespace,
-		Attempt:   &secondAttempt,
-	}
-
-	secondHostNetwork := false
-	secondHostPid := false
-	secondHostIpc := false
-	secondNamespaceOptions := &kubeapi.NamespaceOption{
-		HostNetwork: &secondHostNetwork,
-		HostPid:     &secondHostPid,
-		HostIpc:     &secondHostIpc,
-	}
-
-	secondCgroupParent := "testCgroupParent"
-	secondLinuxSandbox := &kubeapi.LinuxPodSandboxConfig{
-		CgroupParent:     &secondCgroupParent,
-		NamespaceOptions: secondNamespaceOptions,
-	}
-
-	secondHostname := "testHostname"
-	secondLogDirectory := "/var/log/test_log_directory"
-	secondSandboxConfig := &kubeapi.PodSandboxConfig{
-		Metadata:     secondMetadata,
-		Hostname:     &secondHostname,
-		LogDirectory: &secondLogDirectory,
-		Labels: map[string]string{
-			"fizz": "buzz",
-		},
-		Annotations: map[string]string{
-			"hello": "world",
-			"virt":  "let",
-		},
-		Linux: secondLinuxSandbox,
-	}
-
+	sandboxConfigs := []*kubeapi.PodSandboxConfig{firstSandboxConfig, secondSandboxConfig}
 	state_ready := kubeapi.PodSandBoxState_READY
 	state_notready := kubeapi.PodSandBoxState_NOTREADY
 
 	tests := []struct {
-		configs       []*kubeapi.PodSandboxConfig
-		filter        *kubeapi.PodSandboxFilter
-		expectedCount int
-		error         bool
+		filter      *kubeapi.PodSandboxFilter
+		expectedIds []string
 	}{
 		{
-			configs: []*kubeapi.PodSandboxConfig{
-				firstSandboxConfig,
-				secondSandboxConfig,
-			},
-			filter:        &kubeapi.PodSandboxFilter{},
-			expectedCount: 2,
-			error:         false,
+			filter:      &kubeapi.PodSandboxFilter{},
+			expectedIds: []string{*firstSandboxConfig.Metadata.Uid, *secondSandboxConfig.Metadata.Uid},
 		},
 		{
-			configs: []*kubeapi.PodSandboxConfig{
-				firstSandboxConfig,
-				secondSandboxConfig,
-			},
 			filter: &kubeapi.PodSandboxFilter{
-				Id: &firstUid,
+				Id: firstSandboxConfig.Metadata.Uid,
 			},
-			expectedCount: 1,
-			error:         false,
+			expectedIds: []string{*firstSandboxConfig.Metadata.Uid},
 		},
 		{
-			configs: []*kubeapi.PodSandboxConfig{
-				firstSandboxConfig,
-				secondSandboxConfig,
-			},
 			filter: &kubeapi.PodSandboxFilter{
 				State: &state_ready,
 			},
-			expectedCount: 2,
-			error:         false,
+			expectedIds: []string{*firstSandboxConfig.Metadata.Uid, *secondSandboxConfig.Metadata.Uid},
 		},
 		{
-			configs: []*kubeapi.PodSandboxConfig{
-				firstSandboxConfig,
-				secondSandboxConfig,
-			},
 			filter: &kubeapi.PodSandboxFilter{
 				State: &state_notready,
 			},
-			expectedCount: 0,
-			error:         false,
+			expectedIds: []string{},
 		},
 		{
-			configs: []*kubeapi.PodSandboxConfig{
-				firstSandboxConfig,
-				secondSandboxConfig,
-			},
 			filter: &kubeapi.PodSandboxFilter{
-				LabelSelector: map[string]string{
-					"foo": "bar",
-				},
+				LabelSelector: map[string]string{"unique": "first"},
 			},
-			expectedCount: 1,
-			error:         false,
+			expectedIds: []string{*firstSandboxConfig.Metadata.Uid},
 		},
 		{
-			configs:       []*kubeapi.PodSandboxConfig{},
-			filter:        &kubeapi.PodSandboxFilter{},
-			expectedCount: 0,
-			error:         true,
+			filter: &kubeapi.PodSandboxFilter{
+				LabelSelector: map[string]string{"common": "both"},
+			},
+			expectedIds: []string{*firstSandboxConfig.Metadata.Uid, *secondSandboxConfig.Metadata.Uid},
+		},
+		{
+			filter: &kubeapi.PodSandboxFilter{
+				LabelSelector: map[string]string{"unique": "second", "common": "both"},
+			},
+			expectedIds: []string{*secondSandboxConfig.Metadata.Uid},
+		},
+		{
+			filter: &kubeapi.PodSandboxFilter{
+				Id:            firstSandboxConfig.Metadata.Uid,
+				LabelSelector: map[string]string{"unique": "second", "common": "both"},
+			},
+			expectedIds: []string{},
+		},
+		{
+			filter: &kubeapi.PodSandboxFilter{
+				Id:            firstSandboxConfig.Metadata.Uid,
+				LabelSelector: map[string]string{"unique": "first", "common": "both"},
+			},
+			expectedIds: []string{*firstSandboxConfig.Metadata.Uid},
+		},
+		{
+			filter: &kubeapi.PodSandboxFilter{
+				Id:            firstSandboxConfig.Metadata.Uid,
+				LabelSelector: map[string]string{"common": "both"},
+			},
+			expectedIds: []string{*firstSandboxConfig.Metadata.Uid},
 		},
 	}
 
+	b := SetUpBolt(t, sandboxConfigs, []*ContainerTestConfigSet{})
+
 	for _, tc := range tests {
-		b, err := NewFakeBoltClient()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if err := b.VerifySandboxSchema(); err != nil {
-			t.Fatal(err)
-		}
-
-		for _, config := range tc.configs {
-			if err := b.SetPodSandbox(config); err != nil {
-				t.Fatal(err)
-			}
-		}
-
 		sandboxes, err := b.ListPodSandbox(tc.filter)
 		if err != nil {
-			if tc.error {
-				continue
-			}
 			t.Fatal(err)
 		}
 
-		if len(sandboxes) != tc.expectedCount {
-			t.Errorf("Expected %d sandboxes, instead got %d", tc.expectedCount, len(sandboxes))
+		if len(sandboxes) != len(tc.expectedIds) {
+			t.Errorf("Expected %d sandboxes, instead got %d", len(tc.expectedIds), len(sandboxes))
+		}
+
+		for _, id := range tc.expectedIds {
+			found := false
+			for _, podSandbox := range sandboxes {
+				if id == *podSandbox.Id {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("Didn't find expected sandbox id %s in returned sandbox list %v", len(tc.expectedIds), sandboxes)
+			}
 		}
 	}
 }

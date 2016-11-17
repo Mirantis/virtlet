@@ -37,6 +37,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/bolttools"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/fields"
 )
 
 const (
@@ -433,11 +434,115 @@ func libvirtToKubeState(domainInfo C.virDomainInfo, lastState kubeapi.ContainerS
 }
 
 func filterContainer(container *kubeapi.Container, filter *kubeapi.ContainerFilter) bool {
-	return filter.State == nil || container.GetState() == filter.GetState()
+	if filter != nil {
+		if container.GetState() != filter.GetState() {
+			return false
+		}
+		filterSelector := filter.GetLabelSelector()
+		if filterSelector != nil {
+			sel := fields.SelectorFromSet(filterSelector)
+			if !sel.Matches(fields.Set(container.GetLabels())) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func (v *VirtualizationTool) getContainer(boltClient *bolttools.BoltClient, domain *C.struct__virDomain) (*kubeapi.Container, error) {
+	var domainInfo C.virDomainInfo
+	id, err := v.GetDomainUUID(domain)
+	if err != nil {
+		return nil, err
+	}
+	containerInfo, err := boltClient.GetContainerInfo(id)
+	if err != nil {
+		return nil, err
+	}
+	if containerInfo == nil {
+		return nil, nil
+	}
+
+	podSandboxId := containerInfo.SandboxId
+
+	if status := C.virDomainGetInfo(domain, &domainInfo); status < 0 {
+		return nil, GetLibvirtLastError()
+	}
+
+	metadata := &kubeapi.ContainerMetadata{
+		Name: &id,
+	}
+
+	image := &kubeapi.ImageSpec{Image: &containerInfo.Image}
+
+	imageRef := containerInfo.Image
+
+	containerState := libvirtToKubeState(domainInfo, containerInfo.State)
+
+	createdAt := containerInfo.CreatedAt
+
+	container := &kubeapi.Container{
+		Id:           &id,
+		PodSandboxId: &podSandboxId,
+		Metadata:     metadata,
+		Image:        image,
+		ImageRef:     &imageRef,
+		State:        &containerState,
+		CreatedAt:    &createdAt,
+		Labels:       containerInfo.Labels,
+		Annotations:  containerInfo.Annotations,
+	}
+	return container, nil
 }
 
 func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, filter *kubeapi.ContainerFilter) ([]*kubeapi.Container, error) {
-	var domainInfo C.virDomainInfo
+	containers := make([]*kubeapi.Container, 0)
+
+	if filter != nil {
+		if filter.GetId() != "" {
+			domainPtr, err := v.GetDomainPointerById(filter.GetId())
+			defer C.virDomainFree(domainPtr)
+			if err != nil {
+				return nil, err
+			}
+			container, err := v.getContainer(boltClient, domainPtr)
+			if err != nil {
+				return nil, err
+			}
+
+			if filter.GetPodSandboxId() != "" {
+				if container.GetPodSandboxId() != filter.GetPodSandboxId() {
+					return containers, nil
+				}
+			}
+			if filterContainer(container, filter) {
+				containers = append(containers, container)
+			}
+			return containers, nil
+		} else if filter.GetPodSandboxId() != "" {
+			domainIDs, err := boltClient.GetPodSandboxContainerList(filter.GetPodSandboxId())
+			if err != nil {
+				return nil, err
+			}
+			for _, id := range domainIDs {
+				domainPtr, err := v.GetDomainPointerById(id)
+				defer C.virDomainFree(domainPtr)
+				if err != nil {
+					return nil, err
+				}
+				container, err := v.getContainer(boltClient, domainPtr)
+				if err != nil {
+					return nil, err
+				}
+				if filterContainer(container, filter) {
+					containers = append(containers, container)
+				}
+			}
+			return containers, nil
+		}
+	}
+
+	// Get list of all defined domains from libvirt and check each container against remained filter settings
 	var cList *C.virDomainPtr
 	count := C.virConnectListAllDomains(v.conn, (**C.virDomainPtr)(&cList), 0)
 	if count < 0 {
@@ -450,55 +555,10 @@ func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, fi
 	}
 	domains := *(*[]C.virDomainPtr)(unsafe.Pointer(&header))
 
-	containers := make([]*kubeapi.Container, 0, count)
-
-	for _, domain := range domains {
-		id, err := v.GetDomainUUID(domain)
+	for _, domainPtr := range domains {
+		container, err := v.getContainer(boltClient, domainPtr)
 		if err != nil {
 			return nil, err
-		}
-
-		containerInfo, err := boltClient.GetContainerInfo(id)
-		if err != nil {
-			return nil, err
-		}
-		if containerInfo == nil {
-			continue
-		}
-
-		podSandboxId := containerInfo.SandboxId
-
-		if status := C.virDomainGetInfo(domain, &domainInfo); status < 0 {
-			return nil, GetLibvirtLastError()
-		}
-
-		metadata := &kubeapi.ContainerMetadata{
-			Name: &id,
-		}
-
-		image := &kubeapi.ImageSpec{Image: &containerInfo.Image}
-
-		imageRef := containerInfo.Image
-
-		containerState := libvirtToKubeState(domainInfo, containerInfo.State)
-		if containerInfo.State != containerState {
-			if err := boltClient.UpdateState(id, containerState); err != nil {
-				return nil, err
-			}
-		}
-
-		createdAt := containerInfo.CreatedAt
-
-		container := &kubeapi.Container{
-			Id:           &id,
-			PodSandboxId: &podSandboxId,
-			Metadata:     metadata,
-			Image:        image,
-			ImageRef:     &imageRef,
-			State:        &containerState,
-			CreatedAt:    &createdAt,
-			Labels:       containerInfo.Labels,
-			Annotations:  containerInfo.Annotations,
 		}
 
 		if filterContainer(container, filter) {
@@ -509,9 +569,7 @@ func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, fi
 	return containers, nil
 }
 
-func (v *VirtualizationTool) ContainerStatus(boltClient *bolttools.BoltClient, containerId string) (*kubeapi.ContainerStatus, error) {
-	var domainInfo C.virDomainInfo
-
+func (v *VirtualizationTool) GetDomainPointerById(containerId string) (*C.struct__virDomain, error) {
 	cContainerId := C.CString(containerId)
 	defer C.free(unsafe.Pointer(cContainerId))
 
@@ -519,7 +577,17 @@ func (v *VirtualizationTool) ContainerStatus(boltClient *bolttools.BoltClient, c
 	if domain == nil {
 		return nil, GetLibvirtLastError()
 	}
+	return domain, nil
+}
+
+func (v *VirtualizationTool) ContainerStatus(boltClient *bolttools.BoltClient, containerId string) (*kubeapi.ContainerStatus, error) {
+	var domainInfo C.virDomainInfo
+
+	domain, err := v.GetDomainPointerById(containerId)
 	defer C.virDomainFree(domain)
+	if err != nil {
+		return nil, err
+	}
 
 	if status := C.virDomainGetInfo(domain, &domainInfo); status < 0 {
 		return nil, GetLibvirtLastError()
