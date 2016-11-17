@@ -12,7 +12,7 @@ services:
   virtlet_test:
     build: ../..
     environment:
-      - VIRTLET_LOGLEVEL
+      - VIRTLET_LOGLEVEL=3
       - VIRTLET_DISABLE_KVM=1
     volumes:
       - /lib/modules:/lib/modules:ro
@@ -26,7 +26,7 @@ services:
   virtlet:
     build: ../..
     environment:
-      - VIRTLET_LOGLEVEL
+      - VIRTLET_LOGLEVEL=3
       - VIRTLET_DISABLE_KVM=1
     volumes:
       - /lib/modules:/lib/modules:ro
