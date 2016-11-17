@@ -19,6 +19,7 @@ package bolttools
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 	"time"
@@ -42,7 +43,8 @@ func (b *BoltClient) VerifySandboxSchema() error {
 	return err
 }
 
-func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, calicoClient *utils.CalicoClient, dhcpClient *utils.DHCPClient) error {
+// func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, calicoClient *utils.CalicoClient, dhcpClient *utils.DHCPClient) error {
+func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, dhcpClient *utils.DHCPClient) error {
 	podId := config.Metadata.GetUid()
 
 	strLabels, err := json.Marshal(config.GetLabels())
@@ -76,6 +78,7 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, calicoClien
 		return err
 	}
 
+	/* TODO: get back calico
 	ipv4, err := calicoClient.AssignIPv4(podId)
 	if err != nil {
 		return err
@@ -92,9 +95,18 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, calicoClien
 		"0.0.0.0/0": "169.254.1.1",
 	}
 
-	// calico needs such ip
 	ip_with_netmask := ipv4.String() + "/32"
-	hwAddress, err := dhcpClient.CreateNewEndpoint(ip_with_netmask, calicoRoutes)
+	*/
+
+	// TODO: get rid of hardcoded ipv4 and routes
+	ipv4 := net.IP{10, 1, 90, 5}
+	routes := map[string]string{
+		"0.0.0.0/0": "10.1.90.1",
+	}
+	ip_with_netmask := ipv4.String() + "/24"
+
+	// hwAddress, err := dhcpClient.CreateNewEndpoint(ip_with_netmask, calicoRoutes)
+	hwAddress, err := dhcpClient.CreateNewEndpoint(ip_with_netmask, routes)
 	if err != nil {
 		return err
 	}

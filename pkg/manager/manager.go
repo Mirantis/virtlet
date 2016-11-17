@@ -50,8 +50,8 @@ type VirtletManager struct {
 	// bolt
 	boltClient *bolttools.BoltClient
 	// networking
-	calicoClient *utils.CalicoClient
-	dhcpClient   *utils.DHCPClient
+	//	calicoClient *utils.CalicoClient
+	dhcpClient *utils.DHCPClient
 }
 
 func NewVirtletManager(libvirtUri string, poolName string, storageBackend string, etcdEndpoints string) (*VirtletManager, error) {
@@ -71,10 +71,12 @@ func NewVirtletManager(libvirtUri string, poolName string, storageBackend string
 	if err != nil {
 		return nil, err
 	}
+	/* TODO: get back calico
 	calicoClient, err := utils.NewCalicoClient(etcdEndpoints)
 	if err != nil {
 		return nil, err
 	}
+	*/
 	dhcpClient, err := utils.NewDHCPClient()
 	if err != nil {
 		return nil, err
@@ -87,8 +89,8 @@ func NewVirtletManager(libvirtUri string, poolName string, storageBackend string
 		libvirtNetworkingTool:     libvirttools.NewNetworkingTool(libvirtConnTool.Conn),
 		libvirtVirtualizationTool: libvirtVirtualizationTool,
 		boltClient:                boltClient,
-		calicoClient:              calicoClient,
-		dhcpClient:                dhcpClient,
+		//		calicoClient:              calicoClient,
+		dhcpClient: dhcpClient,
 	}
 
 	kubeapi.RegisterRuntimeServiceServer(virtletManager.server, virtletManager)
@@ -132,7 +134,8 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 	glog.V(2).Infof("RunPodSandbox called for pod %s (%s)", name, podId)
 	glog.V(3).Infof("RunPodSandbox: %s", spew.Sdump(in))
 	glog.V(2).Infof("Sandbox config annotations: %v", config.GetAnnotations())
-	if err := v.boltClient.SetPodSandbox(config, v.calicoClient, v.dhcpClient); err != nil {
+	// if err := v.boltClient.SetPodSandbox(config, v.calicoClient, v.dhcpClient); err != nil {
+	if err := v.boltClient.SetPodSandbox(config, v.dhcpClient); err != nil {
 		glog.Errorf("Error when creating pod sandbox for pod %s (%s): %v", name, podId, err)
 		return nil, err
 	}
@@ -169,6 +172,7 @@ func (v *VirtletManager) RemovePodSandbox(ctx context.Context, in *kubeapi.Remov
 		return nil, err
 	}
 
+	/* TODO: get back calico
 	if err := v.calicoClient.RemoveEndpoint(podSandboxId); err != nil {
 		glog.Errorf("Error when removing calico endpoint: %v", err)
 		return nil, err
@@ -178,6 +182,7 @@ func (v *VirtletManager) RemovePodSandbox(ctx context.Context, in *kubeapi.Remov
 		glog.Errorf("Error when removing calico IPAM settings: %v", err)
 		return nil, err
 	}
+	*/
 
 	if err := v.dhcpClient.RemoveEndpoint(hwAddress); err != nil {
 		glog.Errorf("Error when removing configuration from dhcp server: %v", err)
