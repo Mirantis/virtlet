@@ -21,9 +21,10 @@ import (
 
 	"golang.org/x/net/context"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"github.com/Mirantis/virtlet/tests/criapi"
 )
 
-func TestContainerCreate(t *testing.T) {
+func TestContainerCreateStart(t *testing.T) {
 	manager := NewVirtletManager()
 	if err := manager.Run(); err != nil {
 		t.Fatal(err)
@@ -32,71 +33,167 @@ func TestContainerCreate(t *testing.T) {
 
 	runtimeServiceClient := kubeapi.NewRuntimeServiceClient(manager.conn)
 
-	// Sandbox request
-	hostNetwork := false
-	hostPid := false
-	hostIpc := false
-	namespaceOptions := &kubeapi.NamespaceOption{
-		HostNetwork: &hostNetwork,
-		HostPid:     &hostPid,
-		HostIpc:     &hostIpc,
-	}
-
-	cgroupParent := ""
-	linuxPodSandboxConfig := &kubeapi.LinuxPodSandboxConfig{
-		CgroupParent:     &cgroupParent,
-		NamespaceOptions: namespaceOptions,
-	}
-
-	podSandboxName := "foo"
-	podSandboxUid := "c8e21c1b-8008-4337-ac16-f70f2dfaf101"
-	podSandboxNamespace := "default"
-	podSandboxMetadata := &kubeapi.PodSandboxMetadata{
-		Name:      &podSandboxName,
-		Uid:       &podSandboxUid,
-		Namespace: &podSandboxNamespace,
-	}
-
-	podSandboxHostname := "localhost"
-
-	podSandboxConfig := &kubeapi.PodSandboxConfig{
-		Metadata: podSandboxMetadata,
-		Hostname: &podSandboxHostname,
-		Linux:    linuxPodSandboxConfig,
-	}
-	sandboxIn := &kubeapi.RunPodSandboxRequest{Config: podSandboxConfig}
-
-	sandboxOut, err := runtimeServiceClient.RunPodSandbox(context.Background(), sandboxIn)
+	sandboxes, err := criapi.GetSandboxes(2)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Failed to generate array of sandbox configs: %v", err)
 	}
 
+	containers, err := criapi.GetContainersConfig(sandboxes)
+	if err != nil {
+		t.Fatalf("Failed to generate array of container configs: %v", err)
+	}
+
+	containers[0].Labels = map[string]string{"unique": "first", "common": "both"}
+	containers[1].Labels = map[string]string{"unique": "second", "common": "both"}
+
+	filterTests := []struct {
+		containerFilter *kubeapi.ContainerFilter
+		expectedIds     []*string
+	}{
+		{
+			containerFilter: &kubeapi.ContainerFilter{
+				Id: &containers[0].ContainerId,
+			},
+			expectedIds: []*string{&containers[0].ContainerId},
+		},
+		{
+			containerFilter: &kubeapi.ContainerFilter{
+				PodSandboxId: &containers[0].SandboxId,
+			},
+			expectedIds: []*string{&containers[0].ContainerId},
+		},
+		{
+			containerFilter: &kubeapi.ContainerFilter{
+				PodSandboxId:  &containers[0].SandboxId,
+				LabelSelector: map[string]string{"unique": "first", "common": "both"},
+			},
+			expectedIds: []*string{&containers[0].ContainerId},
+		},
+		{
+			containerFilter: &kubeapi.ContainerFilter{
+				PodSandboxId:  &containers[0].SandboxId,
+				LabelSelector: map[string]string{"unique": "nomatch"},
+			},
+			expectedIds: []*string{},
+		},
+		{
+			containerFilter: &kubeapi.ContainerFilter{
+				Id:           &containers[0].ContainerId,
+				PodSandboxId: &containers[0].SandboxId,
+			},
+			expectedIds: []*string{&containers[0].ContainerId},
+		},
+		{
+			containerFilter: &kubeapi.ContainerFilter{
+				Id:            &containers[0].ContainerId,
+				PodSandboxId:  &containers[0].SandboxId,
+				LabelSelector: map[string]string{"unique": "first", "common": "both"},
+			},
+			expectedIds: []*string{&containers[0].ContainerId},
+		},
+		{
+			containerFilter: &kubeapi.ContainerFilter{
+				Id:            &containers[0].ContainerId,
+				PodSandboxId:  &containers[0].SandboxId,
+				LabelSelector: map[string]string{"unique": "nomatch"},
+			},
+			expectedIds: []*string{},
+		},
+		{
+			containerFilter: &kubeapi.ContainerFilter{
+				LabelSelector: map[string]string{"unique": "first", "common": "both"},
+			},
+			expectedIds: []*string{&containers[0].ContainerId},
+		},
+		{
+			containerFilter: &kubeapi.ContainerFilter{
+				LabelSelector: map[string]string{"common": "both"},
+			},
+			expectedIds: []*string{&containers[0].ContainerId, &containers[1].ContainerId},
+		},
+		{
+			containerFilter: &kubeapi.ContainerFilter{},
+			expectedIds:     []*string{&containers[0].ContainerId, &containers[1].ContainerId},
+		},
+	}
+
+	// Pull Images
 	imageServiceClient := kubeapi.NewImageServiceClient(manager.conn)
 
-	imageSpec := &kubeapi.ImageSpec{Image: &imageUrl}
-	in := &kubeapi.PullImageRequest{
-		Image:         imageSpec,
-		Auth:          &kubeapi.AuthConfig{},
-		SandboxConfig: &kubeapi.PodSandboxConfig{},
+	imageSpecs := []*kubeapi.ImageSpec{
+		{Image: &imageCirrosUrl},
+		{Image: &imageCirrosUrl2},
 	}
 
-	if _, err := imageServiceClient.PullImage(context.Background(), in); err != nil {
-		t.Fatal(err)
+	for _, ispec := range imageSpecs {
+		in := &kubeapi.PullImageRequest{
+			Image:         ispec,
+			Auth:          &kubeapi.AuthConfig{},
+			SandboxConfig: &kubeapi.PodSandboxConfig{},
+		}
+
+		if _, err := imageServiceClient.PullImage(context.Background(), in); err != nil {
+			t.Fatal(err)
+		}
 	}
 
-	// Container request
-	hostPath := "/var/lib/virtlet"
-	config := &kubeapi.ContainerConfig{
-		Image:  imageSpec,
-		Mounts: []*kubeapi.Mount{&kubeapi.Mount{HostPath: &hostPath}},
-	}
-	containerIn := &kubeapi.CreateContainerRequest{
-		PodSandboxId:  sandboxOut.PodSandboxId,
-		Config:        config,
-		SandboxConfig: podSandboxConfig,
+	for ind, sandbox := range sandboxes {
+		// Sandbox request
+		sandboxOut, err := runtimeServiceClient.RunPodSandbox(context.Background(), &kubeapi.RunPodSandboxRequest{Config: sandbox})
+		if err != nil {
+			t.Fatal(err)
+		}
+		sandboxes[ind].Metadata.Uid = sandboxOut.PodSandboxId
+
+		// Container request
+		hostPath := "/var/lib/virtlet"
+		config := &kubeapi.ContainerConfig{
+			Image:  imageSpecs[ind],
+			Mounts: []*kubeapi.Mount{{HostPath: &hostPath}},
+			Labels: containers[ind].Labels,
+		}
+		containerIn := &kubeapi.CreateContainerRequest{
+			PodSandboxId:  sandboxOut.PodSandboxId,
+			Config:        config,
+			SandboxConfig: sandbox,
+		}
+
+		createContainerOut, err := runtimeServiceClient.CreateContainer(context.Background(), containerIn)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		containers[ind].ContainerId = *createContainerOut.ContainerId
+
+		_, err = runtimeServiceClient.StartContainer(context.Background(), &kubeapi.StartContainerRequest {ContainerId: &containers[ind].ContainerId})
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
-	if _, err := runtimeServiceClient.CreateContainer(context.Background(), containerIn); err != nil {
-		t.Fatal(err)
+	for _, tc := range filterTests {
+		listContainersRequest := &kubeapi.ListContainersRequest{Filter: tc.containerFilter}
+
+		listContainersOut, err := runtimeServiceClient.ListContainers(context.Background(), listContainersRequest)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if len(listContainersOut.Containers) != len(tc.expectedIds) {
+			t.Errorf("Expected %d sandboxes, instead got %d", len(tc.expectedIds), len(listContainersOut.Containers))
+		}
+
+		for _, id := range tc.expectedIds {
+			found := false
+			for _, container := range listContainersOut.Containers {
+				if *container.Id == *id {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("Didn't find expected sandbox id %s in returned containers list %v", *id, listContainersOut.Containers)
+			}
+		}
 	}
 }

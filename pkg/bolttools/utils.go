@@ -17,8 +17,8 @@ limitations under the License.
 package bolttools
 
 import (
+	"strings"
 	"fmt"
-
 	"github.com/boltdb/bolt"
 )
 
@@ -38,4 +38,25 @@ func getString(bucket *bolt.Bucket, key string) (string, error) {
 	}
 
 	return string(value), nil
+}
+
+func DelValFromCommaSeparatedStrList(in string, del string) string {
+	list := strings.Split(in, ",")
+
+	for ind, el := range list {
+		if el == del {
+			list = append(list[:ind], list[(ind+1):]...)
+			return strings.Join(list, ",")
+		}
+	}
+
+	return in
+}
+
+func AddValToCommaSeparatedStrList(in string, add string) string {
+	if len(in) == 0 {
+		return add
+	} else {
+		return in + "," + add
+	}
 }

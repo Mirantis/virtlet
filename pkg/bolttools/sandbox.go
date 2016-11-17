@@ -24,7 +24,9 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/davecgh/go-spew/spew"
+	"k8s.io/kubernetes/pkg/fields"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"strings"
 )
 
 func (b *BoltClient) VerifySandboxSchema() error {
@@ -102,7 +104,12 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig) error {
 			return err
 		}
 
+		if err := sandboxBucket.Put([]byte("ContainersIDList"), []byte("")); err != nil {
+			return err
+		}
+
 		metadataBucket, err := sandboxBucket.CreateBucketIfNotExists([]byte("metadata"))
+
 		if err != nil {
 			return err
 		}
@@ -194,6 +201,36 @@ func (b *BoltClient) RemovePodSandbox(podId string) error {
 	}
 
 	return nil
+}
+
+func (b *BoltClient) GetPodSandboxContainerList(containerId string) ([]string, error) {
+	var contIDs []string
+	err := b.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte("sandbox"))
+		if bucket == nil {
+			return fmt.Errorf("bucket 'sandbox' doesn't exist")
+		}
+
+		sandboxBucket := bucket.Bucket([]byte(containerId))
+		if sandboxBucket == nil {
+			return fmt.Errorf("bucket '%s' doesn't exist", containerId)
+		}
+
+		contIDsCommaSepList, err := getString(sandboxBucket, "ContainersIDList")
+		if err != nil {
+			return err
+		}
+
+		if len(contIDsCommaSepList) == 0 {
+			// Can't use Split return value for empty string case as Split will return 1 element array with empty string
+			contIDs = []string{}
+		} else {
+			contIDs = strings.Split(contIDsCommaSepList, ",")
+		}
+
+		return nil
+	})
+	return contIDs, err
 }
 
 func (b *BoltClient) GetPodSandboxStatus(podId string) (*kubeapi.PodSandboxStatus, error) {
@@ -364,19 +401,12 @@ func filterPodSandbox(sandbox *kubeapi.PodSandbox, filter *kubeapi.PodSandboxFil
 		return false
 	}
 
-	if filter.GetLabelSelector() != nil {
-		if sandbox.GetLabels() == nil {
-			return false
-		}
-
-		for k, v := range filter.GetLabelSelector() {
-			sv, ok := sandbox.GetLabels()[k]
-
-			if !ok {
-				return false
-			}
-
-			if v != sv {
+	filterSelector := filter.GetLabelSelector()
+	if filterSelector != nil {
+		filterSelector := filter.GetLabelSelector()
+		if filterSelector != nil {
+			sel := fields.SelectorFromSet(filterSelector)
+			if !sel.Matches(fields.Set(sandbox.GetLabels())) {
 				return false
 			}
 		}

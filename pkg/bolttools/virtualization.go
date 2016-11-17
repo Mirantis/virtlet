@@ -77,6 +77,28 @@ func (b *BoltClient) SetContainer(containerId, sandboxId, image string, labels, 
 			return err
 		}
 
+		// Add container id to corresponding Sandbox Container's ids list as well
+		sandboxBucket := tx.Bucket([]byte("sandbox"))
+		if sandboxBucket == nil {
+			return fmt.Errorf("bucket 'sandbox' doesn't exist")
+		}
+
+		sandboxIDBucket := sandboxBucket.Bucket([]byte(sandboxId))
+		if sandboxIDBucket == nil {
+			return fmt.Errorf("Sandbox bucket '%s' doesn't exist", sandboxId)
+		}
+
+		containerIDCommaSepList, err := getString(sandboxIDBucket, "ContainersIDList")
+		if err != nil {
+			return err
+		}
+
+		containerIDCommaSepList = AddValToCommaSeparatedStrList(containerIDCommaSepList, containerId)
+
+		if err := sandboxIDBucket.Put([]byte("ContainersIDList"), []byte(containerIDCommaSepList)); err != nil {
+			return err
+		}
+
 		if err := bucket.Put([]byte("image"), []byte(image)); err != nil {
 			return err
 		}
@@ -204,6 +226,38 @@ func (b *BoltClient) RemoveContainer(containerId string) error {
 		bucket := tx.Bucket([]byte("virtualization"))
 		if bucket == nil {
 			return fmt.Errorf("bucket 'virtualization' doesn't exist")
+		}
+
+		// Delete container id from corresponding Sandbox Container's ids list as well
+		containerBucket := bucket.Bucket([]byte(containerId))
+		if containerBucket == nil {
+			return fmt.Errorf("Container bucket '%s' doesn't exist", containerId)
+		}
+
+		sandboxId, err := getString(containerBucket, "sandboxId")
+		if err != nil {
+			return err
+		}
+
+		sandboxBucket := tx.Bucket([]byte("sandbox"))
+		if sandboxBucket == nil {
+			return fmt.Errorf("bucket 'sandbox' doesn't exist")
+		}
+
+		sandboxIDBucket := sandboxBucket.Bucket([]byte(sandboxId))
+		if sandboxIDBucket == nil {
+			return fmt.Errorf("Sandbox bucket '%s' doesn't exist", sandboxId)
+		}
+
+		containerIDCommaSepList, err := getString(sandboxIDBucket, "ContainersIDList")
+		if err != nil {
+			return err
+		}
+
+		containerIDCommaSepList = DelValFromCommaSeparatedStrList(containerIDCommaSepList, containerId)
+
+		if err := sandboxIDBucket.Put([]byte("ContainersIDList"), []byte(containerIDCommaSepList)); err != nil {
+			return err
 		}
 
 		if err := bucket.DeleteBucket([]byte(containerId)); err != nil {
