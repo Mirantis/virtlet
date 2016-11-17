@@ -45,6 +45,7 @@ type VirtletManager struct {
 	libvirtUri string
 	pid        int
 	conn       *grpc.ClientConn
+	boltDbPath string
 }
 
 func NewVirtletManager() *VirtletManager {
@@ -74,6 +75,8 @@ func (v *VirtletManager) Run() error {
 		return err
 	}
 	virtletDir := path.Dir(virtletPath)
+
+	v.boltDbPath = filename
 
 	pid, err := syscall.ForkExec(virtletPath, []string{
 		virtletPath,

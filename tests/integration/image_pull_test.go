@@ -32,7 +32,7 @@ func TestImagePull(t *testing.T) {
 
 	imageServiceClient := kubeapi.NewImageServiceClient(manager.conn)
 
-	imageSpec := &kubeapi.ImageSpec{Image: &imageUrl}
+	imageSpec := &kubeapi.ImageSpec{Image: &imageCirrosUrl}
 	in := &kubeapi.PullImageRequest{
 		Image:         imageSpec,
 		Auth:          &kubeapi.AuthConfig{},
