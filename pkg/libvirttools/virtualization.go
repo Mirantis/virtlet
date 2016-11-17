@@ -406,7 +406,7 @@ func libvirtToKubeState(domainInfo C.virDomainInfo) kubeapi.ContainerState {
 }
 
 func filterContainer(container *kubeapi.Container, filter *kubeapi.ContainerFilter) bool {
-	return container.GetState() == filter.GetState()
+	return filter.State == nil || container.GetState() == filter.GetState()
 }
 
 func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, filter *kubeapi.ContainerFilter) ([]*kubeapi.Container, error) {
