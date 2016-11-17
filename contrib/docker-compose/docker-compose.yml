@@ -29,7 +29,7 @@ services:
       - virtlet_data:/var/data/virtlet
     entrypoint:
       - /usr/local/bin/virtlet-dhcp
-      - -v=2
+      - -v=3
       - -logtostderr=true
   virtlet:
     build: ../..

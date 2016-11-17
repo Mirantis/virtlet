@@ -132,8 +132,7 @@ type NetInterface struct {
 	Model  InterfaceModel  `xml:"model"`
 	Source InterfaceSource `xml:"source"`
 	Target InterfaceTarget `xml:"target"`
-	IP     InterfaceIP     `xml:"ip"`
-	Route  InterfaceRoute  `xml:"route"`
+	Mac    InterfaceMac    `xml:"mac"`
 }
 
 type InterfaceModel struct {
@@ -148,17 +147,8 @@ type InterfaceSource struct {
 	Network string `xml:"network,attr"`
 }
 
-type InterfaceIP struct {
+type InterfaceMac struct {
 	Address string `xml:"address,attr"`
-	Prefix  string `xml:"prefix,attr"`
-	Peer    string `xml:"peer,attr"`
-}
-
-type InterfaceRoute struct {
-	Family  string `xml:"family,attr"`
-	Address string `xml:"address,attr"`
-	Prefix  string `xml:"prefix,attr"`
-	Gateway string `xml:"gateway,attr"`
 }
 
 var volXML string = `
@@ -217,7 +207,7 @@ func (v *VirtualizationTool) createVolumes(containerName string, mounts []*kubea
 	return domXML, nil
 }
 
-func generateDomXML(name string, memoryUnit string, memory int64, uuid string, cpuNum int, cpuShare int64, cpuPeriod int64, cpuQuota int64, imageFilepath, devName, ipv4 string) string {
+func generateDomXML(name string, memoryUnit string, memory int64, uuid string, cpuNum int, cpuShare int64, cpuPeriod int64, cpuQuota int64, imageFilepath, devName, hwAddress string) string {
 	domXML := `
 <domain type='kvm'>
     <name>%s</name>
@@ -261,13 +251,12 @@ func generateDomXML(name string, memoryUnit string, memory int64, uuid string, c
         <interface type='network'>
             <model type='virtio' />
             <target dev='%s' />
+	    <mac address='%s' />
             <source network='%s' />
-            <ip address='%s' prefix='32' peer='169.254.1.1' />
-            <route family='ipv4' address='0.0.0.0' prefix='0' gateway='168.254.1.1' />
         </interface>
     </devices>
 </domain>`
-	return fmt.Sprintf(domXML, name, uuid, memoryUnit, memory, cpuNum, cpuShare, cpuPeriod, cpuQuota, imageFilepath, devName, defaultNetName, ipv4)
+	return fmt.Sprintf(domXML, name, uuid, memoryUnit, memory, cpuNum, cpuShare, cpuPeriod, cpuQuota, imageFilepath, devName, hwAddress, defaultNetName)
 }
 
 type VirtualizationTool struct {
@@ -290,7 +279,7 @@ func NewVirtualizationTool(conn C.virConnectPtr, poolName string, storageBackend
 	return &VirtualizationTool{conn: conn, volumeStorage: storageBackend, volumePool: pool, volumePoolName: poolName}, nil
 }
 
-func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, in *kubeapi.CreateContainerRequest, imageFilepath, devName, ipv4 string) (string, error) {
+func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, in *kubeapi.CreateContainerRequest, imageFilepath, devName, hwAddress string) (string, error) {
 	uuid, err := utils.NewUuid()
 	if err != nil {
 		return "", err
@@ -336,7 +325,7 @@ func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, i
 	cpuPeriod := config.GetLinux().GetResources().GetCpuPeriod()
 	cpuQuota := config.GetLinux().GetResources().GetCpuQuota()
 
-	domXML := generateDomXML(name, memoryUnit, memory, uuid, cpuNum, cpuShares, cpuPeriod, cpuQuota, imageFilepath, devName, ipv4)
+	domXML := generateDomXML(name, memoryUnit, memory, uuid, cpuNum, cpuShares, cpuPeriod, cpuQuota, imageFilepath, devName, hwAddress)
 	domXML, err = v.createVolumes(name, in.Config.Mounts, domXML)
 	if err != nil {
 		return "", err

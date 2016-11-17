@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/boltdb/bolt"
@@ -41,7 +42,7 @@ func (b *BoltClient) VerifySandboxSchema() error {
 	return err
 }
 
-func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, calicoClient *utils.CalicoClient) error {
+func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, calicoClient *utils.CalicoClient, dhcpClient *utils.DHCPClient) error {
 	podId := config.Metadata.GetUid()
 
 	strLabels, err := json.Marshal(config.GetLabels())
@@ -84,6 +85,20 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, calicoClien
 		return err
 	}
 
+	calicoRoutes := map[string]string{
+		// crossing fingers, hope this will work, should be static route "by dev" to hardcoded calico address
+		"169.254.1.1/32": "0.0.0.0",
+		// which then should be set as default route
+		"0.0.0.0/0": "169.254.1.1",
+	}
+
+	// calico needs such ip
+	ip_with_netmask := ipv4.String() + "/32"
+	hwAddress, err := dhcpClient.CreateNewEndpoint(ip_with_netmask, calicoRoutes)
+	if err != nil {
+		return err
+	}
+
 	err = b.db.Batch(func(tx *bolt.Tx) error {
 		parentBucket := tx.Bucket([]byte("sandbox"))
 		if parentBucket == nil {
@@ -116,6 +131,10 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, calicoClien
 		}
 
 		if err := sandboxBucket.Put([]byte("tapDevice"), []byte(devName)); err != nil {
+			return err
+		}
+
+		if err := sandboxBucket.Put([]byte("hwAddress"), hwAddress); err != nil {
 			return err
 		}
 
@@ -171,7 +190,7 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, calicoClien
 			return err
 		}
 
-		if err := networkStatusBucket.Put([]byte("IPv4"), []byte(ipv4.String())); err != nil {
+		if err := networkStatusBucket.Put([]byte("IPv4"), []byte(ip_with_netmask)); err != nil {
 			return err
 		}
 
@@ -324,6 +343,8 @@ func (b *BoltClient) GetPodSandboxStatus(podId string) (*kubeapi.PodSandboxStatu
 		if err != nil {
 			return err
 		}
+		// TODO: this is fixup after adding netmask to ipv4 string
+		ipv4 = strings.Split(ipv4, "/")[0]
 
 		metadata := &kubeapi.PodSandboxMetadata{
 			Name:      &metadataName,
@@ -533,9 +554,10 @@ func (b *BoltClient) ListPodSandbox(filter *kubeapi.PodSandboxFilter) ([]*kubeap
 	return sandboxes, nil
 }
 
-func (b *BoltClient) RetrieveNetworkInfoFromSandbox(podId string) (string, string, error) {
+func (b *BoltClient) RetrieveNetworkInfoFromSandbox(podId string) (string, string, []byte, error) {
 	var tapDevice string
 	var ipv4 string
+	var hwAddress []byte
 	err := b.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte("sandbox"))
 		if bucket == nil {
@@ -547,11 +569,17 @@ func (b *BoltClient) RetrieveNetworkInfoFromSandbox(podId string) (string, strin
 			return fmt.Errorf("Bucket '%s' doesn't exist", podId)
 		}
 
-		tmpTapDevice, err := getString(sandboxBucket, "tapDevice")
-		if err != nil {
+		if tmpTapDevice, err := getString(sandboxBucket, "tapDevice"); err != nil {
 			return err
+		} else {
+			tapDevice = tmpTapDevice
 		}
-		tapDevice = tmpTapDevice
+
+		if tmpHwAddr, err := get(sandboxBucket, []byte("hwAddress")); err != nil {
+			return err
+		} else {
+			hwAddress = tmpHwAddr
+		}
 
 		networkStatusBucket := sandboxBucket.Bucket([]byte("networkStatus"))
 		if networkStatusBucket == nil {
@@ -567,8 +595,8 @@ func (b *BoltClient) RetrieveNetworkInfoFromSandbox(podId string) (string, strin
 		return nil
 	})
 	if err != nil {
-		return "", "", err
+		return "", "", []byte{}, err
 	}
 
-	return tapDevice, ipv4, nil
+	return tapDevice, ipv4, hwAddress, nil
 }
