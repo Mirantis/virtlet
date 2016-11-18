@@ -14,18 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-#ifndef PKG_LIBVIRTTOOLS_VIRTUALIZATION_H_
-#define PKG_LIBVIRTTOOLS_VIRTUALIZATION_H_
+#ifndef PKG_LIBVIRTTOOLS_ERROR_H_
+#define PKG_LIBVIRTTOOLS_ERROR_H_
 
-#define VIRTLET_VIRTUALIZATION_ERR_BASE 2000
-
-enum virtletVirtualizationErr {
-	VIRTLET_VIRTUALIZATION_ERR_LIBVIRT = VIRTLET_VIRTUALIZATION_ERR_BASE,
+enum virtletErr {
+	VIRTLET_OK = 0,
 };
 
-int defineDomain(virConnectPtr conn, char *domXML);
-int createDomain(virConnectPtr conn, char *uuid);
-int stopDomain(virConnectPtr conn, char *uuid);
-int destroyAndUndefineDomain(virConnectPtr conn, char *uuid);
-
-#endif  // PKG_LIBVIRTTOOLS_VIRTUALIZATION_H_
+#endif  // PKG_LIBVIRTTOOLS_ERROR_H_

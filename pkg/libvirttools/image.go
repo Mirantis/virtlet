@@ -31,7 +31,6 @@ import (
 	"net/url"
 	"reflect"
 	"strings"
-	"syscall"
 	"unsafe"
 
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
@@ -74,7 +73,7 @@ func (i *ImageTool) ListImages() ([]*kubeapi.Image, error) {
 	var cList *C.virStorageVolPtr
 	count := C.virStoragePoolListAllVolumes(i.pool, (**C.virStorageVolPtr)(&cList), 0)
 	if count < 0 {
-		return nil, GetLastError()
+		return nil, GetLibvirtLastError()
 	}
 	header := reflect.SliceHeader{
 		Data: uintptr(unsafe.Pointer(cList)),
@@ -139,11 +138,8 @@ func (i *ImageTool) PullImage(name string) (string, error) {
 	defer C.free(unsafe.Pointer(cVolXML))
 
 	status := C.pullImage(i.conn, i.pool, cShortName, cFilepath, cVolXML)
-	if status < 0 {
-		return "", GetLastError()
-	}
-	if status > 0 {
-		return "", syscall.Errno(status)
+	if err := cErrorHandler.Convert(status); err != nil {
+		return "", err
 	}
 
 	return libvirtFilepath, nil

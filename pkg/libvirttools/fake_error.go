@@ -14,18 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-#ifndef PKG_LIBVIRTTOOLS_VIRTUALIZATION_H_
-#define PKG_LIBVIRTTOOLS_VIRTUALIZATION_H_
+package libvirttools
 
-#define VIRTLET_VIRTUALIZATION_ERR_BASE 2000
+import (
+	"fmt"
+)
 
-enum virtletVirtualizationErr {
-	VIRTLET_VIRTUALIZATION_ERR_LIBVIRT = VIRTLET_VIRTUALIZATION_ERR_BASE,
-};
+func GetFakeLibvirtError() error {
+	return fmt.Errorf("Libvirt error")
+}
 
-int defineDomain(virConnectPtr conn, char *domXML);
-int createDomain(virConnectPtr conn, char *uuid);
-int stopDomain(virConnectPtr conn, char *uuid);
-int destroyAndUndefineDomain(virConnectPtr conn, char *uuid);
-
-#endif  // PKG_LIBVIRTTOOLS_VIRTUALIZATION_H_
+func NewFakeCErrorHandler() *CErrorHandler {
+	errors := NewErrorMap(GetFakeLibvirtError)
+	return &CErrorHandler{errorMap: errors}
+}

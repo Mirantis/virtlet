@@ -31,7 +31,7 @@ void testVirtletVolUploadSourceNullOpaque() {
 	}
 
 	result = virtletVolUploadSource(stream, "", 0, NULL);
-	g_assert_cmpint(result, ==, -1);
+	g_assert_cmpint(result, ==, VIRTLET_IMAGE_ERR_SEND_STREAM);
 }
 
 int main(int argc, char **argv) {
