@@ -3,10 +3,8 @@ services:
   libvirt:
     build: ../docker/libvirt/
     pid: host
+    network_mode: host
     privileged: true
-    # ports:
-    #   - "16509:16509"
-    # network_mode: host
     restart: always
     environment:
       - LIBVIRT_CLEANUP
@@ -20,13 +18,28 @@ services:
       - ./qemu.conf:/etc/libvirt/qemu.conf
       - libvirtd:/var/lib/libvirt
       - libvirt_qemu:/etc/libvirt/qemu
-  virtlet:
+  virtlet-dhcp:
     build: ../..
-    # network_mode: host
+    network_mode: host
     restart: always
     environment:
       - VIRTLET_LOGLEVEL
     volumes:
+      - /run:/run
+      - virtlet_data:/var/data/virtlet
+    entrypoint:
+      - /usr/local/bin/virtlet-dhcp
+      - -v=3
+      - -logtostderr=true
+  virtlet:
+    build: ../..
+    network_mode: host
+    restart: always
+    environment:
+      - VIRTLET_LOGLEVEL
+    privileged: true
+    volumes:
+      - /dev:/dev
       - virtlet_data:/var/data/virtlet
       - /var/lib/virtlet:/var/lib/virtlet
       - /lib/modules:/lib/modules:ro
@@ -34,8 +47,7 @@ services:
       - /run:/run
     depends_on:
       - libvirt
-    links:
-      - "libvirt:libvirt"
+      - virtlet-dhcp
 volumes:
   libvirtd: {}
   libvirt_qemu: {}

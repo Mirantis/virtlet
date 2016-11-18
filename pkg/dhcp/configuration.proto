@@ -1,0 +1,57 @@
+/*
+Copyright 2016 Mirantis
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+syntax = "proto2";
+
+package dhcp;
+
+// DHCPConfiguration defines the public API for configuration manipulation in this dhcp implementation
+service DHCPConfiguration {
+  // SetConfiguration provides network configuration for particular endpoint mac address
+  rpc SetConfiguration(EndpointConfiguration) returns (SetConfigurationResponse) {};
+
+  // RemoveConfiguration removes endpoint configuration from local config map
+  rpc RemoveConfiguration(Endpoint) returns (RemoveConfigurationResponse) {};
+}
+
+message Endpoint {
+  // MAC address of endpoint
+  required bytes hardware_address = 1;
+}
+
+message EndpointConfiguration {
+  message Route {
+    // Destination address, e.x. "192.168.128.5/32" or "192.168.128/24"
+    required string destination = 1;
+    // Router address, e.x. "192.168.0.1"
+    required string through = 2;
+  }
+
+  // Endpoint defines for which machine this configuration is
+  required Endpoint endpoint = 1;
+  // Ipv4Address is resultant machine ip address
+  required string ipv4_address = 2;
+  // Routes provides list of routes for particular machine
+  repeated Route routes = 3;
+}
+
+message AllConfigurations {
+  // EndpointConfigurations stores all configurations already received by server
+  repeated EndpointConfiguration endpoint_configurations = 1;
+}
+
+message SetConfigurationResponse {}
+message RemoveConfigurationResponse {}

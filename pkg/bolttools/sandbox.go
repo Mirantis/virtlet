@@ -19,12 +19,16 @@ package bolttools
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/boltdb/bolt"
 	"github.com/davecgh/go-spew/spew"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 func (b *BoltClient) VerifySandboxSchema() error {
@@ -39,7 +43,8 @@ func (b *BoltClient) VerifySandboxSchema() error {
 	return err
 }
 
-func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig) error {
+// func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, calicoClient *utils.CalicoClient, dhcpClient *utils.DHCPClient) error {
+func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, dhcpClient *utils.DHCPClient) error {
 	podId := config.Metadata.GetUid()
 
 	strLabels, err := json.Marshal(config.GetLabels())
@@ -65,6 +70,45 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig) error {
 	namespaceOptions := linuxSandbox.GetNamespaceOptions()
 	if namespaceOptions == nil {
 		return fmt.Errorf("Linux sandbox config is missing Namespaces attribute: %s", spew.Sdump(config))
+	}
+
+	// leave decision about suffix to kernel - it will assing next free index
+	devName, err := utils.CreatePersistentIface("virtlet%d", utils.Tap)
+	if err != nil {
+		return err
+	}
+
+	/* TODO: get back calico
+	ipv4, err := calicoClient.AssignIPv4(podId)
+	if err != nil {
+		return err
+	}
+
+	if err := calicoClient.ConfigureEndpoint(podId, devName, ipv4); err != nil {
+		return err
+	}
+
+	calicoRoutes := map[string]string{
+		// crossing fingers, hope this will work, should be static route "by dev" to hardcoded calico address
+		"169.254.1.1/32": "0.0.0.0",
+		// which then should be set as default route
+		"0.0.0.0/0": "169.254.1.1",
+	}
+
+	ip_with_netmask := ipv4.String() + "/32"
+	*/
+
+	// TODO: get rid of hardcoded ipv4 and routes
+	ipv4 := net.IP{10, 1, 90, 5}
+	routes := map[string]string{
+		"0.0.0.0/0": "10.1.90.1",
+	}
+	ip_with_netmask := ipv4.String() + "/24"
+
+	// hwAddress, err := dhcpClient.CreateNewEndpoint(ip_with_netmask, calicoRoutes)
+	hwAddress, err := dhcpClient.CreateNewEndpoint(ip_with_netmask, routes)
+	if err != nil {
+		return err
 	}
 
 	err = b.db.Batch(func(tx *bolt.Tx) error {
@@ -95,6 +139,14 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig) error {
 		}
 
 		if err := sandboxBucket.Put([]byte("annotations"), []byte(strAnnotations)); err != nil {
+			return err
+		}
+
+		if err := sandboxBucket.Put([]byte("tapDevice"), []byte(devName)); err != nil {
+			return err
+		}
+
+		if err := sandboxBucket.Put([]byte("hwAddress"), hwAddress); err != nil {
 			return err
 		}
 
@@ -142,6 +194,15 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig) error {
 		}
 
 		if err := namespaceOptionsBucket.Put([]byte("hostIpc"), []byte(strconv.FormatBool(namespaceOptions.GetHostIpc()))); err != nil {
+			return err
+		}
+
+		networkStatusBucket, err := sandboxBucket.CreateBucketIfNotExists([]byte("networkStatus"))
+		if err != nil {
+			return err
+		}
+
+		if err := networkStatusBucket.Put([]byte("IPv4"), []byte(ip_with_netmask)); err != nil {
 			return err
 		}
 
@@ -285,6 +346,18 @@ func (b *BoltClient) GetPodSandboxStatus(podId string) (*kubeapi.PodSandboxStatu
 			return err
 		}
 
+		networkStatusBucket := sandboxBucket.Bucket([]byte("networkStatus"))
+		if networkStatusBucket == nil {
+			return fmt.Errorf("Bucket 'networkStatus' doesn't exist")
+		}
+
+		ipv4, err := getString(networkStatusBucket, "IPv4")
+		if err != nil {
+			return err
+		}
+		// TODO: this is fixup after adding netmask to ipv4 string
+		ipv4 = strings.Split(ipv4, "/")[0]
+
 		metadata := &kubeapi.PodSandboxMetadata{
 			Name:      &metadataName,
 			Uid:       &metadataUid,
@@ -308,11 +381,16 @@ func (b *BoltClient) GetPodSandboxStatus(podId string) (*kubeapi.PodSandboxStatu
 			Namespaces: namespace,
 		}
 
+		networkStatus := &kubeapi.PodSandboxNetworkStatus{
+			Ip: &ipv4,
+		}
+
 		podSandboxStatus = &kubeapi.PodSandboxStatus{
 			Id:          &podId,
 			Metadata:    metadata,
 			State:       &state,
 			CreatedAt:   &createdAt,
+			Network:     networkStatus,
 			Linux:       linuxSandbox,
 			Labels:      labels,
 			Annotations: annotations,
@@ -486,4 +564,51 @@ func (b *BoltClient) ListPodSandbox(filter *kubeapi.PodSandboxFilter) ([]*kubeap
 	}
 
 	return sandboxes, nil
+}
+
+func (b *BoltClient) RetrieveNetworkInfoFromSandbox(podId string) (string, string, []byte, error) {
+	var tapDevice string
+	var ipv4 string
+	var hwAddress []byte
+	err := b.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte("sandbox"))
+		if bucket == nil {
+			return fmt.Errorf("Bucket 'sandbox' doesn't exist")
+		}
+
+		sandboxBucket := bucket.Bucket([]byte(podId))
+		if sandboxBucket == nil {
+			return fmt.Errorf("Bucket '%s' doesn't exist", podId)
+		}
+
+		if tmpTapDevice, err := getString(sandboxBucket, "tapDevice"); err != nil {
+			return err
+		} else {
+			tapDevice = tmpTapDevice
+		}
+
+		if tmpHwAddr, err := get(sandboxBucket, []byte("hwAddress")); err != nil {
+			return err
+		} else {
+			hwAddress = tmpHwAddr
+		}
+
+		networkStatusBucket := sandboxBucket.Bucket([]byte("networkStatus"))
+		if networkStatusBucket == nil {
+			return fmt.Errorf("Bucket 'networkStatus' doesn't exist")
+		}
+
+		tmpipv4, err := getString(networkStatusBucket, "IPv4")
+		if err != nil {
+			return err
+		}
+		ipv4 = tmpipv4
+
+		return nil
+	})
+	if err != nil {
+		return "", "", []byte{}, err
+	}
+
+	return tapDevice, ipv4, hwAddress, nil
 }
