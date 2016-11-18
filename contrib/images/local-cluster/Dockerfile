@@ -1,5 +1,6 @@
 FROM golang:1.7.3
 MAINTAINER Ivan Shvedunov <ishvedunov@mirantis.com>
+ARG k8s_version=v1.5.0-alpha.1
 
 # sudo is needed for local-up-cluster
 # Fake docker executable is only needed to fool local-up-cluster, we
@@ -11,7 +12,7 @@ RUN apt-get update && \
     mkdir -p /go/src/k8s.io && \
     echo -e '#!/bin/sh\nexit 0' >/usr/bin/docker && chmod +x /usr/bin/docker && \
     go get -u github.com/jteeuwen/go-bindata/go-bindata && \
-    git clone -b v1.5.0-alpha.1 https://github.com/kubernetes/kubernetes.git /go/src/k8s.io/kubernetes
+    git clone -b ${k8s_version} https://github.com/kubernetes/kubernetes.git /go/src/k8s.io/kubernetes
 
 WORKDIR /go/src/k8s.io/kubernetes
 

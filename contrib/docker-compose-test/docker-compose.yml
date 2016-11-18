@@ -39,7 +39,10 @@ services:
       - "libvirt:libvirt"
   local_cluster:
     privileged: true
-    build: ../images/local-cluster
+    build:
+      context: ../images/local-cluster
+      args:
+        - k8s_version=v1.5.0-alpha.1
     volumes:
       # for virtlet socket
       - virtlet_run:/run
