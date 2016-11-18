@@ -1,0 +1,67 @@
+version: '2'
+services:
+  libvirt:
+    privileged: true
+    build: ../images/libvirt/
+    environment:
+      - LIBVIRT_CLEANUP
+      - VIRTLET_DISABLE_KVM=1
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup
+      - libvirt_volume_pool:/var/lib/virtlet
+  virtlet_test:
+    build: ../..
+    environment:
+      - VIRTLET_LOGLEVEL=3
+      - VIRTLET_DISABLE_KVM=1
+    volumes:
+      - /lib/modules:/lib/modules:ro
+      - /boot:/boot:ro
+      - libvirt_volume_pool:/var/lib/virtlet
+    depends_on:
+      - libvirt
+    links:
+      - "libvirt:libvirt"
+    command: "/bin/bash -c 'for d in pkg/bolttools pkg/libvirttools tests/integration; do (cd $${d} && go test -v); done'"
+  virtlet:
+    build: ../..
+    environment:
+      - VIRTLET_LOGLEVEL=3
+      - VIRTLET_DISABLE_KVM=1
+    volumes:
+      - /lib/modules:/lib/modules:ro
+      - /boot:/boot:ro
+      - libvirt_volume_pool:/var/lib/virtlet
+      - virtlet_run:/run
+    depends_on:
+      - libvirt
+    links:
+      - "libvirt:libvirt"
+  local_cluster:
+    privileged: true
+    build:
+      context: ../images/local-cluster
+      args:
+        - k8s_version=v1.5.0-alpha.1
+    volumes:
+      # for virtlet socket
+      - virtlet_run:/run
+    depends_on:
+      - virtlet
+  e2e_test:
+    build: ../images/e2e-test
+    environment:
+      - APISERVER_HOST=local_cluster
+      - APISERVER_PORT=8080
+    volumes_from:
+      # we need /kubernetes here
+      - local_cluster
+    depends_on:
+      - local_cluster
+      - libvirt
+    links:
+      - "local_cluster:local_cluster"
+      - "libvirt:libvirt"
+volumes:
+  libvirt_volume_pool: {}
+  virtlet_run: {}

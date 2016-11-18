@@ -14,7 +14,6 @@ Updating dependencies also needs additional tools which could be installed using
 
 ```sh
 curl https://glide.sh/get | sh
-go get github.com/sgotti/glide-vc
 ```
 
 ## Usage
@@ -80,4 +79,12 @@ export KUBERNETES_PROVIDER=local
 export CONTAINER_RUNTIME=remote
 export CONTAINER_RUNTIME_ENDPOINT=/run/virtlet.sock
 ./hack/local-up-cluster.sh
+```
+
+### Running tests
+
+To run integration & e2e tests, use
+
+```sh
+./test.sh
 ```

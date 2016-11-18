@@ -1,7 +1,7 @@
 version: '2'
 services:
   libvirt:
-    build: ../docker/libvirt/
+    build: ../images/libvirt/
     pid: host
     privileged: true
     # ports:
@@ -12,12 +12,12 @@ services:
       - LIBVIRT_CLEANUP
     volumes:
       - /lib/modules:/lib/modules:ro
-      - /run:/run
       - /dev:/dev
-      - /var/lib/virtlet:/var/lib/virtlet
       - /sys/fs/cgroup:/sys/fs/cgroup
-      - ./libvirt.conf:/etc/libvirt/libvirtd.conf
-      - ./qemu.conf:/etc/libvirt/qemu.conf
+      # Uncomment to mount config files from image dir
+      # - ../images/libvirt/libvirt.conf:/etc/libvirt/libvirtd.conf
+      # - ../images/libvirt/qemu.conf:/etc/libvirt/qemu.conf
+      - libvirt_volume_pool:/var/lib/virtlet
       - libvirtd:/var/lib/libvirt
       - libvirt_qemu:/etc/libvirt/qemu
   virtlet:
@@ -28,10 +28,10 @@ services:
       - VIRTLET_LOGLEVEL
     volumes:
       - virtlet_data:/var/data/virtlet
-      - /var/lib/virtlet:/var/lib/virtlet
       - /lib/modules:/lib/modules:ro
       - /boot:/boot:ro
       - /run:/run
+      - libvirt_volume_pool:/var/lib/virtlet
     depends_on:
       - libvirt
     links:
@@ -40,3 +40,4 @@ volumes:
   libvirtd: {}
   libvirt_qemu: {}
   virtlet_data: {}
+  libvirt_volume_pool: {}

@@ -5,7 +5,6 @@ LABEL Name="virtlet" Version="0.1"
 RUN apt-get update \
 	&& apt-get install -y software-properties-common \
 	&& apt-get clean
-RUN add-apt-repository ppa:ubuntu-lxc/lxd-stable
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y  \
 		git \
 		golang \
@@ -39,4 +38,6 @@ RUN ./autogen.sh \
 	&& make install \
 	&& make clean
 
-CMD ["/bin/bash", "-c", "/usr/local/bin/virtlet -v=${VIRTLET_LOGLEVEL:-2} -logtostderr=true -libvirt-uri=qemu+tcp://libvirt/system -etcd-endpoint=http://etcd:2379"]
+RUN mkdir -p /var/data/virtlet
+
+CMD ["/bin/bash", "-c", "/usr/local/bin/virtlet -v=${VIRTLET_LOGLEVEL:-2} -logtostderr=true -libvirt-uri=qemu+tcp://libvirt/system"]

@@ -49,7 +49,7 @@ type VirtletManager struct {
 	boltClient *bolttools.BoltClient
 }
 
-func NewVirtletManager(libvirtUri string, poolName string, storageBackend string, boltEndpoint string) (*VirtletManager, error) {
+func NewVirtletManager(libvirtUri string, poolName string, storageBackend string, boltPath string) (*VirtletManager, error) {
 	libvirtConnTool, err := libvirttools.NewConnectionTool(libvirtUri)
 	if err != nil {
 		return nil, err
@@ -62,7 +62,7 @@ func NewVirtletManager(libvirtUri string, poolName string, storageBackend string
 	if err != nil {
 		return nil, err
 	}
-	boltClient, err := bolttools.NewBoltClient()
+	boltClient, err := bolttools.NewBoltClient(boltPath)
 	if err != nil {
 		return nil, err
 	}
@@ -183,6 +183,8 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 	if err != nil {
 		return nil, err
 	}
+
+	glog.V(2).Infof("CreateContainer: imageName %s, imageFilepath %s", imageName, imageFilepath)
 
 	// TODO: we should not pass whole "in" to CreateContainer - we should pass there only needed info for CreateContainer
 	// without whole data container

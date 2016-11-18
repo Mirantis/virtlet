@@ -14,36 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package bolttools
+package utils
 
 import (
-	"github.com/boltdb/bolt"
+	"io/ioutil"
+	"os"
 )
 
-type BoltClient struct {
-	db *bolt.DB
-}
-
-func NewBoltClient(path string) (*BoltClient, error) {
-	db, err := bolt.Open(path, 0600, nil)
+func Tempfile() (string, error) {
+	f, err := ioutil.TempFile("", "virtlet-test-")
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	client := &BoltClient{db: db}
-	if err := client.VerifyImagesSchema(); err != nil {
-		return nil, err
-	}
-	if err := client.VerifySandboxSchema(); err != nil {
-		return nil, err
-	}
-	if err := client.VerifyVirtualizationSchema(); err != nil {
-		return nil, err
-	}
+	f.Close()
+	os.Remove(f.Name())
 
-	return client, nil
-}
-
-func (b *BoltClient) Close() error {
-	return b.db.Close()
+	return f.Name(), nil
 }
