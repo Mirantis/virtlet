@@ -82,8 +82,7 @@ EOF
 }
 
 function e2e::wait-for-pod {
-  # FIXME: XXX: should wait for Running instead of ContainerCreating after #79 is fixed
-  e2e::wait 30 1 "cluster/kubectl.sh get pod virtlet-example-cirros | grep -q ContainerCreating" \
+  e2e::wait 30 1 "cluster/kubectl.sh get pod virtlet-example-cirros | grep -q Running" \
             "pod to come up"
   cluster/kubectl.sh get pods
 }
