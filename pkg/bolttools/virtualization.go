@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
+	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
 type ContainerInfo struct {
@@ -31,6 +32,7 @@ type ContainerInfo struct {
 	Image       string
 	Labels      map[string]string
 	Annotations map[string]string
+	State       kubeapi.ContainerState
 }
 
 func (b *BoltClient) VerifyVirtualizationSchema() error {
@@ -84,6 +86,33 @@ func (b *BoltClient) SetContainer(containerId, sandboxId, image string, labels, 
 		}
 
 		if err := bucket.Put([]byte("annotations"), []byte(strAnnotations)); err != nil {
+			return err
+		}
+
+		if err := bucket.Put([]byte("state"), []byte{byte(kubeapi.ContainerState_CREATED)}); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return err
+}
+
+func (b *BoltClient) UpdateState(containerId string, state kubeapi.ContainerState) error {
+	err := b.db.Update(func(tx *bolt.Tx) error {
+		parentBucket := tx.Bucket([]byte("virtualization"))
+		if parentBucket == nil {
+			return fmt.Errorf("bucket 'virtualization' doesn't exist")
+		}
+
+		bucket := parentBucket.Bucket([]byte(containerId))
+		if bucket == nil {
+			// Container info removed, but sandbox still exists
+			return nil
+		}
+
+		if err := bucket.Put([]byte("state"), []byte{byte(state)}); err != nil {
 			return err
 		}
 
@@ -148,12 +177,18 @@ func (b *BoltClient) GetContainerInfo(containerId string) (*ContainerInfo, error
 			return err
 		}
 
+		byteState, err := get(bucket, []byte("state"))
+		if err != nil {
+			return err
+		}
+
 		containerInfo = &ContainerInfo{
 			CreatedAt:   createdAt,
 			SandboxId:   sandboxId,
 			Image:       image,
 			Labels:      labels,
 			Annotations: annotations,
+			State:       kubeapi.ContainerState(byteState[0]),
 		}
 
 		return nil

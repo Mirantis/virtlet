@@ -405,7 +405,7 @@ func (v *VirtualizationTool) RemoveContainer(containerId string) error {
 	return nil
 }
 
-func libvirtToKubeState(domainInfo C.virDomainInfo) kubeapi.ContainerState {
+func libvirtToKubeState(domainInfo C.virDomainInfo, lastState kubeapi.ContainerState) kubeapi.ContainerState {
 	var containerState kubeapi.ContainerState
 
 	switch domainInfo.state {
@@ -416,7 +416,11 @@ func libvirtToKubeState(domainInfo C.virDomainInfo) kubeapi.ContainerState {
 	case C.VIR_DOMAIN_SHUTDOWN:
 		containerState = kubeapi.ContainerState_EXITED
 	case C.VIR_DOMAIN_SHUTOFF:
-		containerState = kubeapi.ContainerState_CREATED
+		if lastState == kubeapi.ContainerState_CREATED {
+			containerState = kubeapi.ContainerState_CREATED
+		} else {
+			containerState = kubeapi.ContainerState_EXITED
+		}
 	case C.VIR_DOMAIN_CRASHED:
 		containerState = kubeapi.ContainerState_EXITED
 	case C.VIR_DOMAIN_PMSUSPENDED:
@@ -476,7 +480,12 @@ func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, fi
 
 		imageRef := containerInfo.Image
 
-		containerState := libvirtToKubeState(domainInfo)
+		containerState := libvirtToKubeState(domainInfo, containerInfo.State)
+		if containerInfo.State != containerState {
+			if err := boltClient.UpdateState(id, containerState); err != nil {
+				return nil, err
+			}
+		}
 
 		createdAt := containerInfo.CreatedAt
 
@@ -500,7 +509,7 @@ func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, fi
 	return containers, nil
 }
 
-func (v *VirtualizationTool) ContainerStatus(containerId string) (*kubeapi.ContainerStatus, error) {
+func (v *VirtualizationTool) ContainerStatus(boltClient *bolttools.BoltClient, containerId string) (*kubeapi.ContainerStatus, error) {
 	var domainInfo C.virDomainInfo
 
 	cContainerId := C.CString(containerId)
@@ -516,7 +525,21 @@ func (v *VirtualizationTool) ContainerStatus(containerId string) (*kubeapi.Conta
 		return nil, GetLibvirtLastError()
 	}
 
-	containerState := libvirtToKubeState(domainInfo)
+	containerInfo, err := boltClient.GetContainerInfo(containerId)
+	if err != nil {
+		return nil, err
+	}
+
+	if containerInfo == nil {
+		return nil, fmt.Errorf("missing containerInfo for containerId: %s", containerId)
+	}
+
+	containerState := libvirtToKubeState(domainInfo, containerInfo.State)
+	if containerInfo.State != containerState {
+		if err := boltClient.UpdateState(containerId, containerState); err != nil {
+			return nil, err
+		}
+	}
 
 	return &kubeapi.ContainerStatus{
 		Id:       &containerId,
