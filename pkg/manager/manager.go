@@ -123,8 +123,14 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 }
 
 func (v *VirtletManager) StopPodSandbox(ctx context.Context, in *kubeapi.StopPodSandboxRequest) (*kubeapi.StopPodSandboxResponse, error) {
+	podSandboxId := in.GetPodSandboxId()
 	glog.V(2).Infof("StopPodSandbox called for pod %s", in.GetPodSandboxId())
 	glog.V(3).Infof("StopPodSandbox: %s", spew.Sdump(in))
+	if err := v.boltClient.UpdatePodState(podSandboxId, kubeapi.PodSandBoxState_NOTREADY); err != nil {
+		glog.Errorf("Error when stopping pod sandbox '%s': %v", podSandboxId, err)
+		return nil, err
+	}
+
 	response := &kubeapi.StopPodSandboxResponse{}
 	return response, nil
 }
@@ -135,7 +141,7 @@ func (v *VirtletManager) RemovePodSandbox(ctx context.Context, in *kubeapi.Remov
 	glog.V(3).Infof("RemovePodSandbox: %s", spew.Sdump(in))
 
 	if err := v.boltClient.RemovePodSandbox(podSandboxId); err != nil {
-		glog.Errorf("Error when removing pod sandbox '%s' status: %v", podSandboxId, err)
+		glog.Errorf("Error when removing pod sandbox '%s': %v", podSandboxId, err)
 		return nil, err
 	}
 
@@ -149,7 +155,7 @@ func (v *VirtletManager) PodSandboxStatus(ctx context.Context, in *kubeapi.PodSa
 	podSandboxId := in.GetPodSandboxId()
 	status, err := v.boltClient.GetPodSandboxStatus(podSandboxId)
 	if err != nil {
-		glog.Errorf("Error when getting pod sandbox '%s' status: %v", podSandboxId, err)
+		glog.Errorf("Error when getting pod sandbox '%s': %v", podSandboxId, err)
 		return nil, err
 	}
 	response := &kubeapi.PodSandboxStatusResponse{Status: status}

@@ -98,6 +98,10 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig) error {
 			return err
 		}
 
+		if err := sandboxBucket.Put([]byte("state"), []byte{byte(kubeapi.PodSandBoxState_READY)}); err != nil {
+			return err
+		}
+
 		metadataBucket, err := sandboxBucket.CreateBucketIfNotExists([]byte("metadata"))
 		if err != nil {
 			return err
@@ -142,6 +146,28 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig) error {
 		}
 
 		if err := namespaceOptionsBucket.Put([]byte("hostIpc"), []byte(strconv.FormatBool(namespaceOptions.GetHostIpc()))); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return err
+}
+
+func (b *BoltClient) UpdatePodState(podId string, state kubeapi.PodSandBoxState) error {
+	err := b.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte("sandbox"))
+		if bucket == nil {
+			return fmt.Errorf("bucket 'sandbox' doesn't exist")
+		}
+
+		sandboxBucket := bucket.Bucket([]byte(podId))
+		if sandboxBucket == nil {
+			return fmt.Errorf("bucket '%s' doesn't exist", podId)
+		}
+
+		if err := sandboxBucket.Put([]byte("state"), []byte{byte(state)}); err != nil {
 			return err
 		}
 
@@ -211,6 +237,11 @@ func (b *BoltClient) GetPodSandboxStatus(podId string) (*kubeapi.PodSandboxStatu
 
 		var annotations map[string]string
 		if err := json.Unmarshal(byteAnnotations, &annotations); err != nil {
+			return err
+		}
+
+		bytesState, err := get(sandboxBucket, []byte("state"))
+		if err != nil {
 			return err
 		}
 
@@ -292,7 +323,7 @@ func (b *BoltClient) GetPodSandboxStatus(podId string) (*kubeapi.PodSandboxStatu
 			Attempt:   &uint32MetadataAttempt,
 		}
 
-		state := kubeapi.PodSandBoxState_READY
+		state := kubeapi.PodSandBoxState(bytesState[0])
 
 		namespaceOptions := &kubeapi.NamespaceOption{
 			HostNetwork: &hostNetwork,
@@ -388,6 +419,11 @@ func (b *BoltClient) getPodSandbox(sandboxId []byte, filter *kubeapi.PodSandboxF
 			return err
 		}
 
+		bytesState, err := get(sandboxBucket, []byte("state"))
+		if err != nil {
+			return err
+		}
+
 		metadataBucket := sandboxBucket.Bucket([]byte("metadata"))
 		if metadataBucket == nil {
 			return fmt.Errorf("bucket 'metadata' doesn't exist")
@@ -428,7 +464,7 @@ func (b *BoltClient) getPodSandbox(sandboxId []byte, filter *kubeapi.PodSandboxF
 			Attempt:   &uint32MetadataAttempt,
 		}
 
-		state := kubeapi.PodSandBoxState_READY
+		state := kubeapi.PodSandBoxState(bytesState[0])
 
 		podSandbox = &kubeapi.PodSandbox{
 			Id:        &strSandboxId,
