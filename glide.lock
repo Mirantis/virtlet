@@ -1,5 +1,5 @@
-hash: 031835b624c60d8467c1d21e4413eeef4c406644897340e58b0f37f4309182bf
-updated: 2016-11-14T11:58:04.436127173Z
+hash: 5e230f8db6c71b0b4bce4f48faa46378f9fac9303dedc008704cfe14f66cec58
+updated: 2016-11-15T09:09:36.121742285+01:00
 imports:
 - name: github.com/boltdb/bolt
   version: dfb21201d9270c1082d5fb0f07f500311ff72f18
@@ -41,13 +41,20 @@ imports:
   - proto
 - name: github.com/nu7hatch/gouuid
   version: 179d4d0c4d8d407a32af483c2354df1d2c91e6c3
+- name: go.universe.tf/netboot
+  version: 57a1c9bea27f5d542444c409a768b331fc5e0cb9
+  subpackages:
+  - dhcp4
 - name: golang.org/x/net
   version: e90d6d0afc4c315a0d87a568ae68577cc15149a0
   subpackages:
+  - bpf
   - context
   - http2
   - http2/hpack
+  - internal/iana
   - internal/timeseries
+  - ipv4
   - lex/httplex
   - trace
 - name: golang.org/x/sys
@@ -66,7 +73,7 @@ imports:
   - peer
   - transport
 - name: k8s.io/kubernetes
-  version: v1.5.0-alpha.1
+  version: 1837914d8e219f54631131c7b3c59b8844df5b2c
   repo: git://github.com/kubernetes/kubernetes.git
   vcs: git
   subpackages:
