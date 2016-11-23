@@ -22,7 +22,7 @@ services:
       - libvirt
     links:
       - "libvirt:libvirt"
-    command: "/bin/bash -c 'for d in pkg/bolttools pkg/libvirttools tests/integration; do (cd $${d} && go test -v); done'"
+    command: "/bin/bash -c 'if ! make check; then find . -name test-suite.log | xargs cat; exit 1; fi'"
   virtlet:
     build: ../..
     environment:

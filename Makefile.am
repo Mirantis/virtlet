@@ -14,11 +14,13 @@
 
 export GO15VENDOREXPERIMENT=1
 export CGO_CFLAGS=$(CFLAGS)
-export CGO_LDFLAGS=$(LDFLAGS)
+export CGO_LDFLAGS=$(LDFLAGS) $(LIBS)
 
-SUBDIRS = pkg/bolttools pkg/download pkg/libvirttools pkg/manager
+SUBDIRS = pkg/bolttools pkg/download pkg/libvirttools pkg/manager tests/integration
 
-check_SCRIPTS = cpplint.test dockerfilelint.test gofmt.test
+# FIXME: add back dockerfilelint.test
+# (as of now, it requires Docker)
+check_SCRIPTS = cpplint.test gofmt.test
 TESTS = $(check_SCRIPTS)
 
 .PHONY: all vendor

@@ -9,8 +9,9 @@ PKG_CHECK_MODULES([libvirt], [libvirt])
 PKG_CHECK_MODULES([libguestfs], [libguestfs])
 
 CFLAGS="$CFLAGS $glib_CFLAGS $libvirt_CFLAGS"
-LDFLAGS="$LDFLAGS $glib_LIBS $libvirt_LIBS"
+LDFLAGS="$LDFLAGS"
+LIBS="$LIBS $glib_LIBS $libvirt_LIBS"
 
-AC_CONFIG_FILES([Makefile pkg/bolttools/Makefile pkg/download/Makefile pkg/libvirttools/Makefile pkg/manager/Makefile])
+AC_CONFIG_FILES([Makefile pkg/bolttools/Makefile pkg/download/Makefile pkg/libvirttools/Makefile pkg/manager/Makefile tests/integration/Makefile])
 
 AC_OUTPUT
