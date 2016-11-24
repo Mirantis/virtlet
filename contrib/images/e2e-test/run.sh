@@ -60,8 +60,8 @@ function e2e::wait {
 }
 
 function e2e::wait-for-apiserver {
-  e2e::wait 50 5 "timeout 2 bash -c 'cluster/kubectl.sh get nodes|grep -q Ready' >&/dev/null" "apiserver"
-  e2e::wait 20 1 "cluster/kubectl.sh get sa | grep -q '^default'" "default service account"
+  e2e::wait 100 5 "timeout 2 bash -c 'cluster/kubectl.sh get nodes|grep -q Ready' >&/dev/null" "apiserver"
+  e2e::wait 30 1 "cluster/kubectl.sh get sa | grep -q '^default'" "default service account"
   cluster/kubectl.sh get nodes
 }
 
