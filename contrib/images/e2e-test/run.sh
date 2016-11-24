@@ -60,8 +60,8 @@ function e2e::wait {
 }
 
 function e2e::wait-for-apiserver {
-  e2e::wait 50 5 "timeout 2 bash -c 'cluster/kubectl.sh get nodes|grep -q Ready' >&/dev/null" "apiserver"
-  e2e::wait 20 1 "cluster/kubectl.sh get sa | grep -q '^default'" "default service account"
+  e2e::wait 100 5 "timeout 2 bash -c 'cluster/kubectl.sh get nodes|grep -q Ready' >&/dev/null" "apiserver"
+  e2e::wait 30 1 "cluster/kubectl.sh get sa | grep -q '^default'" "default service account"
   cluster/kubectl.sh get nodes
 }
 
@@ -82,13 +82,13 @@ EOF
 }
 
 function e2e::wait-for-pod {
-  e2e::wait 30 1 "cluster/kubectl.sh get pod virtlet-example-cirros | grep -q Running" \
+  e2e::wait 100 3 "cluster/kubectl.sh get pod virtlet-example-cirros | grep -q Running" \
             "pod to come up"
   cluster/kubectl.sh get pods
 }
 
 function e2e::wait-for-libvirt-domain {
-  e2e::wait 60 1 "virsh -c qemu+tcp://libvirt/system list | grep -q 'cirros.*running'" \
+  e2e::wait 100 3 "virsh -c qemu+tcp://libvirt/system list | grep -q 'cirros.*running'" \
             "libvirt domain to become running"
   virsh -c qemu+tcp://libvirt/system list
 }
