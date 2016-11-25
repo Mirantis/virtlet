@@ -40,7 +40,7 @@ update-vendor: verify-glide-installation
 	glide update --strip-vendor
 
 clean-local:
-	rm -f $(builddir)/virtlet $(builddir)/virtlet-fake-create-container $(builddir)/virtlet-fake-image-pull
+	rm -f $(builddir)/virtlet
 
 install-exec-local:
 	install $(builddir)/virtlet $(bindir)/virtlet
