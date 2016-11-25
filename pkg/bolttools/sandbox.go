@@ -39,7 +39,7 @@ func (b *BoltClient) VerifySandboxSchema() error {
 	return err
 }
 
-func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig) error {
+func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConfiguration []byte) error {
 	podId := config.Metadata.GetUid()
 
 	strLabels, err := json.Marshal(config.GetLabels())
@@ -75,6 +75,10 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig) error {
 
 		sandboxBucket, err := parentBucket.CreateBucketIfNotExists([]byte(podId))
 		if err != nil {
+			return err
+		}
+
+		if err := sandboxBucket.Put([]byte("networkConfiguration"), networkConfiguration); err != nil {
 			return err
 		}
 
@@ -522,4 +526,25 @@ func (b *BoltClient) ListPodSandbox(filter *kubeapi.PodSandboxFilter) ([]*kubeap
 	}
 
 	return sandboxes, nil
+}
+
+func (b *BoltClient) GetPodNetworkConfigurationAsBytes(podId string) ([]byte, error) {
+	var config []byte
+	err := b.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte("sandbox"))
+		if bucket == nil {
+			return fmt.Errorf("bucket 'sandbox' doesn't exist")
+		}
+
+		sandboxBucket := bucket.Bucket([]byte(podId))
+		if sandboxBucket == nil {
+			return fmt.Errorf("bucket '%s' doesn't exist", podId)
+		}
+
+		config = sandboxBucket.Get([]byte("networkConfiguration"))
+
+		return nil
+
+	})
+	return config, err
 }
