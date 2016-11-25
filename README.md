@@ -28,6 +28,11 @@ At this stage Virtlet have following requirements:
 * host should have `python` environment in version which is compatible with `docker-compose` (installation instructions in later section of this doc),
 * you need a kubernetes cluster with specified version which is pinned in glide.lock file
 
+### Networking support
+
+Only supported for now configuration is usage of [CNI plugins](https://github.com/containernetworking/cni) which is required to be installed on the host.
+Virtlet have the same behavior and default values for `--cni-bin-dir` and `--cni-conf-dir` as described in kubelet network plugins [documentation](http://kubernetes.io/docs/admin/network-plugins/).
+
 ### Running docker-compose environment
 
 To run local environment, please install [docker-compose](https://pypi.python.org/pypi/docker-compose)

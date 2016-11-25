@@ -14,6 +14,7 @@ RUN apt-get update \
 		libguestfs-dev \
 		libguestfs0-dbg \
 		libguestfs-tools \
+		iptables \
 	&& apt-get clean
 
 ENV GOPATH /go

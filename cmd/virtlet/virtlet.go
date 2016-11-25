@@ -21,6 +21,7 @@ import (
 	"os"
 
 	"github.com/Mirantis/virtlet/pkg/manager"
+
 	"github.com/golang/glog"
 )
 
@@ -35,12 +36,16 @@ var (
 		"Path to the bolt database file")
 	listen = flag.String("listen", "/run/virtlet.sock",
 		"The unix socket to listen on, e.g. /run/virtlet.sock")
+	cniPluginsDir = flag.String("cni-bin-dir", "/opt/cni/bin",
+		"Path to CNI plugin binaries")
+	cniConfigsDir = flag.String("cni-conf-dir", "/etc/cni/net.d",
+		"Location of CNI configurations (first file name in lexicographic order will be chosen)")
 )
 
 func main() {
 	flag.Parse()
 
-	server, err := manager.NewVirtletManager(*libvirtUri, *pool, *storageBackend, *boltPath)
+	server, err := manager.NewVirtletManager(*libvirtUri, *pool, *storageBackend, *boltPath, *cniPluginsDir, *cniConfigsDir)
 	if err != nil {
 		glog.Errorf("Initializing server failed: %v", err)
 		os.Exit(1)
