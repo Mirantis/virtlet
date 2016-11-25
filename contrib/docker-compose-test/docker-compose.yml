@@ -13,6 +13,7 @@ services:
       - libvirt_volume_pool:/var/lib/virtlet
   virtlet_test:
     build: ../..
+    # 'privileged' is necessary for network namespaces
     privileged: true
     environment:
       - VIRTLET_LOGLEVEL=3
