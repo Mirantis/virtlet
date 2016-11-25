@@ -30,6 +30,7 @@ import (
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
 	"github.com/Mirantis/virtlet/pkg/bolttools"
+	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
 )
 
@@ -47,9 +48,11 @@ type VirtletManager struct {
 	libvirtVirtualizationTool *libvirttools.VirtualizationTool
 	// bolt
 	boltClient *bolttools.BoltClient
+	// cni
+	cniClient *cni.Client
 }
 
-func NewVirtletManager(libvirtUri string, poolName string, storageBackend string, boltPath string) (*VirtletManager, error) {
+func NewVirtletManager(libvirtUri, poolName, storageBackend, boltPath, cniPluginsDir, cniConfigsDir string) (*VirtletManager, error) {
 	libvirtConnTool, err := libvirttools.NewConnectionTool(libvirtUri)
 	if err != nil {
 		return nil, err
@@ -66,6 +69,10 @@ func NewVirtletManager(libvirtUri string, poolName string, storageBackend string
 	if err != nil {
 		return nil, err
 	}
+	cniClient, err := cni.NewClient(cniPluginsDir, cniConfigsDir)
+	if err != nil {
+		return nil, err
+	}
 
 	virtletManager := &VirtletManager{
 		server:                    grpc.NewServer(),
@@ -73,6 +80,7 @@ func NewVirtletManager(libvirtUri string, poolName string, storageBackend string
 		libvirtImageTool:          libvirtImageTool,
 		libvirtVirtualizationTool: libvirtVirtualizationTool,
 		boltClient:                boltClient,
+		cniClient:                 cniClient,
 	}
 
 	kubeapi.RegisterRuntimeServiceServer(virtletManager.server, virtletManager)
@@ -112,10 +120,33 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 	glog.V(2).Infof("RunPodSandbox called for pod %s (%s)", name, podId)
 	glog.V(3).Infof("RunPodSandbox: %s", spew.Sdump(in))
 	glog.V(2).Infof("Sandbox config annotations: %v", config.GetAnnotations())
-	if err := v.boltClient.SetPodSandbox(config); err != nil {
+
+	if err := cni.CreateNetNS(podId); err != nil {
+		glog.Errorf("Error when creating new netns for pod %s (%s): %v", name, podId, err)
+		return nil, err
+	}
+
+	netConfig, err := v.cniClient.AddSandboxToNetwork(podId)
+	if err != nil {
+		glog.Errorf("Error when adding pod %s (%s) to CNI network: %v", name, podId, err)
+		return nil, err
+	}
+
+	bytesNetConfig, err := cni.ResultToBytes(netConfig)
+	if err != nil {
+		glog.Errorf("Error during network configuration result marshaling for pod %s (%s): %v", name, podId, err)
+		if secondErr := v.cniClient.RemoveSandboxFromNetwork(podId); secondErr != nil {
+			glog.Errorf("Error when removing pod %s (%s) from CNI network:", name, podId, err)
+		}
+		return nil, err
+	}
+	glog.V(3).Infof("CNI configuration for pod %s (%s): %s", name, podId, string(bytesNetConfig))
+
+	if err := v.boltClient.SetPodSandbox(config, bytesNetConfig); err != nil {
 		glog.Errorf("Error when creating pod sandbox for pod %s (%s): %v", name, podId, err)
 		return nil, err
 	}
+
 	response := &kubeapi.RunPodSandboxResponse{
 		PodSandboxId: &podId,
 	}
@@ -145,6 +176,16 @@ func (v *VirtletManager) RemovePodSandbox(ctx context.Context, in *kubeapi.Remov
 		return nil, err
 	}
 
+	if err := v.cniClient.RemoveSandboxFromNetwork(podSandboxId); err != nil {
+		glog.Errorf("Error when removing pod sandbox '%s' from CNI network: %v", podSandboxId, err)
+		return nil, err
+	}
+
+	if err := cni.DestroyNetNS(podSandboxId); err != nil {
+		glog.Errorf("Error when removing network namespace for pod sandbox %s: %v", podSandboxId, err)
+		return nil, err
+	}
+
 	response := &kubeapi.RemovePodSandboxResponse{}
 	glog.V(3).Infof("RemovePodSandbox response: %s", spew.Sdump(response))
 	return response, nil
@@ -153,11 +194,32 @@ func (v *VirtletManager) RemovePodSandbox(ctx context.Context, in *kubeapi.Remov
 func (v *VirtletManager) PodSandboxStatus(ctx context.Context, in *kubeapi.PodSandboxStatusRequest) (*kubeapi.PodSandboxStatusResponse, error) {
 	glog.V(3).Infof("PodSandboxStatusStatus: %s", spew.Sdump(in))
 	podSandboxId := in.GetPodSandboxId()
+
 	status, err := v.boltClient.GetPodSandboxStatus(podSandboxId)
 	if err != nil {
 		glog.Errorf("Error when getting pod sandbox '%s': %v", podSandboxId, err)
 		return nil, err
 	}
+
+	netAsBytes, err := v.boltClient.GetPodNetworkConfigurationAsBytes(podSandboxId)
+	if err != nil {
+		glog.Errorf("Error when retrieving pod network configuration for sandbox '%s': %v", podSandboxId, err)
+		return nil, err
+	}
+
+	if len(netAsBytes) != 0 {
+		netResult, err := cni.BytesToResult(netAsBytes)
+		if err != nil {
+			glog.Errorf("Error when unmarshaling pod network configuration for sandbox '%s': %v", podSandboxId, err)
+			return nil, err
+		}
+
+		if netResult.IP4 != nil {
+			ip := netResult.IP4.IP.IP.String()
+			status.Network = &kubeapi.PodSandboxNetworkStatus{Ip: &ip}
+		}
+	}
+
 	response := &kubeapi.PodSandboxStatusResponse{Status: status}
 	glog.V(3).Infof("PodSandboxStatus response: %s", spew.Sdump(response))
 	return response, nil
@@ -178,6 +240,7 @@ func (v *VirtletManager) ListPodSandbox(ctx context.Context, in *kubeapi.ListPod
 
 func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.CreateContainerRequest) (*kubeapi.CreateContainerResponse, error) {
 	config := in.GetConfig()
+	podSandboxId := in.GetPodSandboxId()
 	imageName := config.GetImage().GetImage()
 	name := config.GetMetadata().GetName()
 
@@ -190,10 +253,24 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 		return nil, err
 	}
 
-	glog.V(2).Infof("CreateContainer: imageName %s, imageFilepath %s", imageName, imageFilepath)
+	netAsBytes, err := v.boltClient.GetPodNetworkConfigurationAsBytes(podSandboxId)
+	if err != nil {
+		glog.Errorf("Error when retrieving pod network configuration for sandbox '%s': %v", podSandboxId, err)
+		return nil, err
+	}
+
+	netResult, err := cni.BytesToResult(netAsBytes)
+	if err != nil {
+		glog.Errorf("Error when unmarshaling pod network configuration for sandbox '%s': %v", podSandboxId, err)
+		return nil, err
+	}
+
+	netNSPath := cni.PodNetNSPath(podSandboxId)
+	glog.V(2).Infof("CreateContainer: imageName %s, imageFilepath %s, ip %s, network namespace %s", imageName, imageFilepath, netResult.IP4.IP.IP.String(), netNSPath)
 
 	// TODO: we should not pass whole "in" to CreateContainer - we should pass there only needed info for CreateContainer
 	// without whole data container
+	// TODO: use network configuration by CreateContainer
 	uuid, err := v.libvirtVirtualizationTool.CreateContainer(v.boltClient, in, imageFilepath)
 	if err != nil {
 		glog.Errorf("Error when creating container %s: %v", name, err)
