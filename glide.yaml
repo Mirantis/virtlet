@@ -18,4 +18,6 @@ import:
   subpackages:
   - dhcp4
 - package: github.com/containernetworking/cni
-  version: v0.3.0
+  version: ~0.3.0
+- package: github.com/vishvananda/netlink
+  version: a4f22d8ad2327663017dbb309b5e3f8b6f348020
