@@ -3,10 +3,8 @@ MAINTAINER Michal Rostecki <mrostecki@mirantis.com>
 LABEL Name="virtlet" Version="0.1"
 
 RUN apt-get update \
-	&& apt-get install -y software-properties-common \
-	&& apt-get clean
-RUN DEBIAN_FRONTEND=noninteractive apt-get install -y  \
-		git \
+	&& DEBIAN_FRONTEND=noninteractive apt-get install -y \
+                git \
 		golang \
 		make \
 		autoconf \
