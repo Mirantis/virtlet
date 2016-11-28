@@ -88,3 +88,7 @@ To run integration & e2e tests, use
 ```sh
 ./test.sh
 ```
+
+### Demo of usage
+
+You can watch sample usage session under [this](https://asciinema.org/a/1aq4f2wd8lgw0e1yexvf1knmv) link.
