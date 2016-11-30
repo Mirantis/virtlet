@@ -78,6 +78,34 @@ func withHostAndContNS(t *testing.T, toRun func(hostNS, contNS ns.NetNS)) {
 	})
 }
 
+func verifyLinkUp(t *testing.T, name, title string) netlink.Link {
+	link, err := netlink.LinkByName(name)
+	if err != nil {
+		t.Fatalf("cannot locate link: %s", title)
+	}
+	if link.Attrs().Flags&net.FlagUp == 0 {
+		t.Errorf("link should be up, but it's down: %s", title)
+	}
+	return link
+}
+
+func verifyNoLink(t *testing.T, name, title string) {
+	if _, err := netlink.LinkByName(name); err == nil {
+		t.Errorf("link should not be present: %s", title)
+	}
+}
+
+func verifyBridgeMember(t *testing.T, name, title string, bridge netlink.Link) netlink.Link {
+	if bridge.Type() != "bridge" {
+		t.Fatalf("link %q is not a bridge", bridge.Attrs().Name)
+	}
+	link := verifyLinkUp(t, name, title)
+	if link.Attrs().MasterIndex != bridge.Attrs().Index {
+		t.Errorf("link %q doesn't belong to bridge %q", name, bridge.Attrs().Name)
+	}
+	return link
+}
+
 func TestEscapePair(t *testing.T) {
 	withHostAndContNS(t, func(hostNS, contNS ns.NetNS) {
 		hostVeth, contVeth, err := CreateEscapeVethPair(contNS, "esc0", 1500)
@@ -87,21 +115,13 @@ func TestEscapePair(t *testing.T) {
 		// need to force hostNS here because of side effects of NetNS.Do()
 		// See https://github.com/vishvananda/netns/issues/17
 		hostNS.Do(func(ns.NetNS) error {
-			if _, err = netlink.LinkByName(hostVeth.Attrs().Name); err != nil {
-				t.Errorf("cannot locate host veth")
-			}
-			if _, err = netlink.LinkByName(contVeth.Attrs().Name); err == nil {
-				t.Errorf("container veth should not be present in host namespace")
-			}
+			verifyLinkUp(t, hostVeth.Attrs().Name, "host veth")
+			verifyNoLink(t, contVeth.Attrs().Name, "container veth in host namespace")
 			return nil
 		})
 		contNS.Do(func(ns.NetNS) error {
-			if _, err = netlink.LinkByName(contVeth.Attrs().Name); err != nil {
-				t.Errorf("cannot locate container veth")
-			}
-			if _, err = netlink.LinkByName(hostVeth.Attrs().Name); err == nil {
-				t.Errorf("host veth should not be present in container namespace")
-			}
+			verifyLinkUp(t, contVeth.Attrs().Name, "container veth")
+			verifyNoLink(t, hostVeth.Attrs().Name, "host veth in container namespace")
 			return nil
 		})
 	})
@@ -124,17 +144,15 @@ func makeTestVeth(t *testing.T, base string, index int) netlink.Link {
 	return veth
 }
 
-func makeTestBridge(t *testing.T, links []netlink.Link) *netlink.Bridge {
-	br, err := SetupBridge(links)
+func makeTestBridge(t *testing.T, name string, links []netlink.Link) *netlink.Bridge {
+	br, err := SetupBridge(name, links)
 	if err != nil {
 		t.Fatalf("failed to create first bridge: %v", err)
 	}
-
-	// re-retrieve link by name to be extra sure
-	if _, err := netlink.LinkByName(br.Attrs().Name); err != nil {
-		t.Fatalf("first bridge not found: %v", err)
+	if br.Attrs().Name != name {
+		t.Fatalf("bad bridge name: %q instead of %q", br.Attrs().Name, name)
 	}
-
+	verifyLinkUp(t, name, "bridge")
 	return br
 }
 
@@ -147,8 +165,8 @@ func TestSetupBridge(t *testing.T) {
 			}
 
 			brs := []*netlink.Bridge{
-				makeTestBridge(t, links[0:2]),
-				makeTestBridge(t, links[2:4]),
+				makeTestBridge(t, "testbr0", links[0:2]),
+				makeTestBridge(t, "testbr1", links[2:4]),
 			}
 			if brs[0].Attrs().Name == brs[1].Attrs().Name {
 				t.Errorf("bridges have identical name %q", brs[0].Attrs().Name)
@@ -158,14 +176,10 @@ func TestSetupBridge(t *testing.T) {
 			}
 
 			for i := 0; i < 4; i++ {
-				bridgeIndex := brs[i/2].Attrs().Index
 				name := links[i].Attrs().Name
-				if link, err := netlink.LinkByName(name); err != nil {
-					t.Errorf("cannot locate link %q", name)
-				} else if link.Attrs().MasterIndex != bridgeIndex {
-					t.Errorf("link %q doesn't belong to bridge %d", name, i/2)
-				}
+				verifyBridgeMember(t, name, name, brs[i/2])
 			}
+
 			return nil
 		})
 	})
@@ -185,7 +199,7 @@ func addTestRoute(t *testing.T, route *netlink.Route) {
 	}
 }
 
-func TestExtractVethInfo(t *testing.T) {
+func withFakeCNIVeth(t *testing.T, toRun func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link)) {
 	withHostAndContNS(t, func(hostNS, contNS ns.NetNS) {
 		origHostVeth, origContVeth, err := CreateEscapeVethPair(contNS, "eth0", 1500)
 		if err != nil {
@@ -220,25 +234,68 @@ func TestExtractVethInfo(t *testing.T) {
 				Scope:     netlink.SCOPE_UNIVERSE,
 			})
 
-			if info, err := GrabInterfaceInfo(); err != nil {
-				t.Errorf("failed to grab interface info: %v", err)
-			} else if !reflect.DeepEqual(*info, expectedInterfaceInfo) {
-				t.Errorf("interface info mismatch. Expected:\n%s\nActual:\n%s",
-					spew.Sdump(expectedInterfaceInfo), spew.Sdump(*info))
-			}
+			toRun(hostNS, contNS, origHostVeth, origContVeth)
 
-			if routes, err := netlink.RouteList(origContVeth, netlink.FAMILY_V4); err != nil {
-				t.Errorf("failed to get route list: %v", err)
-			} else if len(routes) != 0 {
-				t.Errorf("unexpected routes remain on the interface: %s", spew.Sdump(routes))
-			}
+			return nil
+		})
+	})
+}
 
-			if addrs, err := netlink.AddrList(origContVeth, netlink.FAMILY_V4); err != nil {
-				t.Errorf("failed to get addresses for veth: %v", err)
-			} else if len(addrs) != 0 {
-				t.Errorf("unexpected addresses remain on the interface: %s", spew.Sdump(addrs))
-			}
+func verifyNoAddressAndRoutes(t *testing.T, link netlink.Link) {
+	if routes, err := netlink.RouteList(link, netlink.FAMILY_V4); err != nil {
+		t.Errorf("failed to get route list: %v", err)
+	} else if len(routes) != 0 {
+		t.Errorf("unexpected routes remain on the interface: %s", spew.Sdump(routes))
+	}
 
+	if addrs, err := netlink.AddrList(link, netlink.FAMILY_V4); err != nil {
+		t.Errorf("failed to get addresses for veth: %v", err)
+	} else if len(addrs) != 0 {
+		t.Errorf("unexpected addresses remain on the interface: %s", spew.Sdump(addrs))
+	}
+}
+
+func TestExtractVethInfo(t *testing.T) {
+	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+		info, contVeth, err := GrabInterfaceInfo()
+		if err != nil {
+			t.Fatalf("failed to grab interface info: %v", err)
+		}
+		if !reflect.DeepEqual(*info, expectedInterfaceInfo) {
+			t.Errorf("interface info mismatch. Expected:\n%s\nActual:\n%s",
+				spew.Sdump(expectedInterfaceInfo), spew.Sdump(*info))
+		}
+		if contVeth.Attrs().Index != origContVeth.Attrs().Index {
+			t.Errorf("GrabInterfaceInfo() didn't return original cont veth. Interface returned: %q", origContVeth.Attrs().Name)
+		}
+		verifyNoAddressAndRoutes(t, origContVeth)
+	})
+}
+
+func TestSetUpContainerSideNetwork(t *testing.T) {
+	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+		containerNetwork, err := SetupContainerSideNetwork()
+		if err != nil {
+			t.Fatalf("failed to set up container side network: %v", err)
+		}
+		if !reflect.DeepEqual(*containerNetwork.Info, expectedInterfaceInfo) {
+			t.Errorf("interface info mismatch. Expected:\n%s\nActual:\n%s",
+				spew.Sdump(expectedInterfaceInfo), spew.Sdump(*containerNetwork.Info))
+		}
+		verifyNoAddressAndRoutes(t, origContVeth)
+
+		bridge := verifyLinkUp(t, "br0", "in-container bridge")
+		verifyBridgeMember(t, origContVeth.Attrs().Name, "origContVeth", bridge)
+		tap := verifyBridgeMember(t, "tap0", "tap0", bridge)
+		if tap.Type() != "tun" {
+			t.Errorf("tap0 interface must have type tun, but has %q instead", tap.Type())
+		}
+		dhcpContainerSideVeth := verifyBridgeMember(t, "dhcpveth0", "dhcpveth0", bridge)
+		if dhcpContainerSideVeth.Type() != "veth" {
+			t.Errorf("dhcpveth0 interface must have type veth, but has %q instead", dhcpContainerSideVeth.Type())
+		}
+		containerNetwork.DhcpNS.Do(func(ns.NetNS) error {
+			verifyLinkUp(t, "dhcpveth1", "dhcp server veth")
 			return nil
 		})
 	})
