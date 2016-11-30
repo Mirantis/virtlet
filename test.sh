@@ -16,6 +16,8 @@ function dcompose {
     docker-compose -f contrib/docker-compose-test/docker-compose.yml "$@"
 }
 
+( cd contrib/images/cni ; ./prepare.sh )
+
 dcompose build
 dcompose run virtlet_test
 dcompose down -v
