@@ -19,10 +19,33 @@ package nettools
 import (
 	"fmt"
 	"github.com/containernetworking/cni/pkg/ns"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/vishvananda/netlink"
+	"log"
 	"net"
+	"reflect"
 	"testing"
 )
+
+var expectedInterfaceInfo = InterfaceInfo{
+	IPNet: &net.IPNet{
+		IP:   net.IP{10, 1, 90, 5},
+		Mask: net.IPMask{255, 255, 255, 0},
+	},
+	Routes: []Route{
+		{
+			Destination: nil,
+			Via:         net.IP{169, 254, 1, 1},
+		},
+		{
+			Destination: &net.IPNet{
+				IP:   net.IP{169, 254, 1, 1},
+				Mask: net.IPMask{255, 255, 255, 255},
+			},
+			Via: nil,
+		},
+	},
+}
 
 // withTemporaryNSAvailable creates a new network namespace and
 // passes is as an argument to the specified function.
@@ -61,12 +84,17 @@ func TestEscapePair(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Error creating escape veth pair: %v", err)
 		}
-		if _, err = netlink.LinkByName(hostVeth.Attrs().Name); err != nil {
-			t.Errorf("cannot locate host veth")
-		}
-		if _, err = netlink.LinkByName(contVeth.Attrs().Name); err == nil {
-			t.Errorf("container veth should not be present in host namespace")
-		}
+		// need to force hostNS here because of side effects of NetNS.Do()
+		// See https://github.com/vishvananda/netns/issues/17
+		hostNS.Do(func(ns.NetNS) error {
+			if _, err = netlink.LinkByName(hostVeth.Attrs().Name); err != nil {
+				t.Errorf("cannot locate host veth")
+			}
+			if _, err = netlink.LinkByName(contVeth.Attrs().Name); err == nil {
+				t.Errorf("container veth should not be present in host namespace")
+			}
+			return nil
+		})
 		contNS.Do(func(ns.NetNS) error {
 			if _, err = netlink.LinkByName(contVeth.Attrs().Name); err != nil {
 				t.Errorf("cannot locate container veth")
@@ -138,6 +166,79 @@ func TestSetupBridge(t *testing.T) {
 					t.Errorf("link %q doesn't belong to bridge %d", name, i/2)
 				}
 			}
+			return nil
+		})
+	})
+}
+
+func parseAddr(addr string) *netlink.Addr {
+	r, err := netlink.ParseAddr(addr)
+	if err != nil {
+		log.Panicf("failed to parse addr: %v", err)
+	}
+	return r
+}
+
+func addTestRoute(t *testing.T, route *netlink.Route) {
+	if err := netlink.RouteAdd(route); err != nil {
+		t.Fatalf("Failed to add route %#v: %v", route, err)
+	}
+}
+
+func TestExtractVethInfo(t *testing.T) {
+	withHostAndContNS(t, func(hostNS, contNS ns.NetNS) {
+		origHostVeth, origContVeth, err := CreateEscapeVethPair(contNS, "eth0", 1500)
+		if err != nil {
+			t.Fatalf("failed to create veth pair: %v", err)
+		}
+		// need to force hostNS here because of side effects of NetNS.Do()
+		// See https://github.com/vishvananda/netns/issues/17
+		hostNS.Do(func(ns.NetNS) error {
+			if err = netlink.LinkSetUp(origHostVeth); err != nil {
+				t.Fatalf("failed to bring up origHostVeth: %v", err)
+			}
+			return nil
+		})
+		contNS.Do(func(ns.NetNS) error {
+			if err = netlink.LinkSetUp(origContVeth); err != nil {
+				t.Fatalf("failed to bring up origContVeth: %v", err)
+			}
+			if err = netlink.AddrAdd(origContVeth, parseAddr("10.1.90.5/24")); err != nil {
+				t.Fatalf("failed to add addr for origContVeth: %v", err)
+			}
+
+			gwAddr := parseAddr("169.254.1.1/32")
+			addTestRoute(t, &netlink.Route{
+				LinkIndex: origContVeth.Attrs().Index,
+				Dst:       gwAddr.IPNet,
+				Scope:     netlink.SCOPE_LINK,
+			})
+
+			addTestRoute(t, &netlink.Route{
+				LinkIndex: origContVeth.Attrs().Index,
+				Gw:        gwAddr.IPNet.IP,
+				Scope:     netlink.SCOPE_UNIVERSE,
+			})
+
+			if info, err := GrabInterfaceInfo(); err != nil {
+				t.Errorf("failed to grab interface info: %v", err)
+			} else if !reflect.DeepEqual(*info, expectedInterfaceInfo) {
+				t.Errorf("interface info mismatch. Expected:\n%s\nActual:\n%s",
+					spew.Sdump(expectedInterfaceInfo), spew.Sdump(*info))
+			}
+
+			if routes, err := netlink.RouteList(origContVeth, netlink.FAMILY_V4); err != nil {
+				t.Errorf("failed to get route list: %v", err)
+			} else if len(routes) != 0 {
+				t.Errorf("unexpected routes remain on the interface: %s", spew.Sdump(routes))
+			}
+
+			if addrs, err := netlink.AddrList(origContVeth, netlink.FAMILY_V4); err != nil {
+				t.Errorf("failed to get addresses for veth: %v", err)
+			} else if len(addrs) != 0 {
+				t.Errorf("unexpected addresses remain on the interface: %s", spew.Sdump(addrs))
+			}
+
 			return nil
 		})
 	})
