@@ -40,7 +40,19 @@ import (
 	"github.com/containernetworking/cni/pkg/ip"
 	"github.com/containernetworking/cni/pkg/ns"
 	"github.com/vishvananda/netlink"
+	"net"
+	"syscall"
 )
+
+type Route struct {
+	Destination *net.IPNet
+	Via         net.IP
+}
+
+type InterfaceInfo struct {
+	IPNet  *net.IPNet
+	Routes []Route
+}
 
 // CreateEscapeVethPair creates a veth pair with contVeth residing in
 // the specified container network namespace and hostVeth residing in
@@ -133,4 +145,73 @@ func SetupBridge(links []netlink.Link) (*netlink.Bridge, error) {
 	}
 
 	return br, nil
+}
+
+// GrabInterfaceInfo extracts ip address and netmask from veth
+// interface in the current namespace, together with routes for this
+// interface. After gathering the information, the function removes
+// address from the namespace along with the routes.
+// There must be exactly one veth interface in the namespace
+// and exactly one address associated with veth.
+func GrabInterfaceInfo() (*InterfaceInfo, error) {
+	links, err := netlink.LinkList()
+	if err != nil {
+		return nil, fmt.Errorf("error listing links: %v", err)
+	}
+	var veth netlink.Link
+	for _, link := range links {
+		if link.Type() != "veth" {
+			continue
+		}
+		if veth != nil {
+			return nil, errors.New("multiple veth links detected in container namespace")
+		}
+		veth = link
+	}
+	if veth == nil {
+		return nil, errors.New("no veth interface found")
+	}
+
+	addrs, err := netlink.AddrList(veth, netlink.FAMILY_V4)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get addresses for veth: %v", err)
+	}
+	if len(addrs) != 1 {
+		return nil, fmt.Errorf("expected exactly one address for veth, but got %v", addrs)
+	}
+
+	info := &InterfaceInfo{
+		IPNet:  addrs[0].IPNet,
+		Routes: nil,
+	}
+
+	routes, err := netlink.RouteList(veth, netlink.FAMILY_V4)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list routes: %v", err)
+	}
+	for _, route := range routes {
+		if route.Protocol == syscall.RTPROT_KERNEL {
+			// route created by kernel
+			continue
+		}
+		if (route.Dst == nil || route.Dst.IP == nil) && route.Gw == nil {
+			// route has only Src
+			continue
+		}
+		info.Routes = append(info.Routes, Route{
+			Destination: route.Dst,
+			Via:         route.Gw,
+		})
+		if err = netlink.RouteDel(&route); err != nil {
+			return nil, fmt.Errorf("error deleting route: %v", err)
+		}
+	}
+
+	for _, addr := range addrs {
+		if err = netlink.AddrDel(veth, &addr); err != nil {
+			return nil, fmt.Errorf("error deleting address from the route: %v", err)
+		}
+	}
+
+	return info, nil
 }
