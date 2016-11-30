@@ -1,5 +1,7 @@
 version: '2'
 services:
+  cni:
+    build: ../images/cni
   libvirt:
     privileged: true
     build: ../images/libvirt/
@@ -11,6 +13,7 @@ services:
       - libvirt_volume_pool:/var/lib/virtlet
   virtlet_test:
     build: ../..
+    privileged: true
     environment:
       - VIRTLET_LOGLEVEL=3
       - VIRTLET_DISABLE_KVM=1
@@ -56,6 +59,7 @@ services:
     volumes_from:
       # we need /kubernetes here
       - local_cluster
+      - cni
     depends_on:
       - local_cluster
       - libvirt
