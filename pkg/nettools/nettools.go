@@ -39,6 +39,7 @@ import (
 	"github.com/containernetworking/cni/pkg/ip"
 	"github.com/containernetworking/cni/pkg/ns"
 	"github.com/vishvananda/netlink"
+	"log"
 	"net"
 	"syscall"
 )
@@ -48,6 +49,8 @@ const (
 	dhcpVethContainerEndName = "dhcpveth0"
 	dhcpVethDhcpEndName      = "dhcpveth1"
 	containerBridgeName      = "br0"
+	// Address for dhcp server internal interface
+	internalDhcpAddr = "169.254.254.2/24"
 )
 
 type Route struct {
@@ -65,16 +68,22 @@ type ContainerNetwork struct {
 	DhcpNS ns.NetNS
 }
 
-// TBD: rm this
 // CreateEscapeVethPair creates a veth pair with innerVeth residing in
 // the specified network namespace innerNS and outerVeth residing in
 // the 'outer' (current) namespace.
+// TBD: move this to test tools
 func CreateEscapeVethPair(innerNS ns.NetNS, ifName string, mtu int) (outerVeth, innerVeth netlink.Link, err error) {
 	var outerVethName string
 
 	err = innerNS.Do(func(outerNS ns.NetNS) error {
 		// create the veth pair in the inner ns and move outer end into the outer netns
 		outerVeth, innerVeth, err = ip.SetupVeth(ifName, mtu, outerNS)
+		if err != nil {
+			return err
+		}
+
+		// need to lookup innerVeth again to get its attrs
+		innerVeth, err = netlink.LinkByName(innerVeth.Attrs().Name)
 		if err != nil {
 			return err
 		}
@@ -214,6 +223,14 @@ func GrabInterfaceInfo() (*InterfaceInfo, netlink.Link, error) {
 	return info, veth, nil
 }
 
+func mustParseAddr(addr string) *netlink.Addr {
+	r, err := netlink.ParseAddr(addr)
+	if err != nil {
+		log.Panicf("failed to parse address %q: %v", addr, err)
+	}
+	return r
+}
+
 // SetupContainerSideNetwork sets up networking in container namespace.
 // It does so by calling GrabInterfaceInfo() first, then making additional
 // network namespace for dhcp server and preparing the following network
@@ -282,6 +299,9 @@ func SetupContainerSideNetwork() (*ContainerNetwork, error) {
 		}
 		if err = netlink.LinkSetUp(veth); err != nil {
 			return fmt.Errorf("failed to set %q up: %v", dhcpVethDhcpEndName, err)
+		}
+		if err = netlink.AddrAdd(veth, mustParseAddr(internalDhcpAddr)); err != nil {
+			return fmt.Errorf("failed to set address for dhcp side veth: %v", err)
 		}
 		return nil
 	}); err != nil {

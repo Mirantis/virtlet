@@ -295,7 +295,18 @@ func TestSetUpContainerSideNetwork(t *testing.T) {
 			t.Errorf("dhcpveth0 interface must have type veth, but has %q instead", dhcpContainerSideVeth.Type())
 		}
 		containerNetwork.DhcpNS.Do(func(ns.NetNS) error {
-			verifyLinkUp(t, "dhcpveth1", "dhcp server veth")
+			link := verifyLinkUp(t, "dhcpveth1", "dhcp server veth")
+			addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
+			if err != nil {
+				t.Errorf("failed to get addresses for dhcp-side veth: %v", err)
+			}
+			expectedAddr := "169.254.254.2/24 dhcpveth1"
+			if len(addrs) != 1 {
+				t.Errorf("dhcp-side veth should have exactly one address, but got this instead: %v", spew.Sdump(addrs))
+			} else if addrs[0].String() != expectedAddr {
+				t.Errorf("bad dhcp-side veth address %q (expected %q)", addrs[0].String(), expectedAddr)
+			}
+
 			return nil
 		})
 	})
