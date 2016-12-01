@@ -278,6 +278,7 @@ func TestSetUpContainerSideNetwork(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to set up container side network: %v", err)
 		}
+		defer containerNetwork.DhcpNS.Close()
 		if !reflect.DeepEqual(*containerNetwork.Info, expectedInterfaceInfo) {
 			t.Errorf("interface info mismatch. Expected:\n%s\nActual:\n%s",
 				spew.Sdump(expectedInterfaceInfo), spew.Sdump(*containerNetwork.Info))

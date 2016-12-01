@@ -100,10 +100,12 @@ func TestDhcpServer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create ns for dhcp server: %v", err)
 	}
+	defer serverNS.Close()
 	clientNS, err := ns.NewNS()
 	if err != nil {
 		t.Fatalf("Failed to create ns for dhcp client: %v", err)
 	}
+	defer clientNS.Close()
 	var clientVeth, serverVeth netlink.Link
 	serverNS.Do(func(ns.NetNS) error {
 		serverVeth, clientVeth, err = nettools.CreateEscapeVethPair(clientNS, "veth0", 1500)
