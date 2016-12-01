@@ -28,7 +28,6 @@ TESTS = $(check_SCRIPTS)
 all:
 	if [ ! -d vendor ]; then $(MAKE) install-vendor; fi
 	go build -o $(builddir)/virtlet ./cmd/virtlet
-	go build -o $(builddir)/virtlet-dhcp ./cmd/dhcpserver
 
 verify-glide-installation:
 	@which glide || go get github.com/Masterminds/glide
@@ -44,4 +43,3 @@ clean-local:
 
 install-exec-local:
 	install $(builddir)/virtlet $(bindir)/virtlet
-	install $(builddir)/virtlet-dhcp $(bindir)/virtlet-dhcp

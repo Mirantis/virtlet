@@ -2,6 +2,7 @@ FROM ubuntu:16.04
 MAINTAINER Michal Rostecki <mrostecki@mirantis.com>
 LABEL Name="virtlet" Version="0.1"
 
+# TODO: dhcpcd5 is only needed for integration tests
 RUN apt-get update \
 	&& DEBIAN_FRONTEND=noninteractive apt-get install -y \
                 git \
@@ -15,6 +16,7 @@ RUN apt-get update \
 		libguestfs0-dbg \
 		libguestfs-tools \
 		iptables \
+                dhcpcd5 \
 	&& apt-get clean
 
 ENV GOPATH /go
