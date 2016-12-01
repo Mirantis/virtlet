@@ -17,29 +17,37 @@ Parts of this file are copied from https://github.com/google/netboot/blob/8e5c0d
 
 */
 
-package server
+package dhcp
 
 import (
 	"bytes"
 	"errors"
 	"fmt"
 	"net"
-	"sync"
 
 	"github.com/golang/glog"
 	"go.universe.tf/netboot/dhcp4"
-
-	"github.com/Mirantis/virtlet/pkg/dhcp"
 )
 
-type dhcpServer struct {
-	mutex         *sync.Mutex
-	configuration *dhcp.Configuration
-	listener      *dhcp4.Conn
+const (
+	serverPort = 67
+)
+
+var (
+	defaultDNS = []byte{8, 8, 8, 8}
+)
+
+type Server struct {
+	config   *Config
+	listener *dhcp4.Conn
 }
 
-func (s *dhcpServer) SetupListener(laddr string) error {
-	if listener, err := dhcp4.NewConn(laddr); err != nil {
+func NewServer(config *Config) *Server {
+	return &Server{config: config}
+}
+
+func (s *Server) SetupListener(laddr string) error {
+	if listener, err := dhcp4.NewConn(fmt.Sprintf("%s:%d", laddr, serverPort)); err != nil {
 		return err
 	} else {
 		s.listener = listener
@@ -47,20 +55,20 @@ func (s *dhcpServer) SetupListener(laddr string) error {
 	return nil
 }
 
-func (s *dhcpServer) Close() error {
+func (s *Server) Close() error {
 	return s.listener.Close()
 }
 
-func (s *dhcpServer) Serve() error {
+func (s *Server) Serve() error {
 	for {
 		pkt, intf, err := s.listener.RecvDHCP()
-		glog.V(2).Infof("Received dhcp packet from: %s", pkt.HardwareAddr.String())
 		if err != nil {
 			return fmt.Errorf("receiving DHCP packet: %v", err)
 		}
 		if intf == nil {
 			return fmt.Errorf("received DHCP packet with no interface information - please fill a bug to https://github.com/google/netboot")
 		}
+		glog.V(2).Infof("Received dhcp packet from: %s", pkt.HardwareAddr.String())
 
 		serverIP, err := interfaceIP(intf)
 		if err != nil {
@@ -130,26 +138,9 @@ func interfaceIP(intf *net.Interface) (net.IP, error) {
 	return nil, errors.New("no usable unicast address configured on interface")
 }
 
-func (s *dhcpServer) findConfiguration(macAddress []byte) *dhcp.EndpointConfiguration {
-	if s.configuration.EndpointConfigurations == nil {
-		// we don't have any configurations received
-		glog.Warningf("EndpointConfigurations not defined when there was query for HardwareAddr %v", macAddress)
-		return nil
-	}
-
-	for _, conf := range s.configuration.EndpointConfigurations {
-		if bytes.Equal(conf.GetEndpoint().GetHardwareAddress(), macAddress) {
-			return conf
-		}
-	}
-
-	return nil
-}
-
-func (s *dhcpServer) prepareResponse(pkt *dhcp4.Packet, serverIP net.IP, mt dhcp4.MessageType) (*dhcp4.Packet, error) {
-	conf := s.findConfiguration(pkt.HardwareAddr)
-	if conf == nil {
-		return nil, fmt.Errorf("can not find configuration for packet from %v", pkt.HardwareAddr)
+func (s *Server) prepareResponse(pkt *dhcp4.Packet, serverIP net.IP, mt dhcp4.MessageType) (*dhcp4.Packet, error) {
+	if !bytes.Equal(pkt.HardwareAddr, s.config.PeerHardwareAddress) {
+		return nil, fmt.Errorf("unexpected packet from %v", pkt.HardwareAddr)
 	}
 
 	p := &dhcp4.Packet{
@@ -168,29 +159,17 @@ func (s *dhcpServer) prepareResponse(pkt *dhcp4.Packet, serverIP net.IP, mt dhcp
 		p.Options[97] = pkt.Options[97]
 	}
 
-	sAddress := conf.GetIpv4Address()
-	ip, ipnet, err := net.ParseCIDR(sAddress)
-	if err != nil {
-		return nil, fmt.Errorf("configuration for mac %v have malformed ip setting (%s): %v", pkt.HardwareAddr, sAddress, err)
-	}
-	if ipnet == nil {
-		return nil, fmt.Errorf("configuration for mac %v lacks netmask: %s", pkt.HardwareAddr, sAddress)
-	}
+	p.YourAddr = s.config.CNIResult.IP4.IP.IP
+	p.Options[dhcp4.OptSubnetMask] = s.config.CNIResult.IP4.IP.Mask
 
-	p.YourAddr = ip
-	p.Options[dhcp4.OptSubnetMask] = []byte(ipnet.Mask)
-
-	defaultRouter := findDefaultRoute(conf, ipnet)
-	if defaultRouter != nil {
-		p.Options[dhcp4.OptRouters] = []byte(*defaultRouter)
+	if s.config.CNIResult.IP4.Gateway != nil {
+		p.Options[dhcp4.OptRouters] = []byte(s.config.CNIResult.IP4.Gateway)
 	}
-	if conf.GetRoutes() != nil {
-		// option 121 is for static routes as defined in rfc3442
-		if data, err := s.getStaticRoutes(conf, ipnet); err != nil {
-			glog.Warningf("Can not transform static routes for mac %v: %v", pkt.HardwareAddr, err)
-		} else {
-			p.Options[121] = data
-		}
+	// option 121 is for static routes as defined in rfc3442
+	if data, err := s.getStaticRoutes(); err != nil {
+		glog.Warningf("Can not transform static routes for mac %v: %v", pkt.HardwareAddr, err)
+	} else if data != nil {
+		p.Options[121] = data
 	}
 
 	// 86400 - full 24h
@@ -202,76 +181,46 @@ func (s *dhcpServer) prepareResponse(pkt *dhcp4.Packet, serverIP net.IP, mt dhcp
 	// 64800 - 18h
 	p.Options[dhcp4.OptRebindingTime] = []byte{0, 0, 253, 32}
 
-	// TODO: remove hardcoded DNS
-	p.Options[dhcp4.OptDNSServers] = []byte{8, 8, 8, 8}
+	// TODO: include more dns options
+	if len(s.config.CNIResult.DNS.Nameservers) == 0 {
+		p.Options[dhcp4.OptDNSServers] = defaultDNS
+	} else {
+		var b bytes.Buffer
+		for _, ns := range s.config.CNIResult.DNS.Nameservers {
+			ip := net.ParseIP(ns).To4()
+			if len(ip) != 4 {
+				glog.Warningf("failed to parse nameserver ip %q", ip)
+			} else {
+				b.Write(ip)
+			}
+		}
+		if b.Len() > 0 {
+			p.Options[dhcp4.OptDNSServers] = b.Bytes()
+		} else {
+			p.Options[dhcp4.OptDNSServers] = defaultDNS
+		}
+	}
 
 	return p, nil
 }
 
-func (s *dhcpServer) offerDHCP(pkt *dhcp4.Packet, serverIP net.IP) (*dhcp4.Packet, error) {
+func (s *Server) offerDHCP(pkt *dhcp4.Packet, serverIP net.IP) (*dhcp4.Packet, error) {
 	return s.prepareResponse(pkt, serverIP, dhcp4.MsgOffer)
 }
 
-func (s *dhcpServer) ackDHCP(pkt *dhcp4.Packet, serverIP net.IP) (*dhcp4.Packet, error) {
+func (s *Server) ackDHCP(pkt *dhcp4.Packet, serverIP net.IP) (*dhcp4.Packet, error) {
 	return s.prepareResponse(pkt, serverIP, dhcp4.MsgAck)
 }
 
-func findDefaultRoute(configuration *dhcp.EndpointConfiguration, network *net.IPNet) *net.IP {
-	routes := configuration.GetRoutes()
-	if routes == nil {
-		return nil
-	}
-	for _, route := range routes {
-		dest := route.GetDestination()
-		_, targetNet, err := net.ParseCIDR(dest)
-		if err != nil {
-			glog.Warningf("Can not parse route destination '%s': %v", dest, err)
-			return nil
-		}
-
-		if targetNet.String() != "0.0.0.0/0" {
-			// not default route
-			continue
-		}
-
-		router := net.ParseIP(route.GetThrough())
-		if !network.Contains(router) {
-			// if this default route is not contained in local
-			// network - do not pass it there
-			// it will be later passed in static routes
-			return nil
-		}
-
-		// convert known to be ipv4 from ipv6 form
-		asBytes := []byte(router)
-		v4router := net.IP(asBytes[len(asBytes)-4:])
-		return &v4router
+func (s *Server) getStaticRoutes() ([]byte, error) {
+	if len(s.config.CNIResult.IP4.Routes) == 0 {
+		return nil, nil
 	}
 
-	return nil
-}
-
-func (s *dhcpServer) getStaticRoutes(configuration *dhcp.EndpointConfiguration, network *net.IPNet) ([]byte, error) {
 	var b bytes.Buffer
-
-	// configuration is already tested if it's not nil
-	for _, route := range configuration.GetRoutes() {
-		dest := route.GetDestination()
-		_, targetNet, err := net.ParseCIDR(dest)
-		if err != nil {
-			return []byte{}, fmt.Errorf("can not parse route destination '%s': %v", dest, err)
-		}
-
-		router := net.ParseIP(route.GetThrough())
-
-		if network.Contains(router) && targetNet.String() == "0.0.0.0/0" {
-			// already returned as default route
-			continue
-		}
-		b.Write(toDestinationDescriptor(targetNet))
-
-		asBytes := []byte(router)
-		b.Write(asBytes[len(asBytes)-4:])
+	for _, route := range s.config.CNIResult.IP4.Routes {
+		b.Write(toDestinationDescriptor(route.Dst))
+		b.Write(route.GW)
 	}
 
 	return b.Bytes(), nil
@@ -279,7 +228,7 @@ func (s *dhcpServer) getStaticRoutes(configuration *dhcp.EndpointConfiguration, 
 
 // toDestinationDescriptor returns calculated destination descriptor according to rfc3442 (page 3)
 // warning: there is no check if ipnet is in required ipv4 type
-func toDestinationDescriptor(network *net.IPNet) []byte {
+func toDestinationDescriptor(network net.IPNet) []byte {
 	s, _ := network.Mask.Size()
 	ipAsBytes := []byte(network.IP)
 	return append(
