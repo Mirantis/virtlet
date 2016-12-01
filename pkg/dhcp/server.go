@@ -220,7 +220,11 @@ func (s *Server) getStaticRoutes() ([]byte, error) {
 	var b bytes.Buffer
 	for _, route := range s.config.CNIResult.IP4.Routes {
 		b.Write(toDestinationDescriptor(route.Dst))
-		b.Write(route.GW)
+		if route.GW != nil {
+			b.Write(route.GW)
+		} else {
+			b.Write([]byte{0, 0, 0, 0})
+		}
 	}
 
 	return b.Bytes(), nil
