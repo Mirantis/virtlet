@@ -18,31 +18,32 @@ package nettools
 
 import (
 	"fmt"
-	"github.com/containernetworking/cni/pkg/ns"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/vishvananda/netlink"
 	"log"
 	"net"
 	"reflect"
 	"testing"
+
+	"github.com/containernetworking/cni/pkg/ns"
+	"github.com/containernetworking/cni/pkg/types"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/vishvananda/netlink"
 )
 
-var expectedInterfaceInfo = InterfaceInfo{
-	IPNet: &net.IPNet{
-		IP:   net.IP{10, 1, 90, 5},
-		Mask: net.IPMask{255, 255, 255, 0},
-	},
-	Routes: []Route{
-		{
-			Destination: nil,
-			Via:         net.IP{169, 254, 1, 1},
+var expectedExtractedLinkInfo = types.Result{
+	IP4: &types.IPConfig{
+		IP: net.IPNet{
+			IP:   net.IP{10, 1, 90, 5},
+			Mask: net.IPMask{255, 255, 255, 0},
 		},
-		{
-			Destination: &net.IPNet{
-				IP:   net.IP{169, 254, 1, 1},
-				Mask: net.IPMask{255, 255, 255, 255},
+		Gateway: net.IP{169, 254, 1, 1},
+		Routes: []types.Route{
+			{
+				Dst: net.IPNet{
+					IP:   net.IP{169, 254, 1, 1},
+					Mask: net.IPMask{255, 255, 255, 255},
+				},
+				GW: nil,
 			},
-			Via: nil,
 		},
 	},
 }
@@ -255,60 +256,91 @@ func verifyNoAddressAndRoutes(t *testing.T, link netlink.Link) {
 	}
 }
 
-func TestExtractVethInfo(t *testing.T) {
+func TestFindVeth(t *testing.T) {
 	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
-		info, contVeth, err := GrabInterfaceInfo()
+		contVeth, err := FindVeth()
 		if err != nil {
-			t.Fatalf("failed to grab interface info: %v", err)
+			t.Fatalf("FindVeth() failed: %v", err)
 		}
-		if !reflect.DeepEqual(*info, expectedInterfaceInfo) {
-			t.Errorf("interface info mismatch. Expected:\n%s\nActual:\n%s",
-				spew.Sdump(expectedInterfaceInfo), spew.Sdump(*info))
-		}
+
 		if contVeth.Attrs().Index != origContVeth.Attrs().Index {
 			t.Errorf("GrabInterfaceInfo() didn't return original cont veth. Interface returned: %q", origContVeth.Attrs().Name)
+		}
+	})
+}
+
+func TestStripLink(t *testing.T) {
+	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+		if err := StripLink(origContVeth); err != nil {
+			t.Fatalf("StripLink() failed: %v", err)
 		}
 		verifyNoAddressAndRoutes(t, origContVeth)
 	})
 }
 
+func TestExtractLinkInfo(t *testing.T) {
+	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+		info, err := ExtractLinkInfo(origContVeth)
+		if err != nil {
+			t.Fatalf("failed to grab interface info: %v", err)
+		}
+		if !reflect.DeepEqual(*info, expectedExtractedLinkInfo) {
+			t.Errorf("interface info mismatch. Expected:\n%s\nActual:\n%s",
+				spew.Sdump(expectedExtractedLinkInfo), spew.Sdump(*info))
+		}
+	})
+}
+
+func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, info *types.Result) {
+	containerNetwork, err := SetupContainerSideNetwork(info)
+	if err != nil {
+		t.Fatalf("failed to set up container side network: %v", err)
+	}
+	defer containerNetwork.DhcpNS.Close()
+	if !reflect.DeepEqual(*containerNetwork.Info, expectedExtractedLinkInfo) {
+		t.Errorf("interface info mismatch. Expected:\n%s\nActual:\n%s",
+			spew.Sdump(expectedExtractedLinkInfo), spew.Sdump(*containerNetwork.Info))
+	}
+	verifyNoAddressAndRoutes(t, origContVeth)
+
+	bridge := verifyLinkUp(t, "br0", "in-container bridge")
+	verifyBridgeMember(t, origContVeth.Attrs().Name, "origContVeth", bridge)
+	tap := verifyBridgeMember(t, "tap0", "tap0", bridge)
+	if tap.Type() != "tun" {
+		t.Errorf("tap0 interface must have type tun, but has %q instead", tap.Type())
+	}
+	dhcpContainerSideVeth := verifyBridgeMember(t, "dhcpveth0", "dhcpveth0", bridge)
+	if dhcpContainerSideVeth.Type() != "veth" {
+		t.Errorf("dhcpveth0 interface must have type veth, but has %q instead", dhcpContainerSideVeth.Type())
+	}
+	containerNetwork.DhcpNS.Do(func(ns.NetNS) error {
+		link := verifyLinkUp(t, "dhcpveth1", "dhcp server veth")
+		addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
+		if err != nil {
+			t.Errorf("failed to get addresses for dhcp-side veth: %v", err)
+		}
+		expectedAddr := "169.254.254.2/24 dhcpveth1"
+		if len(addrs) != 1 {
+			t.Errorf("dhcp-side veth should have exactly one address, but got this instead: %v", spew.Sdump(addrs))
+		} else if addrs[0].String() != expectedAddr {
+			t.Errorf("bad dhcp-side veth address %q (expected %q)", addrs[0].String(), expectedAddr)
+		}
+
+		return nil
+	})
+}
+
 func TestSetUpContainerSideNetwork(t *testing.T) {
 	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
-		containerNetwork, err := SetupContainerSideNetwork()
-		if err != nil {
-			t.Fatalf("failed to set up container side network: %v", err)
-		}
-		defer containerNetwork.DhcpNS.Close()
-		if !reflect.DeepEqual(*containerNetwork.Info, expectedInterfaceInfo) {
-			t.Errorf("interface info mismatch. Expected:\n%s\nActual:\n%s",
-				spew.Sdump(expectedInterfaceInfo), spew.Sdump(*containerNetwork.Info))
-		}
-		verifyNoAddressAndRoutes(t, origContVeth)
+		verifyContainerSideNetwork(t, origContVeth, nil)
+	})
+}
 
-		bridge := verifyLinkUp(t, "br0", "in-container bridge")
-		verifyBridgeMember(t, origContVeth.Attrs().Name, "origContVeth", bridge)
-		tap := verifyBridgeMember(t, "tap0", "tap0", bridge)
-		if tap.Type() != "tun" {
-			t.Errorf("tap0 interface must have type tun, but has %q instead", tap.Type())
+func TestSetUpContainerSideNetworkWithInfo(t *testing.T) {
+	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+		if err := StripLink(origContVeth); err != nil {
+			t.Fatalf("StripLink() failed: %v", err)
 		}
-		dhcpContainerSideVeth := verifyBridgeMember(t, "dhcpveth0", "dhcpveth0", bridge)
-		if dhcpContainerSideVeth.Type() != "veth" {
-			t.Errorf("dhcpveth0 interface must have type veth, but has %q instead", dhcpContainerSideVeth.Type())
-		}
-		containerNetwork.DhcpNS.Do(func(ns.NetNS) error {
-			link := verifyLinkUp(t, "dhcpveth1", "dhcp server veth")
-			addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
-			if err != nil {
-				t.Errorf("failed to get addresses for dhcp-side veth: %v", err)
-			}
-			expectedAddr := "169.254.254.2/24 dhcpveth1"
-			if len(addrs) != 1 {
-				t.Errorf("dhcp-side veth should have exactly one address, but got this instead: %v", spew.Sdump(addrs))
-			} else if addrs[0].String() != expectedAddr {
-				t.Errorf("bad dhcp-side veth address %q (expected %q)", addrs[0].String(), expectedAddr)
-			}
-
-			return nil
-		})
+		verifyContainerSideNetwork(t, origContVeth, &expectedExtractedLinkInfo)
 	})
 }

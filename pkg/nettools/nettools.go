@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Based on CNI's plugins/main/bridge/bridge.go, pkg/ip/link.go
+// Some of the code is based on CNI's plugins/main/bridge/bridge.go, pkg/ip/link.go
 // Original copyright notice:
 //
 // Copyright 2014 CNI authors
@@ -38,6 +38,7 @@ import (
 	"fmt"
 	"github.com/containernetworking/cni/pkg/ip"
 	"github.com/containernetworking/cni/pkg/ns"
+	"github.com/containernetworking/cni/pkg/types"
 	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
 	"log"
@@ -65,7 +66,7 @@ type InterfaceInfo struct {
 }
 
 type ContainerNetwork struct {
-	Info   *InterfaceInfo
+	Info   *types.Result
 	DhcpNS ns.NetNS
 }
 
@@ -154,17 +155,12 @@ func SetupBridge(bridgeName string, links []netlink.Link) (*netlink.Bridge, erro
 	return br, nil
 }
 
-// GrabInterfaceInfo extracts ip address and netmask from veth
-// interface in the current namespace, together with routes for this
-// interface. After gathering the information, the function removes
-// address from the namespace along with the routes.
-// There must be exactly one veth interface in the namespace
-// and exactly one address associated with veth.
-// Returns interface info struct, original veth link and error, if any.
-func GrabInterfaceInfo() (*InterfaceInfo, netlink.Link, error) {
+// FindVeth locates veth link in the current network namespace.
+// There must be exactly one veth interface in the namespace.
+func FindVeth() (netlink.Link, error) {
 	links, err := netlink.LinkList()
 	if err != nil {
-		return nil, nil, fmt.Errorf("error listing links: %v", err)
+		return nil, fmt.Errorf("error listing links: %v", err)
 	}
 	var veth netlink.Link
 	for _, link := range links {
@@ -172,56 +168,91 @@ func GrabInterfaceInfo() (*InterfaceInfo, netlink.Link, error) {
 			continue
 		}
 		if veth != nil {
-			return nil, nil, errors.New("multiple veth links detected in container namespace")
+			return nil, errors.New("multiple veth links detected in container namespace")
 		}
 		veth = link
 	}
 	if veth == nil {
-		return nil, nil, errors.New("no veth interface found")
+		return nil, errors.New("no veth interface found")
 	}
+	return veth, nil
+}
 
-	addrs, err := netlink.AddrList(veth, netlink.FAMILY_V4)
+// StripLink removes addresses from the link
+// along with any routes related to the link, except
+// those created by the kernel
+func StripLink(link netlink.Link) error {
+	routes, err := netlink.RouteList(link, netlink.FAMILY_V4)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get addresses for veth: %v", err)
-	}
-	if len(addrs) != 1 {
-		return nil, nil, fmt.Errorf("expected exactly one address for veth, but got %v", addrs)
+		return fmt.Errorf("failed to list routes: %v", err)
 	}
 
-	info := &InterfaceInfo{
-		IPNet:  addrs[0].IPNet,
-		Routes: nil,
-	}
-
-	routes, err := netlink.RouteList(veth, netlink.FAMILY_V4)
+	addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to list routes: %v", err)
+		return fmt.Errorf("failed to get addresses for link: %v", err)
 	}
+
 	for _, route := range routes {
 		if route.Protocol == syscall.RTPROT_KERNEL {
-			// route created by kernel
+			// route created by the kernel
 			continue
 		}
-		if (route.Dst == nil || route.Dst.IP == nil) && route.Gw == nil {
-			// route has only Src
-			continue
-		}
-		info.Routes = append(info.Routes, Route{
-			Destination: route.Dst,
-			Via:         route.Gw,
-		})
 		if err = netlink.RouteDel(&route); err != nil {
-			return nil, nil, fmt.Errorf("error deleting route: %v", err)
+			return fmt.Errorf("error deleting route: %v", err)
 		}
 	}
 
 	for _, addr := range addrs {
-		if err = netlink.AddrDel(veth, &addr); err != nil {
-			return nil, nil, fmt.Errorf("error deleting address from the route: %v", err)
+		if err = netlink.AddrDel(link, &addr); err != nil {
+			return fmt.Errorf("error deleting address from the route: %v", err)
 		}
 	}
 
-	return info, veth, nil
+	return nil
+}
+
+// ExtractLinkInfo extracts ip address and netmask from veth
+// interface in the current namespace, together with routes for this
+// interface.
+// There must be exactly one veth interface in the namespace
+// and exactly one address associated with veth.
+// Returns interface info struct and error, if any.
+func ExtractLinkInfo(link netlink.Link) (*types.Result, error) {
+	addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get addresses for link: %v", err)
+	}
+	if len(addrs) != 1 {
+		return nil, fmt.Errorf("expected exactly one address for link, but got %v", addrs)
+	}
+
+	result := &types.Result{
+		IP4: &types.IPConfig{
+			IP: *addrs[0].IPNet,
+		},
+	}
+
+	routes, err := netlink.RouteList(link, netlink.FAMILY_V4)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list routes: %v", err)
+	}
+	for _, route := range routes {
+		switch {
+		case route.Protocol == syscall.RTPROT_KERNEL:
+			// route created by kernel
+		case (route.Dst == nil || route.Dst.IP == nil) && route.Gw == nil:
+			// route has only Src
+		case (route.Dst == nil || route.Dst.IP == nil):
+			result.IP4.Gateway = route.Gw
+		default:
+			result.IP4.Routes = append(result.IP4.Routes, types.Route{
+				Dst: *route.Dst,
+				GW:  route.Gw,
+			})
+		}
+	}
+
+	return result, nil
 }
 
 func mustParseAddr(addr string) *netlink.Addr {
@@ -243,9 +274,18 @@ func mustParseAddr(addr string) *netlink.Addr {
 //   In dchp server ns:
 //     dhcpveth1 - dhcp server end of dhcp veth pair
 // Returns container network desciption and error, if any
-func SetupContainerSideNetwork() (*ContainerNetwork, error) {
-	info, contVeth, err := GrabInterfaceInfo()
+func SetupContainerSideNetwork(info *types.Result) (*ContainerNetwork, error) {
+	contVeth, err := FindVeth()
 	if err != nil {
+		return nil, err
+	}
+	if info == nil {
+		info, err = ExtractLinkInfo(contVeth)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if err := StripLink(contVeth); err != nil {
 		return nil, err
 	}
 
