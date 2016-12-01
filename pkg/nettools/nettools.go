@@ -38,6 +38,7 @@ import (
 	"fmt"
 	"github.com/containernetworking/cni/pkg/ip"
 	"github.com/containernetworking/cni/pkg/ns"
+	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
 	"log"
 	"net"
@@ -248,10 +249,19 @@ func SetupContainerSideNetwork() (*ContainerNetwork, error) {
 		return nil, err
 	}
 
+	keepNS := true
 	dhcpNS, err := ns.NewNS()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create dhcp namespace: %v", err)
 	}
+	defer func() {
+		if keepNS {
+			return
+		}
+		if err := dhcpNS.Close(); err != nil {
+			glog.Errorf("failed to close dhcp ns: %v", err)
+		}
+	}()
 
 	tap := &netlink.Tuntap{
 		LinkAttrs: netlink.LinkAttrs{
@@ -312,6 +322,7 @@ func SetupContainerSideNetwork() (*ContainerNetwork, error) {
 		return nil, fmt.Errorf("failed to create bridge: %v", err)
 	}
 
+	keepNS = true
 	return &ContainerNetwork{
 		Info:   info,
 		DhcpNS: dhcpNS,
