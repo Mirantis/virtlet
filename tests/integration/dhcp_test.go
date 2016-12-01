@@ -31,38 +31,13 @@ import (
 	"github.com/Mirantis/virtlet/pkg/nettools"
 )
 
-func runDhcp(serverNS ns.NetNS, peerHardwareAddr net.HardwareAddr) (*dhcp.Server, chan struct{}) {
+func runDhcp(serverNS ns.NetNS, config *dhcp.Config) (*dhcp.Server, chan struct{}) {
 	var server *dhcp.Server
 	readyCh := make(chan struct{})
 	doneCh := make(chan struct{})
 	go func() {
 		serverNS.Do(func(ns.NetNS) error {
-			dhcpConfig := &dhcp.Config{
-				PeerHardwareAddress: peerHardwareAddr,
-				CNIResult: types.Result{
-					IP4: &types.IPConfig{
-						IP: net.IPNet{
-							IP:   net.IP{10, 1, 90, 5},
-							Mask: net.IPMask{255, 255, 255, 0},
-						},
-						Gateway: net.IP{169, 254, 1, 1},
-						Routes: []types.Route{
-							{
-								Dst: net.IPNet{
-									IP:   net.IP{169, 254, 1, 1},
-									Mask: net.IPMask{255, 255, 255, 255},
-								},
-								GW: net.IP{0, 0, 0, 0},
-							},
-						},
-					},
-					DNS: types.DNS{
-						Nameservers: []string{"10.1.90.99"},
-					},
-				},
-			}
-
-			server = dhcp.NewServer(dhcpConfig)
+			server = dhcp.NewServer(config)
 			if err := server.SetupListener("0.0.0.0"); err != nil {
 				log.Panicf("failed to setup dhcp listener: %v", err)
 			}
@@ -79,23 +54,12 @@ func runDhcp(serverNS ns.NetNS, peerHardwareAddr net.HardwareAddr) (*dhcp.Server
 	return server, doneCh
 }
 
-var expectedDhcpOutputSubstrings = []string{
-	"new_broadcast_address='10.1.90.255'",
-	"new_classless_static_routes='169.254.1.1/32 0.0.0.0'",
-	"new_dhcp_lease_time='86400'",
-	"new_dhcp_rebinding_time='64800'",
-	"new_dhcp_renewal_time='43200'",
-	"new_dhcp_server_identifier='169.254.254.2'",
-	"new_domain_name_servers='10.1.90.99'",
-	"new_ip_address='10.1.90.5'",
-	"new_network_number='10.1.90.0'",
-	"new_routers='169.254.1.1'",
-	"new_subnet_cidr='24'",
-	"new_subnet_mask='255.255.255.0'",
-	"veth0: offered 10.1.90.5 from 169.254.254.2",
+type dhcpTestCase struct {
+	config             dhcp.Config
+	expectedSubstrings []string
 }
 
-func TestDhcpServer(t *testing.T) {
+func runDhcpTestCase(t *testing.T, testCase *dhcpTestCase) {
 	serverNS, err := ns.NewNS()
 	if err != nil {
 		t.Fatalf("Failed to create ns for dhcp server: %v", err)
@@ -122,11 +86,15 @@ func TestDhcpServer(t *testing.T) {
 
 		return nil
 	})
-	server, doneCh := runDhcp(serverNS, clientVeth.Attrs().HardwareAddr)
+
+	config := testCase.config
+	config.PeerHardwareAddress = clientVeth.Attrs().HardwareAddr
+	server, doneCh := runDhcp(serverNS, &config)
 	defer func() {
 		server.Close()
 		<-doneCh
 	}()
+
 	clientNS.Do(func(ns.NetNS) error {
 		out, err := exec.Command("dhcpcd", "-T").CombinedOutput()
 		if err != nil {
@@ -135,7 +103,7 @@ func TestDhcpServer(t *testing.T) {
 		}
 		outStr := string(out)
 		var missing []string
-		for _, str := range expectedDhcpOutputSubstrings {
+		for _, str := range testCase.expectedSubstrings {
 			if !strings.Contains(outStr, str) {
 				missing = append(missing, str)
 			}
@@ -146,6 +114,94 @@ func TestDhcpServer(t *testing.T) {
 		}
 		return nil
 	})
+}
+
+func TestDhcpServer(t *testing.T) {
+	testCases := []*dhcpTestCase{
+		{
+			config: dhcp.Config{
+				CNIResult: types.Result{
+					IP4: &types.IPConfig{
+						IP: net.IPNet{
+							IP:   net.IP{10, 1, 90, 5},
+							Mask: net.IPMask{255, 255, 255, 0},
+						},
+						Gateway: net.IP{10, 1, 90, 1},
+						Routes: []types.Route{
+							{
+								Dst: net.IPNet{
+									IP:   net.IP{10, 10, 42, 0},
+									Mask: net.IPMask{255, 255, 255, 0},
+								},
+								GW: net.IP{10, 1, 90, 90},
+							},
+						},
+					},
+				},
+			},
+			expectedSubstrings: []string{
+				"new_broadcast_address='10.1.90.255'",
+				"new_classless_static_routes='10.10.42.0/24 10.1.90.90'",
+				"new_dhcp_lease_time='86400'",
+				"new_dhcp_rebinding_time='64800'",
+				"new_dhcp_renewal_time='43200'",
+				"new_dhcp_server_identifier='169.254.254.2'",
+				"new_domain_name_servers='8.8.8.8'",
+				"new_ip_address='10.1.90.5'",
+				"new_network_number='10.1.90.0'",
+				"new_routers='10.1.90.1'",
+				"new_subnet_cidr='24'",
+				"new_subnet_mask='255.255.255.0'",
+				"veth0: offered 10.1.90.5 from 169.254.254.2",
+			},
+		},
+		{
+			config: dhcp.Config{
+				CNIResult: types.Result{
+					IP4: &types.IPConfig{
+						IP: net.IPNet{
+							IP:   net.IP{10, 1, 90, 5},
+							Mask: net.IPMask{255, 255, 255, 0},
+						},
+						Gateway: net.IP{169, 254, 1, 1},
+						Routes: []types.Route{
+							{
+								Dst: net.IPNet{
+									IP:   net.IP{169, 254, 1, 1},
+									Mask: net.IPMask{255, 255, 255, 255},
+								},
+								GW: nil,
+							},
+						},
+					},
+					DNS: types.DNS{
+						Nameservers: []string{"10.1.90.99"},
+					},
+				},
+			},
+			expectedSubstrings: []string{
+				"new_broadcast_address='10.1.90.255'",
+				"new_classless_static_routes='169.254.1.1/32 0.0.0.0'",
+				"new_dhcp_lease_time='86400'",
+				"new_dhcp_rebinding_time='64800'",
+				"new_dhcp_renewal_time='43200'",
+				"new_dhcp_server_identifier='169.254.254.2'",
+				"new_domain_name_servers='10.1.90.99'",
+				"new_ip_address='10.1.90.5'",
+				"new_network_number='10.1.90.0'",
+				"new_routers='169.254.1.1'",
+				"new_subnet_cidr='24'",
+				"new_subnet_mask='255.255.255.0'",
+				"veth0: offered 10.1.90.5 from 169.254.254.2",
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		// TODO: use subtests https://golang.org/pkg/testing/#hdr-Subtests_and_Sub_benchmarks
+		// (need newer Go)
+		runDhcpTestCase(t, testCase)
+	}
 }
 
 // TODO use code like dhcp4.NewSnooperConn() to catch escaping dhcp packets
