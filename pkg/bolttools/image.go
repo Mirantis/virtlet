@@ -64,7 +64,7 @@ func (b *BoltClient) SetImageFilepath(name, filepath string) error {
 }
 
 func (b *BoltClient) GetImageFilepath(name string) (string, error) {
-	var filepath string
+	filepath := ""
 
 	key := getKey(name)
 
@@ -75,7 +75,9 @@ func (b *BoltClient) GetImageFilepath(name string) (string, error) {
 		}
 
 		fp := bucket.Get([]byte(key))
-		filepath = string(fp)
+		if fp != nil {
+			filepath = string(fp)
+		}
 
 		return nil
 	})

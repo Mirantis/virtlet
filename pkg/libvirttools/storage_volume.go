@@ -37,6 +37,7 @@ const (
 type StorageBackend interface {
 	GenerateVolXML(pool C.virStoragePoolPtr, shortName string, capacity int, capacityUnit, libvirtFilepath string) string
 	CreateVol(pool C.virStoragePoolPtr, volName string, capacity int, capacityUnit string) (C.virStorageVolPtr, error)
+	CreateSnapshot(pool C.virStoragePoolPtr, name string, capacity int, capacityUnit string, backingStorePath string) (C.virStorageVolPtr, error)
 }
 
 func GetStorageBackend(name string) (StorageBackend, error) {
@@ -64,12 +65,6 @@ func (LocalFilesystemBackend) GenerateVolXML(pool C.virStoragePoolPtr, shortName
 	return fmt.Sprintf(volXML, shortName, capacityUnit, capacity, path)
 }
 
-type RBDBackend struct{}
-
-func (RBDBackend) GenerateVolXML(pool C.virStoragePoolPtr, shortName string, capacity int, capacityUnit, libvirtFilepath string) string {
-	return ""
-}
-
 func (LocalFilesystemBackend) CreateVol(pool C.virStoragePoolPtr, volName string, capacity int, capacityUnit string) (C.virStorageVolPtr, error) {
 	volXML := `
 <volume>
@@ -79,16 +74,39 @@ func (LocalFilesystemBackend) CreateVol(pool C.virStoragePoolPtr, volName string
 </volume>`
 	volXML = fmt.Sprintf(volXML, volName, capacityUnit, capacity)
 	glog.V(2).Infof("Create volume using XML description: %s", volXML)
-	cVolXML := C.CString(volXML)
-	defer C.free(unsafe.Pointer(cVolXML))
-	vol := C.virStorageVolCreateXML(pool, cVolXML, 0)
-	if vol == nil {
-		return nil, GetLibvirtLastError()
-	}
-	return vol, nil
+	return _createVol(pool, volXML)
+}
+
+func (LocalFilesystemBackend) CreateSnapshot(pool C.virStoragePoolPtr, name string, capacity int, capacityUnit string, backingStorePath string) (C.virStorageVolPtr, error) {
+	snapshotXML := `
+<volume type='file'>
+    <name>%s</name>
+    <allocation>0</allocation>
+    <capacity unit="%s">%d</capacity>
+    <target>
+         <format type='qcow2'/>
+    </target>
+    <backingStore>
+         <path>%s</path>
+         <format type='qcow2'/>
+     </backingStore>
+</volume>`
+	snapshotXML = fmt.Sprintf(snapshotXML, name, capacityUnit, capacity, backingStorePath)
+	glog.V(2).Infof("Create volume using XML description: %s", snapshotXML)
+	return _createVol(pool, snapshotXML)
+}
+
+type RBDBackend struct{}
+
+func (RBDBackend) GenerateVolXML(pool C.virStoragePoolPtr, shortName string, capacity int, capacityUnit, libvirtFilepath string) string {
+	return ""
 }
 
 func (RBDBackend) CreateVol(pool C.virStoragePoolPtr, volName string, capacity int, capacityUnit string) (C.virStorageVolPtr, error) {
+	return nil, nil
+}
+
+func (RBDBackend) CreateSnapshot(pool C.virStoragePoolPtr, name string, capacity int, capacityUnit string, backingStorePath string) (C.virStorageVolPtr, error) {
 	return nil, nil
 }
 
@@ -128,4 +146,14 @@ func RemoveVol(name string, pool C.virStoragePoolPtr) error {
 		return GetLibvirtLastError()
 	}
 	return nil
+}
+
+func _createVol(pool C.virStoragePoolPtr, volXML string) (C.virStorageVolPtr, error) {
+	cVolXML := C.CString(volXML)
+	defer C.free(unsafe.Pointer(cVolXML))
+	vol := C.virStorageVolCreateXML(pool, cVolXML, 0)
+	if vol == nil {
+		return nil, GetLibvirtLastError()
+	}
+	return vol, nil
 }

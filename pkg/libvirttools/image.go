@@ -127,6 +127,7 @@ func (i *ImageTool) PullImage(name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	libvirtFilepath := fmt.Sprintf("/var/lib/libvirt/images/%s", shortName)
 	volXML := i.storageBackend.GenerateVolXML(i.pool, shortName, 5, "G", libvirtFilepath)
 
