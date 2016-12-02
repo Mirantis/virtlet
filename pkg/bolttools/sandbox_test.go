@@ -97,7 +97,7 @@ func TestSetPodSandbox(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := b.SetPodSandbox(tc.config); err != nil {
+		if err := b.SetPodSandbox(tc.config, []byte{}); err != nil {
 			if tc.error {
 				continue
 			}
@@ -245,7 +245,7 @@ func TestRemovePodSandbox(t *testing.T) {
 		}
 
 		if tc.sandbox != nil {
-			if err := b.SetPodSandbox(tc.sandbox); err != nil {
+			if err := b.SetPodSandbox(tc.sandbox, []byte{}); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -322,7 +322,7 @@ func TestGetPodSandboxStatus(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := b.SetPodSandbox(tc.config); err != nil {
+		if err := b.SetPodSandbox(tc.config, []byte{}); err != nil {
 			t.Fatal(err)
 		}
 
@@ -517,7 +517,7 @@ func TestListPodSandbox(t *testing.T) {
 		}
 
 		for _, config := range tc.configs {
-			if err := b.SetPodSandbox(config); err != nil {
+			if err := b.SetPodSandbox(config, []byte{}); err != nil {
 				t.Fatal(err)
 			}
 		}

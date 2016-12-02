@@ -84,3 +84,6 @@ vendor
 .dirstamp
 cpplint.py
 test-driver
+
+# CNI binaries
+/contrib/images/cni/opt

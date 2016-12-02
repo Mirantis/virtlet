@@ -17,3 +17,5 @@ import:
 - package: go.universe.tf/netboot
   subpackages:
   - dhcp4
+- package: github.com/containernetworking/cni
+  version: v0.3.0
