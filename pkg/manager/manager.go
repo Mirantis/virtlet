@@ -323,6 +323,13 @@ func (v *VirtletManager) RemoveContainer(ctx context.Context, in *kubeapi.Remove
 		return nil, err
 	}
 
+	libvirtBootImagePath := "/var/lib/libvirt/images/snapshot_" + containerId
+
+	if err := v.libvirtImageTool.RemoveImage(libvirtBootImagePath); err != nil {
+		glog.Errorf("Error when removing image snapshot with path '%s': %v", libvirtBootImagePath, err)
+		return nil, err
+	}
+
 	response := &kubeapi.RemoveContainerResponse{}
 	return response, nil
 }
@@ -403,11 +410,29 @@ func (v *VirtletManager) PullImage(ctx context.Context, in *kubeapi.PullImageReq
 
 	name = stripTagFromImageName(name)
 
+	// PullPolicy is not accessible directly within remote runtime
+	// But PullImage request can be called in 2 cases:
+	// 1. PullAlways
+	// 2. PullIfNotPresent
+	// So need to check whether the image with such URL was already downloaded
+
+	imgPath, err := v.boltClient.GetImageFilepath(name)
+	if err != nil {
+		glog.Errorf("Error when pulling image '%s': %v", name, err)
+		return nil, err
+	}
+
+	if imgPath != "" {
+		// Image has been downloaded already
+		return &kubeapi.PullImageResponse{}, nil
+	}
+
 	filepath, err := v.libvirtImageTool.PullImage(name)
 	if err != nil {
 		glog.Errorf("Error when pulling image '%s': %v", name, err)
 		return nil, err
 	}
+
 	err = v.boltClient.SetImageFilepath(name, filepath)
 	if err != nil {
 		glog.Errorf("Error when setting filepath '%s' to image '%s': %v", filepath, name, err)
