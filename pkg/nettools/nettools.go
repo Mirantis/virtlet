@@ -39,18 +39,16 @@ import (
 	"github.com/containernetworking/cni/pkg/ip"
 	"github.com/containernetworking/cni/pkg/ns"
 	"github.com/containernetworking/cni/pkg/types"
-	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
 	"log"
 	"net"
+	"os/exec"
 	"syscall"
 )
 
 const (
-	tapInterfaceName         = "tap0"
-	dhcpVethContainerEndName = "dhcpveth0"
-	dhcpVethDhcpEndName      = "dhcpveth1"
-	containerBridgeName      = "br0"
+	tapInterfaceName    = "tap0"
+	containerBridgeName = "br0"
 	// Address for dhcp server internal interface
 	internalDhcpAddr = "169.254.254.2/24"
 )
@@ -263,18 +261,17 @@ func mustParseAddr(addr string) *netlink.Addr {
 	return r
 }
 
-// SetupContainerSideNetwork sets up networking in container namespace.
-// It does so by calling GrabInterfaceInfo() first, then making additional
-// network namespace for dhcp server and preparing the following network
-// interfaces:
-//   In container ns:
+// SetupContainerSideNetwork sets up networking in container
+// namespace.  It does so by calling ExtractLinkInfo() first unless
+// non-nil info argument is provided and then preparing the following
+// network interfaces in container ns:
 //     tap0      - tap interface for the VM
-//     dhcpveth0 - container end of dchp veth pair
-//     br0       - a bridge that joins tap0, dhcpveth0 and original CNI veth
-//   In dchp server ns:
-//     dhcpveth1 - dhcp server end of dhcp veth pair
-// Returns container network desciption and error, if any
-func SetupContainerSideNetwork(info *types.Result) (*ContainerNetwork, error) {
+//     br0       - a bridge that joins tap0 and original CNI veth
+// The bridge (br0) gets assigned a link-local address to be used
+// for dhcp server.
+// The function should be called from within container namespace.
+// Returns container network info (CNI Result) and error, if any
+func SetupContainerSideNetwork(info *types.Result) (*types.Result, error) {
 	contVeth, err := FindVeth()
 	if err != nil {
 		return nil, err
@@ -288,20 +285,6 @@ func SetupContainerSideNetwork(info *types.Result) (*ContainerNetwork, error) {
 	if err := StripLink(contVeth); err != nil {
 		return nil, err
 	}
-
-	keepNS := true
-	dhcpNS, err := ns.NewNS()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create dhcp namespace: %v", err)
-	}
-	defer func() {
-		if keepNS {
-			return
-		}
-		if err := dhcpNS.Close(); err != nil {
-			glog.Errorf("failed to close dhcp ns: %v", err)
-		}
-	}()
 
 	tap := &netlink.Tuntap{
 		LinkAttrs: netlink.LinkAttrs{
@@ -318,53 +301,27 @@ func SetupContainerSideNetwork(info *types.Result) (*ContainerNetwork, error) {
 		return nil, fmt.Errorf("failed to set %q up: %v", tapInterfaceName, err)
 	}
 
-	dhcpVeth := &netlink.Veth{
-		LinkAttrs: netlink.LinkAttrs{
-			Name:  dhcpVethContainerEndName,
-			Flags: net.FlagUp,
-			MTU:   contVeth.Attrs().MTU,
-		},
-		PeerName: dhcpVethDhcpEndName,
-	}
-	if err := netlink.LinkAdd(dhcpVeth); err != nil {
-		return nil, fmt.Errorf("failed to create dhcp veth pair: %v", err)
-	}
-	if err = netlink.LinkSetUp(dhcpVeth); err != nil {
-		return nil, fmt.Errorf("failed to set %q up: %v", dhcpVethContainerEndName, err)
-	}
-
-	dhcpSideVeth, err := netlink.LinkByName(dhcpVethDhcpEndName)
+	br, err := SetupBridge(containerBridgeName, []netlink.Link{contVeth, tap})
 	if err != nil {
-		return nil, fmt.Errorf("failed to find dhcp side veth before moving it: %v", err)
-	}
-
-	if err := netlink.LinkSetNsFd(dhcpSideVeth, int(dhcpNS.Fd())); err != nil {
-		return nil, fmt.Errorf("failed to move dhcp side veth to its ns: %v", err)
-	}
-
-	if err := dhcpNS.Do(func(ns.NetNS) error {
-		veth, err := netlink.LinkByName(dhcpVethDhcpEndName)
-		if err != nil {
-			return fmt.Errorf("failed to find dhcp side veth: %v", err)
-		}
-		if err = netlink.LinkSetUp(veth); err != nil {
-			return fmt.Errorf("failed to set %q up: %v", dhcpVethDhcpEndName, err)
-		}
-		if err = netlink.AddrAdd(veth, mustParseAddr(internalDhcpAddr)); err != nil {
-			return fmt.Errorf("failed to set address for dhcp side veth: %v", err)
-		}
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-
-	if _, err := SetupBridge(containerBridgeName, []netlink.Link{contVeth, tap, dhcpVeth}); err != nil {
 		return nil, fmt.Errorf("failed to create bridge: %v", err)
 	}
 
-	keepNS = true
-	return &ContainerNetwork{
-		Info:   info,
-		DhcpNS: dhcpNS,
-	}, nil
+	if err = netlink.AddrAdd(br, mustParseAddr(internalDhcpAddr)); err != nil {
+		return nil, fmt.Errorf("failed to set address for the bridge: %v", err)
+	}
+
+	// block DHCP traffic from/to CNI-provided link
+	for _, item := range []struct{ chain, opt string }{
+		// dhcp responses originate from bridge itself
+		{"OUTPUT", "--ip-source-port"},
+		// dhcp requests originate from the VM
+		{"FORWARD", "--ip-destination-port"},
+	} {
+		if out, err := exec.Command("ebtables", "-A", item.chain, "-p", "IPV4", "--ip-protocol", "UDP",
+			item.opt, "67", "--out-if", contVeth.Attrs().Name, "-j", "DROP").CombinedOutput(); err != nil {
+			return nil, fmt.Errorf("ebtables failed: %v\nOut:\n%s", err, out)
+		}
+	}
+
+	return info, nil
 }

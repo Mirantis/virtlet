@@ -54,9 +54,15 @@ var expectedExtractedLinkInfo = types.Result{
 func withTempNetNS(t *testing.T, toRun func(ns ns.NetNS)) {
 	ns, err := ns.NewNS()
 	if err != nil {
-		t.Fatalf("Error creating network namespace: %v", err)
+		t.Errorf("Error creating network namespace: %v", err)
+		return
 	}
 	defer func() {
+		// We use log.Panicf() instead of t.Fatalf() in these tests
+		// because ns.Do() uses separate goroutine
+		if r := recover(); r != nil {
+			t.Fatal(r)
+		}
 		if err = ns.Close(); err != nil {
 			t.Fatalf("Error closing network namespace: %v", err)
 		}
@@ -82,7 +88,7 @@ func withHostAndContNS(t *testing.T, toRun func(hostNS, contNS ns.NetNS)) {
 func verifyLinkUp(t *testing.T, name, title string) netlink.Link {
 	link, err := netlink.LinkByName(name)
 	if err != nil {
-		t.Fatalf("cannot locate link: %s", title)
+		log.Panicf("cannot locate link: %s", title)
 	}
 	if link.Attrs().Flags&net.FlagUp == 0 {
 		t.Errorf("link should be up, but it's down: %s", title)
@@ -98,7 +104,7 @@ func verifyNoLink(t *testing.T, name, title string) {
 
 func verifyBridgeMember(t *testing.T, name, title string, bridge netlink.Link) netlink.Link {
 	if bridge.Type() != "bridge" {
-		t.Fatalf("link %q is not a bridge", bridge.Attrs().Name)
+		log.Panicf("link %q is not a bridge", bridge.Attrs().Name)
 	}
 	link := verifyLinkUp(t, name, title)
 	if link.Attrs().MasterIndex != bridge.Attrs().Index {
@@ -111,7 +117,7 @@ func TestEscapePair(t *testing.T) {
 	withHostAndContNS(t, func(hostNS, contNS ns.NetNS) {
 		hostVeth, contVeth, err := CreateEscapeVethPair(contNS, "esc0", 1500)
 		if err != nil {
-			t.Fatalf("Error creating escape veth pair: %v", err)
+			log.Panicf("Error creating escape veth pair: %v", err)
 		}
 		// need to force hostNS here because of side effects of NetNS.Do()
 		// See https://github.com/vishvananda/netns/issues/17
@@ -139,7 +145,7 @@ func makeTestVeth(t *testing.T, base string, index int) netlink.Link {
 		PeerName: "p" + name,
 	}
 	if err := netlink.LinkAdd(veth); err != nil {
-		t.Fatalf("failed to create veth: %v", err)
+		log.Panicf("failed to create veth: %v", err)
 	}
 
 	return veth
@@ -148,10 +154,10 @@ func makeTestVeth(t *testing.T, base string, index int) netlink.Link {
 func makeTestBridge(t *testing.T, name string, links []netlink.Link) *netlink.Bridge {
 	br, err := SetupBridge(name, links)
 	if err != nil {
-		t.Fatalf("failed to create first bridge: %v", err)
+		log.Panicf("failed to create first bridge: %v", err)
 	}
 	if br.Attrs().Name != name {
-		t.Fatalf("bad bridge name: %q instead of %q", br.Attrs().Name, name)
+		log.Panicf("bad bridge name: %q instead of %q", br.Attrs().Name, name)
 	}
 	verifyLinkUp(t, name, "bridge")
 	return br
@@ -196,7 +202,7 @@ func parseAddr(addr string) *netlink.Addr {
 
 func addTestRoute(t *testing.T, route *netlink.Route) {
 	if err := netlink.RouteAdd(route); err != nil {
-		t.Fatalf("Failed to add route %#v: %v", route, err)
+		log.Panicf("Failed to add route %#v: %v", route, err)
 	}
 }
 
@@ -204,22 +210,22 @@ func withFakeCNIVeth(t *testing.T, toRun func(hostNS, contNS ns.NetNS, origHostV
 	withHostAndContNS(t, func(hostNS, contNS ns.NetNS) {
 		origHostVeth, origContVeth, err := CreateEscapeVethPair(contNS, "eth0", 1500)
 		if err != nil {
-			t.Fatalf("failed to create veth pair: %v", err)
+			log.Panicf("failed to create veth pair: %v", err)
 		}
 		// need to force hostNS here because of side effects of NetNS.Do()
 		// See https://github.com/vishvananda/netns/issues/17
 		hostNS.Do(func(ns.NetNS) error {
 			if err = netlink.LinkSetUp(origHostVeth); err != nil {
-				t.Fatalf("failed to bring up origHostVeth: %v", err)
+				log.Panicf("failed to bring up origHostVeth: %v", err)
 			}
 			return nil
 		})
 		contNS.Do(func(ns.NetNS) error {
 			if err = netlink.LinkSetUp(origContVeth); err != nil {
-				t.Fatalf("failed to bring up origContVeth: %v", err)
+				log.Panicf("failed to bring up origContVeth: %v", err)
 			}
 			if err = netlink.AddrAdd(origContVeth, parseAddr("10.1.90.5/24")); err != nil {
-				t.Fatalf("failed to add addr for origContVeth: %v", err)
+				log.Panicf("failed to add addr for origContVeth: %v", err)
 			}
 
 			gwAddr := parseAddr("169.254.1.1/32")
@@ -260,7 +266,7 @@ func TestFindVeth(t *testing.T) {
 	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
 		contVeth, err := FindVeth()
 		if err != nil {
-			t.Fatalf("FindVeth() failed: %v", err)
+			log.Panicf("FindVeth() failed: %v", err)
 		}
 
 		if contVeth.Attrs().Index != origContVeth.Attrs().Index {
@@ -272,7 +278,7 @@ func TestFindVeth(t *testing.T) {
 func TestStripLink(t *testing.T) {
 	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
 		if err := StripLink(origContVeth); err != nil {
-			t.Fatalf("StripLink() failed: %v", err)
+			log.Panicf("StripLink() failed: %v", err)
 		}
 		verifyNoAddressAndRoutes(t, origContVeth)
 	})
@@ -282,7 +288,7 @@ func TestExtractLinkInfo(t *testing.T) {
 	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
 		info, err := ExtractLinkInfo(origContVeth)
 		if err != nil {
-			t.Fatalf("failed to grab interface info: %v", err)
+			log.Panicf("failed to grab interface info: %v", err)
 		}
 		if !reflect.DeepEqual(*info, expectedExtractedLinkInfo) {
 			t.Errorf("interface info mismatch. Expected:\n%s\nActual:\n%s",
@@ -292,14 +298,13 @@ func TestExtractLinkInfo(t *testing.T) {
 }
 
 func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, info *types.Result) {
-	containerNetwork, err := SetupContainerSideNetwork(info)
+	returnedInfo, err := SetupContainerSideNetwork(info)
 	if err != nil {
-		t.Fatalf("failed to set up container side network: %v", err)
+		log.Panicf("failed to set up container side network: %v", err)
 	}
-	defer containerNetwork.DhcpNS.Close()
-	if !reflect.DeepEqual(*containerNetwork.Info, expectedExtractedLinkInfo) {
+	if !reflect.DeepEqual(*returnedInfo, expectedExtractedLinkInfo) {
 		t.Errorf("interface info mismatch. Expected:\n%s\nActual:\n%s",
-			spew.Sdump(expectedExtractedLinkInfo), spew.Sdump(*containerNetwork.Info))
+			spew.Sdump(expectedExtractedLinkInfo), spew.Sdump(*returnedInfo))
 	}
 	verifyNoAddressAndRoutes(t, origContVeth)
 
@@ -309,25 +314,17 @@ func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, info *t
 	if tap.Type() != "tun" {
 		t.Errorf("tap0 interface must have type tun, but has %q instead", tap.Type())
 	}
-	dhcpContainerSideVeth := verifyBridgeMember(t, "dhcpveth0", "dhcpveth0", bridge)
-	if dhcpContainerSideVeth.Type() != "veth" {
-		t.Errorf("dhcpveth0 interface must have type veth, but has %q instead", dhcpContainerSideVeth.Type())
-	}
-	containerNetwork.DhcpNS.Do(func(ns.NetNS) error {
-		link := verifyLinkUp(t, "dhcpveth1", "dhcp server veth")
-		addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
-		if err != nil {
-			t.Errorf("failed to get addresses for dhcp-side veth: %v", err)
-		}
-		expectedAddr := "169.254.254.2/24 dhcpveth1"
-		if len(addrs) != 1 {
-			t.Errorf("dhcp-side veth should have exactly one address, but got this instead: %v", spew.Sdump(addrs))
-		} else if addrs[0].String() != expectedAddr {
-			t.Errorf("bad dhcp-side veth address %q (expected %q)", addrs[0].String(), expectedAddr)
-		}
 
-		return nil
-	})
+	addrs, err := netlink.AddrList(bridge, netlink.FAMILY_V4)
+	if err != nil {
+		t.Errorf("failed to get addresses for dhcp-side veth: %v", err)
+	}
+	expectedAddr := "169.254.254.2/24 br0"
+	if len(addrs) != 1 {
+		t.Errorf("br0 should have exactly one address, but got this instead: %v", spew.Sdump(addrs))
+	} else if addrs[0].String() != expectedAddr {
+		t.Errorf("bad br0 address %q (expected %q)", addrs[0].String(), expectedAddr)
+	}
 }
 
 func TestSetUpContainerSideNetwork(t *testing.T) {
@@ -339,7 +336,7 @@ func TestSetUpContainerSideNetwork(t *testing.T) {
 func TestSetUpContainerSideNetworkWithInfo(t *testing.T) {
 	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
 		if err := StripLink(origContVeth); err != nil {
-			t.Fatalf("StripLink() failed: %v", err)
+			log.Panicf("StripLink() failed: %v", err)
 		}
 		verifyContainerSideNetwork(t, origContVeth, &expectedExtractedLinkInfo)
 	})
