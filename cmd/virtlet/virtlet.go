@@ -53,5 +53,6 @@ func main() {
 	glog.V(1).Infof("Starting server on socket %s", *listen)
 	if err = server.Serve(*listen); err != nil {
 		glog.Errorf("Serving failed: %v", err)
+		os.Exit(1)
 	}
 }
