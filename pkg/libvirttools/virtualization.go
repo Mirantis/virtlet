@@ -199,6 +199,21 @@ var volXML string = `
     <target dev='vda' bus='virtio'/>
 </disk>`
 
+func (v *VirtualizationTool) createBootImageSnapshot(imageName, backingStorePath string) (string, error) {
+	vol, err := v.volumeStorage.CreateSnapshot(v.volumePool, imageName, defaultCapacity, defaultCapacityUnit, backingStorePath )
+
+	if err != nil {
+		return "", err
+	}
+	path, err := VolGetPath(vol)
+
+	if err != nil {
+		return "", err
+	}
+
+	return path, err
+}
+
 func (v *VirtualizationTool) createVolumes(containerName string, mounts []*kubeapi.Mount, domXML string) (string, error) {
 	copyDomXML := domXML
 	if len(mounts) == 0 {
@@ -314,7 +329,12 @@ func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, i
 	cpuPeriod := config.GetLinux().GetResources().GetCpuPeriod()
 	cpuQuota := config.GetLinux().GetResources().GetCpuQuota()
 
-	domXML := generateDomXML(canUseKvm(), name, memory, memoryUnit, uuid, cpuNum, cpuShares, cpuPeriod, cpuQuota, imageFilepath)
+	snapshotImage, err := v.createBootImageSnapshot("snapshot_" + uuid, imageFilepath)
+	if err != nil {
+		return "", err
+	}
+
+	domXML := generateDomXML(canUseKvm(), name, memory, memoryUnit, uuid, cpuNum, cpuShares, cpuPeriod, cpuQuota, snapshotImage)
 	domXML, err = v.createVolumes(name, in.Config.Mounts, domXML)
 	if err != nil {
 		return "", err
