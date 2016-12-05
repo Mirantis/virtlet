@@ -17,7 +17,6 @@ limitations under the License.
 package integration
 
 import (
-	"encoding/json"
 	"fmt"
 	"net"
 	"testing"
