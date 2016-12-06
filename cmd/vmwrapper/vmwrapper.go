@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"net"
 	"os"
 	"os/exec"
 
@@ -33,31 +32,66 @@ import (
 )
 
 const (
-	nsEnvVar         = "VIRTLET_NS"
-	peerHwAddrEnvVar = "VIRTLET_HWADDR"
-	cniConfigEnvVar  = "VIRTLET_CNI_CONFIG"
+	defaultEmulator = "/usr/bin/qemu-system-x86_64" // FIXME
+	emulatorVar     = "VIRTLET_EMULATOR"
+	nsEnvVar        = "VIRTLET_NS"
+	cniConfigEnvVar = "VIRTLET_CNI_CONFIG"
 )
+
+func runCommand(name string, args []string) error {
+	cmd := exec.Command(name, args...)
+	cmd.Stdin = os.Stdin
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start %q: %v", name, err)
+	}
+	if err := cmd.Wait(); err != nil {
+		return fmt.Errorf("failed to run %q: %v", name, err)
+	}
+	return nil
+}
+
+func runCommandIfExists(path string, args []string) error {
+	_, err := os.Stat(path)
+	switch {
+	case err == nil:
+		return runCommand(path, args)
+	case os.IsNotExist(err):
+		return nil
+	default:
+		return fmt.Errorf("os.Stat(): %v", err)
+	}
+}
 
 func main() {
 	var info *types.Result
 
-	// XXX: rm
-	flag.Set("v", "3")
-	flag.Set("alsologtostderr", "true")
+	emulatorArgs := os.Args[1:]
+
+	// FIXME
+	os.Args = []string{os.Args[0], "-v=3", "-alsologtostderr=true"}
 	flag.Parse()
 
-	if len(os.Args) < 2 {
-		glog.Errorf("must specify emulator executable")
-		os.Exit(1)
-	}
-	emulator := os.Args[1]
-	emulatorArgs := os.Args[2:]
-
+	emulator := os.Getenv(emulatorVar)
 	nsPath := os.Getenv(nsEnvVar)
-	if nsPath == "" {
-		glog.Errorf("must specify VIRTLET_NS")
-		os.Exit(1)
+
+	if emulator == "" || nsPath == "" {
+		// this happens during qemu -help invocation by virtlet
+		// (capability check)
+		// TODO: only do this when *all* above vars are empty
+		// TODO: use per-emulator symlinks to vmwrapper to determine
+		// the necessary binary instead of using fixed defaultEmulator
+		// here
+		if err := runCommand(defaultEmulator, emulatorArgs); err != nil {
+			glog.Errorf("emulator %q failed: %v", defaultEmulator, err)
+			os.Exit(1)
+		}
+		return
 	}
+
+	// TODO: rm
+	runCommandIfExists("/vmwrapper-entry.sh", append([]string{emulator, nsPath, os.Getenv(cniConfigEnvVar)}, emulatorArgs...))
 
 	vmNS, err := ns.GetNS(nsPath)
 	if err != nil {
@@ -65,14 +99,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	peerHwAddrStr := os.Getenv(peerHwAddrEnvVar)
-	if peerHwAddrStr == "" {
-		glog.Errorf("must specify VIRTLET_HWADDR")
-		os.Exit(1)
-	}
-	peerHwAddr, err := net.ParseMAC(peerHwAddrStr)
+	peerHwAddr, err := nettools.GenerateMacAddress()
 	if err != nil {
-		glog.Errorf("bad hwaddr in VIRTLET_HWADDR")
+		glog.Errorf("failed to generate mac address: %v", err)
 		os.Exit(1)
 	}
 
@@ -83,6 +112,14 @@ func main() {
 			os.Exit(1)
 		}
 	}
+
+	// TODO: rm
+	runHook := func(name string) {
+		if err := runCommandIfExists(name, append([]string{emulator, nsPath, os.Getenv(cniConfigEnvVar)}, emulatorArgs...)); err != nil {
+			glog.Errorf("hook %q: %v", name, err)
+		}
+	}
+	runHook("/vmwrapper-pre-ns.sh")
 
 	if err := vmNS.Do(func(ns.NetNS) error {
 		info, err = nettools.SetupContainerSideNetwork(info)
@@ -98,19 +135,24 @@ func main() {
 			return fmt.Errorf("failed to set up dhcp listener: %v", err)
 		}
 
+		runHook("/vmwrapper-pre-qemu.sh")
+
 		errCh := make(chan error)
 		go func() {
-			errCh <- dhcpServer.Serve()
+			// FIXME: do this cleaner
+			errCh <- vmNS.Do(func(ns.NetNS) error {
+				return dhcpServer.Serve()
+			})
 		}()
 
-		cmd := exec.Command(emulator, emulatorArgs...)
-		cmd.Stdin = os.Stdin
-		cmd.Stderr = os.Stderr
-		cmd.Stdout = os.Stdout
-		if err := cmd.Start(); err != nil {
-			return fmt.Errorf("failed to start %q: %v", emulator, err)
+		netArgs := []string{
+			"-netdev",
+			"tap,id=tap0,ifname=tap0,script=no,downscript=no",
+			"-device",
+			"virtio-net-pci,netdev=tap0,id=net0,mac=" + peerHwAddr.String(),
 		}
-		err := cmd.Wait()
+		err := runCommand(emulator, append(emulatorArgs, netArgs...))
+
 		select {
 		case dhcpErr := <-errCh:
 			if dhcpErr == nil {
@@ -121,8 +163,10 @@ func main() {
 		default:
 		}
 
+		runHook("/vmwrapper-after-qemu.sh")
+
 		if err != nil {
-			return fmt.Errorf("%q failed: %v", emulator, err)
+			return err
 		}
 
 		return nil
