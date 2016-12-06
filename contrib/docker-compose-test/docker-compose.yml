@@ -14,7 +14,7 @@ services:
       - /var/run/netns:/var/run/netns:shared
   virtlet_test:
     image: virtlet_build
-    # 'privileged' is necessary for network namespaces
+    # 'privileged' is necessary here for network management
     privileged: true
     environment:
       - VIRTLET_LOGLEVEL=3
