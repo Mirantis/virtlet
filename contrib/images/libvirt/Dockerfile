@@ -10,11 +10,15 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
 		libvirt-bin \
 		python-libvirt \
 		ceph-common \
+                netbase \
+                ebtables \
 	&& apt-get clean
 
 COPY cleanup.py /cleanup.py
 COPY start.sh /start.sh
 COPY libvirt.conf /etc/libvirt/libvirtd.conf
 COPY qemu.conf /etc/libvirt/qemu.conf
+COPY _output/vmwrapper /
+
 
 CMD ["/start.sh"]

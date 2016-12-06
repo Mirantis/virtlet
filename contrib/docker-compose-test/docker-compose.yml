@@ -12,7 +12,7 @@ services:
       - /sys/fs/cgroup:/sys/fs/cgroup
       - libvirt_volume_pool:/var/lib/virtlet
   virtlet_test:
-    build: ../..
+    image: virtlet_build
     # 'privileged' is necessary for network namespaces
     privileged: true
     environment:
@@ -28,7 +28,7 @@ services:
       - libvirt
     links:
       - "libvirt:libvirt"
-    command: "/bin/bash -c 'if ! make check; then find . -name test-suite.log | xargs cat; exit 1; fi'"
+    command: "/bin/bash -c './autogen.sh && ./configure && make && make install && if ! make check; then find . -name test-suite.log | xargs cat; exit 1; fi'"
   virtlet:
     build: ../..
     privileged: true

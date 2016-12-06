@@ -17,6 +17,8 @@ function dcompose {
 }
 
 ( cd contrib/images/cni ; ./prepare.sh )
+build/cmd.sh build
+build/cmd.sh copy
 
 dcompose build
 dcompose run virtlet_test
