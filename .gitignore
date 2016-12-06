@@ -87,3 +87,6 @@ test-driver
 
 # CNI binaries
 /contrib/images/cni/opt
+
+# build output
+_output

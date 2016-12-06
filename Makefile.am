@@ -27,8 +27,9 @@ TESTS = $(check_SCRIPTS)
 
 all:
 	if [ ! -d vendor ]; then $(MAKE) install-vendor; fi
-	go build -o $(builddir)/virtlet ./cmd/virtlet
-	go build -o $(builddir)/vmwrapper ./cmd/vmwrapper
+	mkdir -p $(builddir)/_output $(builddir)/contrib/images/libvirt/_output
+	go build -o $(builddir)/_output/virtlet ./cmd/virtlet
+	go build -o $(builddir)/contrib/images/libvirt/_output/vmwrapper ./cmd/vmwrapper
 
 verify-glide-installation:
 	@which glide || go get github.com/Masterminds/glide
@@ -42,6 +43,6 @@ update-vendor: verify-glide-installation
 clean-local:
 	rm -f $(builddir)/virtlet
 
+# need virtlet binary for integration tests
 install-exec-local:
-	install $(builddir)/virtlet $(bindir)/virtlet
-	install $(builddir)/vmwrapper $(bindir)/vmwrapper
+	install $(builddir)/_output/virtlet $(bindir)/virtlet
