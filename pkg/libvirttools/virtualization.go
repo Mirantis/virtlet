@@ -25,6 +25,7 @@ package libvirttools
 import "C"
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"reflect"
@@ -99,6 +100,18 @@ type Domain struct {
 	Items   []Tag    `xml:",any"`
 }
 
+type CommandLine struct {
+	XMLName xml.Name     `xml:"http://libvirt.org/schemas/domain/qemu/1.0 commandline"`
+	Args    []string     `xml:"http://libvirt.org/schemas/domain/qemu/1.0 arg"`
+	Env     []CommandEnv `xml:"http://libvirt.org/schemas/domain/qemu/1.0 env"`
+}
+
+type CommandEnv struct {
+	XMLName xml.Name `xml:"http://libvirt.org/schemas/domain/qemu/1.0 env"`
+	Name    string   `xml:"name,attr"`
+	Value   string   `xml:"value,attr"`
+}
+
 type Input struct {
 	Type string `xml:"type,attr"`
 	Bus  string `xml:"bus,attr"`
@@ -140,13 +153,18 @@ func canUseKvm() bool {
 	return true
 }
 
-func generateDomXML(useKvm bool, name string, memory int64, memoryUnit string, uuid string, cpuNum int, cpuShare int64, cpuPeriod int64, cpuQuota int64, imageFilepath string) string {
+func generateDomXML(useKvm bool, name string, memory int64, memoryUnit string, uuid string, cpuNum int, cpuShare int64, cpuPeriod int64, cpuQuota int64, imageFilepath, netNSPath, cniConfig string) string {
 	domainType := defaultDomainType
 	emulator := defaultEmulator
 	if !useKvm {
 		domainType = noKvmDomainType
 		emulator = noKvmEmulator
 	}
+	var buf bytes.Buffer
+	if err := xml.EscapeText(&buf, []byte(cniConfig)); err != nil {
+		glog.Errorf("EscapeText() failed: %v", err)
+	}
+	cniConfigEscaped := buf.String()
 	domXML := `
 <domain type='%s'>
     <name>%s</name>
@@ -169,7 +187,7 @@ func generateDomXML(useKvm bool, name string, memory int64, memoryUnit string, u
     <on_reboot>restart</on_reboot>
     <on_crash>restart</on_crash>
     <devices>
-        <emulator>%s</emulator>
+        <emulator>/vmwrapper</emulator>
         <disk type='file' device='disk'>
             <driver name='qemu' type='qcow2'/>
             <source file='%s'/>
@@ -188,8 +206,13 @@ func generateDomXML(useKvm bool, name string, memory int64, memoryUnit string, u
             <model type='cirrus'/>
         </video>
     </devices>
+    <commandline xmlns='http://libvirt.org/schemas/domain/qemu/1.0'>
+      <env name='VIRTLET_EMULATOR' value='%s'/>
+      <env name='VIRTLET_NS' value='%s'/>
+      <env name='VIRTLET_CNI_CONFIG' value='%s'/>
+    </commandline>
 </domain>`
-	return fmt.Sprintf(domXML, domainType, name, uuid, memoryUnit, memory, cpuNum, cpuShare, cpuPeriod, cpuQuota, emulator, imageFilepath)
+	return fmt.Sprintf(domXML, domainType, name, uuid, memoryUnit, memory, cpuNum, cpuShare, cpuPeriod, cpuQuota, imageFilepath, emulator, netNSPath, cniConfigEscaped)
 }
 
 var volXML string = `
@@ -200,7 +223,7 @@ var volXML string = `
 </disk>`
 
 func (v *VirtualizationTool) createBootImageSnapshot(imageName, backingStorePath string) (string, error) {
-	vol, err := v.volumeStorage.CreateSnapshot(v.volumePool, imageName, defaultCapacity, defaultCapacityUnit, backingStorePath )
+	vol, err := v.volumeStorage.CreateSnapshot(v.volumePool, imageName, defaultCapacity, defaultCapacityUnit, backingStorePath)
 
 	if err != nil {
 		return "", err
@@ -283,7 +306,7 @@ func NewVirtualizationTool(conn C.virConnectPtr, poolName string, storageBackend
 	return &VirtualizationTool{conn: conn, volumeStorage: storageBackend, volumePool: pool, volumePoolName: poolName}, nil
 }
 
-func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, in *kubeapi.CreateContainerRequest, imageFilepath string) (string, error) {
+func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, in *kubeapi.CreateContainerRequest, imageFilepath, netNSPath, cniConfig string) (string, error) {
 	uuid, err := utils.NewUuid()
 	if err != nil {
 		return "", err
@@ -329,12 +352,12 @@ func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, i
 	cpuPeriod := config.GetLinux().GetResources().GetCpuPeriod()
 	cpuQuota := config.GetLinux().GetResources().GetCpuQuota()
 
-	snapshotImage, err := v.createBootImageSnapshot("snapshot_" + uuid, imageFilepath)
+	snapshotImage, err := v.createBootImageSnapshot("snapshot_"+uuid, imageFilepath)
 	if err != nil {
 		return "", err
 	}
 
-	domXML := generateDomXML(canUseKvm(), name, memory, memoryUnit, uuid, cpuNum, cpuShares, cpuPeriod, cpuQuota, snapshotImage)
+	domXML := generateDomXML(canUseKvm(), name, memory, memoryUnit, uuid, cpuNum, cpuShares, cpuPeriod, cpuQuota, snapshotImage, netNSPath, cniConfig)
 	domXML, err = v.createVolumes(name, in.Config.Mounts, domXML)
 	if err != nil {
 		return "", err

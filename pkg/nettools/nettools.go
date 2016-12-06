@@ -36,14 +36,16 @@ package nettools
 import (
 	"errors"
 	"fmt"
+	"log"
+	"math/rand"
+	"net"
+	"os/exec"
+	"syscall"
+
 	"github.com/containernetworking/cni/pkg/ip"
 	"github.com/containernetworking/cni/pkg/ns"
 	"github.com/containernetworking/cni/pkg/types"
 	"github.com/vishvananda/netlink"
-	"log"
-	"net"
-	"os/exec"
-	"syscall"
 )
 
 const (
@@ -324,4 +326,21 @@ func SetupContainerSideNetwork(info *types.Result) (*types.Result, error) {
 	}
 
 	return info, nil
+}
+
+// copied from:
+// https://github.com/coreos/rkt/blob/56564bac090b44788684040f2ffd66463f29d5d0/stage1/init/kvm/network.go#L71
+func GenerateMacAddress() (net.HardwareAddr, error) {
+	mac := net.HardwareAddr{
+		2,          // locally administred unicast
+		0x65, 0x02, // OUI (randomly chosen by jell)
+		0, 0, 0, // bytes to randomly overwrite
+	}
+
+	_, err := rand.Read(mac[3:6])
+	if err != nil {
+		return nil, fmt.Errorf("cannot generate random mac address: %v", err)
+	}
+
+	return mac, nil
 }
