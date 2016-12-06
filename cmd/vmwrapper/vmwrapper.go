@@ -84,39 +84,38 @@ func main() {
 		// the necessary binary instead of using fixed defaultEmulator
 		// here
 		if err := runCommand(defaultEmulator, emulatorArgs); err != nil {
-			glog.Errorf("emulator %q failed: %v", defaultEmulator, err)
+			glog.Errorf("Emulator %q failed: %v", defaultEmulator, err)
 			os.Exit(1)
 		}
 		return
 	}
 
-	// TODO: rm
 	runCommandIfExists("/vmwrapper-entry.sh", append([]string{emulator, nsPath, os.Getenv(cniConfigEnvVar)}, emulatorArgs...))
 
 	vmNS, err := ns.GetNS(nsPath)
 	if err != nil {
-		glog.Errorf("failed to open network namespace at %q: %v", nsPath, err)
+		glog.Errorf("Failed to open network namespace at %q: %v", nsPath, err)
 		os.Exit(1)
 	}
 
 	peerHwAddr, err := nettools.GenerateMacAddress()
 	if err != nil {
-		glog.Errorf("failed to generate mac address: %v", err)
+		glog.Errorf("Failed to generate mac address: %v", err)
 		os.Exit(1)
 	}
 
 	cniConfig := os.Getenv(cniConfigEnvVar)
 	if cniConfig != "" {
 		if err := json.Unmarshal([]byte(cniConfig), &info); err != nil {
-			glog.Errorf("failed to unmarshal cni config: %v", err)
+			glog.Errorf("Failed to unmarshal cni config: %v", err)
 			os.Exit(1)
 		}
 	}
 
-	// TODO: rm
+	// TODO: use cleaner way to do this
 	runHook := func(name string) {
 		if err := runCommandIfExists(name, append([]string{emulator, nsPath, os.Getenv(cniConfigEnvVar)}, emulatorArgs...)); err != nil {
-			glog.Errorf("hook %q: %v", name, err)
+			glog.Errorf("Hook %q: %v", name, err)
 		}
 	}
 	runHook("/vmwrapper-pre-ns.sh")
@@ -156,9 +155,9 @@ func main() {
 		select {
 		case dhcpErr := <-errCh:
 			if dhcpErr == nil {
-				glog.Errorf("dhcp server self-exited with nil error")
+				glog.Errorf("DHCP server self-exited with nil error")
 			} else {
-				glog.Errorf("dhcp server failed: %v", dhcpErr)
+				glog.Errorf("DHCP server failed: %v", dhcpErr)
 			}
 		default:
 		}
@@ -171,7 +170,7 @@ func main() {
 
 		return nil
 	}); err != nil {
-		glog.Error(err)
+		glog.Error("Error occurred while in VM network namespace: %s", err)
 		os.Exit(1)
 	}
 }

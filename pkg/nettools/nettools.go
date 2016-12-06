@@ -258,7 +258,7 @@ func ExtractLinkInfo(link netlink.Link) (*types.Result, error) {
 func mustParseAddr(addr string) *netlink.Addr {
 	r, err := netlink.ParseAddr(addr)
 	if err != nil {
-		log.Panicf("failed to parse address %q: %v", addr, err)
+		log.Panicf("Failed to parse address %q: %v", addr, err)
 	}
 	return r
 }
