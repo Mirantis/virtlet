@@ -253,6 +253,7 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 		return nil, err
 	}
 
+	// TODO: get it as string
 	netAsBytes, err := v.boltClient.GetPodNetworkConfigurationAsBytes(podSandboxId)
 	if err != nil {
 		glog.Errorf("Error when retrieving pod network configuration for sandbox '%s': %v", podSandboxId, err)
@@ -271,7 +272,7 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 	// TODO: we should not pass whole "in" to CreateContainer - we should pass there only needed info for CreateContainer
 	// without whole data container
 	// TODO: use network configuration by CreateContainer
-	uuid, err := v.libvirtVirtualizationTool.CreateContainer(v.boltClient, in, imageFilepath)
+	uuid, err := v.libvirtVirtualizationTool.CreateContainer(v.boltClient, in, imageFilepath, netNSPath, string(netAsBytes))
 	if err != nil {
 		glog.Errorf("Error when creating container %s: %v", name, err)
 		return nil, err
