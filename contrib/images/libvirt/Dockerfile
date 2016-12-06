@@ -20,5 +20,9 @@ COPY libvirt.conf /etc/libvirt/libvirtd.conf
 COPY qemu.conf /etc/libvirt/qemu.conf
 COPY _output/vmwrapper /
 
+# uncomment to add vmwrapper hook scripts
+# COPY vmwrapper-entry.sh /
+COPY vmwrapper-pre-qemu.sh /
+# COPY /vmwrapper-after-qemu.sh
 
 CMD ["/start.sh"]
