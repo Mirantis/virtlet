@@ -24,7 +24,7 @@ import (
 )
 
 type Config struct {
-	// TODO :don't use CNI result type here
+	// TODO: don't use CNI result type here
 	CNIResult           types.Result
 	PeerHardwareAddress net.HardwareAddr
 }
