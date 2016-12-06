@@ -143,6 +143,10 @@ func (s *Server) prepareResponse(pkt *dhcp4.Packet, serverIP net.IP, mt dhcp4.Me
 		return nil, fmt.Errorf("unexpected packet from %v", pkt.HardwareAddr)
 	}
 
+	if s.config.CNIResult.IP4 == nil {
+		return nil, fmt.Errorf("IP4 is not specified in CNI config")
+	}
+
 	p := &dhcp4.Packet{
 		Type:          mt,
 		TransactionID: pkt.TransactionID,
