@@ -11,7 +11,7 @@ services:
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup
       - libvirt_volume_pool:/var/lib/virtlet
-      - /var/run/netns:/var/run/netns:shared
+      - /var/lib/virtlet_netns:/var/run/netns:shared
   virtlet_test:
     image: virtlet_build
     # 'privileged' is necessary here for network management
@@ -23,7 +23,7 @@ services:
       - /lib/modules:/lib/modules:ro
       - /boot:/boot:ro
       - libvirt_volume_pool:/var/lib/virtlet
-      - /var/run/netns:/var/run/netns:shared
+      - /var/lib/virtlet_netns:/var/run/netns:shared
     volumes_from:
       - cni
     depends_on:
@@ -42,7 +42,7 @@ services:
       - /boot:/boot:ro
       - libvirt_volume_pool:/var/lib/virtlet
       - virtlet_run:/run
-      - /var/run/netns:/var/run/netns:shared
+      - /var/lib/virtlet_netns:/var/run/netns:shared
     volumes_from:
       - cni
     depends_on:
