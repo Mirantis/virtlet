@@ -16,12 +16,11 @@ function dcompose {
     docker-compose -f contrib/docker-compose-test/docker-compose.yml "$@"
 }
 
-( cd contrib/images/cni ; ./prepare.sh )
 build/cmd.sh build
 build/cmd.sh copy
+build/cmd.sh test
 
-dcompose build
-dcompose run virtlet_test
 dcompose down -v
+dcompose build
 dcompose run e2e_test
 dcompose down -v

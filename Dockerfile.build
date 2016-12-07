@@ -1,25 +1,33 @@
 FROM ubuntu:16.04
-MAINTAINER Michal Rostecki <mrostecki@mirantis.com>
+MAINTAINER Ivan Shvedunov <ishvedunov@mirantis.com>
 LABEL Name="virtlet" Version="0.1"
 
-# TODO: dhcpcd5, ebtables and tcpdump are only needed for integration tests
-RUN apt-get update \
-	&& DEBIAN_FRONTEND=noninteractive apt-get install -y \
+# build container should be able to run libvirt because it's used for integration tests
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
                 git \
-		golang \
-		make \
-		autoconf \
-		automake \
-		libglib2.0-dev \
-		libvirt-dev \
-		libguestfs-dev \
-		libguestfs0-dbg \
-		libguestfs-tools \
-		iptables \
+                golang \
+                make \
+                autoconf \
+                automake \
+                libglib2.0-dev \
+                libvirt-dev \
+                libguestfs-dev \
+                libguestfs0-dbg \
+                libguestfs-tools \
+                iptables \
                 ebtables \
                 dhcpcd5 \
                 tcpdump \
-	&& apt-get clean
+                iproute2 \
+                openssl \
+                qemu-kvm \
+                qemu-system-x86 \
+                libvirt-bin \
+                python-libvirt \
+                ceph-common \
+                netbase && \
+    apt-get clean
 
 ENV GOPATH /go
 ENV PATH $GOPATH/bin:/usr/local/go/bin:$PATH
@@ -32,7 +40,11 @@ COPY . /go/src/github.com/Mirantis/virtlet
 
 WORKDIR /go/src/github.com/Mirantis/virtlet
 
-RUN mkdir -p ~/.ssh \
-	&& ssh-keyscan github.com >> ~/.ssh/known_hosts
+RUN mkdir -p ~/.ssh && \
+    ssh-keyscan github.com >> ~/.ssh/known_hosts && \
+    mkdir -p /var/data/virtlet /var/lib/virtlet /opt/cni/bin && \
+    curl -L https://github.com/containernetworking/cni/releases/download/v0.3.0/cni-v0.3.0.tgz | \
+      tar zxC /opt/cni/bin && \
+    ln -s /go/src/github.com/Mirantis/virtlet/_output/vmwrapper /vmwrapper
 
-RUN mkdir -p /var/data/virtlet
+COPY image_skel /.

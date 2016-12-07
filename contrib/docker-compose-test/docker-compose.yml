@@ -1,54 +1,31 @@
 version: '2'
 services:
-  cni:
-    build: ../images/cni
-  libvirt:
-    privileged: true
-    build: ../images/libvirt/
-    environment:
-      - LIBVIRT_CLEANUP
-      - VIRTLET_DISABLE_KVM=1
-    volumes:
-      - /sys/fs/cgroup:/sys/fs/cgroup
-      - libvirt_volume_pool:/var/lib/virtlet
-      - /var/lib/virtlet_netns:/var/run/netns:shared
   virtlet_test:
     image: virtlet_build
     # 'privileged' is necessary here for network management
     privileged: true
     environment:
+      - LIBVIRT_CLEANUP
       - VIRTLET_LOGLEVEL=3
       - VIRTLET_DISABLE_KVM=1
     volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup
       - /lib/modules:/lib/modules:ro
       - /boot:/boot:ro
-      - libvirt_volume_pool:/var/lib/virtlet
-      - /var/lib/virtlet_netns:/var/run/netns:shared
-    volumes_from:
-      - cni
-    depends_on:
-      - libvirt
-    links:
-      - "libvirt:libvirt"
     command: "/bin/bash -c './autogen.sh && ./configure && make && make install && if ! make check; then find . -name test-suite.log | xargs cat; exit 1; fi'"
   virtlet:
     build: ../..
     privileged: true
     environment:
+      - LIBVIRT_CLEANUP
       - VIRTLET_LOGLEVEL=3
       - VIRTLET_DISABLE_KVM=1
     volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup
       - /lib/modules:/lib/modules:ro
       - /boot:/boot:ro
-      - libvirt_volume_pool:/var/lib/virtlet
+      # contains virtlet socket
       - virtlet_run:/run
-      - /var/lib/virtlet_netns:/var/run/netns:shared
-    volumes_from:
-      - cni
-    depends_on:
-      - libvirt
-    links:
-      - "libvirt:libvirt"
   local_cluster:
     privileged: true
     build:
@@ -60,6 +37,8 @@ services:
       - virtlet_run:/run
     depends_on:
       - virtlet
+    links:
+      - virtlet
   e2e_test:
     build: ../images/e2e-test
     environment:
@@ -70,10 +49,8 @@ services:
       - local_cluster
     depends_on:
       - local_cluster
-      - libvirt
+      - virtlet
     links:
       - "local_cluster:local_cluster"
-      - "libvirt:libvirt"
 volumes:
-  libvirt_volume_pool: {}
   virtlet_run: {}

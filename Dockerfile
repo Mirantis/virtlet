@@ -6,13 +6,21 @@ LABEL Name="virtlet" Version="0.1"
 ENV DEBIAN_FRONTEND noninteractive
 
 RUN apt-get update && \
-    apt-get install -y libvirt0 libguestfs0 libguestfs-tools iptables && \
+    apt-get install -y libvirt-bin libguestfs0 libguestfs-tools ceph-common \
+                       openssl qemu-kvm qemu-system-x86 python-libvirt \
+                       netbase iproute2 iptables ebtables && \
     apt-get clean
 
-RUN mkdir -p /var/data/virtlet
-COPY _output/virtlet /usr/local/bin/
+RUN mkdir -p /var/data/virtlet /var/lib/virtlet /opt/cni/bin && \
+    curl -L https://github.com/containernetworking/cni/releases/download/v0.3.0/cni-v0.3.0.tgz | \
+      tar zxC /opt/cni/bin
 
-ADD contrib/images/cni/etc /etc
-ADD contrib/images/cni/opt /opt
+# Integration tests look for virtlet in $PATH
+# and we want it to be located in the same place both
+# in build/test image and production one
+COPY _output/virtlet /usr/local/bin
+COPY _output/vmwrapper /
 
-CMD ["/bin/bash", "-c", "/usr/local/bin/virtlet -v=${VIRTLET_LOGLEVEL:-2} -logtostderr=true -libvirt-uri=qemu+tcp://libvirt/system"]
+COPY image_skel /.
+
+CMD ["/start.sh"]

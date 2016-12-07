@@ -88,15 +88,16 @@ function e2e::wait-for-pod {
 }
 
 function e2e::wait-for-libvirt-domain {
-  e2e::wait 100 3 "virsh -c qemu+tcp://libvirt/system list | grep -q 'cirros.*running'" \
+  # TODO: don't use tcp
+  e2e::wait 100 3 "virsh -c qemu+tcp://virtlet/system list | grep -q 'cirros.*running'" \
             "libvirt domain to become running"
-  virsh -c qemu+tcp://libvirt/system list
+  virsh -c qemu+tcp://virtlet/system list
 }
 
 function e2e::chat-with-vm {
   expect -c '
     set timeout 600
-    spawn virsh -c qemu+tcp://libvirt/system console cirros
+    spawn virsh -c qemu+tcp://virtlet/system console cirros
     expect {
       timeout { puts "initial message timeout"; exit 1 }
       "Escape character"
