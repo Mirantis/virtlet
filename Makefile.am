@@ -29,7 +29,7 @@ all:
 	if [ ! -d vendor ]; then $(MAKE) install-vendor; fi
 	mkdir -p $(builddir)/_output $(builddir)/contrib/images/libvirt/_output
 	go build -o $(builddir)/_output/virtlet ./cmd/virtlet
-	go build -o $(builddir)/contrib/images/libvirt/_output/vmwrapper ./cmd/vmwrapper
+	go build -o $(builddir)/_output/vmwrapper ./cmd/vmwrapper
 
 verify-glide-installation:
 	@which glide || go get github.com/Masterminds/glide

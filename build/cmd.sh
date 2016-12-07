@@ -12,7 +12,6 @@ volume_name=virtlet_src
 exclude=(
     --exclude 'vendor'
     --exclude .git
-    --exclude contrib/images/cni/opt
 )
 
 function ensure_build_image {
@@ -29,6 +28,9 @@ function vcmd {
         docker run --rm --privileged -i \
                -v "virtlet_src:${remote_project_dir}" \
                -v "virtlet_pkg:/go/pkg" \
+               -v /sys/fs/cgroup:/sys/fs/cgroup \
+               -v /lib/modules:/lib/modules:ro \
+               -v /boot:/boot:ro \
                "${build_image}" bash -c "tar -C '${remote_project_dir}' -xz && $*"
 }
 
@@ -56,6 +58,7 @@ function virtlet_subdir {
 function clean {
     docker volume rm -f virtlet_src || true
     docker volume rm -f virtlet_pkg || true
+    docker rmi "${build_image}" || true
     # find command may produce zero results
     # -exec rm -rf '{}' ';' produces errors when trying to
     # enter deleted directories
@@ -91,6 +94,9 @@ case "${cmd}" in
         ;;
     build)
         ( vcmd "./autogen.sh && ./configure && make" )
+        ;;
+    test)
+        ( vcmd 'VIRTLET_DISABLE_KVM=1 build/do-test.sh' )
         ;;
     run)
         vcmd "$*"
