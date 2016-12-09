@@ -31,6 +31,7 @@ function vcmd {
                -v /sys/fs/cgroup:/sys/fs/cgroup \
                -v /lib/modules:/lib/modules:ro \
                -v /boot:/boot:ro \
+               -e TRAVIS="${TRAVIS:-}" \
                "${build_image}" bash -c "tar -C '${remote_project_dir}' -xz && $*"
 }
 
