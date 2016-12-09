@@ -83,7 +83,7 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConf
 			return err
 		}
 
-		if err := sandboxBucket.Put([]byte("createdAt"), []byte(strconv.FormatInt(time.Now().Unix(), 10))); err != nil {
+		if err := sandboxBucket.Put([]byte("createdAt"), []byte(strconv.FormatInt(time.Now().UnixNano(), 10))); err != nil {
 			return err
 		}
 
@@ -165,7 +165,7 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConf
 	return err
 }
 
-func (b *BoltClient) UpdatePodState(podId string, state kubeapi.PodSandBoxState) error {
+func (b *BoltClient) UpdatePodState(podId string, state byte) error {
 	err := b.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte("sandbox"))
 		if bucket == nil {
@@ -177,7 +177,7 @@ func (b *BoltClient) UpdatePodState(podId string, state kubeapi.PodSandBoxState)
 			return fmt.Errorf("bucket '%s' doesn't exist", podId)
 		}
 
-		if err := sandboxBucket.Put([]byte("state"), []byte{byte(state)}); err != nil {
+		if err := sandboxBucket.Put([]byte("state"), []byte{state}); err != nil {
 			return err
 		}
 

@@ -29,12 +29,15 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
+	"time"
 	"unsafe"
 
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
 	"encoding/xml"
+
 	"github.com/Mirantis/virtlet/pkg/bolttools"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/golang/glog"
@@ -456,7 +459,11 @@ func libvirtToKubeState(domainInfo C.virDomainInfo, lastState kubeapi.ContainerS
 	case C.VIR_DOMAIN_RUNNING:
 		containerState = kubeapi.ContainerState_RUNNING
 	case C.VIR_DOMAIN_PAUSED:
-		containerState = kubeapi.ContainerState_EXITED
+		if lastState == kubeapi.ContainerState_CREATED {
+			containerState = kubeapi.ContainerState_CREATED
+		} else {
+			containerState = kubeapi.ContainerState_EXITED
+		}
 	case C.VIR_DOMAIN_SHUTDOWN:
 		containerState = kubeapi.ContainerState_EXITED
 	case C.VIR_DOMAIN_SHUTOFF:
@@ -495,11 +502,11 @@ func filterContainer(container *kubeapi.Container, filter *kubeapi.ContainerFilt
 
 func (v *VirtualizationTool) getContainer(boltClient *bolttools.BoltClient, domain *C.struct__virDomain) (*kubeapi.Container, error) {
 	var domainInfo C.virDomainInfo
-	id, err := v.GetDomainUUID(domain)
+	containerId, err := v.GetDomainUUID(domain)
 	if err != nil {
 		return nil, err
 	}
-	containerInfo, err := boltClient.GetContainerInfo(id)
+	containerInfo, err := boltClient.GetContainerInfo(containerId)
 	if err != nil {
 		return nil, err
 	}
@@ -514,25 +521,34 @@ func (v *VirtualizationTool) getContainer(boltClient *bolttools.BoltClient, doma
 	}
 
 	metadata := &kubeapi.ContainerMetadata{
-		Name: &id,
+		Name: &containerId,
 	}
 
 	image := &kubeapi.ImageSpec{Image: &containerInfo.Image}
 
-	imageRef := containerInfo.Image
-
 	containerState := libvirtToKubeState(domainInfo, containerInfo.State)
-
-	createdAt := containerInfo.CreatedAt
+	if containerInfo.State != containerState {
+		if err := boltClient.UpdateState(containerId, byte(containerState)); err != nil {
+			return nil, err
+		}
+		startedAt := time.Now().UnixNano()
+		strStartedAt := strconv.FormatInt(startedAt, 10)
+		if containerState == kubeapi.ContainerState_RUNNING {
+			if err := boltClient.UpdateStartedAt(containerId, strStartedAt); err != nil {
+				return nil, err
+			}
+		}
+		containerInfo.StartedAt = startedAt
+	}
 
 	container := &kubeapi.Container{
-		Id:           &id,
+		Id:           &containerId,
 		PodSandboxId: &podSandboxId,
 		Metadata:     metadata,
 		Image:        image,
-		ImageRef:     &imageRef,
+		ImageRef:     &containerInfo.Image,
 		State:        &containerState,
-		CreatedAt:    &createdAt,
+		CreatedAt:    &containerInfo.CreatedAt,
 		Labels:       containerInfo.Labels,
 		Annotations:  containerInfo.Annotations,
 	}
@@ -644,14 +660,28 @@ func (v *VirtualizationTool) ContainerStatus(boltClient *bolttools.BoltClient, c
 
 	containerState := libvirtToKubeState(domainInfo, containerInfo.State)
 	if containerInfo.State != containerState {
-		if err := boltClient.UpdateState(containerId, containerState); err != nil {
+		if err := boltClient.UpdateState(containerId, byte(containerState)); err != nil {
 			return nil, err
 		}
+		startedAt := time.Now().UnixNano()
+		strStartedAt := strconv.FormatInt(startedAt, 10)
+		if containerState == kubeapi.ContainerState_RUNNING {
+			if err := boltClient.UpdateStartedAt(containerId, strStartedAt); err != nil {
+				return nil, err
+			}
+		}
+		containerInfo.StartedAt = startedAt
 	}
 
+	image := &kubeapi.ImageSpec{Image: &containerInfo.Image}
+
 	return &kubeapi.ContainerStatus{
-		Id:       &containerId,
-		Metadata: &kubeapi.ContainerMetadata{},
-		State:    &containerState,
+		Id:        &containerId,
+		Metadata:  &kubeapi.ContainerMetadata{},
+		Image:     image,
+		ImageRef:  &containerInfo.Image,
+		State:     &containerState,
+		CreatedAt: &containerInfo.CreatedAt,
+		StartedAt: &containerInfo.StartedAt,
 	}, nil
 }
