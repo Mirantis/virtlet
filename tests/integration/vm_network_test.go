@@ -78,6 +78,12 @@ func TestVmNetwork(t *testing.T) {
 			Routes: []types.Route{
 				{
 					Dst: net.IPNet{
+						IP:   net.IP{0, 0, 0, 0},
+						Mask: net.IPMask{0, 0, 0, 0},
+					},
+				},
+				{
+					Dst: net.IPNet{
 						IP:   net.IP{10, 10, 42, 0},
 						Mask: net.IPMask{255, 255, 255, 0},
 					},
@@ -98,7 +104,7 @@ func TestVmNetwork(t *testing.T) {
 	if contNS.Do(func(ns.NetNS) error {
 		_, err = nettools.SetupContainerSideNetwork(info)
 		if err != nil {
-			t.Fatalf("failed to set up container side network: %v", err)
+			return fmt.Errorf("failed to set up container side network: %v", err)
 		}
 
 		// Here we setup extra veth for dhcp client.
@@ -109,21 +115,21 @@ func TestVmNetwork(t *testing.T) {
 		var vethToBridge netlink.Link
 		vethToBridge, dhcpClientVeth, err = nettools.CreateEscapeVethPair(clientNS, "veth0", 1500)
 		if err != nil {
-			t.Fatalf("failed to create veth pair for the client: %v", err)
+			return fmt.Errorf("failed to create veth pair for the client: %v", err)
 		}
 
 		brLink, err := netlink.LinkByName("br0")
 		if err != nil {
-			t.Fatalf("failed to locate container-side bridge: %v", err)
+			return fmt.Errorf("failed to locate container-side bridge: %v", err)
 		}
 
 		br, ok := brLink.(*netlink.Bridge)
 		if !ok {
-			t.Fatalf("br0 is not a bridge: %#v", brLink)
+			return fmt.Errorf("br0 is not a bridge: %#v", brLink)
 		}
 
 		if err := netlink.LinkSetMaster(vethToBridge, br); err != nil {
-			t.Fatalf("failed to set master for dhcp client veth: %v", err)
+			return fmt.Errorf("failed to set master for dhcp client veth: %v", err)
 		}
 
 		return nil

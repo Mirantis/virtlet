@@ -245,6 +245,12 @@ func ExtractLinkInfo(link netlink.Link) (*types.Result, error) {
 			// route has only Src
 		case (route.Dst == nil || route.Dst.IP == nil):
 			result.IP4.Gateway = route.Gw
+			result.IP4.Routes = append(result.IP4.Routes, types.Route{
+				Dst: net.IPNet{
+					IP:   net.IP{0, 0, 0, 0},
+					Mask: net.IPMask{0, 0, 0, 0},
+				},
+			})
 		default:
 			result.IP4.Routes = append(result.IP4.Routes, types.Route{
 				Dst: *route.Dst,
