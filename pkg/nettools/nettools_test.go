@@ -70,6 +70,24 @@ func withTempNetNS(t *testing.T, toRun func(ns ns.NetNS)) {
 	toRun(ns)
 }
 
+func inNS(netNS ns.NetNS, name string, toRun func()) {
+	var r interface{}
+	if err := netNS.Do(func(ns.NetNS) error {
+		defer func() {
+			r = recover()
+		}()
+		toRun()
+		return nil
+	}); err != nil {
+		log.Fatalf("failed to enter %s: %v", name, err)
+	}
+
+	// re-panic in the original goroutine
+	if r != nil {
+		log.Panic(r)
+	}
+}
+
 // withHostAndContNS creates two namespaces, one serving as 'host'
 // namespace and one serving as 'container' one, and calls
 // the specified function in the 'host' namespace, passing both
@@ -77,10 +95,7 @@ func withTempNetNS(t *testing.T, toRun func(ns ns.NetNS)) {
 func withHostAndContNS(t *testing.T, toRun func(hostNS, contNS ns.NetNS)) {
 	withTempNetNS(t, func(hostNS ns.NetNS) {
 		withTempNetNS(t, func(contNS ns.NetNS) {
-			hostNS.Do(func(ns.NetNS) error {
-				toRun(hostNS, contNS)
-				return nil
-			})
+			inNS(hostNS, "hostNS", func() { toRun(hostNS, contNS) })
 		})
 	})
 }
@@ -121,15 +136,13 @@ func TestEscapePair(t *testing.T) {
 		}
 		// need to force hostNS here because of side effects of NetNS.Do()
 		// See https://github.com/vishvananda/netns/issues/17
-		hostNS.Do(func(ns.NetNS) error {
+		inNS(hostNS, "hostNS", func() {
 			verifyLinkUp(t, hostVeth.Attrs().Name, "host veth")
 			verifyNoLink(t, contVeth.Attrs().Name, "container veth in host namespace")
-			return nil
 		})
-		contNS.Do(func(ns.NetNS) error {
+		inNS(contNS, "contNS", func() {
 			verifyLinkUp(t, contVeth.Attrs().Name, "container veth")
 			verifyNoLink(t, hostVeth.Attrs().Name, "host veth in container namespace")
-			return nil
 		})
 	})
 }
@@ -165,7 +178,7 @@ func makeTestBridge(t *testing.T, name string, links []netlink.Link) *netlink.Br
 
 func TestSetupBridge(t *testing.T) {
 	withTempNetNS(t, func(hostNS ns.NetNS) {
-		hostNS.Do(func(ns.NetNS) error {
+		inNS(hostNS, "hostNS", func() {
 			var links []netlink.Link
 			for i := 0; i < 4; i++ {
 				links = append(links, makeTestVeth(t, "veth", i))
@@ -186,8 +199,6 @@ func TestSetupBridge(t *testing.T) {
 				name := links[i].Attrs().Name
 				verifyBridgeMember(t, name, name, brs[i/2])
 			}
-
-			return nil
 		})
 	})
 }
@@ -214,13 +225,12 @@ func withFakeCNIVeth(t *testing.T, toRun func(hostNS, contNS ns.NetNS, origHostV
 		}
 		// need to force hostNS here because of side effects of NetNS.Do()
 		// See https://github.com/vishvananda/netns/issues/17
-		hostNS.Do(func(ns.NetNS) error {
+		inNS(hostNS, "hostNS", func() {
 			if err = netlink.LinkSetUp(origHostVeth); err != nil {
 				log.Panicf("failed to bring up origHostVeth: %v", err)
 			}
-			return nil
 		})
-		contNS.Do(func(ns.NetNS) error {
+		inNS(contNS, "contNS", func() {
 			if err = netlink.LinkSetUp(origContVeth); err != nil {
 				log.Panicf("failed to bring up origContVeth: %v", err)
 			}
@@ -242,8 +252,6 @@ func withFakeCNIVeth(t *testing.T, toRun func(hostNS, contNS ns.NetNS, origHostV
 			})
 
 			toRun(hostNS, contNS, origHostVeth, origContVeth)
-
-			return nil
 		})
 	})
 }
