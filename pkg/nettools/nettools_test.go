@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os/exec"
 	"reflect"
 	"testing"
 
@@ -347,5 +348,14 @@ func TestSetUpContainerSideNetworkWithInfo(t *testing.T) {
 			log.Panicf("StripLink() failed: %v", err)
 		}
 		verifyContainerSideNetwork(t, origContVeth, &expectedExtractedLinkInfo)
+	})
+}
+
+func TestLoopbackInterface(t *testing.T) {
+	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+		verifyContainerSideNetwork(t, origContVeth, nil)
+		if out, err := exec.Command("ping", "-c", "1", "127.0.0.1").CombinedOutput(); err != nil {
+			log.Panicf("ping 127.0.0.1 failed:\n%s", out)
+		}
 	})
 }

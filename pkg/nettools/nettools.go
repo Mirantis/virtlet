@@ -49,8 +49,9 @@ import (
 )
 
 const (
-	tapInterfaceName    = "tap0"
-	containerBridgeName = "br0"
+	tapInterfaceName      = "tap0"
+	containerBridgeName   = "br0"
+	loopbackInterfaceName = "lo"
 	// Address for dhcp server internal interface
 	internalDhcpAddr = "169.254.254.2/24"
 )
@@ -263,6 +264,18 @@ func mustParseAddr(addr string) *netlink.Addr {
 	return r
 }
 
+func bringUpLoopback() error {
+	// lo interface is already there in the new ns but it's down
+	lo, err := netlink.LinkByName(loopbackInterfaceName)
+	if err != nil {
+		return fmt.Errorf("failed to find link %q: %v", loopbackInterfaceName, err)
+	}
+	if err := netlink.LinkSetUp(lo); err != nil {
+		return fmt.Errorf("failed to bring up link %q: %v", loopbackInterfaceName, err)
+	}
+	return nil
+}
+
 // SetupContainerSideNetwork sets up networking in container
 // namespace.  It does so by calling ExtractLinkInfo() first unless
 // non-nil info argument is provided and then preparing the following
@@ -323,6 +336,10 @@ func SetupContainerSideNetwork(info *types.Result) (*types.Result, error) {
 			item.opt, "67", "--out-if", contVeth.Attrs().Name, "-j", "DROP").CombinedOutput(); err != nil {
 			return nil, fmt.Errorf("ebtables failed: %v\nOut:\n%s", err, out)
 		}
+	}
+
+	if err := bringUpLoopback(); err != nil {
+		return nil, err
 	}
 
 	return info, nil
