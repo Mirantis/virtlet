@@ -157,7 +157,7 @@ func (v *VirtletManager) StopPodSandbox(ctx context.Context, in *kubeapi.StopPod
 	podSandboxId := in.GetPodSandboxId()
 	glog.V(2).Infof("StopPodSandbox called for pod %s", in.GetPodSandboxId())
 	glog.V(3).Infof("StopPodSandbox: %s", spew.Sdump(in))
-	if err := v.boltClient.UpdatePodState(podSandboxId, kubeapi.PodSandBoxState_NOTREADY); err != nil {
+	if err := v.boltClient.UpdatePodState(podSandboxId, byte(kubeapi.PodSandBoxState_NOTREADY)); err != nil {
 		glog.Errorf("Error when stopping pod sandbox '%s': %v", podSandboxId, err)
 		return nil, err
 	}

@@ -28,6 +28,7 @@ import (
 
 type ContainerInfo struct {
 	CreatedAt   int64
+	StartedAt   int64
 	SandboxId   string
 	Image       string
 	Labels      map[string]string
@@ -69,7 +70,7 @@ func (b *BoltClient) SetContainer(containerId, sandboxId, image string, labels, 
 			return err
 		}
 
-		if err := bucket.Put([]byte("createdAt"), []byte(strconv.FormatInt(time.Now().Unix(), 10))); err != nil {
+		if err := bucket.Put([]byte("createdAt"), []byte(strconv.FormatInt(time.Now().UnixNano(), 10))); err != nil {
 			return err
 		}
 
@@ -114,7 +115,7 @@ func (b *BoltClient) SetContainer(containerId, sandboxId, image string, labels, 
 	return err
 }
 
-func (b *BoltClient) UpdateState(containerId string, state kubeapi.ContainerState) error {
+func (b *BoltClient) UpdateStartedAt(containerId string, startedAt string) error {
 	err := b.db.Update(func(tx *bolt.Tx) error {
 		parentBucket := tx.Bucket([]byte("virtualization"))
 		if parentBucket == nil {
@@ -127,7 +128,30 @@ func (b *BoltClient) UpdateState(containerId string, state kubeapi.ContainerStat
 			return nil
 		}
 
-		if err := bucket.Put([]byte("state"), []byte{byte(state)}); err != nil {
+		if err := bucket.Put([]byte("startedAt"), []byte(startedAt)); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return err
+}
+
+func (b *BoltClient) UpdateState(containerId string, state byte) error {
+	err := b.db.Update(func(tx *bolt.Tx) error {
+		parentBucket := tx.Bucket([]byte("virtualization"))
+		if parentBucket == nil {
+			return fmt.Errorf("bucket 'virtualization' doesn't exist")
+		}
+
+		bucket := parentBucket.Bucket([]byte(containerId))
+		if bucket == nil {
+			// Container info removed, but sandbox still exists
+			return nil
+		}
+
+		if err := bucket.Put([]byte("state"), []byte{state}); err != nil {
 			return err
 		}
 
@@ -160,6 +184,17 @@ func (b *BoltClient) GetContainerInfo(containerId string) (*ContainerInfo, error
 		createdAt, err := strconv.ParseInt(strCreatedAt, 10, 64)
 		if err != nil {
 			return err
+		}
+
+		var startedAt int64
+		bytesStartedAt := bucket.Get([]byte("startedAt"))
+		if bytesStartedAt != nil {
+			startedAt, err = strconv.ParseInt(string(bytesStartedAt), 10, 64)
+			if err != nil {
+				return err
+			}
+		} else {
+			startedAt = 0
 		}
 
 		sandboxId, err := getString(bucket, "sandboxId")
@@ -199,6 +234,7 @@ func (b *BoltClient) GetContainerInfo(containerId string) (*ContainerInfo, error
 
 		containerInfo = &ContainerInfo{
 			CreatedAt:   createdAt,
+			StartedAt:   startedAt,
 			SandboxId:   sandboxId,
 			Image:       image,
 			Labels:      labels,
