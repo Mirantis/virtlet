@@ -57,8 +57,8 @@ function virtlet_subdir {
 }
 
 function clean {
-    docker volume rm -f virtlet_src || true
-    docker volume rm -f virtlet_pkg || true
+    docker volume rm virtlet_src || true
+    docker volume rm virtlet_pkg || true
     docker rmi "${build_image}" || true
     # find command may produce zero results
     # -exec rm -rf '{}' ';' produces errors when trying to
