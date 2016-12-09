@@ -26,7 +26,8 @@ RUN apt-get update && \
                 libvirt-bin \
                 python-libvirt \
                 ceph-common \
-                netbase && \
+                netbase \
+                iputils-ping && \
     apt-get clean
 
 ENV GOPATH /go
