@@ -4,18 +4,6 @@ Virtlet is a Kubernetes runtime server which allows you to run VM workloads, bas
 
 At this stage (pre-alpha), only supported way of starting Virtlet is following instructions from **Running local environment**.
 
-## Setting up Go project
-
-Virtlet requires properly configured [golang installation](https://golang.org/doc/install).
-
-It's expected that you will place this project in `$GOPATH/src/github.com/Mirantis/virtlet` to have a valid import paths.
-
-Updating dependencies also needs additional tools which could be installed using:
-
-```sh
-curl https://glide.sh/get | sh
-```
-
 ## Usage
 
 ### Pre run steps
@@ -30,47 +18,36 @@ At this stage Virtlet have following requirements:
 
 ### Networking support
 
-Only supported for now configuration is usage of [CNI plugins](https://github.com/containernetworking/cni) which is required to be installed on the host.
+For now the only supported configuration is the use of [CNI plugins](https://github.com/containernetworking/cni). To use custom CNI configuration, mount your `/etc/cni` and optionally `/opt/cni` into the virtlet container.
 Virtlet have the same behavior and default values for `--cni-bin-dir` and `--cni-conf-dir` as described in kubelet network plugins [documentation](http://kubernetes.io/docs/admin/network-plugins/).
 
-### Running docker-compose environment
+### Running local environment
 
-To run local environment, please install [docker-compose](https://pypi.python.org/pypi/docker-compose)
-at least in 1.8.0 version. If your Linux distribution is providing an older version, we suggest to
-use [virtualenvwrapper](https://virtualenvwrapper.readthedocs.io):
-
-```sh
-apt-get install virtualenvwrapper
-mkvirtualenv docker-compose
-pip install docker-compose
+First, you need to build virtlet binaries and the docker image:
+```
+build/cmd.sh clean
+build/cmd.sh build
+build/cmd.sh copy
+docker build -t virtlet .
 ```
 
-If you have `docker-compose` ready to use, you can build the Virtlet dev environment by doing:
+To run the virtlet container, use
 
-```sh
-cd $(REPOSITORY_BASE_DIR)/contrib/docker-compose
-docker-compose build
+```
+docker run -it --rm --privileged --network=host \
+       -e VIRTLET_LOGLEVEL=2 \
+       -v /sys/fs/cgroup:/sys/fs/cgroup \
+       -v /boot:/boot:ro \
+       -v /lib/modules:/lib/modules:ro \
+       -v /var/lib/viret:/var/lib/virtlet \
+       -v /run:/run \
+       virtlet
 ```
 
-assuming that `REPOSITORY_BASE_DIR` environment variable is pointing to directory containing Virtlet git clone.
-
-For this moment, we only support local cluster configuration, starting of which instructions are in next section, but in future prepared in this way docker images can be distributed on worker nodes to speedup process of starting.
-
-To start Virtlet environment use following commands:
-
-```sh
-cd $(REPOSITORY_BASE_DIR)/contrib/docker-compose
-docker-compose up
-```
-
-To set log verbosity level, use
-```sh
-VIRTLET_LOGLEVEL=3 docker-compose up
-```
-
+In the command above, `VIRTLET_LOGLEVEL` sets logging level for virtlet.
 3 is currently highest verbosity level, the default being 2.
 
-Now you can follow instructions from next section.
+Now you can follow instructions from the next section.
 
 ### Kubernetes environment
 
@@ -88,12 +65,23 @@ export CONTAINER_RUNTIME_ENDPOINT=/run/virtlet.sock
 
 ### Running tests
 
-To run integration & e2e tests, use
+To run integration & e2e tests, please install [docker-compose](https://pypi.python.org/pypi/docker-compose)
+at least in 1.8.0 version. If your Linux distribution is providing an older version, we suggest to
+use [virtualenvwrapper](https://virtualenvwrapper.readthedocs.io):
+
+```sh
+apt-get install virtualenvwrapper
+mkvirtualenv docker-compose
+pip install docker-compose
+```
+
+In order to run the tests, use:
 
 ```sh
 ./test.sh
 ```
 
-### Demo of usage
+### Virtlet usage demo
 
 You can watch sample usage session under [this](https://asciinema.org/a/1aq4f2wd8lgw0e1yexvf1knmv) link.
+**NOTE:** The demo was prepared using older virtlet version, it will be updated soon.
