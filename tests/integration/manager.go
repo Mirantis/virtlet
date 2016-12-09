@@ -50,7 +50,7 @@ type VirtletManager struct {
 
 func NewVirtletManager() *VirtletManager {
 	return &VirtletManager{
-		libvirtUri: "qemu+tcp://libvirt/system",
+		libvirtUri: "qemu+tcp://localhost/system",
 	}
 }
 

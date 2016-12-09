@@ -16,7 +16,7 @@ export GO15VENDOREXPERIMENT=1
 export CGO_CFLAGS=$(CFLAGS)
 export CGO_LDFLAGS=$(LDFLAGS) $(LIBS)
 
-SUBDIRS = pkg/bolttools pkg/download pkg/libvirttools pkg/manager tests/integration
+SUBDIRS = pkg/bolttools pkg/download pkg/libvirttools pkg/manager pkg/nettools tests/integration
 
 # FIXME: add back dockerfilelint.test
 # (as of now, it requires Docker)
@@ -27,8 +27,9 @@ TESTS = $(check_SCRIPTS)
 
 all:
 	if [ ! -d vendor ]; then $(MAKE) install-vendor; fi
-	go build -o $(builddir)/virtlet ./cmd/virtlet
-	go build -o $(builddir)/virtlet-dhcp ./cmd/dhcpserver
+	mkdir -p $(builddir)/_output $(builddir)/contrib/images/libvirt/_output
+	go build -o $(builddir)/_output/virtlet ./cmd/virtlet
+	go build -o $(builddir)/_output/vmwrapper ./cmd/vmwrapper
 
 verify-glide-installation:
 	@which glide || go get github.com/Masterminds/glide
@@ -40,8 +41,8 @@ update-vendor: verify-glide-installation
 	glide update --strip-vendor
 
 clean-local:
-	rm -f $(builddir)/virtlet $(builddir)/virtlet-fake-create-container $(builddir)/virtlet-fake-image-pull
+	rm -f $(builddir)/virtlet
 
+# need virtlet binary for integration tests
 install-exec-local:
-	install $(builddir)/virtlet $(bindir)/virtlet
-	install $(builddir)/virtlet-dhcp $(bindir)/virtlet-dhcp
+	install $(builddir)/_output/virtlet $(bindir)/virtlet

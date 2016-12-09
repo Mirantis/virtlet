@@ -1,6 +1,3 @@
-# Prerequisites
-*.d
-
 # Compiled Object files, Static and Dynamic libs (Shared Objects)
 *.o
 *.a
@@ -39,12 +36,6 @@ _testmain.go
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
-
-# virtlet binaries
-/virtlet
-/virtlet-fake-create-container
-/virtlet-fake-image-pull
-/virtlet-dhcp
 
 # Autotools
 Makefile
@@ -85,5 +76,5 @@ vendor
 cpplint.py
 test-driver
 
-# CNI binaries
-/contrib/images/cni/opt
+# build output
+_output

@@ -1,10 +1,20 @@
-hash: 6c68d3d889658263fb761c1857480660302345b355ad53b113fecf0f9d95e210
-updated: 2016-11-30T10:29:54.174822325+01:00
+hash: 7279f090814b9cc433c587f4c6ca27e7dcdedb45bf85a06f73fa1bebcf334cd9
+updated: 2016-12-05T13:46:38.758422468+03:00
 imports:
 - name: github.com/boltdb/bolt
   version: dfb21201d9270c1082d5fb0f07f500311ff72f18
 - name: github.com/containernetworking/cni
   version: 5c3c17164270150467498a32c71436c7cd5501be
+  subpackages:
+  - libcni
+  - pkg/invoke
+  - pkg/ip
+  - pkg/ns
+  - pkg/types
+- name: github.com/coreos/go-iptables
+  version: fbb73372b87f6e89951c2b6b31470c2c9d5cfae3
+  subpackages:
+  - iptables
 - name: github.com/davecgh/go-spew
   version: 6cf5744a041a0022271cefed95ba843f6d87fd51
   subpackages:
@@ -12,7 +22,31 @@ imports:
 - name: github.com/gogo/protobuf
   version: e18d7aa8f8c624c915db340349aad4c49b10d173
   subpackages:
+  - gogoproto
+  - plugin/compare
+  - plugin/defaultcheck
+  - plugin/description
+  - plugin/embedcheck
+  - plugin/enumstringer
+  - plugin/equal
+  - plugin/face
+  - plugin/gostring
+  - plugin/marshalto
+  - plugin/oneofcheck
+  - plugin/populate
+  - plugin/size
+  - plugin/stringer
+  - plugin/testgen
+  - plugin/union
+  - plugin/unmarshal
   - proto
+  - protoc-gen-gogo/descriptor
+  - protoc-gen-gogo/generator
+  - protoc-gen-gogo/grpc
+  - protoc-gen-gogo/plugin
+  - sortkeys
+  - vanity
+  - vanity/command
 - name: github.com/golang/glog
   version: 23def4e6c14b4da8ac2ed8007337bc5eb5007998
 - name: github.com/golang/protobuf
@@ -21,6 +55,12 @@ imports:
   - proto
 - name: github.com/nu7hatch/gouuid
   version: 179d4d0c4d8d407a32af483c2354df1d2c91e6c3
+- name: github.com/vishvananda/netlink
+  version: a4f22d8ad2327663017dbb309b5e3f8b6f348020
+  subpackages:
+  - nl
+- name: github.com/vishvananda/netns
+  version: 8ba1072b58e0c2a240eb5f6120165c7776c3e7b8
 - name: go.universe.tf/netboot
   version: 57a1c9bea27f5d542444c409a768b331fc5e0cb9
   subpackages:
@@ -58,5 +98,7 @@ imports:
   vcs: git
   subpackages:
   - api/v1alpha/runtime
+  - pkg/fields
   - pkg/kubelet/api/v1alpha1/runtime
+  - pkg/selection
 testImports: []
