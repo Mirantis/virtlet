@@ -31,6 +31,8 @@ import (
 
 const (
 	serverPort = 67
+	// option 121 is for static routes as defined in rfc3442
+	classlessRouteOption = 121
 )
 
 var (
@@ -166,14 +168,15 @@ func (s *Server) prepareResponse(pkt *dhcp4.Packet, serverIP net.IP, mt dhcp4.Me
 	p.YourAddr = s.config.CNIResult.IP4.IP.IP
 	p.Options[dhcp4.OptSubnetMask] = s.config.CNIResult.IP4.IP.Mask
 
-	if s.config.CNIResult.IP4.Gateway != nil {
-		p.Options[dhcp4.OptRouters] = []byte(s.config.CNIResult.IP4.Gateway)
-	}
-	// option 121 is for static routes as defined in rfc3442
-	if data, err := s.getStaticRoutes(); err != nil {
+	router, routeData, err := s.getStaticRoutes()
+	if err != nil {
 		glog.Warningf("Can not transform static routes for mac %v: %v", pkt.HardwareAddr, err)
-	} else if data != nil {
-		p.Options[121] = data
+	}
+	if router != nil {
+		p.Options[dhcp4.OptRouters] = router
+	}
+	if routeData != nil {
+		p.Options[classlessRouteOption] = routeData
 	}
 
 	// 86400 - full 24h
@@ -190,10 +193,10 @@ func (s *Server) prepareResponse(pkt *dhcp4.Packet, serverIP net.IP, mt dhcp4.Me
 		p.Options[dhcp4.OptDNSServers] = defaultDNS
 	} else {
 		var b bytes.Buffer
-		for _, ns := range s.config.CNIResult.DNS.Nameservers {
-			ip := net.ParseIP(ns).To4()
-			if len(ip) != 4 {
-				glog.Warningf("failed to parse nameserver ip %q", ip)
+		for _, nsIP := range s.config.CNIResult.DNS.Nameservers {
+			ip := net.ParseIP(nsIP).To4()
+			if ip == nil {
+				glog.Warningf("failed to parse nameserver ip %q", nsIP)
 			} else {
 				b.Write(ip)
 			}
@@ -216,29 +219,49 @@ func (s *Server) ackDHCP(pkt *dhcp4.Packet, serverIP net.IP) (*dhcp4.Packet, err
 	return s.prepareResponse(pkt, serverIP, dhcp4.MsgAck)
 }
 
-func (s *Server) getStaticRoutes() ([]byte, error) {
+func (s *Server) getStaticRoutes() (router, routes []byte, err error) {
 	if len(s.config.CNIResult.IP4.Routes) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	var b bytes.Buffer
 	for _, route := range s.config.CNIResult.IP4.Routes {
+		if route.Dst.IP == nil {
+			return nil, nil, fmt.Errorf("invalid route: %#v", route)
+		}
+		dstIP := route.Dst.IP.To4()
+		gw := route.GW
+		if gw == nil {
+			gw = s.config.CNIResult.IP4.Gateway.To4()
+			if gw == nil && s.config.CNIResult.IP4.Gateway != nil {
+				return nil, nil, fmt.Errorf("unexpected IPv6 gateway address: %#v", gw)
+			}
+		} else {
+			gw = gw.To4()
+		}
+		if gw != nil && dstIP.Equal(net.IPv4zero) {
+			if s, _ := route.Dst.Mask.Size(); s == 0 {
+				router = gw
+				continue
+			}
+		}
 		b.Write(toDestinationDescriptor(route.Dst))
-		if route.GW != nil {
-			b.Write(route.GW)
+		if gw != nil {
+			b.Write(gw)
 		} else {
 			b.Write([]byte{0, 0, 0, 0})
 		}
 	}
 
-	return b.Bytes(), nil
+	routes = b.Bytes()
+	return
 }
 
 // toDestinationDescriptor returns calculated destination descriptor according to rfc3442 (page 3)
 // warning: there is no check if ipnet is in required ipv4 type
 func toDestinationDescriptor(network net.IPNet) []byte {
 	s, _ := network.Mask.Size()
-	ipAsBytes := []byte(network.IP)
+	ipAsBytes := []byte(network.IP.To4())
 	return append(
 		[]byte{byte(s)},
 		ipAsBytes[:widthOfMaskToSignificantOctets(s)]...,

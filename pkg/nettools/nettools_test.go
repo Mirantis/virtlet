@@ -40,6 +40,12 @@ var expectedExtractedLinkInfo = types.Result{
 		Routes: []types.Route{
 			{
 				Dst: net.IPNet{
+					IP:   net.IP{0, 0, 0, 0},
+					Mask: net.IPMask{0, 0, 0, 0},
+				},
+			},
+			{
+				Dst: net.IPNet{
 					IP:   net.IP{169, 254, 1, 1},
 					Mask: net.IPMask{255, 255, 255, 255},
 				},

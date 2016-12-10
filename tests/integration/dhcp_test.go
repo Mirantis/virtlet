@@ -48,6 +48,12 @@ func TestDhcpServer(t *testing.T) {
 					Routes: []types.Route{
 						{
 							Dst: net.IPNet{
+								IP:   net.IP{0, 0, 0, 0},
+								Mask: net.IPMask{0, 0, 0, 0},
+							},
+						},
+						{
+							Dst: net.IPNet{
 								IP:   net.IP{10, 10, 42, 0},
 								Mask: net.IPMask{255, 255, 255, 0},
 							},
@@ -79,14 +85,19 @@ func TestDhcpServer(t *testing.T) {
 						IP:   net.IP{10, 1, 90, 5},
 						Mask: net.IPMask{255, 255, 255, 0},
 					},
-					Gateway: net.IP{169, 254, 1, 1},
 					Routes: []types.Route{
+						{
+							Dst: net.IPNet{
+								IP:   net.IP{0, 0, 0, 0},
+								Mask: net.IPMask{0, 0, 0, 0},
+							},
+							GW: net.IP{169, 254, 1, 1},
+						},
 						{
 							Dst: net.IPNet{
 								IP:   net.IP{169, 254, 1, 1},
 								Mask: net.IPMask{255, 255, 255, 255},
 							},
-							GW: nil,
 						},
 					},
 				},
