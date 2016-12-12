@@ -27,13 +27,14 @@ import (
 )
 
 type ContainerInfo struct {
-	CreatedAt   int64
-	StartedAt   int64
-	SandboxId   string
-	Image       string
-	Labels      map[string]string
-	Annotations map[string]string
-	State       kubeapi.ContainerState
+	CreatedAt             int64
+	StartedAt             int64
+	SandboxId             string
+	Image                 string
+	RootImageSnapshotPath string
+	Labels                map[string]string
+	Annotations           map[string]string
+	State                 kubeapi.ContainerState
 }
 
 func (b *BoltClient) VerifyVirtualizationSchema() error {
@@ -48,7 +49,7 @@ func (b *BoltClient) VerifyVirtualizationSchema() error {
 	return err
 }
 
-func (b *BoltClient) SetContainer(containerId, sandboxId, image string, labels, annotations map[string]string) error {
+func (b *BoltClient) SetContainer(containerId, sandboxId, image, rootImageSnapshotPath string, labels, annotations map[string]string) error {
 	strLabels, err := json.Marshal(labels)
 	if err != nil {
 		return err
@@ -94,6 +95,10 @@ func (b *BoltClient) SetContainer(containerId, sandboxId, image string, labels, 
 		}
 
 		if err := bucket.Put([]byte("image"), []byte(image)); err != nil {
+			return err
+		}
+
+		if err := bucket.Put([]byte("rootImageSnapshotPath"), []byte(rootImageSnapshotPath)); err != nil {
 			return err
 		}
 
@@ -202,6 +207,11 @@ func (b *BoltClient) GetContainerInfo(containerId string) (*ContainerInfo, error
 			return err
 		}
 
+		rootImageSnapshotPath, err := getString(bucket, "rootImageSnapshotPath")
+		if err != nil {
+			return err
+		}
+
 		image, err := getString(bucket, "image")
 		if err != nil {
 			return err
@@ -233,13 +243,14 @@ func (b *BoltClient) GetContainerInfo(containerId string) (*ContainerInfo, error
 		}
 
 		containerInfo = &ContainerInfo{
-			CreatedAt:   createdAt,
-			StartedAt:   startedAt,
-			SandboxId:   sandboxId,
-			Image:       image,
-			Labels:      labels,
-			Annotations: annotations,
-			State:       kubeapi.ContainerState(byteState[0]),
+			CreatedAt: createdAt,
+			StartedAt: startedAt,
+			SandboxId: sandboxId,
+			Image:     image,
+			RootImageSnapshotPath: rootImageSnapshotPath,
+			Labels:                labels,
+			Annotations:           annotations,
+			State:                 kubeapi.ContainerState(byteState[0]),
 		}
 
 		return nil

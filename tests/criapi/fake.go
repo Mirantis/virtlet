@@ -1,17 +1,18 @@
 package criapi
 
 import (
-	"strconv"
 	virtletutils "github.com/Mirantis/virtlet/pkg/utils"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"strconv"
 )
 
 type ContainerTestConfigSet struct {
-	SandboxId   string
-	ContainerId string
-	Image       string
-	Labels      map[string]string
-	Annotations map[string]string
+	SandboxId             string
+	ContainerId           string
+	Image                 string
+	RootImageSnapshotPath string
+	Labels                map[string]string
+	Annotations           map[string]string
 }
 
 func GetSandboxes(sandboxNum int) ([]*kubeapi.PodSandboxConfig, error) {
@@ -82,11 +83,12 @@ func GetContainersConfig(sandboxConfigs []*kubeapi.PodSandboxConfig) ([]*Contain
 			return nil, err
 		}
 		containerConf := &ContainerTestConfigSet{
-			SandboxId:   *sandbox.Metadata.Uid,
-			Image:       "testImage",
-			ContainerId: uid,
-			Labels:      map[string]string{"foo": "bar", "fizz": "buzz"},
-			Annotations: map[string]string{"hello": "world", "virt": "let"},
+			SandboxId: *sandbox.Metadata.Uid,
+			Image:     "testImage",
+			RootImageSnapshotPath: "/sample/path",
+			ContainerId:           uid,
+			Labels:                map[string]string{"foo": "bar", "fizz": "buzz"},
+			Annotations:           map[string]string{"hello": "world", "virt": "let"},
 		}
 		containers = append(containers, containerConf)
 	}

@@ -337,7 +337,12 @@ func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, i
 
 	}
 
-	boltClient.SetContainer(uuid, in.GetPodSandboxId(), config.GetImage().GetImage(), config.Labels, config.Annotations)
+	snapshotImage, err := v.createBootImageSnapshot("snapshot_"+uuid, imageFilepath)
+	if err != nil {
+		return "", err
+	}
+
+	boltClient.SetContainer(uuid, in.GetPodSandboxId(), config.GetImage().GetImage(), snapshotImage, config.Labels, config.Annotations)
 
 	memory := config.GetLinux().GetResources().GetMemoryLimitInBytes()
 	memoryUnit := "b"
@@ -354,11 +359,6 @@ func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, i
 	cpuShares := config.GetLinux().GetResources().GetCpuShares()
 	cpuPeriod := config.GetLinux().GetResources().GetCpuPeriod()
 	cpuQuota := config.GetLinux().GetResources().GetCpuQuota()
-
-	snapshotImage, err := v.createBootImageSnapshot("snapshot_"+uuid, imageFilepath)
-	if err != nil {
-		return "", err
-	}
 
 	domXML := generateDomXML(canUseKvm(), name, memory, memoryUnit, uuid, cpuNum, cpuShares, cpuPeriod, cpuQuota, snapshotImage, netNSPath, cniConfig)
 	domXML, err = v.createVolumes(name, in.Config.Mounts, domXML)

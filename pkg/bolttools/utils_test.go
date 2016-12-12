@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/Mirantis/virtlet/tests/criapi"
 	"github.com/boltdb/bolt"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-	"github.com/Mirantis/virtlet/tests/criapi"
 )
 
 func TestGet(t *testing.T) {
@@ -179,7 +179,7 @@ func SetUpBolt(t *testing.T, sandboxConfigs []*kubeapi.PodSandboxConfig, contain
 	}
 
 	for _, container := range containerConfigs {
-		if err := b.SetContainer(container.ContainerId, container.SandboxId, container.Image, container.Labels, container.Annotations); err != nil {
+		if err := b.SetContainer(container.ContainerId, container.SandboxId, container.Image, container.RootImageSnapshotPath, container.Labels, container.Annotations); err != nil {
 			t.Fatal(err)
 		}
 	}

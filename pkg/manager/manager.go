@@ -319,15 +319,19 @@ func (v *VirtletManager) RemoveContainer(ctx context.Context, in *kubeapi.Remove
 		return nil, err
 	}
 
+	containerInfo, err := v.boltClient.GetContainerInfo(containerId)
+	if err != nil {
+		glog.Errorf("Error when retrieving container '%s' info from bolt: %v", containerId, err)
+		return nil, err
+	}
+
 	if err := v.boltClient.RemoveContainer(containerId); err != nil {
 		glog.Errorf("Error when removing container '%s' from bolt: %v", containerId, err)
 		return nil, err
 	}
 
-	libvirtBootImagePath := "/var/lib/libvirt/images/snapshot_" + containerId
-
-	if err := v.libvirtImageTool.RemoveImage(libvirtBootImagePath); err != nil {
-		glog.Errorf("Error when removing image snapshot with path '%s': %v", libvirtBootImagePath, err)
+	if err := v.libvirtImageTool.RemoveImage(containerInfo.RootImageSnapshotPath); err != nil {
+		glog.Errorf("Error when removing image snapshot with path '%s': %v", containerInfo.RootImageSnapshotPath, err)
 		return nil, err
 	}
 
