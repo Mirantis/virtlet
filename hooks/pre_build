@@ -1,0 +1,6 @@
+#!/bin/bash
+
+set -xe
+
+./build/cmd.sh build
+./build/cmd.sh copy
