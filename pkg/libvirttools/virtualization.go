@@ -170,7 +170,7 @@ func generateDomXML(useKvm bool, name string, memory int64, memoryUnit string, u
 	cniConfigEscaped := buf.String()
 	domXML := `
 <domain type='%s'>
-    <name>%s</name>
+    <name>%s-%s</name>
     <uuid>%s</uuid>
     <memory unit='%s'>%d</memory>
     <vcpu>%d</vcpu>
@@ -215,7 +215,7 @@ func generateDomXML(useKvm bool, name string, memory int64, memoryUnit string, u
       <env name='VIRTLET_CNI_CONFIG' value='%s'/>
     </commandline>
 </domain>`
-	return fmt.Sprintf(domXML, domainType, name, uuid, memoryUnit, memory, cpuNum, cpuShare, cpuPeriod, cpuQuota, imageFilepath, emulator, netNSPath, cniConfigEscaped)
+	return fmt.Sprintf(domXML, domainType, uuid, name, uuid, memoryUnit, memory, cpuNum, cpuShare, cpuPeriod, cpuQuota, imageFilepath, emulator, netNSPath, cniConfigEscaped)
 }
 
 var volXML string = `
