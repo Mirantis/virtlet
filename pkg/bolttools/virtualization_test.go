@@ -22,8 +22,8 @@ import (
 	"testing"
 
 	"encoding/json"
-	"github.com/boltdb/bolt"
 	"github.com/Mirantis/virtlet/tests/criapi"
+	"github.com/boltdb/bolt"
 )
 
 func TestSetContainer(t *testing.T) {
@@ -67,6 +67,15 @@ func TestSetContainer(t *testing.T) {
 
 			if image != container.Image {
 				t.Errorf("Expected %s, instead got %s", container.Image, image)
+			}
+
+			rootImageSnapshotPath, err := getString(bucket, "rootImageSnapshotPath")
+			if err != nil {
+				return err
+			}
+
+			if rootImageSnapshotPath != container.RootImageSnapshotPath {
+				t.Errorf("Expected %s, instead got %s", container.RootImageSnapshotPath, rootImageSnapshotPath)
 			}
 
 			labels, err := getString(bucket, "labels")
