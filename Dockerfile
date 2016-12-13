@@ -6,7 +6,7 @@ LABEL Name="virtlet" Version="0.1"
 ENV DEBIAN_FRONTEND noninteractive
 
 RUN apt-get update && \
-    apt-get install -y libvirt-bin libguestfs0 libguestfs-tools ceph-common \
+    apt-get install -y libvirt-bin libguestfs0 libguestfs-tools \
                        openssl qemu-kvm qemu-system-x86 python-libvirt \
                        netbase iproute2 iptables ebtables && \
     apt-get clean
