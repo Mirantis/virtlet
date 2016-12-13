@@ -25,7 +25,6 @@ RUN apt-get update && \
                 qemu-system-x86 \
                 libvirt-bin \
                 python-libvirt \
-                ceph-common \
                 netbase \
                 iputils-ping && \
     apt-get clean
