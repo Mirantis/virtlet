@@ -18,7 +18,7 @@ exclude=(
 function ensure_build_image {
     # can't use 'docker images -q' due to https://github.com/docker/docker/issues/28895
     if ! docker history -q "${build_image}" >& /dev/null; then
-        docker build -t "${build_image}" -f Dockerfile.build "${project_dir}"
+        docker build -t "${build_image}" -f "${project_dir}/Dockerfile.build" "${project_dir}"
     fi
 }
 
@@ -91,10 +91,10 @@ shift
 
 case "${cmd}" in
     gotest)
-        ( vcmd "cd '$(virtlet_subdir)' && go test $*" )
+        ( vcmd "cd '$(virtlet_subdir)' && CGO_CFLAGS='-g -O2 -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include' CGO_LDFLAGS='-lglib-2.0 -lvirt' go test $*" )
         ;;
     gobuild)
-        ( vcmd "cd '$(virtlet_subdir)' && go build $*" )
+        ( vcmd "cd '$(virtlet_subdir)' && CGO_CFLAGS='-g -O2 -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include' CGO_LDFLAGS='-lglib-2.0 -lvirt' go build $*" )
         ;;
     build)
         ( vcmd "./autogen.sh && ./configure && make" )

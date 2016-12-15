@@ -31,7 +31,7 @@ services:
     build:
       context: ../images/local-cluster
       args:
-        - k8s_version=v1.5.0-alpha.1
+        - k8s_version=v1.5.1
     volumes:
       # for virtlet socket
       - virtlet_run:/run

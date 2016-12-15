@@ -29,7 +29,7 @@ import (
 )
 
 func TestSetSandBoxValidation(t *testing.T) {
-	invalidSandboxes, err := criapi.GetSandboxes(3)
+	invalidSandboxes, err := criapi.GetSandboxes(4)
 	if err != nil {
 		t.Fatalf("Failed to generate array of sandbox configs: %v", err)
 	}
@@ -37,7 +37,8 @@ func TestSetSandBoxValidation(t *testing.T) {
 	//Now let's make generated configs to be invalid
 	invalidSandboxes[0].Metadata = nil
 	invalidSandboxes[1].Linux = nil
-	invalidSandboxes[2].Linux.NamespaceOptions = nil
+	invalidSandboxes[2].Linux.SecurityContext = nil
+	invalidSandboxes[3].Linux.SecurityContext.NamespaceOptions = nil
 
 	b, err := NewFakeBoltClient()
 	if err != nil {
@@ -211,7 +212,7 @@ func TestGetPodSandboxStatus(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if status.GetState() != kubeapi.PodSandBoxState_READY {
+		if status.GetState() != kubeapi.PodSandboxState_SANDBOX_READY {
 			t.Errorf("Sandbox state not ready")
 		}
 
@@ -242,8 +243,8 @@ func TestListPodSandbox(t *testing.T) {
 	secondSandboxConfig.Labels = map[string]string{"unique": "second", "common": "both"}
 
 	sandboxConfigs := []*kubeapi.PodSandboxConfig{firstSandboxConfig, secondSandboxConfig}
-	state_ready := kubeapi.PodSandBoxState_READY
-	state_notready := kubeapi.PodSandBoxState_NOTREADY
+	stateReady := kubeapi.PodSandboxState_SANDBOX_READY
+	stateNotReady := kubeapi.PodSandboxState_SANDBOX_NOTREADY
 
 	tests := []struct {
 		filter      *kubeapi.PodSandboxFilter
@@ -261,13 +262,13 @@ func TestListPodSandbox(t *testing.T) {
 		},
 		{
 			filter: &kubeapi.PodSandboxFilter{
-				State: &state_ready,
+				State: &stateReady,
 			},
 			expectedIds: []string{*firstSandboxConfig.Metadata.Uid, *secondSandboxConfig.Metadata.Uid},
 		},
 		{
 			filter: &kubeapi.PodSandboxFilter{
-				State: &state_notready,
+				State: &stateNotReady,
 			},
 			expectedIds: []string{},
 		},
