@@ -335,12 +335,13 @@ func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, i
 		}
 	}
 
-	snapshotImage, err := v.createBootImageSnapshot("snapshot_"+uuid, imageFilepath)
+	snapshotName := "snapshot_" + uuid
+	snapshotImage, err := v.createBootImageSnapshot(snapshotName, imageFilepath)
 	if err != nil {
 		return "", err
 	}
 
-	boltClient.SetContainer(uuid, sandboxId, config.GetImage().GetImage(), snapshotImage, config.Labels, config.Annotations)
+	boltClient.SetContainer(uuid, sandboxId, config.GetImage().GetImage(), snapshotName, config.Labels, config.Annotations)
 
 	memory := config.GetLinux().GetResources().GetMemoryLimitInBytes()
 	memoryUnit := "b"

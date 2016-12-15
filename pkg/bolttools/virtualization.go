@@ -31,7 +31,7 @@ type ContainerInfo struct {
 	StartedAt             int64
 	SandboxId             string
 	Image                 string
-	RootImageSnapshotPath string
+	RootImageSnapshotName string
 	Labels                map[string]string
 	Annotations           map[string]string
 	State                 kubeapi.ContainerState
@@ -49,7 +49,7 @@ func (b *BoltClient) VerifyVirtualizationSchema() error {
 	return err
 }
 
-func (b *BoltClient) SetContainer(containerId, sandboxId, image, rootImageSnapshotPath string, labels, annotations map[string]string) error {
+func (b *BoltClient) SetContainer(containerId, sandboxId, image, rootImageSnapshotName string, labels, annotations map[string]string) error {
 	strLabels, err := json.Marshal(labels)
 	if err != nil {
 		return err
@@ -98,7 +98,7 @@ func (b *BoltClient) SetContainer(containerId, sandboxId, image, rootImageSnapsh
 			return err
 		}
 
-		if err := bucket.Put([]byte("rootImageSnapshotPath"), []byte(rootImageSnapshotPath)); err != nil {
+		if err := bucket.Put([]byte("rootImageSnapshotName"), []byte(rootImageSnapshotName)); err != nil {
 			return err
 		}
 
@@ -207,7 +207,7 @@ func (b *BoltClient) GetContainerInfo(containerId string) (*ContainerInfo, error
 			return err
 		}
 
-		rootImageSnapshotPath, err := getString(bucket, "rootImageSnapshotPath")
+		rootImageSnapshotName, err := getString(bucket, "rootImageSnapshotName")
 		if err != nil {
 			return err
 		}
@@ -247,7 +247,7 @@ func (b *BoltClient) GetContainerInfo(containerId string) (*ContainerInfo, error
 			StartedAt: startedAt,
 			SandboxId: sandboxId,
 			Image:     image,
-			RootImageSnapshotPath: rootImageSnapshotPath,
+			RootImageSnapshotName: rootImageSnapshotName,
 			Labels:                labels,
 			Annotations:           annotations,
 			State:                 kubeapi.ContainerState(byteState[0]),
