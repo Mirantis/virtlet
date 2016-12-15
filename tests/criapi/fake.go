@@ -10,7 +10,7 @@ type ContainerTestConfigSet struct {
 	SandboxId             string
 	ContainerId           string
 	Image                 string
-	RootImageSnapshotPath string
+	RootImageSnapshotName string
 	Labels                map[string]string
 	Annotations           map[string]string
 }
@@ -85,7 +85,7 @@ func GetContainersConfig(sandboxConfigs []*kubeapi.PodSandboxConfig) ([]*Contain
 		containerConf := &ContainerTestConfigSet{
 			SandboxId: *sandbox.Metadata.Uid,
 			Image:     "testImage",
-			RootImageSnapshotPath: "/sample/path",
+			RootImageSnapshotName: "sample_name",
 			ContainerId:           uid,
 			Labels:                map[string]string{"foo": "bar", "fizz": "buzz"},
 			Annotations:           map[string]string{"hello": "world", "virt": "let"},

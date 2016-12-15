@@ -69,13 +69,13 @@ func TestSetContainer(t *testing.T) {
 				t.Errorf("Expected %s, instead got %s", container.Image, image)
 			}
 
-			rootImageSnapshotPath, err := getString(bucket, "rootImageSnapshotPath")
+			rootImageSnapshotName, err := getString(bucket, "rootImageSnapshotName")
 			if err != nil {
 				return err
 			}
 
-			if rootImageSnapshotPath != container.RootImageSnapshotPath {
-				t.Errorf("Expected %s, instead got %s", container.RootImageSnapshotPath, rootImageSnapshotPath)
+			if rootImageSnapshotName != container.RootImageSnapshotName {
+				t.Errorf("Expected %s, instead got %s", container.RootImageSnapshotName, rootImageSnapshotName)
 			}
 
 			labels, err := getString(bucket, "labels")
