@@ -1,5 +1,5 @@
-hash: 7279f090814b9cc433c587f4c6ca27e7dcdedb45bf85a06f73fa1bebcf334cd9
-updated: 2016-12-05T13:46:38.758422468+03:00
+hash: fa3d1e706971c5363fe2c8804ade9bddd498856f61a72b7b63ac4aab3a26f3ca
+updated: 2016-12-15T15:09:09.243431338+03:00
 imports:
 - name: github.com/boltdb/bolt
   version: dfb21201d9270c1082d5fb0f07f500311ff72f18
@@ -50,8 +50,9 @@ imports:
 - name: github.com/golang/glog
   version: 23def4e6c14b4da8ac2ed8007337bc5eb5007998
 - name: github.com/golang/protobuf
-  version: 98fa357170587e470c5f27d3c3ea0947b71eb455
+  version: 8616e8ee5e20a1704615e6c8d7afcdac06087a67
   subpackages:
+  - jsonpb
   - proto
 - name: github.com/nu7hatch/gouuid
   version: 179d4d0c4d8d407a32af483c2354df1d2c91e6c3
@@ -78,7 +79,7 @@ imports:
   - lex/httplex
   - trace
 - name: golang.org/x/sys
-  version: 8f0908ab3b2457e2e15403d3697c9ef5cb4b57a9
+  version: e11762ca30adc5b39fdbfd8c4250dabeb8e456d3
   subpackages:
   - unix
 - name: google.golang.org/grpc
@@ -93,7 +94,7 @@ imports:
   - peer
   - transport
 - name: k8s.io/kubernetes
-  version: 1837914d8e219f54631131c7b3c59b8844df5b2c
+  version: 82450d03cb057bab0950214ef122b67c83fb11df
   repo: git://github.com/kubernetes/kubernetes.git
   vcs: git
   subpackages:
@@ -101,4 +102,5 @@ imports:
   - pkg/fields
   - pkg/kubelet/api/v1alpha1/runtime
   - pkg/selection
+  - pkg/util/exec
 testImports: []

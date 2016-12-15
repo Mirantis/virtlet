@@ -166,7 +166,7 @@ func (v *VirtletManager) StopPodSandbox(ctx context.Context, in *kubeapi.StopPod
 	podSandboxId := in.GetPodSandboxId()
 	glog.V(2).Infof("StopPodSandbox called for pod %s", in.GetPodSandboxId())
 	glog.V(3).Infof("StopPodSandbox: %s", spew.Sdump(in))
-	if err := v.boltClient.UpdatePodState(podSandboxId, byte(kubeapi.PodSandBoxState_NOTREADY)); err != nil {
+	if err := v.boltClient.UpdatePodState(podSandboxId, byte(kubeapi.PodSandboxState_SANDBOX_NOTREADY)); err != nil {
 		glog.Errorf("Error when stopping pod sandbox '%s': %v", podSandboxId, err)
 		return nil, err
 	}
@@ -380,9 +380,49 @@ func (v *VirtletManager) ContainerStatus(ctx context.Context, in *kubeapi.Contai
 	return response, nil
 }
 
-func (v *VirtletManager) Exec(kubeapi.RuntimeService_ExecServer) error {
-	glog.V(3).Infof("Exec (not imageFilepath)")
-	return errors.New("not implemented")
+func (v *VirtletManager) ExecSync(context.Context, *kubeapi.ExecSyncRequest) (*kubeapi.ExecSyncResponse, error) {
+	glog.Errorf("ExecSync() not implemented")
+	return nil, errors.New("not implemented")
+}
+
+func (v *VirtletManager) Exec(context.Context, *kubeapi.ExecRequest) (*kubeapi.ExecResponse, error) {
+	glog.Errorf("Exec() not implemented")
+	return nil, errors.New("not implemented")
+}
+
+func (v *VirtletManager) Attach(context.Context, *kubeapi.AttachRequest) (*kubeapi.AttachResponse, error) {
+	glog.Errorf("Attach() not implemented")
+	return nil, errors.New("not implemented")
+}
+
+func (v *VirtletManager) PortForward(context.Context, *kubeapi.PortForwardRequest) (*kubeapi.PortForwardResponse, error) {
+	glog.Errorf("PortForward() not implemented")
+	return nil, errors.New("not implemented")
+}
+
+func (v *VirtletManager) UpdateRuntimeConfig(context.Context, *kubeapi.UpdateRuntimeConfigRequest) (*kubeapi.UpdateRuntimeConfigResponse, error) {
+	// we don't need to do anything here for now
+	return &kubeapi.UpdateRuntimeConfigResponse{}, nil
+}
+
+func (v *VirtletManager) Status(context.Context, *kubeapi.StatusRequest) (*kubeapi.StatusResponse, error) {
+	ready := true
+	runtimeReadyStr := kubeapi.RuntimeReady
+	networkReadyStr := kubeapi.NetworkReady
+	return &kubeapi.StatusResponse{
+		Status: &kubeapi.RuntimeStatus{
+			Conditions: []*kubeapi.RuntimeCondition{
+				{
+					Type:   &runtimeReadyStr,
+					Status: &ready,
+				},
+				{
+					Type:   &networkReadyStr,
+					Status: &ready,
+				},
+			},
+		},
+	}, nil
 }
 
 //

@@ -63,9 +63,14 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConf
 		return fmt.Errorf("sandbox config is missing Linux attribute: %s", spew.Sdump(config))
 	}
 
-	namespaceOptions := linuxSandbox.GetNamespaceOptions()
+	if linuxSandbox.GetSecurityContext() == nil {
+		// XXX: is this correct ?
+		return fmt.Errorf("Linux sandbox config is missing SecurityContext attribute: %s", spew.Sdump(config))
+	}
+
+	namespaceOptions := linuxSandbox.GetSecurityContext().GetNamespaceOptions()
 	if namespaceOptions == nil {
-		return fmt.Errorf("Linux sandbox config is missing Namespaces attribute: %s", spew.Sdump(config))
+		return fmt.Errorf("SecurityContext is missing Namespaces attribute: %s", spew.Sdump(config))
 	}
 
 	err = b.db.Batch(func(tx *bolt.Tx) error {
@@ -103,7 +108,7 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConf
 			return err
 		}
 
-		if err := sandboxBucket.Put([]byte("state"), []byte{byte(kubeapi.PodSandBoxState_READY)}); err != nil {
+		if err := sandboxBucket.Put([]byte("state"), []byte{byte(kubeapi.PodSandboxState_SANDBOX_READY)}); err != nil {
 			return err
 		}
 
@@ -354,7 +359,7 @@ func (b *BoltClient) GetPodSandboxStatus(podId string) (*kubeapi.PodSandboxStatu
 			Attempt:   &uint32MetadataAttempt,
 		}
 
-		state := kubeapi.PodSandBoxState(bytesState[0])
+		state := kubeapi.PodSandboxState(bytesState[0])
 
 		namespaceOptions := &kubeapi.NamespaceOption{
 			HostNetwork: &hostNetwork,
@@ -488,7 +493,7 @@ func (b *BoltClient) getPodSandbox(sandboxId []byte, filter *kubeapi.PodSandboxF
 			Attempt:   &uint32MetadataAttempt,
 		}
 
-		state := kubeapi.PodSandBoxState(bytesState[0])
+		state := kubeapi.PodSandboxState(bytesState[0])
 
 		podSandbox = &kubeapi.PodSandbox{
 			Id:        &strSandboxId,

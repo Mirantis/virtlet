@@ -110,7 +110,7 @@ func (b *BoltClient) SetContainer(containerId, sandboxId, image, rootImageSnapsh
 			return err
 		}
 
-		if err := bucket.Put([]byte("state"), []byte{byte(kubeapi.ContainerState_CREATED)}); err != nil {
+		if err := bucket.Put([]byte("state"), []byte{byte(kubeapi.ContainerState_CONTAINER_CREATED)}); err != nil {
 			return err
 		}
 

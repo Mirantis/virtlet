@@ -450,27 +450,27 @@ func libvirtToKubeState(domainInfo C.virDomainInfo, lastState kubeapi.ContainerS
 
 	switch domainInfo.state {
 	case C.VIR_DOMAIN_RUNNING:
-		containerState = kubeapi.ContainerState_RUNNING
+		containerState = kubeapi.ContainerState_CONTAINER_RUNNING
 	case C.VIR_DOMAIN_PAUSED:
-		if lastState == kubeapi.ContainerState_CREATED {
-			containerState = kubeapi.ContainerState_CREATED
+		if lastState == kubeapi.ContainerState_CONTAINER_CREATED {
+			containerState = kubeapi.ContainerState_CONTAINER_CREATED
 		} else {
-			containerState = kubeapi.ContainerState_EXITED
+			containerState = kubeapi.ContainerState_CONTAINER_EXITED
 		}
 	case C.VIR_DOMAIN_SHUTDOWN:
-		containerState = kubeapi.ContainerState_EXITED
+		containerState = kubeapi.ContainerState_CONTAINER_EXITED
 	case C.VIR_DOMAIN_SHUTOFF:
-		if lastState == kubeapi.ContainerState_CREATED {
-			containerState = kubeapi.ContainerState_CREATED
+		if lastState == kubeapi.ContainerState_CONTAINER_CREATED {
+			containerState = kubeapi.ContainerState_CONTAINER_CREATED
 		} else {
-			containerState = kubeapi.ContainerState_EXITED
+			containerState = kubeapi.ContainerState_CONTAINER_EXITED
 		}
 	case C.VIR_DOMAIN_CRASHED:
-		containerState = kubeapi.ContainerState_EXITED
+		containerState = kubeapi.ContainerState_CONTAINER_EXITED
 	case C.VIR_DOMAIN_PMSUSPENDED:
-		containerState = kubeapi.ContainerState_EXITED
+		containerState = kubeapi.ContainerState_CONTAINER_EXITED
 	default:
-		containerState = kubeapi.ContainerState_UNKNOWN
+		containerState = kubeapi.ContainerState_CONTAINER_UNKNOWN
 	}
 
 	return containerState
@@ -526,7 +526,7 @@ func (v *VirtualizationTool) getContainer(boltClient *bolttools.BoltClient, doma
 		}
 		startedAt := time.Now().UnixNano()
 		strStartedAt := strconv.FormatInt(startedAt, 10)
-		if containerState == kubeapi.ContainerState_RUNNING {
+		if containerState == kubeapi.ContainerState_CONTAINER_RUNNING {
 			if err := boltClient.UpdateStartedAt(containerId, strStartedAt); err != nil {
 				return nil, err
 			}
@@ -685,7 +685,7 @@ func (v *VirtualizationTool) ContainerStatus(boltClient *bolttools.BoltClient, c
 		}
 		startedAt := time.Now().UnixNano()
 		strStartedAt := strconv.FormatInt(startedAt, 10)
-		if containerState == kubeapi.ContainerState_RUNNING {
+		if containerState == kubeapi.ContainerState_CONTAINER_RUNNING {
 			if err := boltClient.UpdateStartedAt(containerId, strStartedAt); err != nil {
 				return nil, err
 			}
