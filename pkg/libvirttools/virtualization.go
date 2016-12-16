@@ -561,7 +561,8 @@ func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, fi
 			domainPtr, err := v.GetDomainPointerById(filter.GetId())
 			defer C.virDomainFree(domainPtr)
 			if err != nil {
-				return nil, err
+				// There is no such domain - looks like it is already removed, so return an empty list
+				return containers, nil
 			}
 			container, err := v.getContainer(boltClient, domainPtr)
 			if err != nil {
@@ -578,12 +579,14 @@ func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, fi
 		} else if filter.GetPodSandboxId() != "" {
 			domainID, err := boltClient.GetPodSandboxContainerID(filter.GetPodSandboxId())
 			if err != nil {
-				return nil, err
+				// We don't have this sandbox - looks like it's already removed, so return an empty list
+				return containers, nil
 			}
 			domainPtr, err := v.GetDomainPointerById(domainID)
 			defer C.virDomainFree(domainPtr)
 			if err != nil {
-				return nil, err
+				// There is no such domain - looks like it is already removed, so return an empty list
+				return containers, nil
 			}
 			container, err := v.getContainer(boltClient, domainPtr)
 			if err != nil {
