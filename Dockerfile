@@ -15,12 +15,12 @@ RUN mkdir -p /var/data/virtlet /var/lib/virtlet /opt/cni/bin && \
     curl -L https://github.com/containernetworking/cni/releases/download/v0.3.0/cni-v0.3.0.tgz | \
       tar zxC /opt/cni/bin
 
+COPY image_skel /.
+
+CMD ["/start.sh"]
+
 # Integration tests look for virtlet in $PATH
 # and we want it to be located in the same place both
 # in build/test image and production one
 COPY _output/virtlet /usr/local/bin
 COPY _output/vmwrapper /
-
-COPY image_skel /.
-
-CMD ["/start.sh"]
