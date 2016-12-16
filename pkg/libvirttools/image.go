@@ -33,8 +33,6 @@ import (
 	"strings"
 	"unsafe"
 
-	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-
 	"github.com/Mirantis/virtlet/pkg/download"
 )
 
@@ -69,7 +67,12 @@ func NewImageTool(conn C.virConnectPtr, poolName string, storageBackendName stri
 	}, nil
 }
 
-func (i *ImageTool) ListImages() ([]*kubeapi.Image, error) {
+type ImageInfo struct {
+	Name string
+	Size uint64
+}
+
+func (i *ImageTool) ListImages() ([]ImageInfo, error) {
 	var cList *C.virStorageVolPtr
 	count := C.virStoragePoolListAllVolumes(i.pool, (**C.virStorageVolPtr)(&cList), 0)
 	if count < 0 {
@@ -82,7 +85,7 @@ func (i *ImageTool) ListImages() ([]*kubeapi.Image, error) {
 	}
 	volumes := *(*[]C.virStorageVolPtr)(unsafe.Pointer(&header))
 
-	images := make([]*kubeapi.Image, 0, count)
+	images := make([]ImageInfo, 0, count)
 
 	for _, volume := range volumes {
 		id := C.GoString(C.virStorageVolGetName(volume))
@@ -92,33 +95,26 @@ func (i *ImageTool) ListImages() ([]*kubeapi.Image, error) {
 		}
 		size := uint64(volInfo.capacity)
 
-		images = append(images, &kubeapi.Image{
-			Id:       &id,
-			RepoTags: []string{id},
-			Size_:    &size,
+		images = append(images, ImageInfo{
+			Name: id,
+			Size: size,
 		})
 	}
 
 	return images, nil
 }
 
-func (i *ImageTool) ImageStatus(name string) (*kubeapi.Image, error) {
-	vol, err := LookupVol(name, i.pool)
+func (i *ImageTool) ImageSize(name string) (uint64, error) {
+	vol, err := LookupVolumeByName(name, i.pool)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	volInfo, err := VolGetInfo(vol)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
-	size := uint64(volInfo.capacity)
-	image := &kubeapi.Image{
-		Id:       &name,
-		RepoTags: []string{name},
-		Size_:    &size,
-	}
-	return image, nil
+	return uint64(volInfo.capacity), nil
 }
 
 func (i *ImageTool) PullImage(name string) (string, error) {
@@ -147,5 +143,5 @@ func (i *ImageTool) PullImage(name string) (string, error) {
 }
 
 func (i *ImageTool) RemoveImage(name string) error {
-	return RemoveVol(name, i.pool)
+	return RemoveVolumeByName(name, i.pool)
 }

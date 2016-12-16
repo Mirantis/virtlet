@@ -245,7 +245,7 @@ func (v *VirtualizationTool) createVolumes(containerName string, mounts []*kubea
 	if len(mounts) == 0 {
 		return domXML, nil
 	}
-	glog.V(2).Infof("INPUT domain:\n%s\n\n", domXML)
+	glog.V(3).Infof("INPUT domain:\n%s\n\n", domXML)
 	domainXML := &Domain{}
 	err := xml.Unmarshal([]byte(domXML), domainXML)
 	if err != nil {
@@ -255,7 +255,7 @@ func (v *VirtualizationTool) createVolumes(containerName string, mounts []*kubea
 	for _, mount := range mounts {
 		volumeName := containerName + "_" + strings.Replace(mount.GetContainerPath(), "/", "_", -1)
 		if mount.GetHostPath() != "" {
-			vol, err := LookupVol(volumeName, v.volumePool)
+			vol, err := LookupVolumeByName(volumeName, v.volumePool)
 			if vol == nil {
 				vol, err = v.volumeStorage.CreateVol(v.volumePool, volumeName, defaultCapacity, defaultCapacityUnit)
 			}
