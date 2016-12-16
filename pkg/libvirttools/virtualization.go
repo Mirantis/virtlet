@@ -558,10 +558,22 @@ func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, fi
 
 	if filter != nil {
 		if filter.GetId() != "" {
+			// Verify if there is container metadata
+			containerInfo, err := boltClient.GetContainerInfo(filter.GetId())
+			if err != nil {
+				return nil, err
+			}
+			if containerInfo == nil {
+				// There's no such container - looks like it's already removed, so return an empty list
+				return containers, nil
+			}
+
+			// Query libvirt for domain found in bolt
 			domainPtr, err := v.GetDomainPointerById(filter.GetId())
 			defer C.virDomainFree(domainPtr)
 			if err != nil {
-				return nil, err
+				// There's no such domain - looks like it's already removed, so return an empty list
+				return containers, nil
 			}
 			container, err := v.getContainer(boltClient, domainPtr)
 			if err != nil {
@@ -578,12 +590,24 @@ func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, fi
 		} else if filter.GetPodSandboxId() != "" {
 			domainID, err := boltClient.GetPodSandboxContainerID(filter.GetPodSandboxId())
 			if err != nil {
+				// There's no such sandbox - looks like it's already removed, so return an empty list
+				return containers, nil
+			}
+			// Verify if there is container metadata
+			containerInfo, err := boltClient.GetContainerInfo(domainID)
+			if err != nil {
 				return nil, err
 			}
+			if containerInfo == nil {
+				// There's no such container - looks like it's already removed, but still is mentioned in sandbox
+				return nil, fmt.Errorf("Container metadata not found, but it's still mentioned in sandbox %s", filter.GetPodSandboxId())
+			}
+
 			domainPtr, err := v.GetDomainPointerById(domainID)
 			defer C.virDomainFree(domainPtr)
 			if err != nil {
-				return nil, err
+				// There's no such domain - looks like it's already removed, so return an empty list
+				return containers, nil
 			}
 			container, err := v.getContainer(boltClient, domainPtr)
 			if err != nil {
