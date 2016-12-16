@@ -113,6 +113,10 @@ func (v *VirtletManager) Version(ctx context.Context, in *kubeapi.VersionRequest
 	}, nil
 }
 
+//
+// Sandboxes
+//
+
 func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSandboxRequest) (*kubeapi.RunPodSandboxResponse, error) {
 	config := in.GetConfig()
 	podId := config.GetMetadata().GetUid()
@@ -237,6 +241,10 @@ func (v *VirtletManager) ListPodSandbox(ctx context.Context, in *kubeapi.ListPod
 	glog.V(3).Infof("ListPodSandbox response: %s", spew.Sdump(response))
 	return response, nil
 }
+
+//
+// Containers
+//
 
 func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.CreateContainerRequest) (*kubeapi.CreateContainerResponse, error) {
 	config := in.GetConfig()
@@ -372,13 +380,27 @@ func (v *VirtletManager) Exec(kubeapi.RuntimeService_ExecServer) error {
 	return errors.New("not implemented")
 }
 
+//
+// Images
+//
+
 func (v *VirtletManager) ListImages(ctx context.Context, in *kubeapi.ListImagesRequest) (*kubeapi.ListImagesResponse, error) {
 	images, err := v.libvirtImageTool.ListImages()
 	if err != nil {
 		glog.Errorf("Error when listing images: %v", err)
 		return nil, err
 	}
-	response := &kubeapi.ListImagesResponse{Images: images}
+
+	kubeImages := make([]*kubeapi.Image, 0, len(images))
+	for _, image := range images {
+		kubeImages = append(kubeImages, &kubeapi.Image{
+			Id:       &image.Name,
+			RepoTags: []string{image.Name},
+			Size_:    &image.Size,
+		})
+	}
+
+	response := &kubeapi.ListImagesResponse{Images: kubeImages}
 	glog.V(3).Infof("ListImages response: %s", spew.Sdump(response))
 	return response, err
 }
@@ -394,13 +416,18 @@ func (v *VirtletManager) ImageStatus(ctx context.Context, in *kubeapi.ImageStatu
 	if filepath == "" {
 		return &kubeapi.ImageStatusResponse{}, nil
 	}
-	image, err := v.libvirtImageTool.ImageStatus(filepath)
+
+	size, err := v.libvirtImageTool.ImageSize(name)
 	if err != nil {
-		glog.Errorf("Error when getting image '%s' in path '%s' status: %v", name, filepath, err)
+		glog.Errorf("Error when getting size for image '%s' in path '%s': %v", name, filepath, err)
 		return nil, err
 	}
 
-	response := &kubeapi.ImageStatusResponse{Image: image}
+	response := &kubeapi.ImageStatusResponse{Image: &kubeapi.Image{
+		Id:       &name,
+		RepoTags: []string{name},
+		Size_:    &size,
+	}}
 	glog.V(3).Infof("ImageStatus response: %s", spew.Sdump(response))
 	return response, err
 }

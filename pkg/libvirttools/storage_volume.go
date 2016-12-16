@@ -127,7 +127,7 @@ func VolGetPath(vol C.virStorageVolPtr) (string, error) {
 
 }
 
-func LookupVol(name string, pool C.virStoragePoolPtr) (C.virStorageVolPtr, error) {
+func LookupVolumeByName(name string, pool C.virStoragePoolPtr) (C.virStorageVolPtr, error) {
 	cName := C.CString(name)
 	defer C.free(unsafe.Pointer(cName))
 	vol := C.virStorageVolLookupByName(pool, cName)
@@ -137,8 +137,8 @@ func LookupVol(name string, pool C.virStoragePoolPtr) (C.virStorageVolPtr, error
 	return vol, nil
 }
 
-func RemoveVol(name string, pool C.virStoragePoolPtr) error {
-	vol, err := LookupVol(name, pool)
+func RemoveVolumeByName(name string, pool C.virStoragePoolPtr) error {
+	vol, err := LookupVolumeByName(name, pool)
 	if err != nil {
 		return err
 	}
