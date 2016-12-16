@@ -317,24 +317,21 @@ func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, i
 
 	config := in.GetConfig()
 	name := config.GetMetadata().GetName()
+	sandboxId := in.GetPodSandboxId()
 	if name == "" {
 		name = uuid
 	} else {
-		//check whether the domain with such name already exists, need to stop&destroy&undefine it then
-		domain, err := v.GetDomainByName(name)
+		// check whether the domain with such name already exists, if so - return it's uuid
+		domainName := sandboxId + "-" + name
+		domain, _ := v.GetDomainByName(domainName)
 		if domain != nil {
 			if domainID, err := v.GetDomainUUID(domain); err == nil {
-				//TODO: This is temp workaround for returning existent domain on create container call to overcome SyncPod issues
 				return domainID, nil
-				//glog.V(2).Infof("Removing domain with name: %s and id: %s", name, domainID)
-				//v.RemoveContainer(domainID)
 			} else {
-				glog.Errorf("Failed to get UUID for domain with name: %s due to %v", name, err)
+				glog.Errorf("Failed to get UUID for domain with name: %s due to %v", domainName, err)
+				return "", fmt.Errorf("Failure in communication with libvirt: %v", err)
 			}
-		} else {
-			glog.Errorf("Failed to find domain with name: %s due to %v", name, err)
 		}
-
 	}
 
 	snapshotImage, err := v.createBootImageSnapshot("snapshot_"+uuid, imageFilepath)
@@ -342,7 +339,7 @@ func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, i
 		return "", err
 	}
 
-	boltClient.SetContainer(uuid, in.GetPodSandboxId(), config.GetImage().GetImage(), snapshotImage, config.Labels, config.Annotations)
+	boltClient.SetContainer(uuid, sandboxId, config.GetImage().GetImage(), snapshotImage, config.Labels, config.Annotations)
 
 	memory := config.GetLinux().GetResources().GetMemoryLimitInBytes()
 	memoryUnit := "b"
