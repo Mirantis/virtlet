@@ -57,18 +57,23 @@ func NewVirtletManager(libvirtUri, poolName, storageBackend, boltPath, cniPlugin
 	if err != nil {
 		return nil, err
 	}
-	libvirtImageTool, err := libvirttools.NewImageTool(libvirtConnTool.Conn, poolName, storageBackend)
+
+	libvirtImageTool, err := libvirttools.NewImageTool(libvirtConnTool.Conn, poolName)
 	if err != nil {
 		return nil, err
 	}
-	libvirtVirtualizationTool, err := libvirttools.NewVirtualizationTool(libvirtConnTool.Conn, "volumes", "dir")
+
+	// TODO: pool name should be passed like for imageTool
+	libvirtVirtualizationTool, err := libvirttools.NewVirtualizationTool(libvirtConnTool.Conn, "volumes")
 	if err != nil {
 		return nil, err
 	}
+
 	boltClient, err := bolttools.NewBoltClient(boltPath)
 	if err != nil {
 		return nil, err
 	}
+
 	cniClient, err := cni.NewClient(cniPluginsDir, cniConfigsDir)
 	if err != nil {
 		return nil, err
@@ -112,6 +117,10 @@ func (v *VirtletManager) Version(ctx context.Context, in *kubeapi.VersionRequest
 		RuntimeApiVersion: &vRuntimeVersion,
 	}, nil
 }
+
+//
+// Sandboxes
+//
 
 func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSandboxRequest) (*kubeapi.RunPodSandboxResponse, error) {
 	config := in.GetConfig()
@@ -237,6 +246,10 @@ func (v *VirtletManager) ListPodSandbox(ctx context.Context, in *kubeapi.ListPod
 	glog.V(3).Infof("ListPodSandbox response: %s", spew.Sdump(response))
 	return response, nil
 }
+
+//
+// Containers
+//
 
 func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.CreateContainerRequest) (*kubeapi.CreateContainerResponse, error) {
 	config := in.GetConfig()
@@ -372,11 +385,24 @@ func (v *VirtletManager) Exec(kubeapi.RuntimeService_ExecServer) error {
 	return errors.New("not implemented")
 }
 
+//
+// Images
+//
+
 func (v *VirtletManager) ListImages(ctx context.Context, in *kubeapi.ListImagesRequest) (*kubeapi.ListImagesResponse, error) {
-	images, err := v.libvirtImageTool.ListImages()
+	volumeInfos, err := v.libvirtImageTool.ListImagesAsVolumeInfos()
 	if err != nil {
 		glog.Errorf("Error when listing images: %v", err)
 		return nil, err
+	}
+	images := make([]*kubeapi.Image, 0, len(volumeInfos))
+
+	for _, volumeInfo := range volumeInfos {
+		images = append(images, &kubeapi.Image{
+			Id:       &volumeInfo.Name,
+			RepoTags: []string{volumeInfo.Name},
+			Size_:    &volumeInfo.Size,
+		})
 	}
 	response := &kubeapi.ListImagesResponse{Images: images}
 	glog.V(3).Infof("ListImages response: %s", spew.Sdump(response))
@@ -394,13 +420,17 @@ func (v *VirtletManager) ImageStatus(ctx context.Context, in *kubeapi.ImageStatu
 	if filepath == "" {
 		return &kubeapi.ImageStatusResponse{}, nil
 	}
-	image, err := v.libvirtImageTool.ImageStatus(filepath)
+	volumeInfo, err := v.libvirtImageTool.ImageAsVolumeInfo(name)
 	if err != nil {
-		glog.Errorf("Error when getting image '%s' in path '%s' status: %v", name, filepath, err)
+		glog.Errorf("Error when getting info for image '%s' in path '%s': %v", name, filepath, err)
 		return nil, err
 	}
 
-	response := &kubeapi.ImageStatusResponse{Image: image}
+	response := &kubeapi.ImageStatusResponse{Image: &kubeapi.Image{
+		Id:       &volumeInfo.Name,
+		RepoTags: []string{volumeInfo.Name},
+		Size_:    &volumeInfo.Size,
+	}}
 	glog.V(3).Infof("ImageStatus response: %s", spew.Sdump(response))
 	return response, err
 }
@@ -432,7 +462,7 @@ func (v *VirtletManager) PullImage(ctx context.Context, in *kubeapi.PullImageReq
 		return &kubeapi.PullImageResponse{}, nil
 	}
 
-	filepath, err := v.libvirtImageTool.PullImage(name)
+	filepath, err := v.libvirtImageTool.PullImageToVolume(name)
 	if err != nil {
 		glog.Errorf("Error when pulling image '%s': %v", name, err)
 		return nil, err
