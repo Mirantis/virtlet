@@ -226,18 +226,13 @@ var volXML string = `
 </disk>`
 
 func (v *VirtualizationTool) createBootImageSnapshot(imageName, backingStorePath string) (string, error) {
-	vol, err := v.volumeStorage.CreateSnapshot(v.volumePool, imageName, defaultCapacity, defaultCapacityUnit, backingStorePath)
-
-	if err != nil {
-		return "", err
-	}
-	path, err := VolGetPath(vol)
+	vol, err := v.volumeStorage.CreateSnapshot(imageName, defaultCapacity, defaultCapacityUnit, backingStorePath)
 
 	if err != nil {
 		return "", err
 	}
 
-	return path, err
+	return vol.GetPath()
 }
 
 func (v *VirtualizationTool) createVolumes(containerName string, mounts []*kubeapi.Mount, domXML string) (string, error) {
@@ -245,7 +240,7 @@ func (v *VirtualizationTool) createVolumes(containerName string, mounts []*kubea
 	if len(mounts) == 0 {
 		return domXML, nil
 	}
-	glog.V(2).Infof("INPUT domain:\n%s\n\n", domXML)
+	glog.V(3).Infof("INPUT domain:\n%s\n\n", domXML)
 	domainXML := &Domain{}
 	err := xml.Unmarshal([]byte(domXML), domainXML)
 	if err != nil {
@@ -255,21 +250,24 @@ func (v *VirtualizationTool) createVolumes(containerName string, mounts []*kubea
 	for _, mount := range mounts {
 		volumeName := containerName + "_" + strings.Replace(mount.GetContainerPath(), "/", "_", -1)
 		if mount.GetHostPath() != "" {
-			vol, err := LookupVol(volumeName, v.volumePool)
+			vol, err := v.volumeStorage.LookupVolume(volumeName)
 			if vol == nil {
-				vol, err = v.volumeStorage.CreateVol(v.volumePool, volumeName, defaultCapacity, defaultCapacityUnit)
+				vol, err = v.volumeStorage.CreateVolume(volumeName, defaultCapacity, defaultCapacityUnit)
 			}
 			if err != nil {
 				return domXML, err
 			}
-			path, err := VolGetPath(vol)
+
+			path, err := vol.GetPath()
 			if err != nil {
 				return copyDomXML, err
 			}
+
 			err = utils.FormatDisk(path)
 			if err != nil {
 				return copyDomXML, err
 			}
+
 			volXML = fmt.Sprintf(volXML, path)
 			disk := &Disk{}
 			err = xml.Unmarshal([]byte(volXML), disk)
@@ -277,11 +275,13 @@ func (v *VirtualizationTool) createVolumes(containerName string, mounts []*kubea
 			if err != nil {
 				return domXML, err
 			}
+
 			domainXML.Devs.DiskList = append(domainXML.Devs.DiskList, *disk)
 			outArr, err := xml.MarshalIndent(domainXML, " ", "  ")
 			if err != nil {
 				return copyDomXML, err
 			}
+
 			domXML = string(outArr[:])
 			break
 		}
@@ -291,22 +291,16 @@ func (v *VirtualizationTool) createVolumes(containerName string, mounts []*kubea
 
 type VirtualizationTool struct {
 	conn           C.virConnectPtr
-	volumeStorage  StorageBackend
-	volumePool     C.virStoragePoolPtr
+	volumeStorage  *StorageTool
 	volumePoolName string
 }
 
-func NewVirtualizationTool(conn C.virConnectPtr, poolName string, storageBackendName string) (*VirtualizationTool, error) {
-	pool, err := LookupStoragePool(conn, poolName)
+func NewVirtualizationTool(conn C.virConnectPtr, poolName string) (*VirtualizationTool, error) {
+	storageTool, err := NewStorageTool(conn, poolName)
 	if err != nil {
 		return nil, err
 	}
-
-	storageBackend, err := GetStorageBackend(storageBackendName)
-	if err != nil {
-		return nil, err
-	}
-	return &VirtualizationTool{conn: conn, volumeStorage: storageBackend, volumePool: pool, volumePoolName: poolName}, nil
+	return &VirtualizationTool{conn: conn, volumeStorage: storageTool}, nil
 }
 
 func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, in *kubeapi.CreateContainerRequest, imageFilepath, netNSPath, cniConfig string) (string, error) {
@@ -335,12 +329,13 @@ func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, i
 		}
 	}
 
-	snapshotImage, err := v.createBootImageSnapshot("snapshot_"+uuid, imageFilepath)
+	snapshotName := "snapshot_" + uuid
+	snapshotImage, err := v.createBootImageSnapshot(snapshotName, imageFilepath)
 	if err != nil {
 		return "", err
 	}
 
-	boltClient.SetContainer(uuid, sandboxId, config.GetImage().GetImage(), snapshotImage, config.Labels, config.Annotations)
+	boltClient.SetContainer(uuid, sandboxId, config.GetImage().GetImage(), snapshotName, config.Labels, config.Annotations)
 
 	memory := config.GetLinux().GetResources().GetMemoryLimitInBytes()
 	memoryUnit := "b"
@@ -709,4 +704,8 @@ func (v *VirtualizationTool) ContainerStatus(boltClient *bolttools.BoltClient, c
 		CreatedAt: &containerInfo.CreatedAt,
 		StartedAt: &containerInfo.StartedAt,
 	}, nil
+}
+
+func (v *VirtualizationTool) RemoveVolume(name string) error {
+	return v.volumeStorage.RemoveVolume(name)
 }

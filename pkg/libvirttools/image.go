@@ -17,31 +17,20 @@ limitations under the License.
 package libvirttools
 
 /*
-#include <fcntl.h>
 #include <libvirt/libvirt.h>
 #include <libvirt/virterror.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include "image.h"
 */
 import "C"
 
 import (
-	"fmt"
 	"net/url"
-	"reflect"
 	"strings"
-	"unsafe"
-
-	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
 	"github.com/Mirantis/virtlet/pkg/download"
 )
 
 type ImageTool struct {
-	conn           C.virConnectPtr
-	pool           C.virStoragePoolPtr
-	storageBackend StorageBackend
+	tool *StorageTool
 }
 
 func cleanURIImageName(name string) string {
@@ -53,99 +42,36 @@ func cleanURIImageName(name string) string {
 	return segments[len(segments)-1]
 }
 
-func NewImageTool(conn C.virConnectPtr, poolName string, storageBackendName string) (*ImageTool, error) {
-	pool, err := LookupStoragePool(conn, poolName)
+func NewImageTool(conn C.virConnectPtr, poolName string) (*ImageTool, error) {
+	storageTool, err := NewStorageTool(conn, poolName)
 	if err != nil {
 		return nil, err
 	}
-	storageBackend, err := GetStorageBackend(storageBackendName)
-	if err != nil {
-		return nil, err
-	}
-	return &ImageTool{
-		conn:           conn,
-		pool:           pool,
-		storageBackend: storageBackend,
-	}, nil
+	return &ImageTool{tool: storageTool}, nil
 }
 
-func (i *ImageTool) ListImages() ([]*kubeapi.Image, error) {
-	var cList *C.virStorageVolPtr
-	count := C.virStoragePoolListAllVolumes(i.pool, (**C.virStorageVolPtr)(&cList), 0)
-	if count < 0 {
-		return nil, GetLibvirtLastError()
-	}
-	header := reflect.SliceHeader{
-		Data: uintptr(unsafe.Pointer(cList)),
-		Len:  int(count),
-		Cap:  int(count),
-	}
-	volumes := *(*[]C.virStorageVolPtr)(unsafe.Pointer(&header))
-
-	images := make([]*kubeapi.Image, 0, count)
-
-	for _, volume := range volumes {
-		id := C.GoString(C.virStorageVolGetName(volume))
-		volInfo, err := VolGetInfo(volume)
-		if err != nil {
-			return nil, err
-		}
-		size := uint64(volInfo.capacity)
-
-		images = append(images, &kubeapi.Image{
-			Id:       &id,
-			RepoTags: []string{id},
-			Size_:    &size,
-		})
-	}
-
-	return images, nil
+func (i *ImageTool) ListImagesAsVolumeInfos() ([]*VolumeInfo, error) {
+	return i.tool.ListVolumes()
 }
 
-func (i *ImageTool) ImageStatus(name string) (*kubeapi.Image, error) {
-	vol, err := LookupVol(name, i.pool)
+func (i *ImageTool) ImageAsVolumeInfo(name string) (*VolumeInfo, error) {
+	vol, err := i.tool.LookupVolume(name)
 	if err != nil {
 		return nil, err
 	}
-	volInfo, err := VolGetInfo(vol)
-	if err != nil {
-		return nil, err
-	}
-
-	size := uint64(volInfo.capacity)
-	image := &kubeapi.Image{
-		Id:       &name,
-		RepoTags: []string{name},
-		Size_:    &size,
-	}
-	return image, nil
+	return vol.Info()
 }
 
-func (i *ImageTool) PullImage(name string) (string, error) {
+func (i *ImageTool) PullImageToVolume(name string) (string, error) {
 	// TODO(nhlfr): Handle AuthConfig from PullImageRequest.
 	filepath, shortName, err := download.DownloadFile(name)
 	if err != nil {
 		return "", err
 	}
 
-	libvirtFilepath := fmt.Sprintf("/var/lib/libvirt/images/%s", shortName)
-	volXML := i.storageBackend.GenerateVolXML(i.pool, shortName, 5, "G", libvirtFilepath)
-
-	cShortName := C.CString(shortName)
-	defer C.free(unsafe.Pointer(cShortName))
-	cFilepath := C.CString(filepath)
-	defer C.free(unsafe.Pointer(cFilepath))
-	cVolXML := C.CString(volXML)
-	defer C.free(unsafe.Pointer(cVolXML))
-
-	status := C.pullImage(i.conn, i.pool, cShortName, cFilepath, cVolXML)
-	if err := cErrorHandler.Convert(status); err != nil {
-		return "", err
-	}
-
-	return libvirtFilepath, nil
+	return i.tool.PullImageToVolume(name, filepath, shortName)
 }
 
 func (i *ImageTool) RemoveImage(name string) error {
-	return RemoveVol(name, i.pool)
+	return i.tool.RemoveVolume(name)
 }
