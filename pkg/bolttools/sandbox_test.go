@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"github.com/boltdb/bolt"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+
 	"github.com/Mirantis/virtlet/tests/criapi"
 )
 

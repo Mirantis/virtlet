@@ -38,4 +38,3 @@ func getString(bucket *bolt.Bucket, key string) (string, error) {
 
 	return string(value), nil
 }
-
