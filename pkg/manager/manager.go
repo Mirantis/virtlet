@@ -343,7 +343,7 @@ func (v *VirtletManager) RemoveContainer(ctx context.Context, in *kubeapi.Remove
 		return nil, err
 	}
 
-	if err := v.libvirtImageTool.RemoveImage(containerInfo.RootImageSnapshotName); err != nil {
+	if err := v.libvirtVirtualizationTool.RemoveVolume(containerInfo.RootImageSnapshotName); err != nil {
 		glog.Errorf("Error when removing image snapshot with name '%s': %v", containerInfo.RootImageSnapshotName, err)
 		return nil, err
 	}

@@ -705,3 +705,7 @@ func (v *VirtualizationTool) ContainerStatus(boltClient *bolttools.BoltClient, c
 		StartedAt: &containerInfo.StartedAt,
 	}, nil
 }
+
+func (v *VirtualizationTool) RemoveVolume(name string) error {
+	return v.volumeStorage.RemoveVolume(name)
+}
