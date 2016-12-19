@@ -7,7 +7,8 @@ set -o errtrace
 # Note that project_dir must not end with slash
 project_dir="$(cd "$(dirname "${BASH_SOURCE}")/.." && pwd)"
 remote_project_dir="/go/src/github.com/Mirantis/virtlet"
-build_image=virtlet_build:latest
+build_name=virtlet_build
+build_image=${build_name}:latest
 volume_name=virtlet_src
 exclude=(
     --exclude 'vendor'
@@ -32,6 +33,7 @@ function vcmd {
                -v /lib/modules:/lib/modules:ro \
                -v /boot:/boot:ro \
                -e TRAVIS="${TRAVIS:-}" \
+               --name ${build_name} \
                "${build_image}" bash -c "tar -C '${remote_project_dir}' -xz && $*"
 }
 
@@ -41,6 +43,7 @@ function copy_output {
     docker run --rm --privileged -i \
            -v "virtlet_src:${remote_project_dir}" \
            -v "virtlet_pkg:/go/pkg" \
+           --name ${build_name} \
            "${build_image}" \
            bash -c "tar -C '${remote_project_dir}' -cz \$(find . -path '*/_output/*' -type f)" |
         tar -xvz
