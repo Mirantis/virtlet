@@ -170,6 +170,15 @@ func (v *VirtletManager) StopPodSandbox(ctx context.Context, in *kubeapi.StopPod
 		glog.Errorf("Error when stopping pod sandbox '%s': %v", podSandboxId, err)
 		return nil, err
 	}
+	if err := v.cniClient.RemoveSandboxFromNetwork(podSandboxId); err != nil {
+		glog.Errorf("Error when removing pod sandbox '%s' from CNI network: %v", podSandboxId, err)
+		return nil, err
+	}
+
+	if err := cni.DestroyNetNS(podSandboxId); err != nil {
+		glog.Errorf("Error when removing network namespace for pod sandbox %s: %v", podSandboxId, err)
+		return nil, err
+	}
 
 	response := &kubeapi.StopPodSandboxResponse{}
 	return response, nil
@@ -182,16 +191,6 @@ func (v *VirtletManager) RemovePodSandbox(ctx context.Context, in *kubeapi.Remov
 
 	if err := v.boltClient.RemovePodSandbox(podSandboxId); err != nil {
 		glog.Errorf("Error when removing pod sandbox '%s': %v", podSandboxId, err)
-		return nil, err
-	}
-
-	if err := v.cniClient.RemoveSandboxFromNetwork(podSandboxId); err != nil {
-		glog.Errorf("Error when removing pod sandbox '%s' from CNI network: %v", podSandboxId, err)
-		return nil, err
-	}
-
-	if err := cni.DestroyNetNS(podSandboxId); err != nil {
-		glog.Errorf("Error when removing network namespace for pod sandbox %s: %v", podSandboxId, err)
 		return nil, err
 	}
 
@@ -284,7 +283,6 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 
 	// TODO: we should not pass whole "in" to CreateContainer - we should pass there only needed info for CreateContainer
 	// without whole data container
-	// TODO: use network configuration by CreateContainer
 	uuid, err := v.libvirtVirtualizationTool.CreateContainer(v.boltClient, in, imageFilepath, netNSPath, string(netAsBytes))
 	if err != nil {
 		glog.Errorf("Error when creating container %s: %v", name, err)
