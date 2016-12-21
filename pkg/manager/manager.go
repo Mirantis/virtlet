@@ -20,7 +20,6 @@ import (
 	"errors"
 	"net"
 	"os"
-	"strings"
 	"syscall"
 
 	"github.com/davecgh/go-spew/spew"
@@ -261,8 +260,15 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 	glog.V(3).Infof("CreateContainer: %s", spew.Sdump(in))
 	glog.V(3).Infof("CreateContainer config: %s", spew.Sdump(config))
 
-	imageFilepath, err := v.boltClient.GetImageFilepath(imageName)
+	volumeName, err := libvirttools.ImageNameToVolumeName(imageName)
 	if err != nil {
+		glog.Errorf("CreateContainer: error getting volume name for image %q: %v", imageName, err)
+		return nil, err
+	}
+
+	imageFilePath, err := v.libvirtImageTool.ImageFilePath(volumeName)
+	if err != nil {
+		glog.Errorf("Error when getting file path for image %q (volume %q): %v", imageName, volumeName, err)
 		return nil, err
 	}
 
@@ -280,12 +286,12 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 	}
 
 	netNSPath := cni.PodNetNSPath(podSandboxId)
-	glog.V(2).Infof("CreateContainer: imageName %s, imageFilepath %s, ip %s, network namespace %s", imageName, imageFilepath, netResult.IP4.IP.IP.String(), netNSPath)
+	glog.V(2).Infof("CreateContainer: imageName %s, imageFilepath %s, ip %s, network namespace %s", imageName, imageFilePath, netResult.IP4.IP.IP.String(), netNSPath)
 
 	// TODO: we should not pass whole "in" to CreateContainer - we should pass there only needed info for CreateContainer
 	// without whole data container
 	// TODO: use network configuration by CreateContainer
-	uuid, err := v.libvirtVirtualizationTool.CreateContainer(v.boltClient, in, imageFilepath, netNSPath, string(netAsBytes))
+	uuid, err := v.libvirtVirtualizationTool.CreateContainer(v.boltClient, in, imageFilePath, netNSPath, string(netAsBytes))
 	if err != nil {
 		glog.Errorf("Error when creating container %s: %v", name, err)
 		return nil, err
@@ -429,61 +435,108 @@ func (v *VirtletManager) Status(context.Context, *kubeapi.StatusRequest) (*kubea
 // Images
 //
 
+func (v *VirtletManager) imageFromVolumeInfo(volumeInfo *libvirttools.VolumeInfo) (*kubeapi.Image, error) {
+	imageName, err := v.boltClient.GetImageName(volumeInfo.Name)
+	if err != nil {
+		glog.Errorf("Error when checking for existing image with volume %q: %v", volumeInfo.Name, err)
+		return nil, err
+	}
+
+	if imageName == "" {
+		// the image doesn't exist
+		return nil, nil
+	}
+
+	return &kubeapi.Image{
+		Id:       &volumeInfo.Name,
+		RepoTags: []string{imageName},
+		Size_:    &volumeInfo.Size,
+	}, nil
+}
+
 func (v *VirtletManager) ListImages(ctx context.Context, in *kubeapi.ListImagesRequest) (*kubeapi.ListImagesResponse, error) {
 	volumeInfos, err := v.libvirtImageTool.ListImagesAsVolumeInfos()
 	if err != nil {
 		glog.Errorf("Error when listing images: %v", err)
 		return nil, err
 	}
-	images := make([]*kubeapi.Image, 0, len(volumeInfos))
 
+	images := make([]*kubeapi.Image, 0, len(volumeInfos))
 	for _, volumeInfo := range volumeInfos {
-		images = append(images, &kubeapi.Image{
-			Id:       &volumeInfo.Name,
-			RepoTags: []string{volumeInfo.Name},
-			Size_:    &volumeInfo.Size,
-		})
+		image, err := v.imageFromVolumeInfo(volumeInfo)
+		if err != nil {
+			glog.Errorf("ListImages: error when getting image info for volume %q: %v", volumeInfo.Name, err)
+			return nil, err
+		}
+		// skip images that aren't in virtlet db
+		if image == nil {
+			continue
+		}
+		if filter := in.GetFilter(); filter != nil {
+			if filter.GetImage() != nil && filter.GetImage().GetImage() != image.RepoTags[0] {
+				continue
+			}
+		}
+		images = append(images, image)
 	}
+
 	response := &kubeapi.ListImagesResponse{Images: images}
 	glog.V(3).Infof("ListImages response: %s", spew.Sdump(response))
 	return response, err
 }
 
 func (v *VirtletManager) ImageStatus(ctx context.Context, in *kubeapi.ImageStatusRequest) (*kubeapi.ImageStatusResponse, error) {
-	name := in.GetImage().GetImage()
-
-	filepath, err := v.boltClient.GetImageFilepath(name)
+	imageName := in.GetImage().GetImage()
+	volumeName, err := libvirttools.ImageNameToVolumeName(imageName)
 	if err != nil {
-		glog.Errorf("Error when getting image '%s' filepath: %v", name, err)
+		glog.Errorf("ImageStatus: error getting volume name for image %q: %v", imageName, err)
 		return nil, err
 	}
-	if filepath == "" {
+
+	// FIXME: avoid this check by verifying ImageAsVolumeInfo() result instead
+	// (need to be able to distinguish between different libvirt errors for this)
+	// This query is also done in imageFromVolumeInfo() so images
+	// that have volumes but aren't in virtlet db will not be retuned
+	// anyway.
+	existingImageName, err := v.boltClient.GetImageName(volumeName)
+	if err != nil {
+		glog.Errorf("Error when checking for existing image with volume %q: %v", volumeName, err)
+		return nil, err
+	}
+
+	if existingImageName == "" {
+		glog.V(3).Infof("ImageStatus: image %q not found in db, returning empty response", imageName)
 		return &kubeapi.ImageStatusResponse{}, nil
 	}
-	volumeInfo, err := v.libvirtImageTool.ImageAsVolumeInfo(name)
+
+	volumeInfo, err := v.libvirtImageTool.ImageAsVolumeInfo(volumeName)
 	if err != nil {
-		glog.Errorf("Error when getting info for image '%s' in path '%s': %v", name, filepath, err)
+		glog.Errorf("Error when getting info for image %q (volume %q): %v", imageName, volumeName, err)
 		return nil, err
 	}
 
-	response := &kubeapi.ImageStatusResponse{Image: &kubeapi.Image{
-		Id:       &volumeInfo.Name,
-		RepoTags: []string{volumeInfo.Name},
-		Size_:    &volumeInfo.Size,
-	}}
+	image, err := v.imageFromVolumeInfo(volumeInfo)
+	if err != nil {
+		glog.Errorf("ImageStatus: error getting image info for %q (volume %q): %v", imageName, volumeName, err)
+		return nil, err
+	}
+
+	// Note that after the change described in FIXME comment above
+	// the image can be nil here if it's not in virtlet db, but that's ok
+	response := &kubeapi.ImageStatusResponse{Image: image}
 	glog.V(3).Infof("ImageStatus response: %s", spew.Sdump(response))
 	return response, err
 }
 
-func stripTagFromImageName(name string) string {
-	return strings.Split(name, ":")[0]
-}
-
 func (v *VirtletManager) PullImage(ctx context.Context, in *kubeapi.PullImageRequest) (*kubeapi.PullImageResponse, error) {
-	name := in.GetImage().GetImage()
-	glog.V(2).Infof("PullImage called for: %s", name)
+	imageName := in.GetImage().GetImage()
+	glog.V(2).Infof("PullImage called for: %s", imageName)
 
-	name = stripTagFromImageName(name)
+	volumeName, err := libvirttools.ImageNameToVolumeName(imageName)
+	if err != nil {
+		glog.Errorf("PullImage: error getting volume name for image %q: %v", imageName, err)
+		return nil, err
+	}
 
 	// PullPolicy is not accessible directly within remote runtime
 	// But PullImage request can be called in 2 cases:
@@ -491,26 +544,25 @@ func (v *VirtletManager) PullImage(ctx context.Context, in *kubeapi.PullImageReq
 	// 2. PullIfNotPresent
 	// So need to check whether the image with such URL was already downloaded
 
-	imgPath, err := v.boltClient.GetImageFilepath(name)
+	existingImageName, err := v.boltClient.GetImageName(volumeName)
 	if err != nil {
-		glog.Errorf("Error when pulling image '%s': %v", name, err)
+		glog.Errorf("PullImage: error when checking for existing image %q: %v", imageName, err)
 		return nil, err
 	}
 
-	if imgPath != "" {
+	if existingImageName != "" {
 		// Image has been downloaded already
 		return &kubeapi.PullImageResponse{}, nil
 	}
 
-	filepath, err := v.libvirtImageTool.PullImageToVolume(name)
-	if err != nil {
-		glog.Errorf("Error when pulling image '%s': %v", name, err)
+	if err = v.libvirtImageTool.PullImageToVolume(imageName, volumeName); err != nil {
+		glog.Errorf("Error when pulling image %q: %v", imageName, err)
 		return nil, err
 	}
 
-	err = v.boltClient.SetImageFilepath(name, filepath)
+	err = v.boltClient.SetImageName(volumeName, imageName)
 	if err != nil {
-		glog.Errorf("Error when setting filepath '%s' to image '%s': %v", filepath, name, err)
+		glog.Errorf("Error when setting image name %q for volume %q: %v", imageName, volumeName, err)
 		return nil, err
 	}
 
@@ -519,22 +571,22 @@ func (v *VirtletManager) PullImage(ctx context.Context, in *kubeapi.PullImageReq
 }
 
 func (v *VirtletManager) RemoveImage(ctx context.Context, in *kubeapi.RemoveImageRequest) (*kubeapi.RemoveImageResponse, error) {
-	name := in.GetImage().GetImage()
-	glog.V(2).Infof("RemoveImage called for: %s", name)
+	imageName := in.GetImage().GetImage()
+	glog.V(2).Infof("RemoveImage called for: %s", imageName)
 
-	filepath, err := v.boltClient.GetImageFilepath(name)
+	volumeName, err := libvirttools.ImageNameToVolumeName(imageName)
 	if err != nil {
-		glog.Errorf("Error when getting filepath for image '%s': %v", name, err)
+		glog.Errorf("RemoveImage: error getting volume name for image %q: %v", imageName, err)
 		return nil, err
 	}
-	if filepath == "" {
-		err = errors.New("image not found in database")
-		glog.Errorf("Error when getting filepath for image '%s': %v", err)
+
+	if err = v.libvirtImageTool.RemoveImage(volumeName); err != nil {
+		glog.Errorf("Error when removing image %q with path %q: %v", imageName, volumeName, err)
 		return nil, err
 	}
-	err = v.libvirtImageTool.RemoveImage(filepath)
-	if err != nil {
-		glog.Errorf("Error when removing image '%s' with path '%s': %v", name, filepath, err)
+
+	if err = v.boltClient.RemoveImage(volumeName); err != nil {
+		glog.Errorf("Error removing image %q from bolt: %v", imageName, volumeName, err)
 		return nil, err
 	}
 

@@ -54,12 +54,6 @@ func NewVirtletManager() *VirtletManager {
 	}
 }
 
-func NewFakeVirtletManager() *VirtletManager {
-	return &VirtletManager{
-		libvirtUri: "test:///default",
-	}
-}
-
 func (v *VirtletManager) Run() error {
 	filename, err := utils.Tempfile()
 	if err != nil {

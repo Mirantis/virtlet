@@ -17,54 +17,36 @@ limitations under the License.
 package download
 
 import (
-	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
-	"strings"
 
 	"github.com/golang/glog"
 )
 
-func ParseShortName(fileUrl string) (string, error) {
-	u, err := url.Parse(fileUrl)
+func DownloadFile(url, fileName string) (string, error) {
+	// TODO(nhlfr): Use SSL.
+	url = "http://" + url
+
+	path := "/tmp/" + fileName
+	fp, err := os.Create(path)
 	if err != nil {
 		return "", err
 	}
-	segments := strings.Split(u.Path, "/")
-	shortName := segments[len(segments)-1]
-
-	return shortName, nil
-}
-
-func DownloadFile(fileUrl string) (string, string, error) {
-	// TODO(nhlfr): Use SSL.
-	fileUrl = fmt.Sprintf("http://%s", fileUrl)
-	shortName, err := ParseShortName(fileUrl)
-	if err != nil {
-		return "", "", err
-	}
-
-	filepath := fmt.Sprintf("/tmp/%s", shortName)
-	fp, err := os.Create(filepath)
-	if err != nil {
-		return "", "", err
-	}
 	defer fp.Close()
 
-	glog.V(2).Infof("Start downloading %s", fileUrl)
+	glog.V(2).Infof("Start downloading %s", url)
 
-	resp, err := http.Get(fileUrl)
+	resp, err := http.Get(url)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 	defer resp.Body.Close()
 
 	_, err = io.Copy(fp, resp.Body)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
-	glog.V(2).Infof("Data from url %s saved in %s", fileUrl, filepath)
-	return filepath, shortName, nil
+	glog.V(2).Infof("Data from url %s saved in %s", url, path)
+	return path, nil
 }

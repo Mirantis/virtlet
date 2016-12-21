@@ -29,17 +29,23 @@ import (
 	"github.com/Mirantis/virtlet/pkg/download"
 )
 
-type ImageTool struct {
-	tool *StorageTool
+func stripTagFromImageName(imageName string) string {
+	return strings.Split(imageName, ":")[0]
 }
 
-func cleanURIImageName(name string) string {
-	u, err := url.Parse(name)
+func ImageNameToVolumeName(imageName string) (string, error) {
+	u, err := url.Parse(stripTagFromImageName(imageName))
 	if err != nil {
-		return name
+		return "", err
 	}
 	segments := strings.Split(u.Path, "/")
-	return segments[len(segments)-1]
+	volumeName := segments[len(segments)-1]
+
+	return volumeName, nil
+}
+
+type ImageTool struct {
+	tool *StorageTool
 }
 
 func NewImageTool(conn C.virConnectPtr, poolName string) (*ImageTool, error) {
@@ -54,24 +60,32 @@ func (i *ImageTool) ListImagesAsVolumeInfos() ([]*VolumeInfo, error) {
 	return i.tool.ListVolumes()
 }
 
-func (i *ImageTool) ImageAsVolumeInfo(name string) (*VolumeInfo, error) {
-	vol, err := i.tool.LookupVolume(name)
+func (i *ImageTool) ImageFilePath(volumeName string) (string, error) {
+	vol, err := i.tool.LookupVolume(volumeName)
+	if err != nil {
+		return "", err
+	}
+	return vol.GetPath()
+}
+
+func (i *ImageTool) ImageAsVolumeInfo(volumeName string) (*VolumeInfo, error) {
+	vol, err := i.tool.LookupVolume(volumeName)
 	if err != nil {
 		return nil, err
 	}
 	return vol.Info()
 }
 
-func (i *ImageTool) PullImageToVolume(name string) (string, error) {
+func (i *ImageTool) PullImageToVolume(imageName, volumeName string) error {
 	// TODO(nhlfr): Handle AuthConfig from PullImageRequest.
-	filepath, shortName, err := download.DownloadFile(name)
+	path, err := download.DownloadFile(stripTagFromImageName(imageName), volumeName)
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	return i.tool.PullImageToVolume(name, filepath, shortName)
+	return i.tool.PullImageToVolume(path, volumeName)
 }
 
-func (i *ImageTool) RemoveImage(name string) error {
-	return i.tool.RemoveVolume(name)
+func (i *ImageTool) RemoveImage(volumeName string) error {
+	return i.tool.RemoveVolume(volumeName)
 }

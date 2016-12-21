@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -16,4 +16,4 @@ export KUBERNETES_PROVIDER=local
 export EXPERIMENTAL_CRI=true
 export CONTAINER_RUNTIME=remote
 export CONTAINER_RUNTIME_ENDPOINT=/run/virtlet.sock
-bash -x hack/local-up-cluster.sh -o _output/local/bin/linux/amd64
+hack/local-up-cluster.sh -o _output/local/bin/linux/amd64
