@@ -16,28 +16,19 @@ limitations under the License.
 
 package bolttools
 
-import (
-	"fmt"
-	"testing"
+import "testing"
 
-	"github.com/boltdb/bolt"
-)
-
-func TestSetImageFilepath(t *testing.T) {
+func TestGetImageName(t *testing.T) {
 	tests := []struct {
-		name     string
-		filepath string
-		hash     string
+		volumeName, imageName string
 	}{
 		{
-			name:     "my-favorite-distro",
-			filepath: "/opt/data/test/my-favorite-distro.qcow2",
-			hash:     "bd4d2bd18d926910af052843198b994f5f3769193368c834ae0ee3d6bdd4fe4e",
+			volumeName: "my-favorite-distro",
+			imageName:  "example.com/my-favorite-distro",
 		},
 		{
-			name:     "another-distro",
-			filepath: "/tmp/another-distro.qcow2",
-			hash:     "c2b604cdcc4aac54961681f381ceafc074d6ece94602e49ae1cc3464c81563f4",
+			volumeName: "another-distro",
+			imageName:  "another.example.com/another-distro",
 		},
 	}
 
@@ -47,74 +38,70 @@ func TestSetImageFilepath(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := b.VerifyImagesSchema(); err != nil {
+		if err := b.EnsureImageSchema(); err != nil {
 			t.Fatal(err)
 		}
 
-		err = b.SetImageFilepath(tc.name, tc.filepath)
+		err = b.SetImageName(tc.volumeName, tc.imageName)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if err := b.db.View(func(tx *bolt.Tx) error {
-			bucket := tx.Bucket([]byte("images"))
-			if bucket == nil {
-				return fmt.Errorf("bucket 'images' doesn't exist")
-			}
-
-			filepath, err := getString(bucket, tc.hash)
-			if err != nil {
-				return err
-			}
-
-			if filepath != tc.filepath {
-				t.Errorf("Expected %s, instead got %s", tc.filepath, filepath)
-			}
-
-			return nil
-		}); err != nil {
+		imageName, err := b.GetImageName(tc.volumeName)
+		if err != nil {
 			t.Fatal(err)
+		}
+
+		if imageName != tc.imageName {
+			t.Errorf("Bad imageName: expected %q, got %q instead", tc.imageName, imageName)
 		}
 	}
 }
 
-func TestGetImageFilepath(t *testing.T) {
-	tests := []struct {
-		name     string
-		filepath string
-	}{
-		{
-			name:     "my-favorite-distro",
-			filepath: "/opt/data/test/my-favorite-distro.qcow2",
-		},
-		{
-			name:     "another-distro",
-			filepath: "/tmp/another-distro.qcow2",
-		},
+func TestGetNonExistentImageName(t *testing.T) {
+	b, err := NewFakeBoltClient()
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	for _, tc := range tests {
-		b, err := NewFakeBoltClient()
-		if err != nil {
-			t.Fatal(err)
-		}
+	if err := b.EnsureImageSchema(); err != nil {
+		t.Fatal(err)
+	}
 
-		if err := b.VerifyImagesSchema(); err != nil {
-			t.Fatal(err)
-		}
+	imageName, err := b.GetImageName("no-such-volume")
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		err = b.SetImageFilepath(tc.name, tc.filepath)
-		if err != nil {
-			t.Fatal(err)
-		}
+	if imageName != "" {
+		t.Errorf("Bad imageName for non-existent image: %q instead of an empty string", imageName)
+	}
+}
 
-		filepath, err := b.GetImageFilepath(tc.name)
-		if err != nil {
-			t.Fatal(err)
-		}
+func TestRemoveImage(t *testing.T) {
+	b, err := NewFakeBoltClient()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		if filepath != tc.filepath {
-			t.Errorf("Expected %s, instead got %s", tc.filepath, filepath)
-		}
+	if err = b.EnsureImageSchema(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = b.SetImageName("another-distro", "another.example.com/another-distro"); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = b.RemoveImage("another-distro"); err != nil {
+		t.Fatal(err)
+	}
+
+	imageName, err := b.GetImageName("another-distro")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if imageName != "" {
+		t.Errorf("Bad imageName for removed image: %q instead of an empty string", imageName)
 	}
 }

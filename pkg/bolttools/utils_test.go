@@ -164,7 +164,7 @@ func SetUpBolt(t *testing.T, sandboxConfigs []*kubeapi.PodSandboxConfig, contain
 		t.Errorf("Expected to recieve array of zero lenght as a result of list request against empty Bolt db.")
 	}
 
-	if err := b.VerifySandboxSchema(); err != nil {
+	if err := b.EnsureSandboxSchema(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -174,7 +174,7 @@ func SetUpBolt(t *testing.T, sandboxConfigs []*kubeapi.PodSandboxConfig, contain
 		}
 	}
 
-	if err := b.VerifyVirtualizationSchema(); err != nil {
+	if err := b.EnsureVirtualizationSchema(); err != nil {
 		t.Fatal(err)
 	}
 

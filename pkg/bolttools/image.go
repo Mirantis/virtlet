@@ -24,17 +24,17 @@ import (
 	"github.com/boltdb/bolt"
 )
 
+const imageBucket = "images"
+
 func getKey(name string) string {
 	hash := sha256.New()
 	hash.Write([]byte(name))
-	sum := hex.EncodeToString(hash.Sum(nil))
-
-	return sum
+	return hex.EncodeToString(hash.Sum(nil))
 }
 
-func (b *BoltClient) VerifyImagesSchema() error {
+func (b *BoltClient) EnsureImageSchema() error {
 	err := b.db.Update(func(tx *bolt.Tx) error {
-		if _, err := tx.CreateBucketIfNotExists([]byte("images")); err != nil {
+		if _, err := tx.CreateBucketIfNotExists([]byte(imageBucket)); err != nil {
 			return err
 		}
 
@@ -44,43 +44,53 @@ func (b *BoltClient) VerifyImagesSchema() error {
 	return err
 }
 
-func (b *BoltClient) SetImageFilepath(name, filepath string) error {
-	key := getKey(name)
-
-	err := b.db.Update(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket([]byte("images"))
+func (b *BoltClient) SetImageName(volumeName, imageName string) error {
+	key := getKey(volumeName)
+	return b.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte(imageBucket))
 		if bucket == nil {
-			return fmt.Errorf("bucket 'images' doesn't exist")
+			return fmt.Errorf("bucket %q doesn't exist", imageBucket)
 		}
 
-		if err := bucket.Put([]byte(key), []byte(filepath)); err != nil {
+		if err := bucket.Put([]byte(key), []byte(imageName)); err != nil {
 			return err
 		}
 
 		return nil
 	})
-
-	return err
 }
 
-func (b *BoltClient) GetImageFilepath(name string) (string, error) {
-	filepath := ""
-
-	key := getKey(name)
-
+func (b *BoltClient) GetImageName(volumeName string) (string, error) {
+	imageName := ""
+	key := getKey(volumeName)
 	err := b.db.View(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket([]byte("images"))
+		bucket := tx.Bucket([]byte(imageBucket))
 		if bucket == nil {
-			return fmt.Errorf("bucket 'images' doesn't exist")
+			return fmt.Errorf("bucket %q doesn't exist", imageBucket)
 		}
 
 		fp := bucket.Get([]byte(key))
 		if fp != nil {
-			filepath = string(fp)
+			imageName = string(fp)
 		}
 
 		return nil
 	})
+	return imageName, err
+}
 
-	return filepath, err
+func (b *BoltClient) RemoveImage(volumeName string) error {
+	key := getKey(volumeName)
+	return b.db.Batch(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte(imageBucket))
+		if bucket == nil {
+			return fmt.Errorf("bucket %q doesn't exist", imageBucket)
+		}
+
+		if err := bucket.Delete([]byte(key)); err != nil {
+			return err
+		}
+
+		return nil
+	})
 }

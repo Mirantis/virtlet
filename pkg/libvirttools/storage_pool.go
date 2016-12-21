@@ -257,21 +257,17 @@ func (s *StorageTool) ListVolumes() ([]*VolumeInfo, error) {
 	return s.pool.ListVolumes()
 }
 
-func (s *StorageTool) PullImageToVolume(name, filePath, shortName string) (string, error) {
-	libvirtFilepath := fmt.Sprintf("/var/lib/libvirt/images/%s", shortName)
-	volXML := s.GenerateVolumeXML(shortName, 5, "G", libvirtFilepath)
+func (s *StorageTool) PullImageToVolume(path, volumeName string) error {
+	libvirtFilePath := fmt.Sprintf("/var/lib/libvirt/images/%s", volumeName)
+	volXML := s.GenerateVolumeXML(volumeName, 5, "G", libvirtFilePath)
 
-	cShortName := C.CString(shortName)
+	cShortName := C.CString(volumeName)
 	defer C.free(unsafe.Pointer(cShortName))
-	cFilepath := C.CString(filePath)
+	cFilepath := C.CString(path)
 	defer C.free(unsafe.Pointer(cFilepath))
 	cVolXML := C.CString(volXML)
 	defer C.free(unsafe.Pointer(cVolXML))
 
 	status := C.pullImage(s.conn, s.pool.pool, cShortName, cFilepath, cVolXML)
-	if err := cErrorHandler.Convert(status); err != nil {
-		return "", err
-	}
-
-	return libvirtFilepath, nil
+	return cErrorHandler.Convert(status)
 }

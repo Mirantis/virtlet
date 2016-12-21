@@ -37,7 +37,7 @@ type ContainerInfo struct {
 	State                 kubeapi.ContainerState
 }
 
-func (b *BoltClient) VerifyVirtualizationSchema() error {
+func (b *BoltClient) EnsureVirtualizationSchema() error {
 	err := b.db.Update(func(tx *bolt.Tx) error {
 		if _, err := tx.CreateBucketIfNotExists([]byte("virtualization")); err != nil {
 			return err

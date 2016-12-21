@@ -28,16 +28,14 @@ import (
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
-func (b *BoltClient) VerifySandboxSchema() error {
-	err := b.db.Update(func(tx *bolt.Tx) error {
+func (b *BoltClient) EnsureSandboxSchema() error {
+	return b.db.Update(func(tx *bolt.Tx) error {
 		if _, err := tx.CreateBucketIfNotExists([]byte("sandbox")); err != nil {
 			return err
 		}
 
 		return nil
 	})
-
-	return err
 }
 
 func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConfiguration []byte) error {
@@ -73,7 +71,7 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConf
 		return fmt.Errorf("SecurityContext is missing Namespaces attribute: %s", spew.Sdump(config))
 	}
 
-	err = b.db.Batch(func(tx *bolt.Tx) error {
+	return b.db.Batch(func(tx *bolt.Tx) error {
 		parentBucket := tx.Bucket([]byte("sandbox"))
 		if parentBucket == nil {
 			return fmt.Errorf("bucket 'sandbox' doesn't exist")
@@ -166,12 +164,10 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConf
 
 		return nil
 	})
-
-	return err
 }
 
 func (b *BoltClient) UpdatePodState(podId string, state byte) error {
-	err := b.db.Update(func(tx *bolt.Tx) error {
+	return b.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte("sandbox"))
 		if bucket == nil {
 			return fmt.Errorf("bucket 'sandbox' doesn't exist")
@@ -188,12 +184,10 @@ func (b *BoltClient) UpdatePodState(podId string, state byte) error {
 
 		return nil
 	})
-
-	return err
 }
 
 func (b *BoltClient) RemovePodSandbox(podId string) error {
-	if err := b.db.Batch(func(tx *bolt.Tx) error {
+	return b.db.Batch(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte("sandbox"))
 		if bucket == nil {
 			return fmt.Errorf("bucket 'sandbox' doesn't exist")
@@ -204,11 +198,7 @@ func (b *BoltClient) RemovePodSandbox(podId string) error {
 		}
 
 		return nil
-	}); err != nil {
-		return err
-	}
-
-	return nil
+	})
 }
 
 func (b *BoltClient) GetPodSandboxContainerID(podId string) (string, error) {

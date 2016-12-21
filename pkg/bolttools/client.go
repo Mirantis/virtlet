@@ -31,13 +31,13 @@ func NewBoltClient(path string) (*BoltClient, error) {
 	}
 
 	client := &BoltClient{db: db}
-	if err := client.VerifyImagesSchema(); err != nil {
+	if err := client.EnsureImageSchema(); err != nil {
 		return nil, err
 	}
-	if err := client.VerifySandboxSchema(); err != nil {
+	if err := client.EnsureSandboxSchema(); err != nil {
 		return nil, err
 	}
-	if err := client.VerifyVirtualizationSchema(); err != nil {
+	if err := client.EnsureVirtualizationSchema(); err != nil {
 		return nil, err
 	}
 
