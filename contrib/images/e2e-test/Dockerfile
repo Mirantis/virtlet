@@ -10,7 +10,7 @@ RUN apt-get update && \
     mkdir /images && \
     wget http://download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img -O /images/cirros
 
-COPY run.sh /
-RUN chmod +x /run.sh
+COPY run.sh vmchat.exp /
+RUN chmod +x /run.sh /vmchat.exp
 
 CMD ["/run.sh"]
