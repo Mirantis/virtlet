@@ -94,55 +94,12 @@ function e2e::wait-for-libvirt-domain {
   virsh -c qemu+tcp://virtlet/system list
 }
 
-function e2e::chat-with-vm {
-  expect -c '
-    set timeout 600
-    spawn virsh -c qemu+tcp://virtlet/system console cirros
-    expect {
-      timeout { puts "initial message timeout"; exit 1 }
-      "Escape character"
-    }
-    send "\r"
-
-    expect {
-      timeout { puts "login prompt timeout"; exit 1 }
-      "login:"
-    }
-    send "cirros\r"
-
-    set timeout 20
-    expect {
-      timeout { puts "password prompt timeout"; exit 1 }
-      "Password: "
-    }
-    sleep 3
-    send "cubswin:)\r"
-
-    expect {
-      timeout { puts "shell prompt timeout"; exit 1 }
-      -re "\n\\$"
-    }
-    send "/sbin/ifconfig\r"
-
-    expect {
-      timeout { puts "shell prompt timeout"; exit 1 }
-      -re "\n\\$"
-    }
-    send "exit\r"
-
-    expect {
-      timeout { puts "login prompt timeout"; exit 1 }
-      "login:"
-    }
-'
-}
-
 e2e::setup-kubectl
 e2e::serve-image
 e2e::wait-for-apiserver
 e2e::create-vm
 e2e::wait-for-pod
 e2e::wait-for-libvirt-domain
-e2e::chat-with-vm
+/vmchat.exp $(virsh -c qemu+tcp://virtlet/system list --name)
 
 e2e::step "Done"
