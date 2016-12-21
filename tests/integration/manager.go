@@ -112,6 +112,8 @@ func (v *VirtletManager) Run() error {
 
 func (v *VirtletManager) Close() {
 	v.conn.Close()
-	syscall.Kill(v.pid, syscall.SIGKILL)
+	syscall.Kill(v.pid, syscall.SIGTERM)
 	os.Remove(virtletSocket)
+	var ws syscall.WaitStatus
+	syscall.Wait4(v.pid, &ws, 0, nil)
 }
