@@ -8,8 +8,8 @@ LXC_PATH="/var/lib/lxc/"
 K8S_OUTPUT_DIR=${K8S_OUTPUT_DIR:-$GOPATH/src/k8s.io/kubernetes/_output/release-stage/server/linux-amd64/kubernetes/server/bin}
 
 NUM_NODES=${NUM_NODES:-2}
-VIRTLET_IMAGE_NAME=${VIRTLET_IMAGE_NAME:-dockercompose_virtlet}
-LIBVIRT_IMAGE_NAME=${LIBVIRT_IMAGE_NAME:-dockercompose_libvirt}
+VIRTLET_IMAGE_NAME=${VIRTLET_IMAGE_NAME:-virtlet}
+#LIBVIRT_IMAGE_NAME=${LIBVIRT_IMAGE_NAME:-dockercompose_libvirt}
 
 NET_CALICO=${NET_CALICO:-false}
 
@@ -94,10 +94,17 @@ function setup_node() {
 cmd="#!/bin/bash
 
 docker load -i ${BASE_IMAGE_WORK_DIR}/${VIRTLET_IMAGE_NAME}.tar
-docker load -i ${BASE_IMAGE_WORK_DIR}/${LIBVIRT_IMAGE_NAME}.tar
 
-cd ${BASE_IMAGE_WORK_DIR}/docker-compose
-docker-compose up -d
+id=\\\$(docker create -it --privileged --net=host \\
+       -e VIRTLET_LOGLEVEL=2 \\
+       -v /sys/fs/cgroup:/sys/fs/cgroup \\
+       -v /boot:/boot:ro \\
+       -v /lib/modules:/lib/modules:ro \\
+       -v /var/lib/virtlet:/var/lib/virtlet \\
+       -v /run:/run \\
+       virtlet)
+docker start \\\$id
+
 sleep 10
 
 ${BASE_IMAGE_WORK_DIR}/kubelet ${KUBELET_OPTS} > /var/log/kubelet.log 2>&1 &
@@ -150,10 +157,10 @@ function create-update-base-container() {
     # Prepare virtlet images and docker-cimpose yaml
     copy-virtlet-images
     cp -f "${VIRTLET_IMAGE_NAME}.tar" ${container_dir}
-    cp -f "${LIBVIRT_IMAGE_NAME}.tar" ${container_dir}
-    cp -rf ../docker-compose ${container_dir}
-    sed -i 'N;s/virtlet:\n.*build:.*/virtlet:\n    image: dockercompose_virtlet/' ${container_dir}/docker-compose/docker-compose.yml
-    sed -i 'N;s/libvirt:\n.*build:.*/libvirt:\n    image: dockercompose_libvirt/' ${container_dir}/docker-compose/docker-compose.yml
+#    cp -f "${LIBVIRT_IMAGE_NAME}.tar" ${container_dir}
+#    cp -rf ../docker-compose ${container_dir}
+#    sed -i 'N;s/virtlet:\n.*build:.*/virtlet:\n    image: dockercompose_virtlet/' ${container_dir}/docker-compose/docker-compose.yml
+#    sed -i 'N;s/libvirt:\n.*build:.*/libvirt:\n    image: dockercompose_libvirt/' ${container_dir}/docker-compose/docker-compose.yml
 }
 
 function substitute-env-in-file() {
@@ -176,11 +183,11 @@ function update-pods-yamls() {
 
 function copy-virtlet-images() {
     rm -f "./${VIRTLET_IMAGE_NAME}.tar"
-    rm -f "./${LIBVIRT_IMAGE_NAME}.tar"
+#    rm -f "./${LIBVIRT_IMAGE_NAME}.tar"
 
     # Save the docker image as a tar file
     docker save -o "${VIRTLET_IMAGE_NAME}.tar" ${VIRTLET_IMAGE_NAME}
-    docker save -o "${LIBVIRT_IMAGE_NAME}.tar" ${LIBVIRT_IMAGE_NAME}
+#    docker save -o "${LIBVIRT_IMAGE_NAME}.tar" ${LIBVIRT_IMAGE_NAME}
 }
 
 
@@ -224,6 +231,7 @@ function create-kubelet-opts() {
     fi
     export KUBELET_OPTS="\
      --api-servers=http://${MASTER_IP}:8080 \
+     --experimental-cri=true \
      --container-runtime=remote \
      --container-runtime-endpoint=/run/virtlet.sock \
      --image-service-endpoint=/run/virtlet.sock \
