@@ -26,6 +26,7 @@ import "C"
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"reflect"
@@ -428,10 +429,37 @@ func (v *VirtualizationTool) StopContainer(containerId string) error {
 		return err
 	}
 
-	return nil
+	// Wait until domain is really stopped or timeout after 10 sec.
+	return utils.WaitLoop(func() (bool, error) {
+		domain := C.virDomainLookupByUUIDString(v.conn, cContainerId)
+		if domain == nil {
+			// There must be an error
+			lastLibvirtErr := C.virGetLastError()
+			if lastLibvirtErr == nil {
+				return false, errors.New("libvirt returned no domain and no error - this is incorrect")
+			}
+			defer C.virResetError(lastLibvirtErr)
+
+			err := errors.New(C.GoString(lastLibvirtErr.message))
+			return false, err
+		}
+		defer C.virDomainFree(domain)
+
+		state, err := getDomainState(domain)
+		if err != nil {
+			return false, err
+		}
+
+		return state == C.VIR_DOMAIN_SHUTDOWN, nil
+	}, 10*time.Second)
 }
 
+// RemoveContainer tries to gracefully stop domain, then forcibly removes it
+// even if it's still running
+// it waits up to 5 sec for doing the job by libvirt
 func (v *VirtualizationTool) RemoveContainer(containerId string) error {
+	// Give a chance to gracefully stop domain
+	// TODO: handle errors - there could be e.x. connection error
 	v.StopContainer(containerId)
 
 	cContainerId := C.CString(containerId)
@@ -442,13 +470,35 @@ func (v *VirtualizationTool) RemoveContainer(containerId string) error {
 		return err
 	}
 
-	return nil
+	// Wait until domain is really removed or timeout after 5 sec.
+	return utils.WaitLoop(func() (bool, error) {
+		domain := C.virDomainLookupByUUIDString(v.conn, cContainerId)
+		if domain != nil {
+			C.virDomainFree(domain)
+			return false, nil
+		}
+
+		// There must be an error
+		lastLibvirtErr := C.virGetLastError()
+		if lastLibvirtErr == nil {
+			return false, errors.New("libvirt returned no domain and no error - this is incorrect")
+		}
+		defer C.virResetError(lastLibvirtErr)
+
+		if lastLibvirtErr.code == C.VIR_ERR_NO_DOMAIN {
+			return true, nil
+		}
+
+		// Other error occured
+		err := errors.New(C.GoString(lastLibvirtErr.message))
+		return false, err
+	}, 5*time.Second)
 }
 
-func libvirtToKubeState(domainInfo C.virDomainInfo, lastState kubeapi.ContainerState) kubeapi.ContainerState {
+func libvirtToKubeState(domainState uint8, lastState kubeapi.ContainerState) kubeapi.ContainerState {
 	var containerState kubeapi.ContainerState
 
-	switch domainInfo.state {
+	switch domainState {
 	case C.VIR_DOMAIN_RUNNING:
 		containerState = kubeapi.ContainerState_CONTAINER_RUNNING
 	case C.VIR_DOMAIN_PAUSED:
@@ -476,6 +526,48 @@ func libvirtToKubeState(domainInfo C.virDomainInfo, lastState kubeapi.ContainerS
 	return containerState
 }
 
+func getDomainState(domain *C.struct__virDomain) (uint8, error) {
+	var domainInfo C.virDomainInfo
+
+	if status := C.virDomainGetInfo(domain, &domainInfo); status < 0 {
+		return 255, GetLibvirtLastError()
+	}
+
+	return uint8(domainInfo.state), nil
+}
+
+func getContainerInfo(boltClient *bolttools.BoltClient, domain *C.struct__virDomain, containerId string) (*bolttools.ContainerInfo, error) {
+	containerInfo, err := boltClient.GetContainerInfo(containerId)
+	if err != nil {
+		return nil, err
+	}
+	if containerInfo == nil {
+		return nil, nil
+	}
+
+	domainState, err := getDomainState(domain)
+	if err != nil {
+		return nil, err
+	}
+
+	containerState := libvirtToKubeState(domainState, containerInfo.State)
+	if containerInfo.State != containerState {
+		if err := boltClient.UpdateState(containerId, byte(containerState)); err != nil {
+			return nil, err
+		}
+		startedAt := time.Now().UnixNano()
+		if containerState == kubeapi.ContainerState_CONTAINER_RUNNING {
+			strStartedAt := strconv.FormatInt(startedAt, 10)
+			if err := boltClient.UpdateStartedAt(containerId, strStartedAt); err != nil {
+				return nil, err
+			}
+		}
+		containerInfo.StartedAt = startedAt
+		containerInfo.State = containerState
+	}
+	return containerInfo, nil
+}
+
 func filterContainer(container *kubeapi.Container, filter *kubeapi.ContainerFilter) bool {
 	if filter != nil {
 		//TODO: Get rid of checking filter Status is nil after fix in CRI
@@ -494,24 +586,17 @@ func filterContainer(container *kubeapi.Container, filter *kubeapi.ContainerFilt
 }
 
 func (v *VirtualizationTool) getContainer(boltClient *bolttools.BoltClient, domain *C.struct__virDomain) (*kubeapi.Container, error) {
-	var domainInfo C.virDomainInfo
 	containerId, err := v.GetDomainUUID(domain)
 	if err != nil {
 		return nil, err
 	}
-	containerInfo, err := boltClient.GetContainerInfo(containerId)
+
+	containerInfo, err := getContainerInfo(boltClient, domain, containerId)
 	if err != nil {
 		return nil, err
 	}
-	if containerInfo == nil {
-		return nil, nil
-	}
 
 	podSandboxId := containerInfo.SandboxId
-
-	if status := C.virDomainGetInfo(domain, &domainInfo); status < 0 {
-		return nil, GetLibvirtLastError()
-	}
 
 	metadata := &kubeapi.ContainerMetadata{
 		Name: &containerId,
@@ -519,28 +604,13 @@ func (v *VirtualizationTool) getContainer(boltClient *bolttools.BoltClient, doma
 
 	image := &kubeapi.ImageSpec{Image: &containerInfo.Image}
 
-	containerState := libvirtToKubeState(domainInfo, containerInfo.State)
-	if containerInfo.State != containerState {
-		if err := boltClient.UpdateState(containerId, byte(containerState)); err != nil {
-			return nil, err
-		}
-		startedAt := time.Now().UnixNano()
-		strStartedAt := strconv.FormatInt(startedAt, 10)
-		if containerState == kubeapi.ContainerState_CONTAINER_RUNNING {
-			if err := boltClient.UpdateStartedAt(containerId, strStartedAt); err != nil {
-				return nil, err
-			}
-		}
-		containerInfo.StartedAt = startedAt
-	}
-
 	container := &kubeapi.Container{
 		Id:           &containerId,
 		PodSandboxId: &podSandboxId,
 		Metadata:     metadata,
 		Image:        image,
 		ImageRef:     &containerInfo.Image,
-		State:        &containerState,
+		State:        &containerInfo.State,
 		CreatedAt:    &containerInfo.CreatedAt,
 		Labels:       containerInfo.Labels,
 		Annotations:  containerInfo.Annotations,
@@ -657,40 +727,19 @@ func (v *VirtualizationTool) GetDomainPointerById(containerId string) (*C.struct
 }
 
 func (v *VirtualizationTool) ContainerStatus(boltClient *bolttools.BoltClient, containerId string) (*kubeapi.ContainerStatus, error) {
-	var domainInfo C.virDomainInfo
-
 	domain, err := v.GetDomainPointerById(containerId)
 	defer C.virDomainFree(domain)
 	if err != nil {
 		return nil, err
 	}
 
-	if status := C.virDomainGetInfo(domain, &domainInfo); status < 0 {
-		return nil, GetLibvirtLastError()
-	}
-
-	containerInfo, err := boltClient.GetContainerInfo(containerId)
+	containerInfo, err := getContainerInfo(boltClient, domain, containerId)
 	if err != nil {
 		return nil, err
 	}
 
 	if containerInfo == nil {
 		return nil, fmt.Errorf("missing containerInfo for containerId: %s", containerId)
-	}
-
-	containerState := libvirtToKubeState(domainInfo, containerInfo.State)
-	if containerInfo.State != containerState {
-		if err := boltClient.UpdateState(containerId, byte(containerState)); err != nil {
-			return nil, err
-		}
-		startedAt := time.Now().UnixNano()
-		strStartedAt := strconv.FormatInt(startedAt, 10)
-		if containerState == kubeapi.ContainerState_CONTAINER_RUNNING {
-			if err := boltClient.UpdateStartedAt(containerId, strStartedAt); err != nil {
-				return nil, err
-			}
-		}
-		containerInfo.StartedAt = startedAt
 	}
 
 	image := &kubeapi.ImageSpec{Image: &containerInfo.Image}
@@ -700,7 +749,7 @@ func (v *VirtualizationTool) ContainerStatus(boltClient *bolttools.BoltClient, c
 		Metadata:  &kubeapi.ContainerMetadata{},
 		Image:     image,
 		ImageRef:  &containerInfo.Image,
-		State:     &containerState,
+		State:     &containerInfo.State,
 		CreatedAt: &containerInfo.CreatedAt,
 		StartedAt: &containerInfo.StartedAt,
 	}, nil
