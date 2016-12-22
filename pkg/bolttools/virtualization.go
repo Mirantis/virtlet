@@ -37,7 +37,7 @@ type ContainerInfo struct {
 	State                 kubeapi.ContainerState
 }
 
-func (b *BoltClient) VerifyVirtualizationSchema() error {
+func (b *BoltClient) EnsureVirtualizationSchema() error {
 	err := b.db.Update(func(tx *bolt.Tx) error {
 		if _, err := tx.CreateBucketIfNotExists([]byte("virtualization")); err != nil {
 			return err
@@ -110,7 +110,7 @@ func (b *BoltClient) SetContainer(containerId, sandboxId, image, rootImageSnapsh
 			return err
 		}
 
-		if err := bucket.Put([]byte("state"), []byte{byte(kubeapi.ContainerState_CREATED)}); err != nil {
+		if err := bucket.Put([]byte("state"), []byte{byte(kubeapi.ContainerState_CONTAINER_CREATED)}); err != nil {
 			return err
 		}
 

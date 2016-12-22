@@ -10,7 +10,10 @@ export PATH=${PATH}:/go/src/k8s.io/kubernetes/third_party/etcd
 export KUBELET_HOST="$ext_ip"
 export HOSTNAME_OVERRIDE="$ext_ip"
 export API_HOST="$ext_ip"
+export API_HOST_IP="$ext_ip"
+export KUBELET_HOST="$ext_ip"
 export KUBERNETES_PROVIDER=local
+export EXPERIMENTAL_CRI=true
 export CONTAINER_RUNTIME=remote
 export CONTAINER_RUNTIME_ENDPOINT=/run/virtlet.sock
 hack/local-up-cluster.sh -o _output/local/bin/linux/amd64

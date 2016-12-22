@@ -46,8 +46,10 @@ func GetSandboxes(sandboxNum int) ([]*kubeapi.PodSandboxConfig, error) {
 
 		cgroupParent := ""
 		linuxSandbox := &kubeapi.LinuxPodSandboxConfig{
-			CgroupParent:     &cgroupParent,
-			NamespaceOptions: namespaceOptions,
+			CgroupParent: &cgroupParent,
+			SecurityContext: &kubeapi.LinuxSandboxSecurityContext{
+				NamespaceOptions: namespaceOptions,
+			},
 		}
 
 		hostname := "localhost"

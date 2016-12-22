@@ -17,111 +17,13 @@ limitations under the License.
 package bolttools
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
-	"encoding/json"
 	"github.com/Mirantis/virtlet/tests/criapi"
-	"github.com/boltdb/bolt"
 )
 
-func TestSetContainer(t *testing.T) {
-	sandboxes, err := criapi.GetSandboxes(2)
-	if err != nil {
-		t.Fatalf("Failed to generate array of sandbox configs: %v", err)
-	}
-	containers, err := criapi.GetContainersConfig(sandboxes)
-	if err != nil {
-		t.Fatalf("Failed to generate array of container configs: %v", err)
-	}
-
-	b := SetUpBolt(t, sandboxes, containers)
-
-	for _, container := range containers {
-
-		if err := b.db.View(func(tx *bolt.Tx) error {
-			parentBucket := tx.Bucket([]byte("virtualization"))
-			if parentBucket == nil {
-				return fmt.Errorf("bucket 'virtualization' doesn't exist")
-			}
-
-			bucket := parentBucket.Bucket([]byte(container.ContainerId))
-			if bucket == nil {
-				return fmt.Errorf("bucket '%s' doesn't exist", container.ContainerId)
-			}
-
-			sandboxId, err := getString(bucket, "sandboxId")
-			if err != nil {
-				return err
-			}
-
-			if sandboxId != container.SandboxId {
-				t.Errorf("Expected %s, instead got %s", container.SandboxId, sandboxId)
-			}
-
-			image, err := getString(bucket, "image")
-			if err != nil {
-				return err
-			}
-
-			if image != container.Image {
-				t.Errorf("Expected %s, instead got %s", container.Image, image)
-			}
-
-			rootImageSnapshotName, err := getString(bucket, "rootImageSnapshotName")
-			if err != nil {
-				return err
-			}
-
-			if rootImageSnapshotName != container.RootImageSnapshotName {
-				t.Errorf("Expected %s, instead got %s", container.RootImageSnapshotName, rootImageSnapshotName)
-			}
-
-			labels, err := getString(bucket, "labels")
-			if err != nil {
-				return err
-			}
-
-			matchJson, err := json.Marshal(container.Labels)
-			if err != nil {
-				return err
-			}
-
-			if labels != string(matchJson) {
-				t.Errorf("Expected %s, instead got %s", matchJson, labels)
-			}
-
-			annotations, err := getString(bucket, "annotations")
-			if err != nil {
-				return err
-			}
-
-			matchJson, err = json.Marshal(container.Annotations)
-			if err != nil {
-				return err
-			}
-
-			if annotations != string(matchJson) {
-				t.Errorf("Expected %s, instead got %s", matchJson, annotations)
-			}
-
-			return nil
-		}); err != nil {
-			t.Fatal(err)
-		}
-
-		contID, err := b.GetPodSandboxContainerID(container.SandboxId)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if contID != container.ContainerId {
-			t.Errorf("Expected to get containerID: '%s' in ContainerID field: '%s' of PodSandbox:'%s'", container.ContainerId, contID, container.SandboxId)
-		}
-	}
-}
-
-func TestGetContainerInfo(t *testing.T) {
+func TestSetGetContainerInfo(t *testing.T) {
 	sandboxes, err := criapi.GetSandboxes(2)
 	if err != nil {
 		t.Fatalf("Failed to generate array of sandbox configs: %v", err)

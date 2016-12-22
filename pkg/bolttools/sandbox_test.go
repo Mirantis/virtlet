@@ -17,19 +17,16 @@ limitations under the License.
 package bolttools
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
-	"encoding/json"
-	"github.com/boltdb/bolt"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
 	"github.com/Mirantis/virtlet/tests/criapi"
 )
 
 func TestSetSandBoxValidation(t *testing.T) {
-	invalidSandboxes, err := criapi.GetSandboxes(3)
+	invalidSandboxes, err := criapi.GetSandboxes(4)
 	if err != nil {
 		t.Fatalf("Failed to generate array of sandbox configs: %v", err)
 	}
@@ -37,14 +34,15 @@ func TestSetSandBoxValidation(t *testing.T) {
 	//Now let's make generated configs to be invalid
 	invalidSandboxes[0].Metadata = nil
 	invalidSandboxes[1].Linux = nil
-	invalidSandboxes[2].Linux.NamespaceOptions = nil
+	invalidSandboxes[2].Linux.SecurityContext = nil
+	invalidSandboxes[3].Linux.SecurityContext.NamespaceOptions = nil
 
 	b, err := NewFakeBoltClient()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := b.VerifySandboxSchema(); err != nil {
+	if err := b.EnsureSandboxSchema(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -53,98 +51,6 @@ func TestSetSandBoxValidation(t *testing.T) {
 			if err := b.SetPodSandbox(sandbox, []byte{}); err == nil {
 				t.Fatalf("Expected to recieve error on attempt to set invalid sandbox %v", sandbox)
 			}
-		}
-	}
-}
-
-func TestSetPodSandbox(t *testing.T) {
-	sandboxes, err := criapi.GetSandboxes(2)
-	if err != nil {
-		t.Fatalf("Failed to generate array of sandbox configs: %v", err)
-	}
-
-	b := SetUpBolt(t, sandboxes, []*criapi.ContainerTestConfigSet{})
-
-	for _, sandbox := range sandboxes {
-		if err := b.db.View(func(tx *bolt.Tx) error {
-			parentBucket := tx.Bucket([]byte("sandbox"))
-			if parentBucket == nil {
-				return fmt.Errorf("bucket 'sandbox' doesn't exist")
-			}
-
-			bucket := parentBucket.Bucket([]byte(sandbox.GetMetadata().GetUid()))
-			if bucket == nil {
-				return fmt.Errorf("bucket '%s' doesn't exist", sandbox.GetMetadata().GetUid())
-			}
-
-			hostname, err := getString(bucket, "hostname")
-			if err != nil {
-				return err
-			}
-			if hostname != sandbox.GetHostname() {
-				t.Errorf("Expected %s, instead got %s", sandbox.GetHostname(), hostname)
-			}
-
-			strLabels, err := getString(bucket, "labels")
-			if err != nil {
-				return err
-			}
-
-			matchJson, err := json.Marshal(sandbox.GetLabels())
-			if err != nil {
-				return err
-			}
-
-			if strLabels != string(matchJson) {
-				t.Errorf("Expected %s, instead got %s", matchJson, strLabels)
-			}
-
-			matchJson, err = json.Marshal(sandbox.GetAnnotations())
-			if err != nil {
-				return err
-			}
-
-			strAnnotations, err := getString(bucket, "annotations")
-			if err != nil {
-				return err
-			}
-
-			if strAnnotations != string(matchJson) {
-				t.Errorf("Expected %s, instead got %s", matchJson, strAnnotations)
-			}
-
-			metadataBucket := bucket.Bucket([]byte("metadata"))
-			if metadataBucket == nil {
-				return fmt.Errorf("bucket 'metadata' doesn't exist")
-			}
-
-			name, err := getString(metadataBucket, "name")
-			if err != nil {
-				return err
-			}
-			if name != sandbox.GetMetadata().GetName() {
-				t.Errorf("Expected %s, instead got %s", sandbox.GetMetadata().GetName(), name)
-			}
-
-			uid, err := getString(metadataBucket, "uid")
-			if err != nil {
-				return err
-			}
-			if uid != sandbox.GetMetadata().GetUid() {
-				t.Errorf("Expected %s, instead got %s", sandbox.GetMetadata().GetUid(), uid)
-			}
-
-			namespace, err := getString(metadataBucket, "namespace")
-			if err != nil {
-				return err
-			}
-			if namespace != sandbox.GetMetadata().GetNamespace() {
-				t.Errorf("Expected %s, instead got %s", sandbox.GetMetadata().GetNamespace(), namespace)
-			}
-
-			return nil
-		}); err != nil {
-			t.Fatal(err)
 		}
 	}
 }
@@ -177,7 +83,7 @@ func TestRemovePodSandbox(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := b.VerifySandboxSchema(); err != nil {
+		if err := b.EnsureSandboxSchema(); err != nil {
 			t.Fatal(err)
 		}
 
@@ -197,7 +103,7 @@ func TestRemovePodSandbox(t *testing.T) {
 	}
 }
 
-func TestGetPodSandboxStatus(t *testing.T) {
+func TestSetGetPodSandboxStatus(t *testing.T) {
 	sandboxes, err := criapi.GetSandboxes(2)
 	if err != nil {
 		t.Fatalf("Failed to generate array of sandbox configs: %v", err)
@@ -211,7 +117,7 @@ func TestGetPodSandboxStatus(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if status.GetState() != kubeapi.PodSandBoxState_READY {
+		if status.GetState() != kubeapi.PodSandboxState_SANDBOX_READY {
 			t.Errorf("Sandbox state not ready")
 		}
 
@@ -242,8 +148,8 @@ func TestListPodSandbox(t *testing.T) {
 	secondSandboxConfig.Labels = map[string]string{"unique": "second", "common": "both"}
 
 	sandboxConfigs := []*kubeapi.PodSandboxConfig{firstSandboxConfig, secondSandboxConfig}
-	state_ready := kubeapi.PodSandBoxState_READY
-	state_notready := kubeapi.PodSandBoxState_NOTREADY
+	stateReady := kubeapi.PodSandboxState_SANDBOX_READY
+	stateNotReady := kubeapi.PodSandboxState_SANDBOX_NOTREADY
 
 	tests := []struct {
 		filter      *kubeapi.PodSandboxFilter
@@ -261,13 +167,13 @@ func TestListPodSandbox(t *testing.T) {
 		},
 		{
 			filter: &kubeapi.PodSandboxFilter{
-				State: &state_ready,
+				State: &stateReady,
 			},
 			expectedIds: []string{*firstSandboxConfig.Metadata.Uid, *secondSandboxConfig.Metadata.Uid},
 		},
 		{
 			filter: &kubeapi.PodSandboxFilter{
-				State: &state_notready,
+				State: &stateNotReady,
 			},
 			expectedIds: []string{},
 		},
