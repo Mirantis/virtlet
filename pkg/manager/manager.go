@@ -325,6 +325,7 @@ func (v *VirtletManager) StopContainer(ctx context.Context, in *kubeapi.StopCont
 		return nil, err
 	}
 	response := &kubeapi.StopContainerResponse{}
+	glog.V(2).Info("Sending stop response for containerID: %s", containerId)
 	return response, nil
 }
 

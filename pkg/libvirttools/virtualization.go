@@ -429,7 +429,29 @@ func (v *VirtualizationTool) StopContainer(containerId string) error {
 		return err
 	}
 
-	return nil
+	// Wait until domain is really stopped or timeout after 10 sec.
+	return utils.WaitLoop(func() (bool, error) {
+		domain := C.virDomainLookupByUUIDString(v.conn, cContainerId)
+		if domain == nil {
+			// There must be an error
+			lastLibvirtErr := C.virGetLastError()
+			if lastLibvirtErr == nil {
+				return false, errors.New("libvirt returned no domain and no error - this is incorrect")
+			}
+			defer C.virResetError(lastLibvirtErr)
+
+			err := errors.New(C.GoString(lastLibvirtErr.message))
+			return false, err
+		}
+		defer C.virDomainFree(domain)
+
+		state, err := getDomainState(domain)
+		if err != nil {
+			return false, err
+		}
+
+		return state == C.VIR_DOMAIN_SHUTDOWN, nil
+	}, 10*time.Second)
 }
 
 // RemoveContainer tries to gracefully stop domain, then forcibly removes it
