@@ -26,6 +26,7 @@ import "C"
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"reflect"
@@ -431,7 +432,12 @@ func (v *VirtualizationTool) StopContainer(containerId string) error {
 	return nil
 }
 
+// RemoveContainer tries to gracefully stop domain, then forcibly removes it
+// even if it's still running
+// it waits up to 5 sec for doing the job by libvirt
 func (v *VirtualizationTool) RemoveContainer(containerId string) error {
+	// Give a chance to gracefully stop domain
+	// TODO: handle errors - there could be e.x. connection error
 	v.StopContainer(containerId)
 
 	cContainerId := C.CString(containerId)
@@ -442,7 +448,29 @@ func (v *VirtualizationTool) RemoveContainer(containerId string) error {
 		return err
 	}
 
-	return nil
+	// Wait until domain is really removed or timeout after 5 sec.
+	return utils.WaitLoop(func() (bool, error) {
+		domain := C.virDomainLookupByUUIDString(v.conn, cContainerId)
+		if domain != nil {
+			C.virDomainFree(domain)
+			return false, nil
+		}
+
+		// There must be an error
+		lastLibvirtErr := C.virGetLastError()
+		if lastLibvirtErr == nil {
+			return false, errors.New("libvirt returned no domain and no error - this is incorrect")
+		}
+		defer C.virResetError(lastLibvirtErr)
+
+		if lastLibvirtErr.code == C.VIR_ERR_NO_DOMAIN {
+			return true, nil
+		}
+
+		// Other error occured
+		err := errors.New(C.GoString(lastLibvirtErr.message))
+		return false, err
+	}, 5*time.Second)
 }
 
 func libvirtToKubeState(domainState uint8, lastState kubeapi.ContainerState) kubeapi.ContainerState {
