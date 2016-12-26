@@ -12,6 +12,7 @@ VIRTLET_IMAGE_NAME=${VIRTLET_IMAGE_NAME:-virtlet}
 #LIBVIRT_IMAGE_NAME=${LIBVIRT_IMAGE_NAME:-dockercompose_libvirt}
 
 NET_CALICO=${NET_CALICO:-false}
+DOCKER_RUNTIME=${DOCKER_RUNTIME:-true}
 
 BASE_IMAGE_WORK_DIR=${BASE_IMAGE_WORK_DIR:-/home/ubuntu/virtlet}
 
@@ -91,6 +92,9 @@ ${BASE_IMAGE_WORK_DIR}/kubelet --config=${BASE_IMAGE_WORK_DIR}/k8s_master_pods -
 function setup_node() {
     lxc-attach -n $1 -- touch ${BASE_IMAGE_WORK_DIR}/start_node.sh
 
+cmd=""
+
+if [ $DOCKER_RUNTIME == "false" ]; then
 cmd="#!/bin/bash
 
 docker load -i ${BASE_IMAGE_WORK_DIR}/${VIRTLET_IMAGE_NAME}.tar
@@ -106,7 +110,10 @@ id=\\\$(docker create -it --privileged --net=host \\
 docker start \\\$id
 
 sleep 10
+"
+fi
 
+cmd=$cmd + "
 ${BASE_IMAGE_WORK_DIR}/kubelet ${KUBELET_OPTS} > /var/log/kubelet.log 2>&1 &
 ${BASE_IMAGE_WORK_DIR}/kube-proxy ${PROXY_OPTS} > /var/log/kube-proxy.log 2>&1 &
 "
@@ -154,9 +161,11 @@ function create-update-base-container() {
     cp -f ${K8S_OUTPUT_DIR}/kube-proxy ${container_dir}/kube-proxy
     cp -rf ./k8s_master_pods ${container_dir}
 
+if [ $DOCKER_RUNTIME == "false" ]; then
     # Prepare virtlet images and docker-cimpose yaml
     copy-virtlet-images
     cp -f "${VIRTLET_IMAGE_NAME}.tar" ${container_dir}
+fi
 #    cp -f "${LIBVIRT_IMAGE_NAME}.tar" ${container_dir}
 #    cp -rf ../docker-compose ${container_dir}
 #    sed -i 'N;s/virtlet:\n.*build:.*/virtlet:\n    image: dockercompose_virtlet/' ${container_dir}/docker-compose/docker-compose.yml
@@ -229,19 +238,26 @@ function create-kubelet-opts() {
     else
         cni_opts=""
     fi
+
+    if [ $DOCKER_RUNTIME == "false" ]; then
+        remote_runtime_opts="\
+             --experimental-cri=true \
+             --container-runtime=remote \
+             --container-runtime-endpoint=/run/virtlet.sock \
+             --image-service-endpoint=/run/virtlet.sock"
+    else
+        remote_runtime_opts=""
+    fi
+
     export KUBELET_OPTS="\
      --api-servers=http://${MASTER_IP}:8080 \
-     --experimental-cri=true \
-     --container-runtime=remote \
-     --container-runtime-endpoint=/run/virtlet.sock \
-     --image-service-endpoint=/run/virtlet.sock \
      --logtostderr=true \
      --cluster-dns= \
      --cluster-domain= \
      --config= \
      --allow-privileged=true\
      --v=5\
-     $cni_opts"
+     $cni_opts $remote_runtime_opts"
 }
 
 function create-kube-proxy-opts() {
