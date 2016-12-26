@@ -46,12 +46,14 @@ func getContextWithTimeout(timeout time.Duration) (context.Context, context.Canc
 type RuntimeProxy struct {
 	timeout       time.Duration
 	server        *grpc.Server
+	conn          *grpc.ClientConn
 	runtimeClient runtimeapi.RuntimeServiceClient
 	imageClient   runtimeapi.ImageServiceClient
 }
 
 // NewRuntimeProxy creates a new internalapi.RuntimeService.
 func NewRuntimeProxy(addr string, connectionTimout time.Duration) (*RuntimeProxy, error) {
+	// TODO: don't connect right there, use lazy connection
 	glog.Infof("Connecting to runtime service %s", addr)
 	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithTimeout(connectionTimout), grpc.WithDialer(dial))
 	if err != nil {
@@ -61,6 +63,7 @@ func NewRuntimeProxy(addr string, connectionTimout time.Duration) (*RuntimeProxy
 
 	proxy := &RuntimeProxy{
 		server:        grpc.NewServer(),
+		conn:          conn,
 		runtimeClient: runtimeapi.NewRuntimeServiceClient(conn),
 		imageClient:   runtimeapi.NewImageServiceClient(conn),
 	}
@@ -70,7 +73,7 @@ func NewRuntimeProxy(addr string, connectionTimout time.Duration) (*RuntimeProxy
 	return proxy, nil
 }
 
-func (r *RuntimeProxy) Serve(addr string) error {
+func (r *RuntimeProxy) Serve(addr string, readyCh chan struct{}) error {
 	if err := syscall.Unlink(addr); err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -79,7 +82,19 @@ func (r *RuntimeProxy) Serve(addr string) error {
 		return err
 	}
 	defer ln.Close()
+	if readyCh != nil {
+		close(readyCh)
+	}
 	return r.server.Serve(ln)
+}
+
+func (r *RuntimeProxy) Stop() {
+	// TODO: check if conn / server is present
+	if err := r.conn.Close(); err != nil {
+		glog.Errorf("Failed to close gRPC connection: %v", err)
+		return
+	}
+	r.server.Stop()
 }
 
 // RuntimeServiceServer methods follow
