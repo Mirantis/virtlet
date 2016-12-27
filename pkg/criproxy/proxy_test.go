@@ -17,14 +17,16 @@ limitations under the License.
 package criproxy
 
 import (
+	"encoding/json"
+	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
-	// "github.com/davecgh/go-spew/spew"
+	"github.com/pmezard/go-difflib/difflib"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-	"reflect"
 
 	proxytest "github.com/Mirantis/virtlet/pkg/criproxy/testing"
 )
@@ -55,6 +57,14 @@ func startServer(t *testing.T, s ServerWithReadinessFeedback, addr string) {
 	}
 }
 
+func pstr(s string) *string {
+	return &s
+}
+
+func puint64(v uint64) *uint64 {
+	return &v
+}
+
 func TestCriProxy(t *testing.T) {
 	criServer := proxytest.NewFakeCriServer()
 	defer criServer.Stop()
@@ -74,30 +84,63 @@ func TestCriProxy(t *testing.T) {
 		t.Fatalf("Connect remote runtime %s failed: %v", fakeCriSocketPath, err)
 	}
 	defer conn.Close()
-	imageClient := runtimeapi.NewImageServiceClient(conn)
+	// imageClient := runtimeapi.NewImageServiceClient(conn)
 
 	fakeImageNames := []string{"image1", "image2"}
 	criServer.SetFakeImages(fakeImageNames)
 	criServer.SetFakeImageSize(fakeImageSize)
 
-	resp, err := imageClient.ListImages(context.Background(), &runtimeapi.ListImagesRequest{})
-	if err != nil {
-		t.Fatalf("ListImages() failed: %v", err)
-	}
+	for _, step := range []struct {
+		name, method string
+		in, resp     interface{}
+	}{
+		{
+			// TODO: test image filtering
+			name:   "list images",
+			method: "/runtime.ImageService/ListImages",
+			in:     &runtimeapi.ListImagesRequest{},
+			resp: &runtimeapi.ListImagesResponse{
+				Images: []*runtimeapi.Image{
+					{
+						Id:       pstr("image1"),
+						RepoTags: []string{"image1"},
+						Size_:    puint64(fakeImageSize),
+					},
+					{
+						Id:       pstr("image2"),
+						RepoTags: []string{"image2"},
+						Size_:    puint64(fakeImageSize),
+					},
+				},
+			},
+		},
+	} {
+		t.Run(step.name, func(t *testing.T) {
+			actualResponse := reflect.New(reflect.TypeOf(step.resp).Elem()).Interface()
+			if err := grpc.Invoke(context.Background(), step.method, step.in, actualResponse, conn); err != nil {
+				t.Fatalf("GRPC call failed: %v", err)
+			}
 
-	var repoTags []string
-	for _, image := range resp.GetImages() {
-		imageRepoTags := image.GetRepoTags()
-		if len(imageRepoTags) != 1 {
-			t.Errorf("bad repo tags for image: %#v", imageRepoTags)
-			continue
-		}
-		if image.GetSize_() != fakeImageSize {
-			t.Errorf("bad image size for image %q: %v instead of %v", imageRepoTags[0], image.GetSize_(), fakeImageSize)
-		}
-		repoTags = append(repoTags, imageRepoTags[0])
-	}
-	if !reflect.DeepEqual(fakeImageNames, repoTags) {
-		t.Errorf("bad image tags returned: %#v instead of %#v", repoTags, fakeImageNames)
+			if !reflect.DeepEqual(actualResponse, step.resp) {
+				expectedJSON, err := json.MarshalIndent(step.resp, "", "  ")
+				if err != nil {
+					t.Fatalf("Failed to marshal json: %v", err)
+				}
+				actualJSON, err := json.MarshalIndent(actualResponse, "", "  ")
+				if err != nil {
+					t.Fatalf("Failed to marshal json: %v", err)
+				}
+				diff := difflib.UnifiedDiff{
+					A:        difflib.SplitLines(string(expectedJSON)),
+					B:        difflib.SplitLines(string(actualJSON)),
+					FromFile: "expected",
+					ToFile:   "actual",
+					Context:  5,
+				}
+				diffText, _ := difflib.GetUnifiedDiffString(diff)
+				fmt.Println(diffText)
+				t.Errorf("Response diff:\n%s", diffText)
+			}
+		})
 	}
 }

@@ -19,6 +19,7 @@ limitations under the License.
 package testing
 
 import (
+	"sort"
 	"sync"
 
 	"golang.org/x/net/context"
@@ -71,9 +72,16 @@ func (r *FakeImageServer) ListImages(ctx context.Context, in *runtimeapi.ListIma
 
 	r.Called = append(r.Called, "ListImages")
 
+	var imageNames []string
+	for imageName, _ := range r.Images {
+		imageNames = append(imageNames, imageName)
+	}
+	sort.Strings(imageNames)
+
 	filter := in.GetFilter()
 	images := make([]*runtimeapi.Image, 0)
-	for _, img := range r.Images {
+	for _, name := range imageNames {
+		img := r.Images[name]
 		if filter != nil && filter.Image != nil {
 			imageName := filter.Image.GetImage()
 			found := false
