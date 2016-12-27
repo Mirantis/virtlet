@@ -7,7 +7,8 @@ set -o errtrace
 # Note that project_dir must not end with slash
 project_dir="$(cd "$(dirname "${BASH_SOURCE}")/.." && pwd)"
 remote_project_dir="/go/src/github.com/Mirantis/virtlet"
-build_name=virtlet_build
+build_name="virtlet_build"
+container_name="${build_name}-$(openssl rand -hex 16)"
 build_image=${build_name}:latest
 volume_name=virtlet_src
 exclude=(
@@ -27,14 +28,22 @@ function vcmd {
     cd "${project_dir}"
     tar -C "${project_dir}" "${exclude[@]}" -cz . |
         docker run --rm --privileged -i \
+               -l virtlet_build \
                -v "virtlet_src:${remote_project_dir}" \
                -v "virtlet_pkg:/go/pkg" \
                -v /sys/fs/cgroup:/sys/fs/cgroup \
                -v /lib/modules:/lib/modules:ro \
                -v /boot:/boot:ro \
                -e TRAVIS="${TRAVIS:-}" \
-               --name ${build_name} \
+               --name ${container_name} \
                "${build_image}" bash -c "tar -C '${remote_project_dir}' -xz && $*"
+}
+
+function stop {
+  docker ps -q --filter=label=virtlet_build | while read container_id; do
+    echo >&2 "Removing container:" "${container_id}"
+    docker rm -fv "${container_id}"
+  done
 }
 
 function copy_output {
@@ -43,7 +52,7 @@ function copy_output {
     docker run --rm --privileged -i \
            -v "virtlet_src:${remote_project_dir}" \
            -v "virtlet_pkg:/go/pkg" \
-           --name ${build_name} \
+           --name ${container_name} \
            "${build_image}" \
            bash -c "tar -C '${remote_project_dir}' -cz \$(find . -path '*/_output/*' -type f)" |
         tar -xvz
@@ -60,6 +69,7 @@ function virtlet_subdir {
 }
 
 function clean {
+    stop
     docker volume rm virtlet_src || true
     docker volume rm virtlet_pkg || true
     docker rmi "${build_image}" || true
@@ -76,6 +86,7 @@ function usage {
     echo >&2 "  $0 build"
     echo >&2 "  $0 test"
     echo >&2 "  $0 copy"
+    echo >&2 "  $0 stop"
     echo >&2 "  $0 clean"
     echo >&2 "  $0 gotest [TEST_ARGS...]"
     echo >&2 "  $0 gobuild [BUILD_ARGS...]"
@@ -104,6 +115,9 @@ case "${cmd}" in
         ;;
     run)
         vcmd "$*"
+        ;;
+    stop)
+        stop
         ;;
     clean)
         clean
