@@ -21,6 +21,7 @@ package testing
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"sync"
 	"time"
 
@@ -224,9 +225,16 @@ func (r *FakeRuntimeServer) ListPodSandbox(ctx context.Context, in *runtimeapi.L
 
 	r.Called = append(r.Called, "ListPodSandbox")
 
+	var ids []string
+	for id, _ := range r.Sandboxes {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+
 	filter := in.GetFilter()
 	result := make([]*runtimeapi.PodSandbox, 0)
-	for id, s := range r.Sandboxes {
+	for _, id := range ids {
+		s := r.Sandboxes[id]
 		if filter != nil {
 			if filter.Id != nil && filter.GetId() != id {
 				continue
@@ -343,9 +351,16 @@ func (r *FakeRuntimeServer) ListContainers(ctx context.Context, in *runtimeapi.L
 
 	r.Called = append(r.Called, "ListContainers")
 
+	var ids []string
+	for id, _ := range r.Containers {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+
 	filter := in.GetFilter()
 	result := make([]*runtimeapi.Container, 0)
-	for _, s := range r.Containers {
+	for _, id := range ids {
+		s := r.Containers[id]
 		if filter != nil {
 			if filter.Id != nil && filter.GetId() != s.GetId() {
 				continue
