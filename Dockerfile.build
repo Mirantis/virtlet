@@ -6,7 +6,6 @@ LABEL Name="virtlet" Version="0.1"
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
                 git \
-                golang \
                 make \
                 autoconf \
                 automake \
@@ -28,6 +27,17 @@ RUN apt-get update && \
                 netbase \
                 iputils-ping && \
     apt-get clean
+
+# The following is based on official Go container:
+# https://github.com/docker-library/golang/blob/18ee81a2ec649dd7b3d5126b24eef86bc9c86d80/1.7/Dockerfile
+ENV GOLANG_VERSION 1.7.4
+ENV GOLANG_DOWNLOAD_URL https://golang.org/dl/go$GOLANG_VERSION.linux-amd64.tar.gz
+ENV GOLANG_DOWNLOAD_SHA256 47fda42e46b4c3ec93fa5d4d4cc6a748aa3f9411a2a2b7e08e3a6d80d753ec8b
+
+RUN curl -fsSL "$GOLANG_DOWNLOAD_URL" -o golang.tar.gz \
+	&& echo "$GOLANG_DOWNLOAD_SHA256  golang.tar.gz" | sha256sum -c - \
+	&& tar -C /usr/local -xzf golang.tar.gz \
+	&& rm golang.tar.gz
 
 ENV GOPATH /go
 ENV PATH /go/src/github.com/Mirantis/virtlet/_output:$GOPATH/bin:/usr/local/go/bin:$PATH
