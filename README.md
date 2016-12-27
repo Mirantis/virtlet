@@ -13,8 +13,7 @@ At this stage Virtlet have following requirements:
 * SELinux/AppArmor disabled on host (to disable them - follow documentation from your host Linux distribution),
 * if host have libvirt installed - it should be stopped when working with Virtlet,
 * [docker](https://www.docker.com) should be installed on host and user account on which Virtlet will be built and run - should be properly configured to use this docker installation (possibly adding user's account into group in which docker deamon is running should be enough, but please follow docker documentation for your host Linux distribution),
-* host should have `python` environment in version which is compatible with `docker-compose` (installation instructions in later section of this doc),
-* you need a kubernetes cluster with specified version which is pinned in glide.lock file
+* you need a kubernetes cluster with specified version which is pinned in glide.yaml file
 
 ### Networking support
 
@@ -47,11 +46,13 @@ docker run -it --rm --privileged --network=host \
 In the command above, `VIRTLET_LOGLEVEL` sets logging level for virtlet.
 3 is currently highest verbosity level, the default being 2.
 
+Fedora based systems require additional parameter for docker: `--pid=host`.
+
 Now you can follow instructions from the next section.
 
 ### Kubernetes environment
 
-Currently the only supported version of Kubernetes is specified in glide.lock file, Virtlet may work with different version though.
+Currently the only supported version of Kubernetes is specified in glide.yaml file, Virtlet may work with different version though.
 
 Assuming standard configuration for Kubernetes sources location, use following commands:
 
