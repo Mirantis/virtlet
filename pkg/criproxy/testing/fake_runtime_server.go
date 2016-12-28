@@ -82,8 +82,23 @@ func (r *FakeRuntimeServer) SetFakeContainers(containers []*FakeContainer) {
 }
 
 func NewFakeRuntimeServer(journal Journal) *FakeRuntimeServer {
+	ready := true
+	runtimeReadyStr := runtimeapi.RuntimeReady
+	networkReadyStr := runtimeapi.NetworkReady
 	return &FakeRuntimeServer{
-		journal:    journal,
+		journal: journal,
+		FakeStatus: &runtimeapi.RuntimeStatus{
+			Conditions: []*runtimeapi.RuntimeCondition{
+				{
+					Type:   &runtimeReadyStr,
+					Status: &ready,
+				},
+				{
+					Type:   &networkReadyStr,
+					Status: &ready,
+				},
+			},
+		},
 		Containers: make(map[string]*FakeContainer),
 		Sandboxes:  make(map[string]*FakePodSandbox),
 	}

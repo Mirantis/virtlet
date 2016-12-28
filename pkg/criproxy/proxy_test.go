@@ -63,6 +63,10 @@ func pstr(s string) *string {
 	return &s
 }
 
+func pbool(b bool) *bool {
+	return &b
+}
+
 func puint64(v uint64) *uint64 {
 	return &v
 }
@@ -104,6 +108,40 @@ func TestCriProxy(t *testing.T) {
 		in, resp     interface{}
 		journal      []string
 	}{
+		{
+			name:   "version",
+			method: "/runtime.RuntimeService/Version",
+			in:     &runtimeapi.VersionRequest{},
+			resp: &runtimeapi.VersionResponse{
+				Version:           pstr("0.1.0"),
+				RuntimeName:       pstr("fakeRuntime"),
+				RuntimeVersion:    pstr("0.1.0"),
+				RuntimeApiVersion: pstr("0.1.0"),
+			},
+			journal: []string{"1/runtime/Version"},
+		},
+		{
+			name:   "status",
+			method: "/runtime.RuntimeService/Status",
+			in:     &runtimeapi.StatusRequest{},
+			resp: &runtimeapi.StatusResponse{
+				Status: &runtimeapi.RuntimeStatus{
+					Conditions: []*runtimeapi.RuntimeCondition{
+						{
+							Type:   pstr("RuntimeReady"),
+							Status: pbool(true),
+						},
+						{
+							Type:   pstr("NetworkReady"),
+							Status: pbool(true),
+						},
+					},
+				},
+			},
+			// FIXME: actually, both runtimes need to be contacted and
+			// the result needs to be combined
+			journal: []string{"1/runtime/Status"},
+		},
 		{
 			name:   "list images",
 			method: "/runtime.ImageService/ListImages",
@@ -305,3 +343,5 @@ func TestCriProxy(t *testing.T) {
 		})
 	}
 }
+
+// TODO: proper status handling (contact both runtimes, etc.)
