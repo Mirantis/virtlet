@@ -19,6 +19,7 @@ package criproxy
 import (
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -38,6 +39,10 @@ const (
 	connectionTimeoutForTests = 20 * time.Second
 	fakeImageSize1            = uint64(424242)
 	fakeImageSize2            = uint64(434343)
+	podUid1                   = "4bde9008-4663-4342-84ed-310cea787f95"
+	podSandboxId1             = "pod-1-1_default_" + podUid1 + "_0"
+	podUid2                   = "927a91df-f4d3-49a9-a257-5ca7f16f85fc"
+	podSandboxId2             = "alt__pod-2-1_default_" + podUid2 + "_0"
 )
 
 type ServerWithReadinessFeedback interface {
@@ -65,6 +70,10 @@ func pstr(s string) *string {
 
 func pbool(b bool) *bool {
 	return &b
+}
+
+func puint32(v uint32) *uint32 {
+	return &v
 }
 
 func puint64(v uint64) *uint64 {
@@ -107,6 +116,7 @@ func TestCriProxy(t *testing.T) {
 		name, method string
 		in, resp     interface{}
 		journal      []string
+		error        string
 	}{
 		{
 			name:   "version",
@@ -141,6 +151,291 @@ func TestCriProxy(t *testing.T) {
 			// FIXME: actually, both runtimes need to be contacted and
 			// the result needs to be combined
 			journal: []string{"1/runtime/Status"},
+		},
+		{
+			name:   "run pod sandbox 1",
+			method: "/runtime.RuntimeService/RunPodSandbox",
+			in: &runtimeapi.RunPodSandboxRequest{
+				Config: &runtimeapi.PodSandboxConfig{
+					Metadata: &runtimeapi.PodSandboxMetadata{
+						Name:      pstr("pod-1-1"),
+						Uid:       pstr(podUid1),
+						Namespace: pstr("default"),
+						Attempt:   puint32(0),
+					},
+					Labels: map[string]string{"name": "pod-1-1"},
+				},
+			},
+			resp: &runtimeapi.RunPodSandboxResponse{
+				PodSandboxId: pstr(podSandboxId1),
+			},
+			journal: []string{"1/runtime/RunPodSandbox"},
+		},
+		{
+			name:   "run pod sandbox 2",
+			method: "/runtime.RuntimeService/RunPodSandbox",
+			in: &runtimeapi.RunPodSandboxRequest{
+				Config: &runtimeapi.PodSandboxConfig{
+					Metadata: &runtimeapi.PodSandboxMetadata{
+						Name:      pstr("pod-2-1"),
+						Uid:       pstr(podUid2),
+						Namespace: pstr("default"),
+						Attempt:   puint32(0),
+					},
+					Labels: map[string]string{"name": "pod-2-1"},
+					Annotations: map[string]string{
+						"kubernetes.io/target-runtime": "alt",
+					},
+				},
+			},
+			resp: &runtimeapi.RunPodSandboxResponse{
+				PodSandboxId: pstr(podSandboxId2),
+			},
+			journal: []string{"2/runtime/RunPodSandbox"},
+		},
+		{
+			name:   "run pod sandbox with bad runtime id",
+			method: "/runtime.RuntimeService/RunPodSandbox",
+			in: &runtimeapi.RunPodSandboxRequest{
+				Config: &runtimeapi.PodSandboxConfig{
+					Metadata: &runtimeapi.PodSandboxMetadata{
+						Name:      pstr("pod-x-1"),
+						Uid:       pstr(podUid2),
+						Namespace: pstr("default"),
+						Attempt:   puint32(0),
+					},
+					Labels: map[string]string{"name": "pod-x-1"},
+					Annotations: map[string]string{
+						"kubernetes.io/target-runtime": "badruntime",
+					},
+				},
+			},
+			// resp must be specified even in case of expected error
+			// because the type is needed to make the GRPC call
+			resp:  &runtimeapi.RunPodSandboxResponse{},
+			error: "criproxy: unknown runtime: \"badruntime\"",
+		},
+		{
+			name:   "list pod sandboxes",
+			method: "/runtime.RuntimeService/ListPodSandbox",
+			in:     &runtimeapi.ListPodSandboxRequest{},
+			resp: &runtimeapi.ListPodSandboxResponse{
+				Items: []*runtimeapi.PodSandbox{
+					{
+						Id: pstr(podSandboxId1),
+						Metadata: &runtimeapi.PodSandboxMetadata{
+							Name:      pstr("pod-1-1"),
+							Uid:       pstr(podUid1),
+							Namespace: pstr("default"),
+							Attempt:   puint32(0),
+						},
+						State:     runtimeapi.PodSandboxState_SANDBOX_READY.Enum(),
+						CreatedAt: &criServer1.CurrentTime,
+						Labels:    map[string]string{"name": "pod-1-1"},
+					},
+					{
+						Id: pstr(podSandboxId2),
+						Metadata: &runtimeapi.PodSandboxMetadata{
+							Name:      pstr("pod-2-1"),
+							Uid:       pstr(podUid2),
+							Namespace: pstr("default"),
+							Attempt:   puint32(0),
+						},
+						State:     runtimeapi.PodSandboxState_SANDBOX_READY.Enum(),
+						CreatedAt: &criServer2.CurrentTime,
+						Labels:    map[string]string{"name": "pod-2-1"},
+						Annotations: map[string]string{
+							"kubernetes.io/target-runtime": "alt",
+						},
+					},
+				},
+			},
+			journal: []string{"1/runtime/ListPodSandbox", "2/runtime/ListPodSandbox"},
+		},
+		{
+			name:   "list pod sandboxes with filter 1",
+			method: "/runtime.RuntimeService/ListPodSandbox",
+			in: &runtimeapi.ListPodSandboxRequest{
+				Filter: &runtimeapi.PodSandboxFilter{Id: pstr(podSandboxId1)},
+			},
+			resp: &runtimeapi.ListPodSandboxResponse{
+				Items: []*runtimeapi.PodSandbox{
+					{
+						Id: pstr(podSandboxId1),
+						Metadata: &runtimeapi.PodSandboxMetadata{
+							Name:      pstr("pod-1-1"),
+							Uid:       pstr(podUid1),
+							Namespace: pstr("default"),
+							Attempt:   puint32(0),
+						},
+						State:     runtimeapi.PodSandboxState_SANDBOX_READY.Enum(),
+						CreatedAt: &criServer1.CurrentTime,
+						Labels:    map[string]string{"name": "pod-1-1"},
+					},
+				},
+			},
+			journal: []string{"1/runtime/ListPodSandbox"},
+		},
+		{
+			name:   "list pod sandboxes with filter 2",
+			method: "/runtime.RuntimeService/ListPodSandbox",
+			in: &runtimeapi.ListPodSandboxRequest{
+				Filter: &runtimeapi.PodSandboxFilter{Id: pstr(podSandboxId2)},
+			},
+			resp: &runtimeapi.ListPodSandboxResponse{
+				Items: []*runtimeapi.PodSandbox{
+					{
+						Id: pstr(podSandboxId2),
+						Metadata: &runtimeapi.PodSandboxMetadata{
+							Name:      pstr("pod-2-1"),
+							Uid:       pstr(podUid2),
+							Namespace: pstr("default"),
+							Attempt:   puint32(0),
+						},
+						State:     runtimeapi.PodSandboxState_SANDBOX_READY.Enum(),
+						CreatedAt: &criServer2.CurrentTime,
+						Labels:    map[string]string{"name": "pod-2-1"},
+						Annotations: map[string]string{
+							"kubernetes.io/target-runtime": "alt",
+						},
+					},
+				},
+			},
+			journal: []string{"2/runtime/ListPodSandbox"},
+		},
+		{
+			name:   "pod sandbox status 1",
+			method: "/runtime.RuntimeService/PodSandboxStatus",
+			in: &runtimeapi.PodSandboxStatusRequest{
+				PodSandboxId: pstr(podSandboxId1),
+			},
+			resp: &runtimeapi.PodSandboxStatusResponse{
+				Status: &runtimeapi.PodSandboxStatus{
+					Id: pstr(podSandboxId1),
+					Metadata: &runtimeapi.PodSandboxMetadata{
+						Name:      pstr("pod-1-1"),
+						Uid:       pstr(podUid1),
+						Namespace: pstr("default"),
+						Attempt:   puint32(0),
+					},
+					State:     runtimeapi.PodSandboxState_SANDBOX_READY.Enum(),
+					CreatedAt: &criServer1.CurrentTime,
+					Network: &runtimeapi.PodSandboxNetworkStatus{
+						Ip: pstr("192.168.192.168"),
+					},
+					Labels: map[string]string{"name": "pod-1-1"},
+				},
+			},
+			journal: []string{"1/runtime/PodSandboxStatus"},
+		},
+		{
+			name:   "pod sandbox status 2",
+			method: "/runtime.RuntimeService/PodSandboxStatus",
+			in: &runtimeapi.PodSandboxStatusRequest{
+				PodSandboxId: pstr(podSandboxId2),
+			},
+			resp: &runtimeapi.PodSandboxStatusResponse{
+				Status: &runtimeapi.PodSandboxStatus{
+					Id: pstr(podSandboxId2),
+					Metadata: &runtimeapi.PodSandboxMetadata{
+						Name:      pstr("pod-2-1"),
+						Uid:       pstr(podUid2),
+						Namespace: pstr("default"),
+						Attempt:   puint32(0),
+					},
+					State:     runtimeapi.PodSandboxState_SANDBOX_READY.Enum(),
+					CreatedAt: &criServer2.CurrentTime,
+					Network: &runtimeapi.PodSandboxNetworkStatus{
+						Ip: pstr("192.168.192.168"),
+					},
+					Labels: map[string]string{"name": "pod-2-1"},
+					Annotations: map[string]string{
+						"kubernetes.io/target-runtime": "alt",
+					},
+				},
+			},
+			journal: []string{"2/runtime/PodSandboxStatus"},
+		},
+		// TODO: add container testing steps here
+		{
+			name:   "stop pod sandbox 1",
+			method: "/runtime.RuntimeService/StopPodSandbox",
+			in: &runtimeapi.StopPodSandboxRequest{
+				PodSandboxId: pstr(podSandboxId1),
+			},
+			resp:    &runtimeapi.StopPodSandboxResponse{},
+			journal: []string{"1/runtime/StopPodSandbox"},
+		},
+		{
+			name:   "stop pod sandbox 2",
+			method: "/runtime.RuntimeService/StopPodSandbox",
+			in: &runtimeapi.StopPodSandboxRequest{
+				PodSandboxId: pstr(podSandboxId2),
+			},
+			resp:    &runtimeapi.StopPodSandboxResponse{},
+			journal: []string{"2/runtime/StopPodSandbox"},
+		},
+		{
+			name:   "relist pod sandboxes after stopping",
+			method: "/runtime.RuntimeService/ListPodSandbox",
+			in:     &runtimeapi.ListPodSandboxRequest{},
+			resp: &runtimeapi.ListPodSandboxResponse{
+				Items: []*runtimeapi.PodSandbox{
+					{
+						Id: pstr(podSandboxId1),
+						Metadata: &runtimeapi.PodSandboxMetadata{
+							Name:      pstr("pod-1-1"),
+							Uid:       pstr(podUid1),
+							Namespace: pstr("default"),
+							Attempt:   puint32(0),
+						},
+						State:     runtimeapi.PodSandboxState_SANDBOX_NOTREADY.Enum(),
+						CreatedAt: &criServer1.CurrentTime,
+						Labels:    map[string]string{"name": "pod-1-1"},
+					},
+					{
+						Id: pstr(podSandboxId2),
+						Metadata: &runtimeapi.PodSandboxMetadata{
+							Name:      pstr("pod-2-1"),
+							Uid:       pstr(podUid2),
+							Namespace: pstr("default"),
+							Attempt:   puint32(0),
+						},
+						State:     runtimeapi.PodSandboxState_SANDBOX_NOTREADY.Enum(),
+						CreatedAt: &criServer2.CurrentTime,
+						Labels:    map[string]string{"name": "pod-2-1"},
+						Annotations: map[string]string{
+							"kubernetes.io/target-runtime": "alt",
+						},
+					},
+				},
+			},
+			journal: []string{"1/runtime/ListPodSandbox", "2/runtime/ListPodSandbox"},
+		},
+		{
+			name:   "remove pod sandbox 1",
+			method: "/runtime.RuntimeService/RemovePodSandbox",
+			in: &runtimeapi.RemovePodSandboxRequest{
+				PodSandboxId: pstr(podSandboxId1),
+			},
+			resp:    &runtimeapi.RemovePodSandboxResponse{},
+			journal: []string{"1/runtime/RemovePodSandbox"},
+		},
+		{
+			name:   "remove pod sandbox 2",
+			method: "/runtime.RuntimeService/RemovePodSandbox",
+			in: &runtimeapi.RemovePodSandboxRequest{
+				PodSandboxId: pstr(podSandboxId2),
+			},
+			resp:    &runtimeapi.RemovePodSandboxResponse{},
+			journal: []string{"2/runtime/RemovePodSandbox"},
+		},
+		{
+			name:    "relist pod sandboxes after removal",
+			method:  "/runtime.RuntimeService/ListPodSandbox",
+			in:      &runtimeapi.ListPodSandboxRequest{},
+			resp:    &runtimeapi.ListPodSandboxResponse{},
+			journal: []string{"1/runtime/ListPodSandbox", "2/runtime/ListPodSandbox"},
 		},
 		{
 			name:   "list images",
@@ -313,11 +608,17 @@ func TestCriProxy(t *testing.T) {
 	} {
 		t.Run(step.name, func(t *testing.T) {
 			actualResponse := reflect.New(reflect.TypeOf(step.resp).Elem()).Interface()
-			if err := grpc.Invoke(context.Background(), step.method, step.in, actualResponse, conn); err != nil {
-				t.Fatalf("GRPC call failed: %v", err)
+			err := grpc.Invoke(context.Background(), step.method, step.in, actualResponse, conn)
+			switch {
+			case step.error == "" && err != nil:
+				t.Errorf("GRPC call failed: %v", err)
+			case step.error != "" && err == nil:
+				t.Errorf("did not get expected error")
+			case step.error != "" && !strings.Contains(err.Error(), step.error):
+				t.Errorf("bad error message: %q instead of %q", err.Error(), step.error)
 			}
 
-			if !reflect.DeepEqual(actualResponse, step.resp) {
+			if err == nil && !reflect.DeepEqual(actualResponse, step.resp) {
 				expectedJSON, err := json.MarshalIndent(step.resp, "", "  ")
 				if err != nil {
 					t.Fatalf("Failed to marshal json: %v", err)
@@ -345,3 +646,6 @@ func TestCriProxy(t *testing.T) {
 }
 
 // TODO: proper status handling (contact both runtimes, etc.)
+// TODO: make sure patching requests/responses is ok & if it is, don't use copying for them
+// TODO: make sure image prefixes are checked for containers
+// TODO: UpdateRuntimeConfigRequest -- should be called for every rintime
