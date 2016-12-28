@@ -29,8 +29,8 @@ import (
 type FakeImageServer struct {
 	sync.Mutex
 
+	journal       Journal
 	FakeImageSize uint64
-	Called        []string
 	Images        map[string]*runtimeapi.Image
 }
 
@@ -51,10 +51,10 @@ func (r *FakeImageServer) SetFakeImageSize(size uint64) {
 	r.FakeImageSize = size
 }
 
-func NewFakeImageServer() *FakeImageServer {
+func NewFakeImageServer(journal Journal) *FakeImageServer {
 	return &FakeImageServer{
-		Called: make([]string, 0),
-		Images: make(map[string]*runtimeapi.Image),
+		journal: journal,
+		Images:  make(map[string]*runtimeapi.Image),
 	}
 }
 
@@ -70,7 +70,7 @@ func (r *FakeImageServer) ListImages(ctx context.Context, in *runtimeapi.ListIma
 	r.Lock()
 	defer r.Unlock()
 
-	r.Called = append(r.Called, "ListImages")
+	r.journal.Record("ListImages")
 
 	var imageNames []string
 	for imageName, _ := range r.Images {
@@ -105,7 +105,7 @@ func (r *FakeImageServer) ImageStatus(ctx context.Context, in *runtimeapi.ImageS
 	r.Lock()
 	defer r.Unlock()
 
-	r.Called = append(r.Called, "ImageStatus")
+	r.journal.Record("ImageStatus")
 
 	image := in.GetImage()
 	return &runtimeapi.ImageStatusResponse{Image: r.Images[image.GetImage()]}, nil
@@ -115,7 +115,7 @@ func (r *FakeImageServer) PullImage(ctx context.Context, in *runtimeapi.PullImag
 	r.Lock()
 	defer r.Unlock()
 
-	r.Called = append(r.Called, "PullImage")
+	r.journal.Record("PullImage")
 
 	// ImageID should be randomized for real container runtime, but here just use
 	// image's name for easily making fake images.
@@ -132,7 +132,7 @@ func (r *FakeImageServer) RemoveImage(ctx context.Context, in *runtimeapi.Remove
 	r.Lock()
 	defer r.Unlock()
 
-	r.Called = append(r.Called, "RemoveImage")
+	r.journal.Record("RemoveImage")
 
 	// Remove the image
 	image := in.GetImage()
