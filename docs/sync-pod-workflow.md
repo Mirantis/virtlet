@@ -4,7 +4,7 @@
 
 1. Check SandBox statuses (SANDBOX_READY) => If yes, Sandbox container is re-created.
 2. Check whether hostNetwork setting has been changed. => If yes, Sandbox container is killed&re-created.
-**NOTE:** hostNetwork setting is ignored by virtlet, netns will be created always for new PodSandBox. Thus, hostNetwork setting change is causing killing VM with furhter re-creation of the same network and domain (corresponding issue: TODO).
+**NOTE:** hostNetwork setting is ignored by virtlet, netns will be created always for new PodSandBox. Thus, hostNetwork setting change is causing killing VM with furhter re-creation of the same network and domain (corresponding issue: https://github.com/Mirantis/virtlet/issues/184).
 
 **II. Process containers**
 

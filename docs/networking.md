@@ -58,4 +58,4 @@ In containers world hostNetwok=true means pods with such setting will have the s
 
 In VM world we can't have two VM-pods with the same ip, so it means we need to have bridge binded to host interface for outbound VM's traffic (in other world the same as libvirt NAT-based network). But such model isin't sufficient for providing node-to-Pod connectivity for which we still need overlay network.
 
-As a possible enhancement we could try to detect hostNetwork change setting case and emulate activity for kubelet not touching deployed VM (corresponding issue: TODO).
+As a possible enhancement we could try to detect hostNetwork change setting case and emulate activity for kubelet not touching deployed VM (corresponding issue: https://github.com/Mirantis/virtlet/issues/184).
