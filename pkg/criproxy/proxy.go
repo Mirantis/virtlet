@@ -34,6 +34,10 @@ import (
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
+const (
+	targetRuntimeAnnotationKey = "kubernetes.io/target-runtime"
+)
+
 // dial creates a net.Conn by unix socket addr.
 func dial(addr string, timeout time.Duration) (net.Conn, error) {
 	return net.DialTimeout("unix", addr, timeout)
@@ -102,6 +106,32 @@ func (c *apiClient) imageName(unprefixedName string) string {
 	return c.id + "/" + unprefixedName
 }
 
+func (c *apiClient) augmentId(id string) *string {
+	if !c.isPrimary() {
+		id = c.id + "__" + id
+	}
+	return &id
+}
+
+func (c *apiClient) annotationsMatch(annotations map[string]string) bool {
+	targetRuntime, found := annotations[targetRuntimeAnnotationKey]
+	if c.isPrimary() {
+		return !found
+	}
+	return found && targetRuntime == c.id
+}
+
+func (c *apiClient) idPrefixMatches(id string) (bool, string) {
+	switch {
+	case c.isPrimary():
+		return true, id
+	case strings.HasPrefix(id, c.id+"__"):
+		return true, id[len(c.id)+2:]
+	default:
+		return false, ""
+	}
+}
+
 func (c *apiClient) imageMatches(imageName string) (bool, string) {
 	switch {
 	case c.isPrimary():
@@ -111,6 +141,26 @@ func (c *apiClient) imageMatches(imageName string) (bool, string) {
 	default:
 		return false, ""
 	}
+}
+
+func (c *apiClient) prefixSandbox(unprefixedSandbox *runtimeapi.PodSandbox) *runtimeapi.PodSandbox {
+	if c.isPrimary() {
+		return unprefixedSandbox
+	}
+	sandbox := *unprefixedSandbox
+	sandbox.Id = c.augmentId(*unprefixedSandbox.Id)
+	return &sandbox
+}
+
+func (c *apiClient) prefixSandboxes(sandboxes []*runtimeapi.PodSandbox) []*runtimeapi.PodSandbox {
+	if c.isPrimary() {
+		return sandboxes
+	}
+	var r []*runtimeapi.PodSandbox
+	for _, unprefixedSandbox := range sandboxes {
+		r = append(r, c.prefixSandbox(unprefixedSandbox))
+	}
+	return r
 }
 
 func (c *apiClient) prefixImage(unprefixedImage *runtimeapi.Image) *runtimeapi.Image {
@@ -221,68 +271,109 @@ func (r *RuntimeProxy) Version(ctx context.Context, in *runtimeapi.VersionReques
 // RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
 // the sandbox is in ready state.
 func (r *RuntimeProxy) RunPodSandbox(ctx context.Context, in *runtimeapi.RunPodSandboxRequest) (*runtimeapi.RunPodSandboxResponse, error) {
-	glog.Infof("ENTER: RunPodSandbox(): %s", spew.Sdump(in))
-	resp, err := r.clients[0].RunPodSandbox(ctx, in)
+	if in.GetConfig() == nil {
+		glog.Errorf("FAIL: RunPodSandbox(): no sandbox config")
+		return nil, errors.New("criproxy: no sandbox config")
+	}
+	client, err := r.clientForAnnotations(in.GetConfig().GetAnnotations())
+	if err != nil {
+		glog.Errorf("FAIL: RunPodSandbox(): error looking for runtime: %v", err)
+		return nil, err
+	}
+
+	glog.Infof("ENTER: RunPodSandbox() [%s]: %s", client.id, spew.Sdump(in))
+
+	resp, err := client.RunPodSandbox(ctx, in)
 	if err != nil {
 		glog.Errorf("FAIL: RunPodSandbox(): RunPodSandbox from runtime service failed: %v", err)
 		return nil, err
 	}
 
-	glog.Infof("LEAVE: RunPodSandbox(): %s", spew.Sdump(resp))
+	resp.PodSandboxId = client.augmentId(*resp.PodSandboxId)
+	glog.Infof("LEAVE: RunPodSandbox() [%s]: %s", client.id, spew.Sdump(resp))
 	return resp, nil
 }
 
 // StopPodSandbox stops the sandbox. If there are any running containers in the
 // sandbox, they should be forced to termination.
 func (r *RuntimeProxy) StopPodSandbox(ctx context.Context, in *runtimeapi.StopPodSandboxRequest) (*runtimeapi.StopPodSandboxResponse, error) {
-	glog.Infof("ENTER: StopPodSandbox(): %s", spew.Sdump(in))
-	resp, err := r.clients[0].StopPodSandbox(ctx, in)
+	client, unprefixed := r.clientForId(in.GetPodSandboxId())
+	glog.Infof("ENTER: StopPodSandbox() [%s]: %s", client.id, spew.Sdump(in))
+	in.PodSandboxId = &unprefixed
+
+	resp, err := client.StopPodSandbox(ctx, in)
 	if err != nil {
-		glog.Errorf("FAIL: StopPodSandbox(): StopPodSandbox %q from runtime service failed: %v", in.GetPodSandboxId(), err)
+		glog.Errorf("FAIL: StopPodSandbox() [%s]: StopPodSandbox %q from runtime service failed: %v", client.id, in.GetPodSandboxId(), err)
+		err = client.wrapError(err)
 		return nil, err
 	}
 
-	glog.Infof("LEAVE: StopPodSandbox(): %s", spew.Sdump(resp))
+	glog.Infof("LEAVE: StopPodSandbox() [%s]: %s", client.id, spew.Sdump(resp))
 	return resp, nil
 }
 
 // RemovePodSandbox removes the sandbox. If there are any containers in the
 // sandbox, they should be forcibly removed.
 func (r *RuntimeProxy) RemovePodSandbox(ctx context.Context, in *runtimeapi.RemovePodSandboxRequest) (*runtimeapi.RemovePodSandboxResponse, error) {
-	glog.Infof("ENTER: RemovePodSandbox(): %s", spew.Sdump(in))
-	resp, err := r.clients[0].RemovePodSandbox(ctx, in)
+	client, unprefixed := r.clientForId(in.GetPodSandboxId())
+	glog.Infof("ENTER: RemovePodSandbox() [%s]: %s", client.id, spew.Sdump(in))
+	in.PodSandboxId = &unprefixed
+
+	resp, err := client.RemovePodSandbox(ctx, in)
 	if err != nil {
-		glog.Errorf("FAIL: RemovePodSandbox(): RemovePodSandbox %q from runtime service failed: %v", in.GetPodSandboxId(), err)
+		glog.Errorf("FAIL: RemovePodSandbox() [%s]: RemovePodSandbox %q from runtime service failed: %v", client.id, in.GetPodSandboxId(), err)
+		err = client.wrapError(err)
 		return nil, err
 	}
 
-	glog.Infof("LEAVE: RemovePodSandbox(): %s", spew.Sdump(resp))
+	glog.Infof("LEAVE: RemovePodSandbox() [%s]: %s", client.id, spew.Sdump(resp))
 	return resp, nil
 }
 
 // PodSandboxStatus returns ruRemoteRuntimeServicentiSandbox.
 func (r *RuntimeProxy) PodSandboxStatus(ctx context.Context, in *runtimeapi.PodSandboxStatusRequest) (*runtimeapi.PodSandboxStatusResponse, error) {
-	glog.Infof("ENTER: PodSandboxStatus(): %s", spew.Sdump(in))
-	resp, err := r.clients[0].PodSandboxStatus(ctx, in)
+	client, unprefixed := r.clientForId(in.GetPodSandboxId())
+	glog.Infof("ENTER: PodSandboxStatus() [%s]: %s", client.id, spew.Sdump(in))
+	in.PodSandboxId = &unprefixed
+
+	glog.Infof("ENTER: PodSandboxStatus() [%s]: %s", client.id, spew.Sdump(in))
+	resp, err := client.PodSandboxStatus(ctx, in)
 	if err != nil {
 		glog.Errorf("FAIL: PodSandboxStatus(): PodSandboxStatus %q from runtime service failed: %v", in.GetPodSandboxId(), err)
+		err = client.wrapError(err)
 		return nil, err
 	}
 
-	glog.Infof("LEAVE: PodSandboxStatus(): %s", spew.Sdump(resp))
+	resp.GetStatus().Id = client.augmentId(resp.GetStatus().GetId())
+	glog.Infof("LEAVE: PodSandboxStatus() [%s]: %s", client.id, spew.Sdump(resp))
 	return resp, nil
 }
 
 // ListPodSandbox returns a list of PodSandboxes.
 func (r *RuntimeProxy) ListPodSandbox(ctx context.Context, in *runtimeapi.ListPodSandboxRequest) (*runtimeapi.ListPodSandboxResponse, error) {
-	glog.Infof("ENTER: ListPodSandbox(): %s", spew.Sdump(in))
-	resp, err := r.clients[0].ListPodSandbox(ctx, in)
-	if err != nil {
-		glog.Errorf("FAIL: ListPodSandbox(): ListPodSandbox with filter %q from runtime service failed: %v", in.GetFilter(), err)
-		return nil, err
+	clients := r.clients
+	clientStr := "all clients"
+	if in.GetFilter() != nil && in.GetFilter().Id != nil {
+		client, unprefixed := r.clientForId(in.GetFilter().GetId())
+		clients = []*apiClient{client}
+		in.GetFilter().Id = &unprefixed
+		clientStr = client.id
 	}
 
-	glog.Infof("LEAVE: ListPodSandbox(): %s", spew.Sdump(resp))
+	glog.Infof("ENTER: ListPodSandbox() [%s]: %s", clientStr, spew.Sdump(in))
+	var sandboxes []*runtimeapi.PodSandbox
+	for _, client := range clients {
+		resp, err := client.ListPodSandbox(ctx, in)
+		if err != nil {
+			err = client.wrapError(err)
+			glog.Errorf("FAIL: ListPodSandbox() [%s]: ListPodSandbox with filter %#v from runtime service failed: %v", clientStr, in.GetFilter(), err)
+			return nil, err
+		}
+		sandboxes = append(sandboxes, client.prefixSandboxes(resp.GetItems())...)
+	}
+
+	resp := &runtimeapi.ListPodSandboxResponse{Items: sandboxes}
+	glog.Infof("LEAVE: ListPodSandbox() [%s]: %s", clientStr, spew.Sdump(resp))
 	return resp, nil
 }
 
@@ -485,13 +576,13 @@ func (r *RuntimeProxy) ImageStatus(ctx context.Context, in *runtimeapi.ImageStat
 	resp, err := client.ImageStatus(ctx, in)
 	if err != nil {
 		glog.Errorf("FAIL: ImageStatus() [%s]: ImageStatus %q from image service failed: %v", client.id, in.GetImage().GetImage(), err)
+		err = client.wrapError(err)
 		return nil, err
 	}
 
+	resp.Image = client.prefixImage(resp.Image)
 	glog.Infof("LEAVE: ImageStatus() [%s]: %s", client.id, spew.Sdump(resp))
-	return &runtimeapi.ImageStatusResponse{
-		Image: client.prefixImage(resp.Image),
-	}, nil
+	return resp, nil
 }
 
 // PullImage pulls an image with authentication config.
@@ -502,6 +593,7 @@ func (r *RuntimeProxy) PullImage(ctx context.Context, in *runtimeapi.PullImageRe
 	resp, err := client.PullImage(ctx, in)
 	if err != nil {
 		glog.Errorf("FAIL: PullImage() [%s]: PullImage %q from image service failed: %v", client.id, in.GetImage().GetImage(), err)
+		err = client.wrapError(err)
 		return nil, err
 	}
 
@@ -517,11 +609,30 @@ func (r *RuntimeProxy) RemoveImage(ctx context.Context, in *runtimeapi.RemoveIma
 	resp, err := client.RemoveImage(ctx, in)
 	if err != nil {
 		glog.Errorf("FAIL: RemoveImage() [%s]: RemoveImage %q from image service failed: %v", client.id, in.GetImage().GetImage(), err)
+		err = client.wrapError(err)
 		return nil, err
 	}
 
 	glog.Infof("LEAVE: RemoveImage() [%s]: %s", client.id, spew.Sdump(resp))
 	return resp, nil
+}
+
+func (r *RuntimeProxy) clientForAnnotations(annotations map[string]string) (*apiClient, error) {
+	for _, client := range r.clients {
+		if client.annotationsMatch(annotations) {
+			return client, nil
+		}
+	}
+	return nil, fmt.Errorf("criproxy: unknown runtime: %q", annotations[targetRuntimeAnnotationKey])
+}
+
+func (r *RuntimeProxy) clientForId(id string) (*apiClient, string) {
+	for _, client := range r.clients[1:] {
+		if ok, unprefixed := client.idPrefixMatches(id); ok {
+			return client, unprefixed
+		}
+	}
+	return r.clients[0], id
 }
 
 func (r *RuntimeProxy) clientForImage(image *runtimeapi.ImageSpec) (*apiClient, string) {

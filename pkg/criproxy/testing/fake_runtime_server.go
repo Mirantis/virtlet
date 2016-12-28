@@ -53,6 +53,8 @@ type FakeRuntimeServer struct {
 
 	journal Journal
 
+	CurrentTime int64
+
 	FakeStatus *runtimeapi.RuntimeStatus
 	Containers map[string]*FakeContainer
 	Sandboxes  map[string]*FakePodSandbox
@@ -86,7 +88,8 @@ func NewFakeRuntimeServer(journal Journal) *FakeRuntimeServer {
 	runtimeReadyStr := runtimeapi.RuntimeReady
 	networkReadyStr := runtimeapi.NetworkReady
 	return &FakeRuntimeServer{
-		journal: journal,
+		journal:     journal,
+		CurrentTime: time.Now().UnixNano(),
 		FakeStatus: &runtimeapi.RuntimeStatus{
 			Conditions: []*runtimeapi.RuntimeCondition{
 				{
@@ -137,14 +140,13 @@ func (r *FakeRuntimeServer) RunPodSandbox(ctx context.Context, in *runtimeapi.Ru
 	// fixed name from BuildSandboxName() for easily making fake sandboxes.
 	config := in.GetConfig()
 	podSandboxID := BuildSandboxName(config.Metadata)
-	createdAt := time.Now().UnixNano()
 	readyState := runtimeapi.PodSandboxState_SANDBOX_READY
 	r.Sandboxes[podSandboxID] = &FakePodSandbox{
 		PodSandboxStatus: runtimeapi.PodSandboxStatus{
 			Id:        &podSandboxID,
 			Metadata:  config.Metadata,
 			State:     &readyState,
-			CreatedAt: &createdAt,
+			CreatedAt: &r.CurrentTime,
 			Network: &runtimeapi.PodSandboxNetworkStatus{
 				Ip: &FakePodSandboxIP,
 			},
@@ -252,7 +254,6 @@ func (r *FakeRuntimeServer) CreateContainer(ctx context.Context, in *runtimeapi.
 	podSandboxID := in.GetPodSandboxId()
 	config := in.GetConfig()
 	containerID := BuildContainerName(config.Metadata, podSandboxID)
-	createdAt := time.Now().UnixNano()
 	createdState := runtimeapi.ContainerState_CONTAINER_CREATED
 	imageRef := config.Image.GetImage()
 	r.Containers[containerID] = &FakeContainer{
@@ -261,7 +262,7 @@ func (r *FakeRuntimeServer) CreateContainer(ctx context.Context, in *runtimeapi.
 			Metadata:    config.Metadata,
 			Image:       config.Image,
 			ImageRef:    &imageRef,
-			CreatedAt:   &createdAt,
+			CreatedAt:   &r.CurrentTime,
 			State:       &createdState,
 			Labels:      config.Labels,
 			Annotations: config.Annotations,
@@ -285,10 +286,9 @@ func (r *FakeRuntimeServer) StartContainer(ctx context.Context, in *runtimeapi.S
 	}
 
 	// Set container to running.
-	startedAt := time.Now().UnixNano()
 	runningState := runtimeapi.ContainerState_CONTAINER_RUNNING
 	c.State = &runningState
-	c.StartedAt = &startedAt
+	c.StartedAt = &r.CurrentTime
 
 	return &runtimeapi.StartContainerResponse{}, nil
 }
@@ -306,10 +306,9 @@ func (r *FakeRuntimeServer) StopContainer(ctx context.Context, in *runtimeapi.St
 	}
 
 	// Set container to exited state.
-	finishedAt := time.Now().UnixNano()
 	exitedState := runtimeapi.ContainerState_CONTAINER_EXITED
 	c.State = &exitedState
-	c.FinishedAt = &finishedAt
+	c.FinishedAt = &r.CurrentTime
 
 	return &runtimeapi.StopContainerResponse{}, nil
 }
