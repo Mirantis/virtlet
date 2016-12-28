@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/Mirantis/virtlet/pkg/criproxy"
@@ -35,19 +36,19 @@ var (
 	listen = flag.String("listen", "/run/criproxy.sock",
 		"The unix socket to listen on, e.g. /run/virtlet.sock")
 	connect = flag.String("connect", "/var/run/dockershim.sock",
-		"CRI unix socket to connect to, e.g. /var/run/dockershim.sock")
+		"CRI runtime ids and unix socket(s) to connect to, e.g. /var/run/dockershim.sock,alt:/var/run/another.sock")
 )
 
 func main() {
 	flag.Parse()
 
-	proxy, err := criproxy.NewRuntimeProxy(*connect, connectionTimeout)
-	if err != nil {
-		glog.Errorf("Initializing server failed: %v", err)
+	proxy := criproxy.NewRuntimeProxy(strings.Split(*connect, ","), connectionTimeout)
+	if err := proxy.Connect(); err != nil {
+		glog.Errorf("Error connecting to CRI endpoints: %v", err)
 		os.Exit(1)
 	}
 	glog.V(1).Infof("Starting CRI proxy on socket %s", *listen)
-	if err = proxy.Serve(*listen); err != nil {
+	if err := proxy.Serve(*listen, nil); err != nil {
 		glog.Errorf("Serving failed: %v", err)
 		os.Exit(1)
 	}

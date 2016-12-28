@@ -18,7 +18,6 @@ package criproxy
 
 import (
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -32,10 +31,13 @@ import (
 )
 
 const (
-	fakeCriSocketPath         = "/tmp/fake-cri.socket"
+	fakeCriSocketPath1        = "/tmp/fake-cri-1.socket"
+	fakeCriSocketPath2        = "/tmp/fake-cri-2.socket"
+	altSocketSpec             = "alt:" + fakeCriSocketPath2
 	criProxySocketForTests    = "/tmp/cri-proxy.socket"
 	connectionTimeoutForTests = 20 * time.Second
-	fakeImageSize             = uint64(424242)
+	fakeImageSize1            = uint64(424242)
+	fakeImageSize2            = uint64(434343)
 )
 
 type ServerWithReadinessFeedback interface {
@@ -66,13 +68,17 @@ func puint64(v uint64) *uint64 {
 }
 
 func TestCriProxy(t *testing.T) {
-	criServer := proxytest.NewFakeCriServer()
-	defer criServer.Stop()
-	// TODO: don't wait for the server to start, the proxy should do it
-	startServer(t, criServer, fakeCriSocketPath)
+	journal := proxytest.NewSimpleJournal()
+	criServer1 := proxytest.NewFakeCriServer(proxytest.NewPrefixJournal(journal, "1/"))
+	defer criServer1.Stop()
+	criServer2 := proxytest.NewFakeCriServer(proxytest.NewPrefixJournal(journal, "2/"))
+	defer criServer2.Stop()
+	// TODO: don't wait for the servers to start, the proxy should do it
+	startServer(t, criServer1, fakeCriSocketPath1)
+	startServer(t, criServer2, fakeCriSocketPath2)
 
-	proxy, err := NewRuntimeProxy(fakeCriSocketPath, connectionTimeoutForTests)
-	if err != nil {
+	proxy := NewRuntimeProxy([]string{fakeCriSocketPath1, altSocketSpec}, connectionTimeoutForTests)
+	if err := proxy.Connect(); err != nil {
 		// TODO: NewRuntimeProxy() shouldn't do any real work
 		t.Fatalf("Failed to set up CRI proxy: %v", err)
 	}
@@ -81,38 +87,190 @@ func TestCriProxy(t *testing.T) {
 
 	conn, err := grpc.Dial(criProxySocketForTests, grpc.WithInsecure(), grpc.WithTimeout(connectionTimeoutForTests), grpc.WithDialer(dial))
 	if err != nil {
-		t.Fatalf("Connect remote runtime %s failed: %v", fakeCriSocketPath, err)
+		t.Fatalf("Connect remote runtime %s failed: %v", criProxySocketForTests, err)
 	}
 	defer conn.Close()
-	// imageClient := runtimeapi.NewImageServiceClient(conn)
 
-	fakeImageNames := []string{"image1", "image2"}
-	criServer.SetFakeImages(fakeImageNames)
-	criServer.SetFakeImageSize(fakeImageSize)
+	fakeImageNames1 := []string{"image1-1", "image1-2"}
+	criServer1.SetFakeImages(fakeImageNames1)
+	criServer1.SetFakeImageSize(fakeImageSize1)
+
+	fakeImageNames2 := []string{"image2-1", "image2-2"}
+	criServer2.SetFakeImages(fakeImageNames2)
+	criServer2.SetFakeImageSize(fakeImageSize2)
 
 	for _, step := range []struct {
 		name, method string
 		in, resp     interface{}
+		journal      []string
 	}{
 		{
-			// TODO: test image filtering
 			name:   "list images",
 			method: "/runtime.ImageService/ListImages",
 			in:     &runtimeapi.ListImagesRequest{},
 			resp: &runtimeapi.ListImagesResponse{
 				Images: []*runtimeapi.Image{
 					{
-						Id:       pstr("image1"),
-						RepoTags: []string{"image1"},
-						Size_:    puint64(fakeImageSize),
+						Id:       pstr("image1-1"),
+						RepoTags: []string{"image1-1"},
+						Size_:    puint64(fakeImageSize1),
 					},
 					{
-						Id:       pstr("image2"),
-						RepoTags: []string{"image2"},
-						Size_:    puint64(fakeImageSize),
+						Id:       pstr("image1-2"),
+						RepoTags: []string{"image1-2"},
+						Size_:    puint64(fakeImageSize1),
+					},
+					{
+						Id:       pstr("alt/image2-1"),
+						RepoTags: []string{"alt/image2-1"},
+						Size_:    puint64(fakeImageSize2),
+					},
+					{
+						Id:       pstr("alt/image2-2"),
+						RepoTags: []string{"alt/image2-2"},
+						Size_:    puint64(fakeImageSize2),
 					},
 				},
 			},
+			journal: []string{"1/image/ListImages", "2/image/ListImages"},
+		},
+		{
+			name:   "pull image (primary)",
+			method: "/runtime.ImageService/PullImage",
+			in: &runtimeapi.PullImageRequest{
+				Image:         &runtimeapi.ImageSpec{Image: pstr("image1-3")},
+				Auth:          &runtimeapi.AuthConfig{},
+				SandboxConfig: &runtimeapi.PodSandboxConfig{},
+			},
+			resp:    &runtimeapi.PullImageResponse{},
+			journal: []string{"1/image/PullImage"},
+		},
+		{
+			name:   "pull image (alt)",
+			method: "/runtime.ImageService/PullImage",
+			in: &runtimeapi.PullImageRequest{
+				Image:         &runtimeapi.ImageSpec{Image: pstr("alt/image2-3")},
+				Auth:          &runtimeapi.AuthConfig{},
+				SandboxConfig: &runtimeapi.PodSandboxConfig{},
+			},
+			resp:    &runtimeapi.PullImageResponse{},
+			journal: []string{"2/image/PullImage"},
+		},
+		{
+			name:   "list pulled image 1",
+			method: "/runtime.ImageService/ListImages",
+			in: &runtimeapi.ListImagesRequest{
+				Filter: &runtimeapi.ImageFilter{
+					Image: &runtimeapi.ImageSpec{Image: pstr("image1-3")},
+				},
+			},
+			resp: &runtimeapi.ListImagesResponse{
+				Images: []*runtimeapi.Image{
+					{
+						Id:       pstr("image1-3"),
+						RepoTags: []string{"image1-3"},
+						Size_:    puint64(fakeImageSize1),
+					},
+				},
+			},
+			journal: []string{"1/image/ListImages"},
+		},
+		{
+			name:   "list pulled image 2",
+			method: "/runtime.ImageService/ListImages",
+			in: &runtimeapi.ListImagesRequest{
+				Filter: &runtimeapi.ImageFilter{
+					Image: &runtimeapi.ImageSpec{Image: pstr("alt/image2-3")},
+				},
+			},
+			resp: &runtimeapi.ListImagesResponse{
+				Images: []*runtimeapi.Image{
+					{
+						Id:       pstr("alt/image2-3"),
+						RepoTags: []string{"alt/image2-3"},
+						Size_:    puint64(fakeImageSize2),
+					},
+				},
+			},
+			journal: []string{"2/image/ListImages"},
+		},
+		{
+			name:   "image status 1-2",
+			method: "/runtime.ImageService/ImageStatus",
+			in: &runtimeapi.ImageStatusRequest{
+				Image: &runtimeapi.ImageSpec{Image: pstr("image1-2")},
+			},
+			resp: &runtimeapi.ImageStatusResponse{
+				Image: &runtimeapi.Image{
+					Id:       pstr("image1-2"),
+					RepoTags: []string{"image1-2"},
+					Size_:    puint64(fakeImageSize1),
+				},
+			},
+			journal: []string{"1/image/ImageStatus"},
+		},
+		{
+			name:   "image status 2-3",
+			method: "/runtime.ImageService/ImageStatus",
+			in: &runtimeapi.ImageStatusRequest{
+				Image: &runtimeapi.ImageSpec{Image: pstr("alt/image2-3")},
+			},
+			resp: &runtimeapi.ImageStatusResponse{
+				Image: &runtimeapi.Image{
+					Id:       pstr("alt/image2-3"),
+					RepoTags: []string{"alt/image2-3"},
+					Size_:    puint64(fakeImageSize2),
+				},
+			},
+			journal: []string{"2/image/ImageStatus"},
+		},
+		{
+			name:   "remove image 1-1",
+			method: "/runtime.ImageService/RemoveImage",
+			in: &runtimeapi.RemoveImageRequest{
+				Image: &runtimeapi.ImageSpec{Image: pstr("image1-1")},
+			},
+			resp:    &runtimeapi.RemoveImageResponse{},
+			journal: []string{"1/image/RemoveImage"},
+		},
+		{
+			name:   "remove image 2-2",
+			method: "/runtime.ImageService/RemoveImage",
+			in: &runtimeapi.RemoveImageRequest{
+				Image: &runtimeapi.ImageSpec{Image: pstr("alt/image2-2")},
+			},
+			resp:    &runtimeapi.RemoveImageResponse{},
+			journal: []string{"2/image/RemoveImage"},
+		},
+		{
+			name:   "relist images after removing some of them",
+			method: "/runtime.ImageService/ListImages",
+			in:     &runtimeapi.ListImagesRequest{},
+			resp: &runtimeapi.ListImagesResponse{
+				Images: []*runtimeapi.Image{
+					{
+						Id:       pstr("image1-2"),
+						RepoTags: []string{"image1-2"},
+						Size_:    puint64(fakeImageSize1),
+					},
+					{
+						Id:       pstr("image1-3"),
+						RepoTags: []string{"image1-3"},
+						Size_:    puint64(fakeImageSize1),
+					},
+					{
+						Id:       pstr("alt/image2-1"),
+						RepoTags: []string{"alt/image2-1"},
+						Size_:    puint64(fakeImageSize2),
+					},
+					{
+						Id:       pstr("alt/image2-3"),
+						RepoTags: []string{"alt/image2-3"},
+						Size_:    puint64(fakeImageSize2),
+					},
+				},
+			},
+			journal: []string{"1/image/ListImages", "2/image/ListImages"},
 		},
 	} {
 		t.Run(step.name, func(t *testing.T) {
@@ -138,8 +296,11 @@ func TestCriProxy(t *testing.T) {
 					Context:  5,
 				}
 				diffText, _ := difflib.GetUnifiedDiffString(diff)
-				fmt.Println(diffText)
 				t.Errorf("Response diff:\n%s", diffText)
+			}
+
+			if err := journal.Verify(step.journal); err != nil {
+				t.Error(err)
 			}
 		})
 	}

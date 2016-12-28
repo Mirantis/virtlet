@@ -15,12 +15,11 @@ limitations under the License.
 */
 
 // TODO: credits
-// (based on fake_runtime_service.go and utils.go [from the same dir] from k8s)
+// (based on fake_runtime_service.go from k8s)
 package testing
 
 import (
 	"fmt"
-	"reflect"
 	"sort"
 	"sync"
 	"time"
@@ -35,29 +34,6 @@ var (
 	FakeRuntimeName  = "fakeRuntime"
 	FakePodSandboxIP = "192.168.192.168"
 )
-
-func BuildContainerName(metadata *runtimeapi.ContainerMetadata, sandboxID string) string {
-	// include the sandbox ID to make the container ID unique.
-	return fmt.Sprintf("%s_%s_%d", sandboxID, metadata.GetName(), metadata.GetAttempt())
-}
-
-func BuildSandboxName(metadata *runtimeapi.PodSandboxMetadata) string {
-	return fmt.Sprintf("%s_%s_%s_%d", metadata.GetName(), metadata.GetNamespace(), metadata.GetUid(), metadata.GetAttempt())
-}
-
-func filterInLabels(filter, labels map[string]string) bool {
-	for k, v := range filter {
-		if value, ok := labels[k]; ok {
-			if value != v {
-				return false
-			}
-		} else {
-			return false
-		}
-	}
-
-	return true
-}
 
 type FakePodSandbox struct {
 	// PodSandboxStatus contains the runtime information for a sandbox.
@@ -75,7 +51,7 @@ type FakeContainer struct {
 type FakeRuntimeServer struct {
 	sync.Mutex
 
-	Called []string
+	journal Journal
 
 	FakeStatus *runtimeapi.RuntimeStatus
 	Containers map[string]*FakeContainer
@@ -105,19 +81,9 @@ func (r *FakeRuntimeServer) SetFakeContainers(containers []*FakeContainer) {
 
 }
 
-func (r *FakeRuntimeServer) AssertCalls(calls []string) error {
-	r.Lock()
-	defer r.Unlock()
-
-	if !reflect.DeepEqual(calls, r.Called) {
-		return fmt.Errorf("expected %#v, got %#v", calls, r.Called)
-	}
-	return nil
-}
-
-func NewFakeRuntimeServer() *FakeRuntimeServer {
+func NewFakeRuntimeServer(journal Journal) *FakeRuntimeServer {
 	return &FakeRuntimeServer{
-		Called:     make([]string, 0),
+		journal:    journal,
 		Containers: make(map[string]*FakeContainer),
 		Sandboxes:  make(map[string]*FakePodSandbox),
 	}
@@ -127,7 +93,7 @@ func (r *FakeRuntimeServer) Version(ctx context.Context, in *runtimeapi.VersionR
 	r.Lock()
 	defer r.Unlock()
 
-	r.Called = append(r.Called, "Version")
+	r.journal.Record("Version")
 
 	return &runtimeapi.VersionResponse{
 		Version:           &version,
@@ -141,7 +107,7 @@ func (r *FakeRuntimeServer) Status(ctx context.Context, in *runtimeapi.StatusReq
 	r.Lock()
 	defer r.Unlock()
 
-	r.Called = append(r.Called, "Status")
+	r.journal.Record("Status")
 
 	return &runtimeapi.StatusResponse{Status: r.FakeStatus}, nil
 }
@@ -150,7 +116,7 @@ func (r *FakeRuntimeServer) RunPodSandbox(ctx context.Context, in *runtimeapi.Ru
 	r.Lock()
 	defer r.Unlock()
 
-	r.Called = append(r.Called, "RunPodSandbox")
+	r.journal.Record("RunPodSandbox")
 
 	// PodSandboxID should be randomized for real container runtime, but here just use
 	// fixed name from BuildSandboxName() for easily making fake sandboxes.
@@ -179,7 +145,7 @@ func (r *FakeRuntimeServer) StopPodSandbox(ctx context.Context, in *runtimeapi.S
 	r.Lock()
 	defer r.Unlock()
 
-	r.Called = append(r.Called, "StopPodSandbox")
+	r.journal.Record("StopPodSandbox")
 
 	podSandboxID := in.GetPodSandboxId()
 	notReadyState := runtimeapi.PodSandboxState_SANDBOX_NOTREADY
@@ -196,7 +162,7 @@ func (r *FakeRuntimeServer) RemovePodSandbox(ctx context.Context, in *runtimeapi
 	r.Lock()
 	defer r.Unlock()
 
-	r.Called = append(r.Called, "RemovePodSandbox")
+	r.journal.Record("RemovePodSandbox")
 
 	// Remove the pod sandbox
 	delete(r.Sandboxes, in.GetPodSandboxId())
@@ -208,7 +174,7 @@ func (r *FakeRuntimeServer) PodSandboxStatus(ctx context.Context, in *runtimeapi
 	r.Lock()
 	defer r.Unlock()
 
-	r.Called = append(r.Called, "PodSandboxStatus")
+	r.journal.Record("PodSandboxStatus")
 
 	podSandboxID := in.GetPodSandboxId()
 	s, ok := r.Sandboxes[podSandboxID]
@@ -223,7 +189,7 @@ func (r *FakeRuntimeServer) ListPodSandbox(ctx context.Context, in *runtimeapi.L
 	r.Lock()
 	defer r.Unlock()
 
-	r.Called = append(r.Called, "ListPodSandbox")
+	r.journal.Record("ListPodSandbox")
 
 	var ids []string
 	for id, _ := range r.Sandboxes {
@@ -264,7 +230,7 @@ func (r *FakeRuntimeServer) CreateContainer(ctx context.Context, in *runtimeapi.
 	r.Lock()
 	defer r.Unlock()
 
-	r.Called = append(r.Called, "CreateContainer")
+	r.journal.Record("CreateContainer")
 
 	// ContainerID should be randomized for real container runtime, but here just use
 	// fixed BuildContainerName() for easily making fake containers.
@@ -295,7 +261,7 @@ func (r *FakeRuntimeServer) StartContainer(ctx context.Context, in *runtimeapi.S
 	r.Lock()
 	defer r.Unlock()
 
-	r.Called = append(r.Called, "StartContainer")
+	r.journal.Record("StartContainer")
 
 	containerID := in.GetContainerId()
 	c, ok := r.Containers[containerID]
@@ -316,7 +282,7 @@ func (r *FakeRuntimeServer) StopContainer(ctx context.Context, in *runtimeapi.St
 	r.Lock()
 	defer r.Unlock()
 
-	r.Called = append(r.Called, "StopContainer")
+	r.journal.Record("StopContainer")
 
 	containerID := in.GetContainerId()
 	c, ok := r.Containers[containerID]
@@ -337,7 +303,7 @@ func (r *FakeRuntimeServer) RemoveContainer(ctx context.Context, in *runtimeapi.
 	r.Lock()
 	defer r.Unlock()
 
-	r.Called = append(r.Called, "RemoveContainer")
+	r.journal.Record("RemoveContainer")
 
 	// Remove the container
 	delete(r.Containers, in.GetContainerId())
@@ -349,7 +315,7 @@ func (r *FakeRuntimeServer) ListContainers(ctx context.Context, in *runtimeapi.L
 	r.Lock()
 	defer r.Unlock()
 
-	r.Called = append(r.Called, "ListContainers")
+	r.journal.Record("ListContainers")
 
 	var ids []string
 	for id, _ := range r.Containers {
@@ -396,7 +362,7 @@ func (r *FakeRuntimeServer) ContainerStatus(ctx context.Context, in *runtimeapi.
 	r.Lock()
 	defer r.Unlock()
 
-	r.Called = append(r.Called, "ContainerStatus")
+	r.journal.Record("ContainerStatus")
 
 	containerID := in.GetContainerId()
 	c, ok := r.Containers[containerID]
@@ -411,7 +377,7 @@ func (r *FakeRuntimeServer) ExecSync(ctx context.Context, in *runtimeapi.ExecSyn
 	r.Lock()
 	defer r.Unlock()
 
-	r.Called = append(r.Called, "ExecSync")
+	r.journal.Record("ExecSync")
 	exitCode := int32(0)
 	return &runtimeapi.ExecSyncResponse{Stdout: nil, Stderr: nil, ExitCode: &exitCode}, nil
 }
@@ -420,7 +386,7 @@ func (r *FakeRuntimeServer) Exec(ctx context.Context, in *runtimeapi.ExecRequest
 	r.Lock()
 	defer r.Unlock()
 
-	r.Called = append(r.Called, "Exec")
+	r.journal.Record("Exec")
 	return &runtimeapi.ExecResponse{}, nil
 }
 
@@ -428,7 +394,7 @@ func (r *FakeRuntimeServer) Attach(ctx context.Context, in *runtimeapi.AttachReq
 	r.Lock()
 	defer r.Unlock()
 
-	r.Called = append(r.Called, "Attach")
+	r.journal.Record("Attach")
 	return &runtimeapi.AttachResponse{}, nil
 }
 
@@ -436,7 +402,7 @@ func (r *FakeRuntimeServer) PortForward(ctx context.Context, in *runtimeapi.Port
 	r.Lock()
 	defer r.Unlock()
 
-	r.Called = append(r.Called, "PortForward")
+	r.journal.Record("PortForward")
 	return &runtimeapi.PortForwardResponse{}, nil
 }
 

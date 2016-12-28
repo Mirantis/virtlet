@@ -31,10 +31,10 @@ type FakeCriServer struct {
 	server *grpc.Server
 }
 
-func NewFakeCriServer() *FakeCriServer {
+func NewFakeCriServer(journal Journal) *FakeCriServer {
 	s := &FakeCriServer{
-		FakeRuntimeServer: NewFakeRuntimeServer(),
-		FakeImageServer:   NewFakeImageServer(),
+		FakeRuntimeServer: NewFakeRuntimeServer(NewPrefixJournal(journal, "runtime/")),
+		FakeImageServer:   NewFakeImageServer(NewPrefixJournal(journal, "image/")),
 		server:            grpc.NewServer(),
 	}
 	runtimeapi.RegisterRuntimeServiceServer(s.server, s)

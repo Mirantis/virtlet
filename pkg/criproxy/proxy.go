@@ -19,6 +19,8 @@ limitations under the License.
 package criproxy
 
 import (
+	"errors"
+	"fmt"
 	"net"
 	"os"
 	"strings"
@@ -42,35 +44,140 @@ func getContextWithTimeout(timeout time.Duration) (context.Context, context.Canc
 	return context.WithTimeout(context.Background(), timeout)
 }
 
+type apiClient struct {
+	runtimeapi.RuntimeServiceClient
+	runtimeapi.ImageServiceClient
+	conn              *grpc.ClientConn
+	addr              string
+	id                string
+	connectionTimeout time.Duration
+}
+
+func newApiClient(addr string, connectionTimeout time.Duration) *apiClient {
+	id := ""
+	parts := strings.SplitN(addr, ":", 2)
+	if len(parts) == 2 {
+		id, addr = parts[0], parts[1]
+	}
+	return &apiClient{addr: addr, id: id, connectionTimeout: connectionTimeout}
+}
+
+func (c *apiClient) isPrimary() bool {
+	return c.id == ""
+}
+
+func (c *apiClient) connect() error {
+	glog.V(1).Infof("Connecting to runtime service %s", c.addr)
+	conn, err := grpc.Dial(c.addr, grpc.WithInsecure(), grpc.WithTimeout(c.connectionTimeout), grpc.WithDialer(dial))
+	if err != nil {
+		return err
+	}
+	c.conn = conn
+	c.RuntimeServiceClient = runtimeapi.NewRuntimeServiceClient(conn)
+	c.ImageServiceClient = runtimeapi.NewImageServiceClient(conn)
+
+	return nil
+}
+
+func (c *apiClient) stop() {
+	if c.conn == nil {
+		return
+	}
+	if err := c.conn.Close(); err != nil {
+		glog.Errorf("Failed to close gRPC connection: %v", err)
+	}
+	c.conn = nil
+	c.RuntimeServiceClient = nil
+	c.ImageServiceClient = nil
+}
+
+func (c *apiClient) wrapError(err error) error {
+	return fmt.Errorf("%q: %v", c.addr, err)
+}
+
+func (c *apiClient) imageName(unprefixedName string) string {
+	if c.isPrimary() {
+		return unprefixedName
+	}
+	return c.id + "/" + unprefixedName
+}
+
+func (c *apiClient) imageMatches(imageName string) (bool, string) {
+	switch {
+	case c.isPrimary():
+		return true, imageName
+	case strings.HasPrefix(imageName, c.id+"/"):
+		return true, imageName[len(c.id)+1:]
+	default:
+		return false, ""
+	}
+}
+
+func (c *apiClient) prefixImage(unprefixedImage *runtimeapi.Image) *runtimeapi.Image {
+	if c.isPrimary() {
+		return unprefixedImage
+	}
+	image := *unprefixedImage
+	id := c.imageName(image.GetId())
+	image.Id = &id
+	for n, tag := range image.GetRepoTags() {
+		image.RepoTags[n] = c.imageName(tag)
+	}
+	return &image
+}
+
+func (c *apiClient) prefixImages(images []*runtimeapi.Image) []*runtimeapi.Image {
+	if c.isPrimary() {
+		return images
+	}
+	var r []*runtimeapi.Image
+	for _, unprefixedImage := range images {
+		r = append(r, c.prefixImage(unprefixedImage))
+	}
+	return r
+}
+
 // RuntimeProxy is a gRPC implementation of internalapi.RuntimeService.
 type RuntimeProxy struct {
-	timeout       time.Duration
-	server        *grpc.Server
-	conn          *grpc.ClientConn
-	runtimeClient runtimeapi.RuntimeServiceClient
-	imageClient   runtimeapi.ImageServiceClient
+	timeout time.Duration
+	server  *grpc.Server
+	conn    *grpc.ClientConn
+	clients []*apiClient
 }
 
 // NewRuntimeProxy creates a new internalapi.RuntimeService.
-func NewRuntimeProxy(addr string, connectionTimout time.Duration) (*RuntimeProxy, error) {
-	// TODO: don't connect right there, use lazy connection
-	glog.Infof("Connecting to runtime service %s", addr)
-	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithTimeout(connectionTimout), grpc.WithDialer(dial))
-	if err != nil {
-		glog.Errorf("Connect remote runtime %s failed: %v", addr, err)
-		return nil, err
-	}
-
-	proxy := &RuntimeProxy{
-		server:        grpc.NewServer(),
-		conn:          conn,
-		runtimeClient: runtimeapi.NewRuntimeServiceClient(conn),
-		imageClient:   runtimeapi.NewImageServiceClient(conn),
+func NewRuntimeProxy(addrs []string, connectionTimout time.Duration) *RuntimeProxy {
+	proxy := &RuntimeProxy{server: grpc.NewServer()}
+	for _, addr := range addrs {
+		proxy.clients = append(proxy.clients, newApiClient(addr, connectionTimout))
 	}
 	runtimeapi.RegisterRuntimeServiceServer(proxy.server, proxy)
 	runtimeapi.RegisterImageServiceServer(proxy.server, proxy)
 
-	return proxy, nil
+	return proxy
+}
+
+func (r *RuntimeProxy) Connect() error {
+	if len(r.clients) == 0 {
+		return errors.New("no sockets specified to connect to")
+	}
+	if !r.clients[0].isPrimary() {
+		return errors.New("the first client should be primary (no id)")
+	}
+	for _, client := range r.clients[1:] {
+		if client.isPrimary() {
+			return errors.New("only the first client should be primary (no id)")
+		}
+	}
+	for n, client := range r.clients {
+		if err := client.connect(); err != nil {
+			for i := 0; i < n; i++ {
+				r.clients[i].stop()
+			}
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *RuntimeProxy) Serve(addr string, readyCh chan struct{}) error {
@@ -89,11 +196,10 @@ func (r *RuntimeProxy) Serve(addr string, readyCh chan struct{}) error {
 }
 
 func (r *RuntimeProxy) Stop() {
-	// TODO: check if conn / server is present
-	if err := r.conn.Close(); err != nil {
-		glog.Errorf("Failed to close gRPC connection: %v", err)
-		return
+	for _, client := range r.clients {
+		client.stop()
 	}
+	// TODO: check if the server is present
 	r.server.Stop()
 }
 
@@ -102,7 +208,7 @@ func (r *RuntimeProxy) Stop() {
 // Version returns the runtime name, runtime version and runtime API version.
 func (r *RuntimeProxy) Version(ctx context.Context, in *runtimeapi.VersionRequest) (*runtimeapi.VersionResponse, error) {
 	glog.Infof("ENTER: Version(): %s", spew.Sdump(in))
-	resp, err := r.runtimeClient.Version(ctx, in)
+	resp, err := r.clients[0].Version(ctx, in)
 	if err != nil {
 		glog.Errorf("FAIL: Version(): Version from runtime service failed: %v", err)
 		return nil, err
@@ -116,7 +222,7 @@ func (r *RuntimeProxy) Version(ctx context.Context, in *runtimeapi.VersionReques
 // the sandbox is in ready state.
 func (r *RuntimeProxy) RunPodSandbox(ctx context.Context, in *runtimeapi.RunPodSandboxRequest) (*runtimeapi.RunPodSandboxResponse, error) {
 	glog.Infof("ENTER: RunPodSandbox(): %s", spew.Sdump(in))
-	resp, err := r.runtimeClient.RunPodSandbox(ctx, in)
+	resp, err := r.clients[0].RunPodSandbox(ctx, in)
 	if err != nil {
 		glog.Errorf("FAIL: RunPodSandbox(): RunPodSandbox from runtime service failed: %v", err)
 		return nil, err
@@ -130,7 +236,7 @@ func (r *RuntimeProxy) RunPodSandbox(ctx context.Context, in *runtimeapi.RunPodS
 // sandbox, they should be forced to termination.
 func (r *RuntimeProxy) StopPodSandbox(ctx context.Context, in *runtimeapi.StopPodSandboxRequest) (*runtimeapi.StopPodSandboxResponse, error) {
 	glog.Infof("ENTER: StopPodSandbox(): %s", spew.Sdump(in))
-	resp, err := r.runtimeClient.StopPodSandbox(ctx, in)
+	resp, err := r.clients[0].StopPodSandbox(ctx, in)
 	if err != nil {
 		glog.Errorf("FAIL: StopPodSandbox(): StopPodSandbox %q from runtime service failed: %v", in.GetPodSandboxId(), err)
 		return nil, err
@@ -144,7 +250,7 @@ func (r *RuntimeProxy) StopPodSandbox(ctx context.Context, in *runtimeapi.StopPo
 // sandbox, they should be forcibly removed.
 func (r *RuntimeProxy) RemovePodSandbox(ctx context.Context, in *runtimeapi.RemovePodSandboxRequest) (*runtimeapi.RemovePodSandboxResponse, error) {
 	glog.Infof("ENTER: RemovePodSandbox(): %s", spew.Sdump(in))
-	resp, err := r.runtimeClient.RemovePodSandbox(ctx, in)
+	resp, err := r.clients[0].RemovePodSandbox(ctx, in)
 	if err != nil {
 		glog.Errorf("FAIL: RemovePodSandbox(): RemovePodSandbox %q from runtime service failed: %v", in.GetPodSandboxId(), err)
 		return nil, err
@@ -157,7 +263,7 @@ func (r *RuntimeProxy) RemovePodSandbox(ctx context.Context, in *runtimeapi.Remo
 // PodSandboxStatus returns ruRemoteRuntimeServicentiSandbox.
 func (r *RuntimeProxy) PodSandboxStatus(ctx context.Context, in *runtimeapi.PodSandboxStatusRequest) (*runtimeapi.PodSandboxStatusResponse, error) {
 	glog.Infof("ENTER: PodSandboxStatus(): %s", spew.Sdump(in))
-	resp, err := r.runtimeClient.PodSandboxStatus(ctx, in)
+	resp, err := r.clients[0].PodSandboxStatus(ctx, in)
 	if err != nil {
 		glog.Errorf("FAIL: PodSandboxStatus(): PodSandboxStatus %q from runtime service failed: %v", in.GetPodSandboxId(), err)
 		return nil, err
@@ -170,7 +276,7 @@ func (r *RuntimeProxy) PodSandboxStatus(ctx context.Context, in *runtimeapi.PodS
 // ListPodSandbox returns a list of PodSandboxes.
 func (r *RuntimeProxy) ListPodSandbox(ctx context.Context, in *runtimeapi.ListPodSandboxRequest) (*runtimeapi.ListPodSandboxResponse, error) {
 	glog.Infof("ENTER: ListPodSandbox(): %s", spew.Sdump(in))
-	resp, err := r.runtimeClient.ListPodSandbox(ctx, in)
+	resp, err := r.clients[0].ListPodSandbox(ctx, in)
 	if err != nil {
 		glog.Errorf("FAIL: ListPodSandbox(): ListPodSandbox with filter %q from runtime service failed: %v", in.GetFilter(), err)
 		return nil, err
@@ -183,7 +289,7 @@ func (r *RuntimeProxy) ListPodSandbox(ctx context.Context, in *runtimeapi.ListPo
 // CreateContainer creates a new container in the specified PodSandbox.
 func (r *RuntimeProxy) CreateContainer(ctx context.Context, in *runtimeapi.CreateContainerRequest) (*runtimeapi.CreateContainerResponse, error) {
 	glog.Infof("ENTER: CreateContainer(): %s", spew.Sdump(in))
-	resp, err := r.runtimeClient.CreateContainer(ctx, in)
+	resp, err := r.clients[0].CreateContainer(ctx, in)
 	if err != nil {
 		glog.Errorf("FAIL: CreateContainer(): CreateContainer in sandbox %q from runtime service failed: %v", in.GetPodSandboxId(), err)
 		return nil, err
@@ -196,7 +302,7 @@ func (r *RuntimeProxy) CreateContainer(ctx context.Context, in *runtimeapi.Creat
 // StartContainer starts the container.
 func (r *RuntimeProxy) StartContainer(ctx context.Context, in *runtimeapi.StartContainerRequest) (*runtimeapi.StartContainerResponse, error) {
 	glog.Infof("ENTER: StartContainer(): %s", spew.Sdump(in))
-	resp, err := r.runtimeClient.StartContainer(ctx, in)
+	resp, err := r.clients[0].StartContainer(ctx, in)
 	if err != nil {
 		glog.Errorf("FAIL: StartContainer(): StartContainer %q from runtime service failed: %v", in.GetContainerId(), err)
 		return nil, err
@@ -209,7 +315,7 @@ func (r *RuntimeProxy) StartContainer(ctx context.Context, in *runtimeapi.StartC
 // StopContainer stops a running container with a grace period (i.e., timeout).
 func (r *RuntimeProxy) StopContainer(ctx context.Context, in *runtimeapi.StopContainerRequest) (*runtimeapi.StopContainerResponse, error) {
 	glog.Infof("ENTER: StopContainer(): %s", spew.Sdump(in))
-	resp, err := r.runtimeClient.StopContainer(ctx, in)
+	resp, err := r.clients[0].StopContainer(ctx, in)
 	if err != nil {
 		glog.Errorf("FAIL: StopContainer(): StopContainer %q from runtime service failed: %v", in.GetContainerId(), err)
 		return nil, err
@@ -223,7 +329,7 @@ func (r *RuntimeProxy) StopContainer(ctx context.Context, in *runtimeapi.StopCon
 // should be forced to removal.
 func (r *RuntimeProxy) RemoveContainer(ctx context.Context, in *runtimeapi.RemoveContainerRequest) (*runtimeapi.RemoveContainerResponse, error) {
 	glog.Infof("ENTER: RemoveContainer(): %s", spew.Sdump(in))
-	resp, err := r.runtimeClient.RemoveContainer(ctx, in)
+	resp, err := r.clients[0].RemoveContainer(ctx, in)
 	if err != nil {
 		glog.Errorf("FAIL: RemoveContainer(): RemoveContainer %q from runtime service failed: %v", in.GetContainerId(), err)
 		return nil, err
@@ -236,7 +342,7 @@ func (r *RuntimeProxy) RemoveContainer(ctx context.Context, in *runtimeapi.Remov
 // ListContainers lists containers by filters.
 func (r *RuntimeProxy) ListContainers(ctx context.Context, in *runtimeapi.ListContainersRequest) (*runtimeapi.ListContainersResponse, error) {
 	glog.Infof("ENTER: ListContainers(): %s", spew.Sdump(in))
-	resp, err := r.runtimeClient.ListContainers(ctx, in)
+	resp, err := r.clients[0].ListContainers(ctx, in)
 	if err != nil {
 		glog.Errorf("FAIL: ListContainers(): ListContainers with filter %q from runtime service failed: %v", in.GetFilter(), err)
 		return nil, err
@@ -249,7 +355,7 @@ func (r *RuntimeProxy) ListContainers(ctx context.Context, in *runtimeapi.ListCo
 // ContainerStatus returns the container status.
 func (r *RuntimeProxy) ContainerStatus(ctx context.Context, in *runtimeapi.ContainerStatusRequest) (*runtimeapi.ContainerStatusResponse, error) {
 	glog.Infof("ENTER: ContainerStatus(): %s", spew.Sdump(in))
-	resp, err := r.runtimeClient.ContainerStatus(ctx, in)
+	resp, err := r.clients[0].ContainerStatus(ctx, in)
 	if err != nil {
 		glog.Errorf("FAIL: ContainerStatus(): ContainerStatus %q from runtime service failed: %v", in.GetContainerId(), err)
 		return nil, err
@@ -263,7 +369,7 @@ func (r *RuntimeProxy) ContainerStatus(ctx context.Context, in *runtimeapi.Conta
 // If command exits with a non-zero exit code, an error is returned.
 func (r *RuntimeProxy) ExecSync(ctx context.Context, in *runtimeapi.ExecSyncRequest) (*runtimeapi.ExecSyncResponse, error) {
 	glog.Infof("ENTER: ExecSync(): %s", spew.Sdump(in))
-	resp, err := r.runtimeClient.ExecSync(ctx, in)
+	resp, err := r.clients[0].ExecSync(ctx, in)
 	if err != nil {
 		glog.Errorf("FAIL: ExecSync(): ExecSync %s '%s' from runtime service failed: %v", in.GetContainerId(), strings.Join(in.GetCmd(), " "), err)
 		return nil, err
@@ -276,7 +382,7 @@ func (r *RuntimeProxy) ExecSync(ctx context.Context, in *runtimeapi.ExecSyncRequ
 // Exec prepares a streaming endpoint to execute a command in the container, and returns the address.
 func (r *RuntimeProxy) Exec(ctx context.Context, in *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
 	glog.Infof("ENTER: Exec(): %s", spew.Sdump(in))
-	resp, err := r.runtimeClient.Exec(ctx, in)
+	resp, err := r.clients[0].Exec(ctx, in)
 	if err != nil {
 		glog.Errorf("FAIL: Exec(): Exec %s '%s' from runtime service failed: %v", in.GetContainerId(), strings.Join(in.GetCmd(), " "), err)
 		return nil, err
@@ -289,7 +395,7 @@ func (r *RuntimeProxy) Exec(ctx context.Context, in *runtimeapi.ExecRequest) (*r
 // Attach prepares a streaming endpoint to attach to a running container, and returns the address.
 func (r *RuntimeProxy) Attach(ctx context.Context, in *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
 	glog.Infof("ENTER: Attach(): %s", spew.Sdump(in))
-	resp, err := r.runtimeClient.Attach(ctx, in)
+	resp, err := r.clients[0].Attach(ctx, in)
 	if err != nil {
 		glog.Errorf("FAIL: Attach(): Attach %s from runtime service failed: %v", in.GetContainerId(), err)
 		return nil, err
@@ -302,7 +408,7 @@ func (r *RuntimeProxy) Attach(ctx context.Context, in *runtimeapi.AttachRequest)
 // PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.
 func (r *RuntimeProxy) PortForward(ctx context.Context, in *runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error) {
 	glog.Infof("ENTER: PortForward(): %s", spew.Sdump(in))
-	resp, err := r.runtimeClient.PortForward(ctx, in)
+	resp, err := r.clients[0].PortForward(ctx, in)
 	if err != nil {
 		glog.Errorf("FAIL: PortForward(): PortForward %s from runtime service failed: %v", in.GetPodSandboxId(), err)
 		return nil, err
@@ -317,7 +423,7 @@ func (r *RuntimeProxy) PortForward(ctx context.Context, in *runtimeapi.PortForwa
 // and the runtime service just proxies it down to the network plugin.
 func (r *RuntimeProxy) UpdateRuntimeConfig(ctx context.Context, in *runtimeapi.UpdateRuntimeConfigRequest) (*runtimeapi.UpdateRuntimeConfigResponse, error) {
 	glog.Infof("ENTER: UpdateRuntimeConfig(): %s", spew.Sdump(in))
-	resp, err := r.runtimeClient.UpdateRuntimeConfig(ctx, in)
+	resp, err := r.clients[0].UpdateRuntimeConfig(ctx, in)
 
 	if err != nil {
 		glog.Errorf("FAIL: UpdateRuntimeConfig(): UpdateRuntimeConfig from runtime service failed: %v", err)
@@ -331,7 +437,7 @@ func (r *RuntimeProxy) UpdateRuntimeConfig(ctx context.Context, in *runtimeapi.U
 // Status returns the status of the runtime.
 func (r *RuntimeProxy) Status(ctx context.Context, in *runtimeapi.StatusRequest) (*runtimeapi.StatusResponse, error) {
 	glog.Infof("ENTER: Status(): %s", spew.Sdump(in))
-	resp, err := r.runtimeClient.Status(ctx, in)
+	resp, err := r.clients[0].Status(ctx, in)
 	if err != nil {
 		glog.Errorf("FAIL: Status(): Status from runtime service failed: %v", err)
 		return nil, err
@@ -345,36 +451,57 @@ func (r *RuntimeProxy) Status(ctx context.Context, in *runtimeapi.StatusRequest)
 
 // ListImages lists available images.
 func (r *RuntimeProxy) ListImages(ctx context.Context, in *runtimeapi.ListImagesRequest) (*runtimeapi.ListImagesResponse, error) {
-	glog.Infof("ENTER: ListImages(): %s", spew.Sdump(in))
-	resp, err := r.imageClient.ListImages(ctx, in)
-	if err != nil {
-		glog.Errorf("FAIL: ListImages(): ListImages with filter %q from image service failed: %v", in.GetFilter(), err)
-		return nil, err
+	clients := r.clients
+	clientStr := "all clients"
+	if in.GetFilter() != nil && in.GetFilter().GetImage() != nil {
+		client, unprefixed := r.clientForImage(in.GetFilter().GetImage())
+		clients = []*apiClient{client}
+		in.GetFilter().GetImage().Image = &unprefixed
+		clientStr = client.id
 	}
 
-	glog.Infof("LEAVE: ListImages(): %s", spew.Sdump(resp))
+	glog.V(3).Infof("ENTER: ListImages() [%s]: %s", clientStr, spew.Sdump(in))
+	var images []*runtimeapi.Image
+	for _, client := range clients {
+		resp, err := client.ListImages(ctx, in)
+		if err != nil {
+			err = client.wrapError(err)
+			glog.Errorf("FAIL: ListImages() [%s]: ListImages with filter %q from image service failed: %v", clientStr, in.GetFilter(), err)
+			return nil, err
+		}
+		images = append(images, client.prefixImages(resp.GetImages())...)
+	}
+
+	resp := &runtimeapi.ListImagesResponse{Images: images}
+	glog.V(3).Infof("LEAVE: ListImages() [%s]: %s", clientStr, spew.Sdump(resp))
 	return resp, nil
 }
 
 // ImageStatus returns the status of the image.
 func (r *RuntimeProxy) ImageStatus(ctx context.Context, in *runtimeapi.ImageStatusRequest) (*runtimeapi.ImageStatusResponse, error) {
-	glog.Infof("ENTER: ImageStatus(): %s", spew.Sdump(in))
-	resp, err := r.imageClient.ImageStatus(ctx, in)
+	client, unprefixed := r.clientForImage(in.GetImage())
+	glog.Infof("ENTER: ImageStatus() [%s]: %s", client.id, spew.Sdump(in))
+	in.Image.Image = &unprefixed
+	resp, err := client.ImageStatus(ctx, in)
 	if err != nil {
-		glog.Errorf("FAIL: ImageStatus(): ImageStatus %q from image service failed: %v", in.GetImage().GetImage(), err)
+		glog.Errorf("FAIL: ImageStatus() [%s]: ImageStatus %q from image service failed: %v", client.id, in.GetImage().GetImage(), err)
 		return nil, err
 	}
 
-	glog.Infof("LEAVE: ImageStatus(): %s", spew.Sdump(resp))
-	return resp, nil
+	glog.Infof("LEAVE: ImageStatus() [%s]: %s", client.id, spew.Sdump(resp))
+	return &runtimeapi.ImageStatusResponse{
+		Image: client.prefixImage(resp.Image),
+	}, nil
 }
 
 // PullImage pulls an image with authentication config.
 func (r *RuntimeProxy) PullImage(ctx context.Context, in *runtimeapi.PullImageRequest) (*runtimeapi.PullImageResponse, error) {
-	glog.Infof("ENTER: PullImage(): %s", spew.Sdump(in))
-	resp, err := r.imageClient.PullImage(ctx, in)
+	client, unprefixed := r.clientForImage(in.GetImage())
+	glog.Infof("ENTER: PullImage() [%s]: %s", client.id, spew.Sdump(in))
+	in.Image.Image = &unprefixed
+	resp, err := client.PullImage(ctx, in)
 	if err != nil {
-		glog.Errorf("FAIL: PullImage(): PullImage %q from image service failed: %v", in.GetImage().GetImage(), err)
+		glog.Errorf("FAIL: PullImage() [%s]: PullImage %q from image service failed: %v", client.id, in.GetImage().GetImage(), err)
 		return nil, err
 	}
 
@@ -384,22 +511,29 @@ func (r *RuntimeProxy) PullImage(ctx context.Context, in *runtimeapi.PullImageRe
 
 // RemoveImage removes the image.
 func (r *RuntimeProxy) RemoveImage(ctx context.Context, in *runtimeapi.RemoveImageRequest) (*runtimeapi.RemoveImageResponse, error) {
-	glog.Infof("ENTER: RemoveImage(): %s", spew.Sdump(in))
-	resp, err := r.imageClient.RemoveImage(ctx, in)
+	client, unprefixed := r.clientForImage(in.GetImage())
+	glog.Infof("ENTER: RemoveImage() [%s]: %s", client.id, spew.Sdump(in))
+	in.Image.Image = &unprefixed
+	resp, err := client.RemoveImage(ctx, in)
 	if err != nil {
-		glog.Errorf("FAIL: RemoveImage(): RemoveImage %q from image service failed: %v", in.GetImage().GetImage(), err)
+		glog.Errorf("FAIL: RemoveImage() [%s]: RemoveImage %q from image service failed: %v", client.id, in.GetImage().GetImage(), err)
 		return nil, err
 	}
 
-	glog.Infof("LEAVE: RemoveImage(): %s", spew.Sdump(resp))
+	glog.Infof("LEAVE: RemoveImage() [%s]: %s", client.id, spew.Sdump(resp))
 	return resp, nil
 }
 
-// TODO: remove all of the following
+func (r *RuntimeProxy) clientForImage(image *runtimeapi.ImageSpec) (*apiClient, string) {
+	for _, client := range r.clients[1:] {
+		if ok, unprefixed := client.imageMatches(image.GetImage()); ok {
+			return client, unprefixed
+		}
+	}
+	return r.clients[0], image.GetImage()
+}
 
-// var removeThis1 runtimeapi.RuntimeServiceServer = &RuntimeProxy{}
-// var removeThis2 runtimeapi.ImageServiceServer = &RuntimeProxy{}
-
+// TODO: remove this
 func init() {
 	// Make spew output more readable for k8s runtime API objects
 	spew.Config.DisableMethods = true
