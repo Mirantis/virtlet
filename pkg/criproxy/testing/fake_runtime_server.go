@@ -122,7 +122,7 @@ func (r *FakeRuntimeServer) RunPodSandbox(ctx context.Context, in *runtimeapi.Ru
 	// fixed name from BuildSandboxName() for easily making fake sandboxes.
 	config := in.GetConfig()
 	podSandboxID := BuildSandboxName(config.Metadata)
-	createdAt := time.Now().Unix()
+	createdAt := time.Now().UnixNano()
 	readyState := runtimeapi.PodSandboxState_SANDBOX_READY
 	r.Sandboxes[podSandboxID] = &FakePodSandbox{
 		PodSandboxStatus: runtimeapi.PodSandboxStatus{
@@ -237,7 +237,7 @@ func (r *FakeRuntimeServer) CreateContainer(ctx context.Context, in *runtimeapi.
 	podSandboxID := in.GetPodSandboxId()
 	config := in.GetConfig()
 	containerID := BuildContainerName(config.Metadata, podSandboxID)
-	createdAt := time.Now().Unix()
+	createdAt := time.Now().UnixNano()
 	createdState := runtimeapi.ContainerState_CONTAINER_CREATED
 	imageRef := config.Image.GetImage()
 	r.Containers[containerID] = &FakeContainer{
@@ -270,7 +270,7 @@ func (r *FakeRuntimeServer) StartContainer(ctx context.Context, in *runtimeapi.S
 	}
 
 	// Set container to running.
-	startedAt := time.Now().Unix()
+	startedAt := time.Now().UnixNano()
 	runningState := runtimeapi.ContainerState_CONTAINER_RUNNING
 	c.State = &runningState
 	c.StartedAt = &startedAt
@@ -291,7 +291,7 @@ func (r *FakeRuntimeServer) StopContainer(ctx context.Context, in *runtimeapi.St
 	}
 
 	// Set container to exited state.
-	finishedAt := time.Now().Unix()
+	finishedAt := time.Now().UnixNano()
 	exitedState := runtimeapi.ContainerState_CONTAINER_EXITED
 	c.State = &exitedState
 	c.FinishedAt = &finishedAt
