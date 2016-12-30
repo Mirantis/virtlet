@@ -148,7 +148,7 @@ func (c *apiClient) prefixSandbox(unprefixedSandbox *runtimeapi.PodSandbox) *run
 		return unprefixedSandbox
 	}
 	sandbox := *unprefixedSandbox
-	sandbox.Id = c.augmentId(*unprefixedSandbox.Id)
+	sandbox.Id = c.augmentId(unprefixedSandbox.GetId())
 	return &sandbox
 }
 
@@ -159,6 +159,29 @@ func (c *apiClient) prefixSandboxes(sandboxes []*runtimeapi.PodSandbox) []*runti
 	var r []*runtimeapi.PodSandbox
 	for _, unprefixedSandbox := range sandboxes {
 		r = append(r, c.prefixSandbox(unprefixedSandbox))
+	}
+	return r
+}
+
+func (c *apiClient) prefixContainer(unprefixedContainer *runtimeapi.Container) *runtimeapi.Container {
+	if c.isPrimary() {
+		return unprefixedContainer
+	}
+	container := *unprefixedContainer
+	container.Id = c.augmentId(unprefixedContainer.GetId())
+	container.PodSandboxId = c.augmentId(unprefixedContainer.GetPodSandboxId())
+	imageName := c.imageName(unprefixedContainer.GetImage().GetImage())
+	container.Image.Image = &imageName
+	return &container
+}
+
+func (c *apiClient) prefixContainers(unprefixedContainers []*runtimeapi.Container) []*runtimeapi.Container {
+	if c.isPrimary() {
+		return unprefixedContainers
+	}
+	var r []*runtimeapi.Container
+	for _, unprefixedContainer := range unprefixedContainers {
+		r = append(r, c.prefixContainer(unprefixedContainer))
 	}
 	return r
 }
@@ -289,7 +312,7 @@ func (r *RuntimeProxy) RunPodSandbox(ctx context.Context, in *runtimeapi.RunPodS
 		return nil, err
 	}
 
-	resp.PodSandboxId = client.augmentId(*resp.PodSandboxId)
+	resp.PodSandboxId = client.augmentId(resp.GetPodSandboxId())
 	glog.Infof("LEAVE: RunPodSandbox() [%s]: %s", client.id, spew.Sdump(resp))
 	return resp, nil
 }
@@ -379,14 +402,32 @@ func (r *RuntimeProxy) ListPodSandbox(ctx context.Context, in *runtimeapi.ListPo
 
 // CreateContainer creates a new container in the specified PodSandbox.
 func (r *RuntimeProxy) CreateContainer(ctx context.Context, in *runtimeapi.CreateContainerRequest) (*runtimeapi.CreateContainerResponse, error) {
-	glog.Infof("ENTER: CreateContainer(): %s", spew.Sdump(in))
-	resp, err := r.clients[0].CreateContainer(ctx, in)
+	client, unprefixedSandboxId := r.clientForId(in.GetPodSandboxId())
+	glog.Infof("ENTER: CreateContainer() [%s]: %s", client.id, spew.Sdump(in))
+	in.PodSandboxId = &unprefixedSandboxId
+
+	if in.GetConfig() == nil {
+		glog.Errorf("FAIL: CreateContainer() [%s]: no sandbox config", client.id)
+		return nil, errors.New("criproxy: no sandbox config")
+	}
+
+	image := in.GetConfig().GetImage()
+	imageClient, unprefixedImage := r.clientForImage(image)
+	if imageClient != client {
+		glog.Errorf("FAIL: CreateContainer() [%s]: image %q is for a wrong runtime", client.id, image.GetImage())
+		return nil, fmt.Errorf("criproxy: image %q is for a wrong runtime", image.GetImage())
+	}
+	image.Image = &unprefixedImage
+
+	resp, err := client.CreateContainer(ctx, in)
 	if err != nil {
-		glog.Errorf("FAIL: CreateContainer(): CreateContainer in sandbox %q from runtime service failed: %v", in.GetPodSandboxId(), err)
+		glog.Errorf("FAIL: CreateContainer() [%s]: CreateContainer in sandbox %q from runtime service failed: %v", client.id, in.GetPodSandboxId(), err)
+		err = client.wrapError(err)
 		return nil, err
 	}
 
-	glog.Infof("LEAVE: CreateContainer(): %s", spew.Sdump(resp))
+	resp.ContainerId = client.augmentId(resp.GetContainerId())
+	glog.Infof("LEAVE: CreateContainer() [%s]: %s", client.id, spew.Sdump(resp))
 	return resp, nil
 }
 
@@ -432,27 +473,65 @@ func (r *RuntimeProxy) RemoveContainer(ctx context.Context, in *runtimeapi.Remov
 
 // ListContainers lists containers by filters.
 func (r *RuntimeProxy) ListContainers(ctx context.Context, in *runtimeapi.ListContainersRequest) (*runtimeapi.ListContainersResponse, error) {
-	glog.Infof("ENTER: ListContainers(): %s", spew.Sdump(in))
-	resp, err := r.clients[0].ListContainers(ctx, in)
-	if err != nil {
-		glog.Errorf("FAIL: ListContainers(): ListContainers with filter %q from runtime service failed: %v", in.GetFilter(), err)
-		return nil, err
+	clients := r.clients
+	clientStr := "all clients"
+	if filter := in.GetFilter(); filter != nil {
+		var singleClient *apiClient
+		if filter.Id != nil {
+			var unprefixed string
+			singleClient, unprefixed = r.clientForId(filter.GetId())
+			filter.Id = &unprefixed
+		}
+		if filter.PodSandboxId != nil {
+			anotherClient, unprefixed := r.clientForId(filter.GetPodSandboxId())
+			filter.PodSandboxId = &unprefixed
+			if singleClient == nil {
+				singleClient = anotherClient
+			} else if singleClient != anotherClient {
+				// different id prefixes for sandbox & container
+				return &runtimeapi.ListContainersResponse{}, nil
+			}
+		}
+		if singleClient != nil {
+			clients = []*apiClient{singleClient}
+			clientStr = singleClient.id
+		}
 	}
 
-	glog.Infof("LEAVE: ListContainers(): %s", spew.Sdump(resp))
+	glog.Infof("ENTER: ListContainers() [%s]: %s", clientStr, spew.Sdump(in))
+	var containers []*runtimeapi.Container
+	for _, client := range clients {
+		resp, err := client.ListContainers(ctx, in)
+		if err != nil {
+			err = client.wrapError(err)
+			glog.Errorf("FAIL: ListContainers() [%s]: ListContainers with filter %q from runtime service failed: %v", clientStr, in.GetFilter(), err)
+			return nil, err
+		}
+		containers = append(containers, client.prefixContainers(resp.GetContainers())...)
+	}
+
+	resp := &runtimeapi.ListContainersResponse{Containers: containers}
+	glog.Infof("LEAVE: ListContainers() [%s]: %s", clientStr, spew.Sdump(resp))
 	return resp, nil
 }
 
 // ContainerStatus returns the container status.
 func (r *RuntimeProxy) ContainerStatus(ctx context.Context, in *runtimeapi.ContainerStatusRequest) (*runtimeapi.ContainerStatusResponse, error) {
-	glog.Infof("ENTER: ContainerStatus(): %s", spew.Sdump(in))
-	resp, err := r.clients[0].ContainerStatus(ctx, in)
+	client, unprefixed := r.clientForId(in.GetContainerId())
+	glog.Infof("ENTER: ContainerStatus() [%s]: %s", client.id, spew.Sdump(in))
+	in.ContainerId = &unprefixed
+
+	resp, err := client.ContainerStatus(ctx, in)
 	if err != nil {
-		glog.Errorf("FAIL: ContainerStatus(): ContainerStatus %q from runtime service failed: %v", in.GetContainerId(), err)
+		glog.Errorf("FAIL: ContainerStatus() [%s]: ContainerStatus %q from runtime service failed: %v", client.id, in.GetContainerId(), err)
+		err = client.wrapError(err)
 		return nil, err
 	}
 
 	glog.Infof("LEAVE: ContainerStatus(): %s", spew.Sdump(resp))
+	resp.GetStatus().Id = client.augmentId(resp.GetStatus().GetId())
+	imageName := client.imageName(resp.GetStatus().GetImage().GetImage())
+	resp.GetStatus().Image.Image = &imageName
 	return resp, nil
 }
 
@@ -650,3 +729,6 @@ func init() {
 	spew.Config.DisableMethods = true
 	spew.Config.DisablePointerMethods = true
 }
+
+// TODO: for primary client, show [primary] not [] in the logs
+// (add apiClient.Name() or something)

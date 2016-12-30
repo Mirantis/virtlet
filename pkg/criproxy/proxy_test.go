@@ -18,6 +18,7 @@ package criproxy
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -43,6 +44,8 @@ const (
 	podSandboxId1             = "pod-1-1_default_" + podUid1 + "_0"
 	podUid2                   = "927a91df-f4d3-49a9-a257-5ca7f16f85fc"
 	podSandboxId2             = "alt__pod-2-1_default_" + podUid2 + "_0"
+	containerId1              = podSandboxId1 + "_container1_0"
+	containerId2              = podSandboxId2 + "_container2_0"
 )
 
 type ServerWithReadinessFeedback interface {
@@ -115,6 +118,7 @@ func TestCriProxy(t *testing.T) {
 	for _, step := range []struct {
 		name, method string
 		in, resp     interface{}
+		ins          []interface{}
 		journal      []string
 		error        string
 	}{
@@ -356,7 +360,259 @@ func TestCriProxy(t *testing.T) {
 			},
 			journal: []string{"2/runtime/PodSandboxStatus"},
 		},
-		// TODO: add container testing steps here
+		{
+			name:   "create container 1",
+			method: "/runtime.RuntimeService/CreateContainer",
+			in: &runtimeapi.CreateContainerRequest{
+				PodSandboxId: pstr(podSandboxId1),
+				Config: &runtimeapi.ContainerConfig{
+					Metadata: &runtimeapi.ContainerMetadata{
+						Name:    pstr("container1"),
+						Attempt: puint32(0),
+					},
+					Image: &runtimeapi.ImageSpec{
+						Image: pstr("image1-1"),
+					},
+				},
+			},
+			resp: &runtimeapi.CreateContainerResponse{
+				ContainerId: pstr(containerId1),
+			},
+			journal: []string{"1/runtime/CreateContainer"},
+		},
+		{
+			name:   "create container 2",
+			method: "/runtime.RuntimeService/CreateContainer",
+			in: &runtimeapi.CreateContainerRequest{
+				PodSandboxId: pstr(podSandboxId2),
+				Config: &runtimeapi.ContainerConfig{
+					Metadata: &runtimeapi.ContainerMetadata{
+						Name:    pstr("container2"),
+						Attempt: puint32(0),
+					},
+					Image: &runtimeapi.ImageSpec{
+						Image: pstr("alt/image2-1"),
+					},
+				},
+			},
+			resp: &runtimeapi.CreateContainerResponse{
+				ContainerId: pstr(containerId2),
+			},
+			journal: []string{"2/runtime/CreateContainer"},
+		},
+		{
+			name:   "try to create container for a wrong runtime",
+			method: "/runtime.RuntimeService/CreateContainer",
+			in: &runtimeapi.CreateContainerRequest{
+				PodSandboxId: pstr(podSandboxId2),
+				Config: &runtimeapi.ContainerConfig{
+					Metadata: &runtimeapi.ContainerMetadata{
+						Name:    pstr("container2"),
+						Attempt: puint32(0),
+					},
+					Image: &runtimeapi.ImageSpec{
+						Image: pstr("image1-2"),
+					},
+				},
+			},
+			// resp must be specified even in case of expected error
+			// because the type is needed to make the GRPC call
+			resp:  &runtimeapi.CreateContainerResponse{},
+			error: "criproxy: image \"image1-2\" is for a wrong runtime",
+		},
+		{
+			name:   "list containers",
+			method: "/runtime.RuntimeService/ListContainers",
+			in:     &runtimeapi.ListContainersRequest{},
+			resp: &runtimeapi.ListContainersResponse{
+				Containers: []*runtimeapi.Container{
+					{
+						Id:           pstr(containerId1),
+						PodSandboxId: pstr(podSandboxId1),
+						Metadata: &runtimeapi.ContainerMetadata{
+							Name:    pstr("container1"),
+							Attempt: puint32(0),
+						},
+						Image: &runtimeapi.ImageSpec{
+							Image: pstr("image1-1"),
+						},
+						ImageRef:  pstr("image1-1"),
+						CreatedAt: &criServer1.CurrentTime,
+						State:     runtimeapi.ContainerState_CONTAINER_CREATED.Enum(),
+					},
+					{
+						Id:           pstr(containerId2),
+						PodSandboxId: pstr(podSandboxId2),
+						Metadata: &runtimeapi.ContainerMetadata{
+							Name:    pstr("container2"),
+							Attempt: puint32(0),
+						},
+						Image: &runtimeapi.ImageSpec{
+							Image: pstr("alt/image2-1"),
+						},
+						ImageRef:  pstr("image2-1"),
+						CreatedAt: &criServer2.CurrentTime,
+						State:     runtimeapi.ContainerState_CONTAINER_CREATED.Enum(),
+					},
+				},
+			},
+			journal: []string{"1/runtime/ListContainers", "2/runtime/ListContainers"},
+		},
+		{
+			name:   "list containers with container filter 1",
+			method: "/runtime.RuntimeService/ListContainers",
+			ins: []interface{}{
+				&runtimeapi.ListContainersRequest{
+					Filter: &runtimeapi.ContainerFilter{Id: pstr(containerId1)},
+				},
+				&runtimeapi.ListContainersRequest{
+					Filter: &runtimeapi.ContainerFilter{PodSandboxId: pstr(podSandboxId1)},
+				},
+				&runtimeapi.ListContainersRequest{
+					Filter: &runtimeapi.ContainerFilter{
+						Id:           pstr(containerId1),
+						PodSandboxId: pstr(podSandboxId1),
+					},
+				},
+				&runtimeapi.ListContainersRequest{
+					Filter: &runtimeapi.ContainerFilter{
+						Id:           pstr(containerId1),
+						PodSandboxId: pstr(podSandboxId1),
+						State:        runtimeapi.ContainerState_CONTAINER_CREATED.Enum(),
+					},
+				},
+			},
+			resp: &runtimeapi.ListContainersResponse{
+				Containers: []*runtimeapi.Container{
+					{
+						Id:           pstr(containerId1),
+						PodSandboxId: pstr(podSandboxId1),
+						Metadata: &runtimeapi.ContainerMetadata{
+							Name:    pstr("container1"),
+							Attempt: puint32(0),
+						},
+						Image: &runtimeapi.ImageSpec{
+							Image: pstr("image1-1"),
+						},
+						ImageRef:  pstr("image1-1"),
+						CreatedAt: &criServer1.CurrentTime,
+						State:     runtimeapi.ContainerState_CONTAINER_CREATED.Enum(),
+					},
+				},
+			},
+			journal: []string{"1/runtime/ListContainers"},
+		},
+		{
+			name:   "list containers with container filter 2",
+			method: "/runtime.RuntimeService/ListContainers",
+			ins: []interface{}{
+				&runtimeapi.ListContainersRequest{
+					Filter: &runtimeapi.ContainerFilter{Id: pstr(containerId2)},
+				},
+				&runtimeapi.ListContainersRequest{
+					Filter: &runtimeapi.ContainerFilter{PodSandboxId: pstr(podSandboxId2)},
+				},
+				&runtimeapi.ListContainersRequest{
+					Filter: &runtimeapi.ContainerFilter{
+						Id:           pstr(containerId2),
+						PodSandboxId: pstr(podSandboxId2),
+					},
+				},
+				&runtimeapi.ListContainersRequest{
+					Filter: &runtimeapi.ContainerFilter{
+						Id:           pstr(containerId2),
+						PodSandboxId: pstr(podSandboxId2),
+						State:        runtimeapi.ContainerState_CONTAINER_CREATED.Enum(),
+					},
+				},
+			},
+			resp: &runtimeapi.ListContainersResponse{
+				Containers: []*runtimeapi.Container{
+					{
+						Id:           pstr(containerId2),
+						PodSandboxId: pstr(podSandboxId2),
+						Metadata: &runtimeapi.ContainerMetadata{
+							Name:    pstr("container2"),
+							Attempt: puint32(0),
+						},
+						Image: &runtimeapi.ImageSpec{
+							Image: pstr("alt/image2-1"),
+						},
+						ImageRef:  pstr("image2-1"),
+						CreatedAt: &criServer2.CurrentTime,
+						State:     runtimeapi.ContainerState_CONTAINER_CREATED.Enum(),
+					},
+				},
+			},
+			journal: []string{"2/runtime/ListContainers"},
+		},
+		{
+			name:   "list containers with contradicting id+sandbox filters",
+			method: "/runtime.RuntimeService/ListContainers",
+			ins: []interface{}{
+				&runtimeapi.ListContainersRequest{
+					Filter: &runtimeapi.ContainerFilter{
+						Id:           pstr(containerId1),
+						PodSandboxId: pstr(podSandboxId2),
+					},
+				},
+				&runtimeapi.ListContainersRequest{
+					Filter: &runtimeapi.ContainerFilter{
+						Id:           pstr(containerId1),
+						PodSandboxId: pstr(podSandboxId2),
+						State:        runtimeapi.ContainerState_CONTAINER_CREATED.Enum(),
+					},
+				},
+			},
+			resp: &runtimeapi.ListContainersResponse{},
+		},
+		{
+			name:   "container status 1",
+			method: "/runtime.RuntimeService/ContainerStatus",
+			in: &runtimeapi.ContainerStatusRequest{
+				ContainerId: pstr(containerId1),
+			},
+			resp: &runtimeapi.ContainerStatusResponse{
+				Status: &runtimeapi.ContainerStatus{
+					Id: pstr(containerId1),
+					Metadata: &runtimeapi.ContainerMetadata{
+						Name:    pstr("container1"),
+						Attempt: puint32(0),
+					},
+					Image: &runtimeapi.ImageSpec{
+						Image: pstr("image1-1"),
+					},
+					ImageRef:  pstr("image1-1"),
+					CreatedAt: &criServer1.CurrentTime,
+					State:     runtimeapi.ContainerState_CONTAINER_CREATED.Enum(),
+				},
+			},
+			journal: []string{"1/runtime/ContainerStatus"},
+		},
+		{
+			name:   "container status 2",
+			method: "/runtime.RuntimeService/ContainerStatus",
+			in: &runtimeapi.ContainerStatusRequest{
+				ContainerId: pstr(containerId2),
+			},
+			resp: &runtimeapi.ContainerStatusResponse{
+				Status: &runtimeapi.ContainerStatus{
+					Id: pstr(containerId2),
+					Metadata: &runtimeapi.ContainerMetadata{
+						Name:    pstr("container2"),
+						Attempt: puint32(0),
+					},
+					Image: &runtimeapi.ImageSpec{
+						Image: pstr("alt/image2-1"),
+					},
+					// ImageRef is not prefixed
+					ImageRef:  pstr("image2-1"),
+					CreatedAt: &criServer2.CurrentTime,
+					State:     runtimeapi.ContainerState_CONTAINER_CREATED.Enum(),
+				},
+			},
+			journal: []string{"2/runtime/ContainerStatus"},
+		},
 		{
 			name:   "stop pod sandbox 1",
 			method: "/runtime.RuntimeService/StopPodSandbox",
@@ -606,42 +862,58 @@ func TestCriProxy(t *testing.T) {
 			journal: []string{"1/image/ListImages", "2/image/ListImages"},
 		},
 	} {
-		t.Run(step.name, func(t *testing.T) {
-			actualResponse := reflect.New(reflect.TypeOf(step.resp).Elem()).Interface()
-			err := grpc.Invoke(context.Background(), step.method, step.in, actualResponse, conn)
-			switch {
-			case step.error == "" && err != nil:
-				t.Errorf("GRPC call failed: %v", err)
-			case step.error != "" && err == nil:
-				t.Errorf("did not get expected error")
-			case step.error != "" && !strings.Contains(err.Error(), step.error):
-				t.Errorf("bad error message: %q instead of %q", err.Error(), step.error)
+		var ins []interface{}
+		if step.ins == nil {
+			ins = []interface{}{step.in}
+		} else {
+			if step.in != nil {
+				t.Fatalf("can't specify both 'in' and 'ins' for the step %s", step.name)
 			}
+			ins = step.ins
+		}
 
-			if err == nil && !reflect.DeepEqual(actualResponse, step.resp) {
-				expectedJSON, err := json.MarshalIndent(step.resp, "", "  ")
-				if err != nil {
-					t.Fatalf("Failed to marshal json: %v", err)
-				}
-				actualJSON, err := json.MarshalIndent(actualResponse, "", "  ")
-				if err != nil {
-					t.Fatalf("Failed to marshal json: %v", err)
-				}
-				diff := difflib.UnifiedDiff{
-					A:        difflib.SplitLines(string(expectedJSON)),
-					B:        difflib.SplitLines(string(actualJSON)),
-					FromFile: "expected",
-					ToFile:   "actual",
-					Context:  5,
-				}
-				diffText, _ := difflib.GetUnifiedDiffString(diff)
-				t.Errorf("Response diff:\n%s", diffText)
+		for n, in := range ins {
+			name := step.name
+			if len(ins) > 1 {
+				name = fmt.Sprintf("%s [%d]", name, n+1)
 			}
+			t.Run(name, func(t *testing.T) {
+				actualResponse := reflect.New(reflect.TypeOf(step.resp).Elem()).Interface()
+				err := grpc.Invoke(context.Background(), step.method, in, actualResponse, conn)
+				switch {
+				case step.error == "" && err != nil:
+					t.Errorf("GRPC call failed: %v", err)
+				case step.error != "" && err == nil:
+					t.Errorf("did not get expected error")
+				case step.error != "" && !strings.Contains(err.Error(), step.error):
+					t.Errorf("bad error message: %q instead of %q", err.Error(), step.error)
+				}
 
-			if err := journal.Verify(step.journal); err != nil {
-				t.Error(err)
-			}
-		})
+				if err == nil && !reflect.DeepEqual(actualResponse, step.resp) {
+					expectedJSON, err := json.MarshalIndent(step.resp, "", "  ")
+					if err != nil {
+						t.Fatalf("Failed to marshal json: %v", err)
+					}
+					actualJSON, err := json.MarshalIndent(actualResponse, "", "  ")
+					if err != nil {
+						t.Fatalf("Failed to marshal json: %v", err)
+					}
+					diff := difflib.UnifiedDiff{
+						A:        difflib.SplitLines(string(expectedJSON)),
+						B:        difflib.SplitLines(string(actualJSON)),
+						FromFile: "expected",
+						ToFile:   "actual",
+						Context:  5,
+					}
+					diffText, _ := difflib.GetUnifiedDiffString(diff)
+					t.Errorf("Response diff:\n%s", diffText)
+				}
+
+				if err := journal.Verify(step.journal); err != nil {
+					t.Error(err)
+				}
+			})
+		}
 	}
 }
 
