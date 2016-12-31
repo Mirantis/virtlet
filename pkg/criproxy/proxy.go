@@ -36,6 +36,9 @@ import (
 
 const (
 	targetRuntimeAnnotationKey = "kubernetes.io/target-runtime"
+	// FIXME: make the following configurable
+	numConnectAttempts     = 300
+	connectAttemptInterval = 200 * time.Millisecond
 )
 
 // dial creates a net.Conn by unix socket addr.
@@ -70,8 +73,28 @@ func (c *apiClient) isPrimary() bool {
 	return c.id == ""
 }
 
+func (c *apiClient) waitForSocket() error {
+	var err error
+	for i := 0; i < numConnectAttempts; i++ {
+		if i > 0 {
+			time.Sleep(connectAttemptInterval)
+		}
+		if _, err = os.Stat(c.addr); err != nil {
+			glog.V(1).Infof("%q is not here yet: %s", c.addr, err)
+		} else {
+			break
+		}
+	}
+	return err
+}
+
 func (c *apiClient) connect() error {
 	glog.V(1).Infof("Connecting to runtime service %s", c.addr)
+	if err := c.waitForSocket(); err != nil {
+		glog.Errorf("Failed to find the socket: %v", err)
+		return fmt.Errorf("failed to find the socket: %v", err)
+	}
+
 	conn, err := grpc.Dial(c.addr, grpc.WithInsecure(), grpc.WithTimeout(c.connectionTimeout), grpc.WithDialer(dial))
 	if err != nil {
 		return err

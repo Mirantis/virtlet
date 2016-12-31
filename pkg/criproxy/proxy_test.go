@@ -87,37 +87,79 @@ func puint64(v uint64) *uint64 {
 	return &v
 }
 
-func TestCriProxy(t *testing.T) {
-	journal := proxytest.NewSimpleJournal()
-	criServer1 := proxytest.NewFakeCriServer(proxytest.NewPrefixJournal(journal, "1/"))
-	defer criServer1.Stop()
-	criServer2 := proxytest.NewFakeCriServer(proxytest.NewPrefixJournal(journal, "2/"))
-	defer criServer2.Stop()
-	// TODO: don't wait for the servers to start, the proxy should do it
-	startServer(t, criServer1, fakeCriSocketPath1)
-	startServer(t, criServer2, fakeCriSocketPath2)
+type proxyTester struct {
+	journal *proxytest.SimpleJournal
+	servers []*proxytest.FakeCriServer
+	proxy   *RuntimeProxy
+	conn    *grpc.ClientConn
+}
 
-	proxy := NewRuntimeProxy([]string{fakeCriSocketPath1, altSocketSpec}, connectionTimeoutForTests)
-	if err := proxy.Connect(); err != nil {
-		// TODO: NewRuntimeProxy() shouldn't do any real work
+func newProxyTester() *proxyTester {
+	journal := proxytest.NewSimpleJournal()
+	return &proxyTester{
+		journal: journal,
+		servers: []*proxytest.FakeCriServer{
+			proxytest.NewFakeCriServer(proxytest.NewPrefixJournal(journal, "1/")),
+			proxytest.NewFakeCriServer(proxytest.NewPrefixJournal(journal, "2/")),
+		},
+		proxy: NewRuntimeProxy([]string{fakeCriSocketPath1, altSocketSpec}, connectionTimeoutForTests),
+	}
+}
+
+func (tester *proxyTester) startServers(t *testing.T) {
+	startServer(t, tester.servers[0], fakeCriSocketPath1)
+	startServer(t, tester.servers[1], fakeCriSocketPath2)
+}
+
+func (tester *proxyTester) startProxy(t *testing.T) {
+	if err := tester.proxy.Connect(); err != nil {
 		t.Fatalf("Failed to set up CRI proxy: %v", err)
 	}
-	defer proxy.Stop()
-	startServer(t, proxy, criProxySocketForTests)
+	startServer(t, tester.proxy, criProxySocketForTests)
+}
 
+func (tester *proxyTester) connectToProxy(t *testing.T) {
 	conn, err := grpc.Dial(criProxySocketForTests, grpc.WithInsecure(), grpc.WithTimeout(connectionTimeoutForTests), grpc.WithDialer(dial))
 	if err != nil {
 		t.Fatalf("Connect remote runtime %s failed: %v", criProxySocketForTests, err)
 	}
-	defer conn.Close()
+	tester.conn = conn
+}
+
+func (tester *proxyTester) stop() {
+	if tester.conn != nil {
+		tester.conn.Close()
+	}
+	for _, server := range tester.servers {
+		server.Stop()
+	}
+	tester.proxy.Stop()
+}
+
+func (tester *proxyTester) invoke(method string, in, resp interface{}) error {
+	return grpc.Invoke(context.Background(), method, in, resp, tester.conn)
+}
+
+func (tester *proxyTester) verifyJournal(t *testing.T, expectedJournal []string) {
+	if err := tester.journal.Verify(expectedJournal); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestCriProxy(t *testing.T) {
+	tester := newProxyTester()
+	defer tester.stop()
+	tester.startServers(t)
+	tester.startProxy(t)
+	tester.connectToProxy(t)
 
 	fakeImageNames1 := []string{"image1-1", "image1-2"}
-	criServer1.SetFakeImages(fakeImageNames1)
-	criServer1.SetFakeImageSize(fakeImageSize1)
+	tester.servers[0].SetFakeImages(fakeImageNames1)
+	tester.servers[0].SetFakeImageSize(fakeImageSize1)
 
 	fakeImageNames2 := []string{"image2-1", "image2-2"}
-	criServer2.SetFakeImages(fakeImageNames2)
-	criServer2.SetFakeImageSize(fakeImageSize2)
+	tester.servers[1].SetFakeImages(fakeImageNames2)
+	tester.servers[1].SetFakeImageSize(fakeImageSize2)
 
 	for _, step := range []struct {
 		name, method string
@@ -238,7 +280,7 @@ func TestCriProxy(t *testing.T) {
 							Attempt:   puint32(0),
 						},
 						State:     runtimeapi.PodSandboxState_SANDBOX_READY.Enum(),
-						CreatedAt: &criServer1.CurrentTime,
+						CreatedAt: &tester.servers[0].CurrentTime,
 						Labels:    map[string]string{"name": "pod-1-1"},
 					},
 					{
@@ -250,7 +292,7 @@ func TestCriProxy(t *testing.T) {
 							Attempt:   puint32(0),
 						},
 						State:     runtimeapi.PodSandboxState_SANDBOX_READY.Enum(),
-						CreatedAt: &criServer2.CurrentTime,
+						CreatedAt: &tester.servers[1].CurrentTime,
 						Labels:    map[string]string{"name": "pod-2-1"},
 						Annotations: map[string]string{
 							"kubernetes.io/target-runtime": "alt",
@@ -277,7 +319,7 @@ func TestCriProxy(t *testing.T) {
 							Attempt:   puint32(0),
 						},
 						State:     runtimeapi.PodSandboxState_SANDBOX_READY.Enum(),
-						CreatedAt: &criServer1.CurrentTime,
+						CreatedAt: &tester.servers[0].CurrentTime,
 						Labels:    map[string]string{"name": "pod-1-1"},
 					},
 				},
@@ -301,7 +343,7 @@ func TestCriProxy(t *testing.T) {
 							Attempt:   puint32(0),
 						},
 						State:     runtimeapi.PodSandboxState_SANDBOX_READY.Enum(),
-						CreatedAt: &criServer2.CurrentTime,
+						CreatedAt: &tester.servers[1].CurrentTime,
 						Labels:    map[string]string{"name": "pod-2-1"},
 						Annotations: map[string]string{
 							"kubernetes.io/target-runtime": "alt",
@@ -327,7 +369,7 @@ func TestCriProxy(t *testing.T) {
 						Attempt:   puint32(0),
 					},
 					State:     runtimeapi.PodSandboxState_SANDBOX_READY.Enum(),
-					CreatedAt: &criServer1.CurrentTime,
+					CreatedAt: &tester.servers[0].CurrentTime,
 					Network: &runtimeapi.PodSandboxNetworkStatus{
 						Ip: pstr("192.168.192.168"),
 					},
@@ -352,7 +394,7 @@ func TestCriProxy(t *testing.T) {
 						Attempt:   puint32(0),
 					},
 					State:     runtimeapi.PodSandboxState_SANDBOX_READY.Enum(),
-					CreatedAt: &criServer2.CurrentTime,
+					CreatedAt: &tester.servers[1].CurrentTime,
 					Network: &runtimeapi.PodSandboxNetworkStatus{
 						Ip: pstr("192.168.192.168"),
 					},
@@ -441,7 +483,7 @@ func TestCriProxy(t *testing.T) {
 							Image: pstr("image1-1"),
 						},
 						ImageRef:  pstr("image1-1"),
-						CreatedAt: &criServer1.CurrentTime,
+						CreatedAt: &tester.servers[0].CurrentTime,
 						State:     runtimeapi.ContainerState_CONTAINER_CREATED.Enum(),
 					},
 					{
@@ -455,7 +497,7 @@ func TestCriProxy(t *testing.T) {
 							Image: pstr("alt/image2-1"),
 						},
 						ImageRef:  pstr("image2-1"),
-						CreatedAt: &criServer2.CurrentTime,
+						CreatedAt: &tester.servers[1].CurrentTime,
 						State:     runtimeapi.ContainerState_CONTAINER_CREATED.Enum(),
 					},
 				},
@@ -499,7 +541,7 @@ func TestCriProxy(t *testing.T) {
 							Image: pstr("image1-1"),
 						},
 						ImageRef:  pstr("image1-1"),
-						CreatedAt: &criServer1.CurrentTime,
+						CreatedAt: &tester.servers[0].CurrentTime,
 						State:     runtimeapi.ContainerState_CONTAINER_CREATED.Enum(),
 					},
 				},
@@ -543,7 +585,7 @@ func TestCriProxy(t *testing.T) {
 							Image: pstr("alt/image2-1"),
 						},
 						ImageRef:  pstr("image2-1"),
-						CreatedAt: &criServer2.CurrentTime,
+						CreatedAt: &tester.servers[1].CurrentTime,
 						State:     runtimeapi.ContainerState_CONTAINER_CREATED.Enum(),
 					},
 				},
@@ -588,7 +630,7 @@ func TestCriProxy(t *testing.T) {
 						Image: pstr("image1-1"),
 					},
 					ImageRef:  pstr("image1-1"),
-					CreatedAt: &criServer1.CurrentTime,
+					CreatedAt: &tester.servers[0].CurrentTime,
 					State:     runtimeapi.ContainerState_CONTAINER_CREATED.Enum(),
 				},
 			},
@@ -612,7 +654,7 @@ func TestCriProxy(t *testing.T) {
 					},
 					// ImageRef is not prefixed
 					ImageRef:  pstr("image2-1"),
-					CreatedAt: &criServer2.CurrentTime,
+					CreatedAt: &tester.servers[1].CurrentTime,
 					State:     runtimeapi.ContainerState_CONTAINER_CREATED.Enum(),
 				},
 			},
@@ -783,7 +825,7 @@ func TestCriProxy(t *testing.T) {
 							Attempt:   puint32(0),
 						},
 						State:     runtimeapi.PodSandboxState_SANDBOX_NOTREADY.Enum(),
-						CreatedAt: &criServer1.CurrentTime,
+						CreatedAt: &tester.servers[0].CurrentTime,
 						Labels:    map[string]string{"name": "pod-1-1"},
 					},
 					{
@@ -795,7 +837,7 @@ func TestCriProxy(t *testing.T) {
 							Attempt:   puint32(0),
 						},
 						State:     runtimeapi.PodSandboxState_SANDBOX_NOTREADY.Enum(),
-						CreatedAt: &criServer2.CurrentTime,
+						CreatedAt: &tester.servers[1].CurrentTime,
 						Labels:    map[string]string{"name": "pod-2-1"},
 						Annotations: map[string]string{
 							"kubernetes.io/target-runtime": "alt",
@@ -1023,7 +1065,7 @@ func TestCriProxy(t *testing.T) {
 			}
 			t.Run(name, func(t *testing.T) {
 				actualResponse := reflect.New(reflect.TypeOf(step.resp).Elem()).Interface()
-				err := grpc.Invoke(context.Background(), step.method, in, actualResponse, conn)
+				err := tester.invoke(step.method, in, actualResponse)
 				switch {
 				case step.error == "" && err != nil:
 					t.Errorf("GRPC call failed: %v", err)
@@ -1053,11 +1095,24 @@ func TestCriProxy(t *testing.T) {
 					t.Errorf("Response diff:\n%s", diffText)
 				}
 
-				if err := journal.Verify(step.journal); err != nil {
-					t.Error(err)
-				}
+				tester.verifyJournal(t, step.journal)
 			})
 		}
+	}
+}
+
+func TestCriProxyNoStartupRace(t *testing.T) {
+	tester := newProxyTester()
+	defer tester.stop()
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+		tester.startServers(t)
+	}()
+
+	tester.startProxy(t)
+	tester.connectToProxy(t)
+	if err := tester.invoke("/runtime.RuntimeService/UpdateRuntimeConfig", &runtimeapi.UpdateRuntimeConfigRequest{}, &runtimeapi.UpdateRuntimeConfigResponse{}); err != nil {
+		t.Errorf("failed to invoke UpdateRuntimeConfig(): %v", err)
 	}
 }
 
