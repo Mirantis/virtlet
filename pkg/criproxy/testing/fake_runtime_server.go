@@ -108,9 +108,6 @@ func NewFakeRuntimeServer(journal Journal) *FakeRuntimeServer {
 }
 
 func (r *FakeRuntimeServer) Version(ctx context.Context, in *runtimeapi.VersionRequest) (*runtimeapi.VersionResponse, error) {
-	r.Lock()
-	defer r.Unlock()
-
 	r.journal.Record("Version")
 
 	return &runtimeapi.VersionResponse{
@@ -122,11 +119,7 @@ func (r *FakeRuntimeServer) Version(ctx context.Context, in *runtimeapi.VersionR
 }
 
 func (r *FakeRuntimeServer) Status(ctx context.Context, in *runtimeapi.StatusRequest) (*runtimeapi.StatusResponse, error) {
-	r.Lock()
-	defer r.Unlock()
-
 	r.journal.Record("Status")
-
 	return &runtimeapi.StatusResponse{Status: r.FakeStatus}, nil
 }
 
@@ -388,38 +381,27 @@ func (r *FakeRuntimeServer) ContainerStatus(ctx context.Context, in *runtimeapi.
 }
 
 func (r *FakeRuntimeServer) ExecSync(ctx context.Context, in *runtimeapi.ExecSyncRequest) (*runtimeapi.ExecSyncResponse, error) {
-	r.Lock()
-	defer r.Unlock()
-
 	r.journal.Record("ExecSync")
 	exitCode := int32(0)
 	return &runtimeapi.ExecSyncResponse{Stdout: nil, Stderr: nil, ExitCode: &exitCode}, nil
 }
 
 func (r *FakeRuntimeServer) Exec(ctx context.Context, in *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
-	r.Lock()
-	defer r.Unlock()
-
 	r.journal.Record("Exec")
 	return &runtimeapi.ExecResponse{}, nil
 }
 
 func (r *FakeRuntimeServer) Attach(ctx context.Context, in *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
-	r.Lock()
-	defer r.Unlock()
-
 	r.journal.Record("Attach")
 	return &runtimeapi.AttachResponse{}, nil
 }
 
 func (r *FakeRuntimeServer) PortForward(ctx context.Context, in *runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error) {
-	r.Lock()
-	defer r.Unlock()
-
 	r.journal.Record("PortForward")
 	return &runtimeapi.PortForwardResponse{}, nil
 }
 
 func (r *FakeRuntimeServer) UpdateRuntimeConfig(ctx context.Context, in *runtimeapi.UpdateRuntimeConfigRequest) (*runtimeapi.UpdateRuntimeConfigResponse, error) {
+	r.journal.Record("UpdateRuntimeConfig")
 	return &runtimeapi.UpdateRuntimeConfigResponse{}, nil
 }
