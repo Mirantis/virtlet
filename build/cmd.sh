@@ -14,6 +14,7 @@ volume_name=virtlet_src
 exclude=(
     --exclude 'vendor'
     --exclude .git
+    --exclude _output
 )
 
 function ensure_build_image {
