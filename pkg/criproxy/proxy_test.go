@@ -75,6 +75,10 @@ func pbool(b bool) *bool {
 	return &b
 }
 
+func pint32(v int32) *int32 {
+	return &v
+}
+
 func puint32(v uint32) *uint32 {
 	return &v
 }
@@ -565,6 +569,7 @@ func TestCriProxy(t *testing.T) {
 				},
 			},
 			resp: &runtimeapi.ListContainersResponse{},
+			// note that runtimes' ListContainers() aren't even invoked in this case
 		},
 		{
 			name:   "container status 1",
@@ -612,6 +617,138 @@ func TestCriProxy(t *testing.T) {
 				},
 			},
 			journal: []string{"2/runtime/ContainerStatus"},
+		},
+		{
+			name:   "start container 1",
+			method: "/runtime.RuntimeService/StartContainer",
+			in: &runtimeapi.StartContainerRequest{
+				ContainerId: pstr(containerId1),
+			},
+			resp:    &runtimeapi.StartContainerResponse{},
+			journal: []string{"1/runtime/StartContainer"},
+		},
+		{
+			name:   "start container 2",
+			method: "/runtime.RuntimeService/StartContainer",
+			in: &runtimeapi.StartContainerRequest{
+				ContainerId: pstr(containerId2),
+			},
+			resp:    &runtimeapi.StartContainerResponse{},
+			journal: []string{"2/runtime/StartContainer"},
+		},
+		{
+			name:   "stop container 1",
+			method: "/runtime.RuntimeService/StopContainer",
+			in: &runtimeapi.StopContainerRequest{
+				ContainerId: pstr(containerId1),
+			},
+			resp:    &runtimeapi.StopContainerResponse{},
+			journal: []string{"1/runtime/StopContainer"},
+		},
+		{
+			name:   "stop container 2",
+			method: "/runtime.RuntimeService/StopContainer",
+			in: &runtimeapi.StopContainerRequest{
+				ContainerId: pstr(containerId2),
+			},
+			resp:    &runtimeapi.StopContainerResponse{},
+			journal: []string{"2/runtime/StopContainer"},
+		},
+		{
+			name:   "remove container 1",
+			method: "/runtime.RuntimeService/RemoveContainer",
+			in: &runtimeapi.RemoveContainerRequest{
+				ContainerId: pstr(containerId1),
+			},
+			resp:    &runtimeapi.RemoveContainerResponse{},
+			journal: []string{"1/runtime/RemoveContainer"},
+		},
+		{
+			name:   "remove container 2",
+			method: "/runtime.RuntimeService/RemoveContainer",
+			in: &runtimeapi.RemoveContainerRequest{
+				ContainerId: pstr(containerId2),
+			},
+			resp:    &runtimeapi.RemoveContainerResponse{},
+			journal: []string{"2/runtime/RemoveContainer"},
+		},
+		{
+			name:   "exec sync 1",
+			method: "/runtime.RuntimeService/ExecSync",
+			in: &runtimeapi.ExecSyncRequest{
+				ContainerId: pstr(containerId1),
+				Cmd:         []string{"ls"},
+			},
+			resp:    &runtimeapi.ExecSyncResponse{ExitCode: pint32(0)},
+			journal: []string{"1/runtime/ExecSync"},
+		},
+		{
+			name:   "exec sync 2",
+			method: "/runtime.RuntimeService/ExecSync",
+			in: &runtimeapi.ExecSyncRequest{
+				ContainerId: pstr(containerId2),
+				Cmd:         []string{"ls"},
+			},
+			resp:    &runtimeapi.ExecSyncResponse{ExitCode: pint32(0)},
+			journal: []string{"2/runtime/ExecSync"},
+		},
+		{
+			name:   "exec 1",
+			method: "/runtime.RuntimeService/Exec",
+			in: &runtimeapi.ExecRequest{
+				ContainerId: pstr(containerId1),
+				Cmd:         []string{"ls"},
+			},
+			resp:    &runtimeapi.ExecResponse{},
+			journal: []string{"1/runtime/Exec"},
+		},
+		{
+			name:   "exec 2",
+			method: "/runtime.RuntimeService/Exec",
+			in: &runtimeapi.ExecRequest{
+				ContainerId: pstr(containerId2),
+				Cmd:         []string{"ls"},
+			},
+			resp:    &runtimeapi.ExecResponse{},
+			journal: []string{"2/runtime/Exec"},
+		},
+		{
+			name:   "attach 1",
+			method: "/runtime.RuntimeService/Attach",
+			in: &runtimeapi.AttachRequest{
+				ContainerId: pstr(containerId1),
+			},
+			resp:    &runtimeapi.AttachResponse{},
+			journal: []string{"1/runtime/Attach"},
+		},
+		{
+			name:   "attach 2",
+			method: "/runtime.RuntimeService/Attach",
+			in: &runtimeapi.AttachRequest{
+				ContainerId: pstr(containerId2),
+			},
+			resp:    &runtimeapi.AttachResponse{},
+			journal: []string{"2/runtime/Attach"},
+		},
+		{
+			name:   "port forward 1",
+			method: "/runtime.RuntimeService/PortForward",
+			in: &runtimeapi.PortForwardRequest{
+				PodSandboxId: pstr(podSandboxId1),
+				Port:         []int32{80},
+			},
+			resp:    &runtimeapi.PortForwardResponse{},
+			journal: []string{"1/runtime/PortForward"},
+		},
+		{
+			name:   "port forward 2",
+			method: "/runtime.RuntimeService/PortForward",
+			in: &runtimeapi.PortForwardRequest{
+				PodSandboxId: pstr(podSandboxId2),
+				Port:         []int32{80},
+			},
+			resp:    &runtimeapi.PortForwardResponse{},
+			journal: []string{"2/runtime/PortForward"},
 		},
 		{
 			name:   "stop pod sandbox 1",
@@ -692,6 +829,13 @@ func TestCriProxy(t *testing.T) {
 			in:      &runtimeapi.ListPodSandboxRequest{},
 			resp:    &runtimeapi.ListPodSandboxResponse{},
 			journal: []string{"1/runtime/ListPodSandbox", "2/runtime/ListPodSandbox"},
+		},
+		{
+			name:    "update runtime config",
+			method:  "/runtime.RuntimeService/UpdateRuntimeConfig",
+			in:      &runtimeapi.UpdateRuntimeConfigRequest{},
+			resp:    &runtimeapi.UpdateRuntimeConfigResponse{},
+			journal: []string{"1/runtime/UpdateRuntimeConfig", "2/runtime/UpdateRuntimeConfig"},
 		},
 		{
 			name:   "list images",
@@ -919,5 +1063,3 @@ func TestCriProxy(t *testing.T) {
 
 // TODO: proper status handling (contact both runtimes, etc.)
 // TODO: make sure patching requests/responses is ok & if it is, don't use copying for them
-// TODO: make sure image prefixes are checked for containers
-// TODO: UpdateRuntimeConfigRequest -- should be called for every rintime
