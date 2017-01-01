@@ -18,6 +18,7 @@ package criproxy
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"reflect"
 	"strings"
@@ -94,27 +95,45 @@ type proxyTester struct {
 	conn    *grpc.ClientConn
 }
 
-func newProxyTester() *proxyTester {
+func newProxyTester(t *testing.T) *proxyTester {
 	journal := proxytest.NewSimpleJournal()
+	proxy, err := NewRuntimeProxy([]string{fakeCriSocketPath1, altSocketSpec}, connectionTimeoutForTests)
+	if err != nil {
+		t.Fatalf("failed to create runtime proxy: %v", err)
+	}
+	servers := []*proxytest.FakeCriServer{
+		proxytest.NewFakeCriServer(proxytest.NewPrefixJournal(journal, "1/")),
+		proxytest.NewFakeCriServer(proxytest.NewPrefixJournal(journal, "2/")),
+	}
+
+	fakeImageNames1 := []string{"image1-1", "image1-2"}
+	servers[0].SetFakeImages(fakeImageNames1)
+	servers[0].SetFakeImageSize(fakeImageSize1)
+
+	fakeImageNames2 := []string{"image2-1", "image2-2"}
+	servers[1].SetFakeImages(fakeImageNames2)
+	servers[1].SetFakeImageSize(fakeImageSize2)
+
 	return &proxyTester{
 		journal: journal,
-		servers: []*proxytest.FakeCriServer{
-			proxytest.NewFakeCriServer(proxytest.NewPrefixJournal(journal, "1/")),
-			proxytest.NewFakeCriServer(proxytest.NewPrefixJournal(journal, "2/")),
-		},
-		proxy: NewRuntimeProxy([]string{fakeCriSocketPath1, altSocketSpec}, connectionTimeoutForTests),
+		servers: servers,
+		proxy:   proxy,
 	}
 }
 
-func (tester *proxyTester) startServers(t *testing.T) {
-	startServer(t, tester.servers[0], fakeCriSocketPath1)
-	startServer(t, tester.servers[1], fakeCriSocketPath2)
+func (tester *proxyTester) startServers(t *testing.T, which int) {
+	paths := []string{fakeCriSocketPath1, fakeCriSocketPath2}
+	for i := 0; i < 2; i++ {
+		if which < 0 || i == which {
+			startServer(t, tester.servers[i], paths[i])
+		}
+	}
 }
 
 func (tester *proxyTester) startProxy(t *testing.T) {
-	if err := tester.proxy.Connect(); err != nil {
-		t.Fatalf("Failed to set up CRI proxy: %v", err)
-	}
+	// if err := tester.proxy.Connect(); err != nil {
+	// 	t.Fatalf("Failed to set up CRI proxy: %v", err)
+	// }
 	startServer(t, tester.proxy, criProxySocketForTests)
 }
 
@@ -136,30 +155,56 @@ func (tester *proxyTester) stop() {
 	tester.proxy.Stop()
 }
 
-func (tester *proxyTester) invoke(method string, in, resp interface{}) error {
-	return grpc.Invoke(context.Background(), method, in, resp, tester.conn)
-}
-
 func (tester *proxyTester) verifyJournal(t *testing.T, expectedJournal []string) {
 	if err := tester.journal.Verify(expectedJournal); err != nil {
 		t.Error(err)
 	}
 }
 
+func (tester *proxyTester) invoke(method string, in, resp interface{}) error {
+	return grpc.Invoke(context.Background(), method, in, resp, tester.conn)
+}
+
+func (tester *proxyTester) verifyCall(t *testing.T, method string, in, resp interface{}, expectedError string) {
+	actualResponse := reflect.New(reflect.TypeOf(resp).Elem()).Interface()
+
+	err := tester.invoke(method, in, actualResponse)
+	switch {
+	case expectedError == "" && err != nil:
+		t.Errorf("GRPC call failed: %v", err)
+	case expectedError != "" && err == nil:
+		t.Errorf("did not get expected error")
+	case expectedError != "" && !strings.Contains(err.Error(), expectedError):
+		t.Errorf("bad error message: %q instead of %q", err.Error(), expectedError)
+	}
+
+	if err == nil && !reflect.DeepEqual(actualResponse, resp) {
+		expectedJSON, err := json.MarshalIndent(resp, "", "  ")
+		if err != nil {
+			t.Fatalf("Failed to marshal json: %v", err)
+		}
+		actualJSON, err := json.MarshalIndent(actualResponse, "", "  ")
+		if err != nil {
+			t.Fatalf("Failed to marshal json: %v", err)
+		}
+		diff := difflib.UnifiedDiff{
+			A:        difflib.SplitLines(string(expectedJSON)),
+			B:        difflib.SplitLines(string(actualJSON)),
+			FromFile: "expected",
+			ToFile:   "actual",
+			Context:  5,
+		}
+		diffText, _ := difflib.GetUnifiedDiffString(diff)
+		t.Errorf("Response diff:\n%s", diffText)
+	}
+}
+
 func TestCriProxy(t *testing.T) {
-	tester := newProxyTester()
+	tester := newProxyTester(t)
 	defer tester.stop()
-	tester.startServers(t)
+	tester.startServers(t, -1)
 	tester.startProxy(t)
 	tester.connectToProxy(t)
-
-	fakeImageNames1 := []string{"image1-1", "image1-2"}
-	tester.servers[0].SetFakeImages(fakeImageNames1)
-	tester.servers[0].SetFakeImageSize(fakeImageSize1)
-
-	fakeImageNames2 := []string{"image2-1", "image2-2"}
-	tester.servers[1].SetFakeImages(fakeImageNames2)
-	tester.servers[1].SetFakeImageSize(fakeImageSize2)
 
 	for _, step := range []struct {
 		name, method string
@@ -1064,37 +1109,7 @@ func TestCriProxy(t *testing.T) {
 				name = fmt.Sprintf("%s [%d]", name, n+1)
 			}
 			t.Run(name, func(t *testing.T) {
-				actualResponse := reflect.New(reflect.TypeOf(step.resp).Elem()).Interface()
-				err := tester.invoke(step.method, in, actualResponse)
-				switch {
-				case step.error == "" && err != nil:
-					t.Errorf("GRPC call failed: %v", err)
-				case step.error != "" && err == nil:
-					t.Errorf("did not get expected error")
-				case step.error != "" && !strings.Contains(err.Error(), step.error):
-					t.Errorf("bad error message: %q instead of %q", err.Error(), step.error)
-				}
-
-				if err == nil && !reflect.DeepEqual(actualResponse, step.resp) {
-					expectedJSON, err := json.MarshalIndent(step.resp, "", "  ")
-					if err != nil {
-						t.Fatalf("Failed to marshal json: %v", err)
-					}
-					actualJSON, err := json.MarshalIndent(actualResponse, "", "  ")
-					if err != nil {
-						t.Fatalf("Failed to marshal json: %v", err)
-					}
-					diff := difflib.UnifiedDiff{
-						A:        difflib.SplitLines(string(expectedJSON)),
-						B:        difflib.SplitLines(string(actualJSON)),
-						FromFile: "expected",
-						ToFile:   "actual",
-						Context:  5,
-					}
-					diffText, _ := difflib.GetUnifiedDiffString(diff)
-					t.Errorf("Response diff:\n%s", diffText)
-				}
-
+				tester.verifyCall(t, step.method, in, step.resp, step.error)
 				tester.verifyJournal(t, step.journal)
 			})
 		}
@@ -1102,18 +1117,104 @@ func TestCriProxy(t *testing.T) {
 }
 
 func TestCriProxyNoStartupRace(t *testing.T) {
-	tester := newProxyTester()
+	tester := newProxyTester(t)
 	defer tester.stop()
-	go func() {
-		time.Sleep(500 * time.Millisecond)
-		tester.startServers(t)
-	}()
+	tester.startServers(t, 0)
 
 	tester.startProxy(t)
 	tester.connectToProxy(t)
-	if err := tester.invoke("/runtime.RuntimeService/UpdateRuntimeConfig", &runtimeapi.UpdateRuntimeConfigRequest{}, &runtimeapi.UpdateRuntimeConfigResponse{}); err != nil {
-		t.Errorf("failed to invoke UpdateRuntimeConfig(): %v", err)
+	// should not need 2nd runtime to contact just the first one
+	listReq := &runtimeapi.ListImagesRequest{
+		Filter: &runtimeapi.ImageFilter{
+			Image: &runtimeapi.ImageSpec{Image: pstr("image1-2")},
+		},
 	}
+
+	// this one skips 2nd client because of the filter
+	tester.verifyCall(t, "/runtime.ImageService/ListImages", listReq, &runtimeapi.ListImagesResponse{
+		Images: []*runtimeapi.Image{
+			{
+				Id:       pstr("image1-2"),
+				RepoTags: []string{"image1-2"},
+				Size_:    puint64(fakeImageSize1),
+			},
+		},
+	}, "")
+	tester.verifyJournal(t, []string{"1/image/ListImages"})
+
+	// this one skips 2nd client because it's not connected yet
+	tester.verifyCall(t, "/runtime.ImageService/ListImages", &runtimeapi.ListImagesRequest{}, &runtimeapi.ListImagesResponse{
+		Images: []*runtimeapi.Image{
+			{
+				Id:       pstr("image1-1"),
+				RepoTags: []string{"image1-1"},
+				Size_:    puint64(fakeImageSize1),
+			},
+			{
+				Id:       pstr("image1-2"),
+				RepoTags: []string{"image1-2"},
+				Size_:    puint64(fakeImageSize1),
+			},
+		},
+	}, "")
+	tester.verifyJournal(t, []string{"1/image/ListImages"})
+
+	tester.verifyCall(t, "/runtime.RuntimeService/UpdateRuntimeConfig", &runtimeapi.UpdateRuntimeConfigRequest{}, &runtimeapi.UpdateRuntimeConfigResponse{}, "")
+	tester.verifyJournal(t, []string{"1/runtime/UpdateRuntimeConfig"})
+
+	tester.startServers(t, 1)
+
+	for i := 0; ; i++ {
+		if i == 100 {
+			t.Fatalf("2nd client didn't activate")
+		}
+		time.Sleep(200 * time.Millisecond)
+		var resp runtimeapi.ListImagesResponse
+		if err := tester.invoke("/runtime.ImageService/ListImages", &runtimeapi.ListImagesRequest{}, &resp); err != nil {
+			t.Fatalf("ListImages() failed while waiting for 2nd client to connect: %v", err)
+		}
+		if len(resp.GetImages()) == 4 {
+			tester.verifyJournal(t, []string{"1/image/ListImages", "2/image/ListImages"})
+			break
+		} else {
+			tester.verifyJournal(t, []string{"1/image/ListImages"})
+		}
+	}
+
+	tester.verifyCall(t, "/runtime.RuntimeService/UpdateRuntimeConfig", &runtimeapi.UpdateRuntimeConfigRequest{}, &runtimeapi.UpdateRuntimeConfigResponse{}, "")
+	tester.verifyJournal(t, []string{"1/runtime/UpdateRuntimeConfig", "2/runtime/UpdateRuntimeConfig"})
+
+	tester.verifyCall(t, "/runtime.ImageService/ListImages", &runtimeapi.ListImagesRequest{}, &runtimeapi.ListImagesResponse{
+		Images: []*runtimeapi.Image{
+			{
+				Id:       pstr("image1-1"),
+				RepoTags: []string{"image1-1"},
+				Size_:    puint64(fakeImageSize1),
+			},
+			{
+				Id:       pstr("image1-2"),
+				RepoTags: []string{"image1-2"},
+				Size_:    puint64(fakeImageSize1),
+			},
+			{
+				Id:       pstr("alt/image2-1"),
+				RepoTags: []string{"alt/image2-1"},
+				Size_:    puint64(fakeImageSize2),
+			},
+			{
+				Id:       pstr("alt/image2-2"),
+				RepoTags: []string{"alt/image2-2"},
+				Size_:    puint64(fakeImageSize2),
+			},
+		},
+	}, "")
+	tester.verifyJournal(t, []string{"1/image/ListImages", "2/image/ListImages"})
+}
+
+func init() {
+	// FIXME: testing.Verbose() always returns false
+	flag.Set("alsologtostderr", "true")
+	flag.Set("v", "5")
 }
 
 // TODO: proper status handling (contact both runtimes, etc.)
