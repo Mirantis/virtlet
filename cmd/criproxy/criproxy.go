@@ -42,9 +42,9 @@ var (
 func main() {
 	flag.Parse()
 
-	proxy := criproxy.NewRuntimeProxy(strings.Split(*connect, ","), connectionTimeout)
-	if err := proxy.Connect(); err != nil {
-		glog.Errorf("Error connecting to CRI endpoints: %v", err)
+	proxy, err := criproxy.NewRuntimeProxy(strings.Split(*connect, ","), connectionTimeout)
+	if err != nil {
+		glog.Errorf("Error starting CRI proxy: %v", err)
 		os.Exit(1)
 	}
 	glog.V(1).Infof("Starting CRI proxy on socket %s", *listen)
