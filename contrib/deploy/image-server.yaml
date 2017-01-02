@@ -1,0 +1,39 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: image-server
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        role: image-server
+      annotations:
+        pod.beta.kubernetes.io/init-containers: >
+          [
+            {
+              "name": "dl-image",
+              "image": "busybox",
+              "imagePullPolicy": "IfNotPresent",
+              "command": ["wget", "http://download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img", "-O", "/images/cirros"],
+              "volumeMounts": [
+                {
+                  "name": "images",
+                  "mountPath": "/images"
+                }
+              ]
+            }
+          ]
+    spec:
+      containers:
+      - name: web
+        image: nginx
+        ports:
+        - name: web
+          containerPort: 80
+        volumeMounts:
+        - mountPath: /usr/share/nginx/html
+          name: images
+      volumes:
+      - name: images
+        emptyDir: {}
