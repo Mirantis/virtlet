@@ -133,6 +133,7 @@ func (c *apiClient) connect() chan error {
 
 		c.Lock()
 		defer c.Unlock()
+		glog.V(1).Infof("Connected to runtime service %s", c.addr)
 		c.conn = conn
 		c.RuntimeServiceClient = runtimeapi.NewRuntimeServiceClient(conn)
 		c.ImageServiceClient = runtimeapi.NewImageServiceClient(conn)
@@ -432,7 +433,9 @@ func (r *RuntimeProxy) PodSandboxStatus(ctx context.Context, in *runtimeapi.PodS
 		return nil, client.wrapError(err)
 	}
 
-	resp.GetStatus().Id = client.augmentId(resp.GetStatus().GetId())
+	if resp.GetStatus() != nil {
+		resp.GetStatus().Id = client.augmentId(resp.GetStatus().GetId())
+	}
 	glog.Infof("LEAVE: PodSandboxStatus() [%s]: %s", client.id, spew.Sdump(resp))
 	return resp, nil
 }
@@ -651,10 +654,12 @@ func (r *RuntimeProxy) ContainerStatus(ctx context.Context, in *runtimeapi.Conta
 		return nil, client.wrapError(err)
 	}
 
+	if resp.GetStatus() != nil {
+		resp.GetStatus().Id = client.augmentId(resp.GetStatus().GetId())
+		imageName := client.imageName(resp.GetStatus().GetImage().GetImage())
+		resp.GetStatus().Image.Image = &imageName
+	}
 	glog.Infof("LEAVE: ContainerStatus(): %s", spew.Sdump(resp))
-	resp.GetStatus().Id = client.augmentId(resp.GetStatus().GetId())
-	imageName := client.imageName(resp.GetStatus().GetImage().GetImage())
-	resp.GetStatus().Image.Image = &imageName
 	return resp, nil
 }
 
@@ -844,8 +849,10 @@ func (r *RuntimeProxy) ImageStatus(ctx context.Context, in *runtimeapi.ImageStat
 		return nil, client.wrapError(err)
 	}
 
-	resp.Image = client.prefixImage(resp.Image)
 	glog.Infof("LEAVE: ImageStatus() [%s]: %s", client.id, spew.Sdump(resp))
+	if resp.Image != nil {
+		resp.Image = client.prefixImage(resp.Image)
+	}
 	return resp, nil
 }
 

@@ -1217,5 +1217,6 @@ func init() {
 	flag.Set("v", "5")
 }
 
+// TODO: never wait for the client to connect, just err
 // TODO: proper status handling (contact both runtimes, etc.)
 // TODO: make sure patching requests/responses is ok & if it is, don't use copying for them
