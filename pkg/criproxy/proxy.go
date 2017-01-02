@@ -40,8 +40,7 @@ type clientState int
 const (
 	targetRuntimeAnnotationKey = "kubernetes.io/target-runtime"
 	// FIXME: make the following configurable
-	numConnectAttempts     = 300
-	connectAttemptInterval = 200 * time.Millisecond
+	connectAttemptInterval = 500 * time.Millisecond
 	clientStateOffline     = clientState(iota)
 	clientStateConnecting
 	clientStateConnected
@@ -84,15 +83,13 @@ func (c *apiClient) isPrimary() bool {
 
 func (c *apiClient) waitForSocket() error {
 	var err error
-	for i := 0; i < numConnectAttempts; i++ {
-		if i > 0 {
-			time.Sleep(connectAttemptInterval)
-		}
+	for {
 		if _, err = os.Stat(c.addr); err != nil {
 			glog.V(1).Infof("%q is not here yet: %s", c.addr, err)
 		} else {
 			break
 		}
+		time.Sleep(connectAttemptInterval)
 	}
 	return err
 }
