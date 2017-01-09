@@ -57,7 +57,9 @@ const (
 	targetRuntimeAnnotationKey = "kubernetes.io/target-runtime"
 	// FIXME: make the following configurable
 	connectAttemptInterval = 500 * time.Millisecond
-	clientStateOffline     = clientState(iota)
+	// connect timeout when waiting for the socket to become available
+	connectWaitTimeout = 500 * time.Millisecond
+	clientStateOffline = clientState(iota)
 	clientStateConnecting
 	clientStateConnected
 )
@@ -103,6 +105,12 @@ func (c *apiClient) waitForSocket() error {
 		if _, err = os.Stat(c.addr); err != nil {
 			glog.V(1).Infof("%q is not here yet: %s", c.addr, err)
 		} else {
+			break
+		}
+		if conn, err := dial(c.addr, connectWaitTimeout); err != nil {
+			glog.V(1).Infof("can't connect to %q yet: %s", c.addr, err)
+		} else {
+			conn.Close()
 			break
 		}
 		time.Sleep(connectAttemptInterval)
