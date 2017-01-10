@@ -16,7 +16,7 @@ export GO15VENDOREXPERIMENT=1
 export CGO_CFLAGS=$(CFLAGS)
 export CGO_LDFLAGS=$(LDFLAGS) $(LIBS)
 
-SUBDIRS = pkg/bolttools pkg/download pkg/libvirttools pkg/manager pkg/nettools tests/integration tests/network
+SUBDIRS = pkg/bolttools pkg/download pkg/libvirttools pkg/manager pkg/nettools pkg/criproxy tests/integration tests/network
 
 # FIXME: add back dockerfilelint.test
 # (as of now, it requires Docker)
@@ -30,6 +30,7 @@ all:
 	mkdir -p $(builddir)/_output $(builddir)/contrib/images/libvirt/_output
 	go build -o $(builddir)/_output/virtlet ./cmd/virtlet
 	go build -o $(builddir)/_output/vmwrapper ./cmd/vmwrapper
+	go build -o $(builddir)/_output/criproxy ./cmd/criproxy
 
 verify-glide-installation:
 	@which glide || go get github.com/Masterminds/glide

@@ -1,0 +1,82 @@
+apiVersion: extensions/v1beta1 
+kind: DaemonSet
+metadata:
+  name: virtlet
+spec:
+  template:
+    metadata:
+      name: virtlet
+      labels:
+        runtime: virtlet
+      annotations:
+        scheduler.alpha.kubernetes.io/affinity: >
+          {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "extraRuntime",
+                        "operator": "In",
+                        "values": ["virtlet"]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+    spec:
+      # TODO: hostPID: true for VMs to survive libvirt restart
+      hostNetwork: true
+      containers:
+      - name: virtlet
+        image: mirantis/virtlet
+        # Workaround for https://github.com/kubernetes/kubernetes/issues/17406
+        command:
+          - "/bin/bash"
+          - "-c"
+          - "echo ${IMAGE_SERVICE_SERVICE_HOST} image-service >>/etc/hosts && /start.sh"
+        volumeMounts:
+        - mountPath: /sys/fs/cgroup
+          name: cgroup
+        - mountPath: /lib/modules
+          name: modules
+          readOnly: true
+        - mountPath: /boot
+          name: boot
+          readOnly: true
+        - mountPath: /run
+          name: run
+        - mountPath: /var/lib/virtlet
+          name: virtlet
+        # FIXME: E0102 08:26:02.959687      32 virtlet.go:50] Initializing server failed: cannot open path '/var/lib/libvirt/images': No such file or directory
+        # - mountPath: /var/lib/libvirt
+        #   name: libvirt
+        securityContext:
+          privileged: true
+        env:
+        - name: VIRTLET_LOGLEVEL
+          value: "3"
+        - name: VIRTLET_DISABLE_KVM
+          value: "1"
+      volumes:
+      - hostPath:
+          path: /sys/fs/cgroup
+        name: cgroup
+      - hostPath:
+          path: /lib/modules
+        name: modules
+      - hostPath:
+          path: /boot
+        name: boot
+      - hostPath:
+          path: /run
+        name: run
+      - hostPath:
+          path: /var/lib/virtlet
+        name: virtlet
+      - hostPath:
+          path: /var/lib/libvirt
+        name: libvirt
