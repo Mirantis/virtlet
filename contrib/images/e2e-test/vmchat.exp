@@ -22,7 +22,7 @@ expect {
     "Password: "
 }
 sleep 3
-send "cubswin:)\r"
+send "letmein\r"
 
 expect {
     timeout { puts "shell prompt timeout"; exit 1 }
