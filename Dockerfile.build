@@ -25,7 +25,8 @@ RUN apt-get update && \
                 libvirt-bin \
                 python-libvirt \
                 netbase \
-                iputils-ping && \
+                iputils-ping \
+                mercurial && \
     apt-get clean
 
 # The following is based on official Go container:

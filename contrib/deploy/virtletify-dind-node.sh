@@ -22,12 +22,12 @@ docker cp _output/criproxy kube-node-1:/usr/local/bin/
 # kubeadm-dind-cluster specific node naming
 node_name="$(docker exec "${container}" hostname --ip-address)"
 
-docker exec -d "${container}" bash -c '/usr/local/bin/criproxy -v 3 -alsologtostderr -connect /var/run/dockershim.sock,virtlet:/run/virtlet.sock >& /tmp/criproxy.log'
+docker exec -d "${container}" bash -c '/usr/local/bin/criproxy -v 3 -alsologtostderr -connect docker,virtlet:/run/virtlet.sock >& /tmp/criproxy.log'
 
 # FIXME: --node-labels doesn't work here because of this issue:
 # https://github.com/kubernetes/kubernetes/issues/28051
 docker exec "${container}" sed -i \
-       "s@'\$@ --node-labels=extraRuntime=virtlet --experimental-cri --container-runtime=mixed --container-runtime-endpoint=/run/criproxy.sock --image-service-endpoint=/run/criproxy.sock'@" \
+       "s@'\$@ --node-labels=extraRuntime=virtlet --experimental-cri --container-runtime=remote --container-runtime-endpoint=/run/criproxy.sock --image-service-endpoint=/run/criproxy.sock'@" \
        /etc/systemd/system/kubelet.service.d/20-hostname-override.conf
 docker exec -i "${container}" systemctl stop kubelet
 docker exec -i "${container}" bash -c 'docker ps -qa|xargs docker rm -fv'
