@@ -57,13 +57,13 @@ func NewVirtletManager(libvirtUri, poolName, storageBackend, boltPath, cniPlugin
 		return nil, err
 	}
 
-	libvirtImageTool, err := libvirttools.NewImageTool(libvirtConnTool.Conn, poolName)
+	libvirtImageTool, err := libvirttools.NewImageTool(libvirtConnTool.Connection(), poolName)
 	if err != nil {
 		return nil, err
 	}
 
 	// TODO: pool name should be passed like for imageTool
-	libvirtVirtualizationTool, err := libvirttools.NewVirtualizationTool(libvirtConnTool.Conn, "volumes")
+	libvirtVirtualizationTool, err := libvirttools.NewVirtualizationTool(libvirtConnTool.Connection(), "volumes")
 	if err != nil {
 		return nil, err
 	}

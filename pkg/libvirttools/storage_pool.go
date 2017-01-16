@@ -1,5 +1,5 @@
 /*
-Copyright 2016 Mirantis
+Copyright 2016-2017 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,22 +16,11 @@ limitations under the License.
 
 package libvirttools
 
-/*
-#include <fcntl.h>
-#include <libvirt/libvirt.h>
-#include <libvirt/virterror.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include "image.h"
-*/
-import "C"
-
 import (
 	"fmt"
-	"reflect"
-	"unsafe"
 
 	"github.com/golang/glog"
+	libvirt "github.com/libvirt/libvirt-go"
 )
 
 const (
@@ -41,44 +30,40 @@ const (
 )
 
 type Volume struct {
+	tool   StorageOperations
 	Name   string
-	volume C.virStorageVolPtr
+	volume *libvirt.StorageVol
 }
 
 func (v *Volume) Remove() error {
-	if status := C.virStorageVolDelete(v.volume, 0); status != 0 {
-		return GetLibvirtLastError()
-	}
-	return nil
+	return v.tool.RemoveVolume(v.volume)
 }
 
 func (v *Volume) GetPath() (string, error) {
-	cPath := C.virStorageVolGetPath(v.volume)
-	if cPath == nil {
-		return "", GetLibvirtLastError()
-	}
-	return C.GoString(cPath), nil
+	return v.tool.VolumeGetPath(v.volume)
 }
 
 type VolumeInfo struct {
+	tool StorageOperations
 	Name string
 	Size uint64
 }
 
 func (v *Volume) Info() (*VolumeInfo, error) {
-	return volumeInfo(v.Name, v.volume)
+	return volumeInfo(v.tool, v.Name, v.volume)
 }
 
-func volumeInfo(name string, volume C.virStorageVolPtr) (*VolumeInfo, error) {
-	var volInfo C.virStorageVolInfo
-	if status := C.virStorageVolGetInfo(volume, &volInfo); status != 0 {
-		return nil, GetLibvirtLastError()
+func volumeInfo(tool StorageOperations, name string, volume *libvirt.StorageVol) (*VolumeInfo, error) {
+	volInfo, err := tool.VolumeGetInfo(volume)
+	if err != nil {
+		return nil, err
 	}
-	return &VolumeInfo{Name: name, Size: uint64(volInfo.capacity)}, nil
+	return &VolumeInfo{Name: name, Size: volInfo.Capacity}, nil
 }
 
 type Pool struct {
-	pool       C.virStoragePoolPtr
+	tool       StorageOperations
+	pool       *libvirt.StoragePool
 	volumesDir string
 	poolType   string
 }
@@ -101,34 +86,30 @@ func generatePoolXML(name string, path string, poolType string) string {
 	return fmt.Sprintf(poolXML, poolType, name, path)
 }
 
-func createPool(conn C.virConnectPtr, name string, path string, poolType string) (*Pool, error) {
+func createPool(tool StorageOperations, name string, path string, poolType string) (*Pool, error) {
 	poolXML := generatePoolXML(name, path, poolType)
-	bPoolXML := []byte(poolXML)
-	cPoolXML := (*C.char)(unsafe.Pointer(&bPoolXML[0]))
 
 	glog.V(2).Infof("Creating storage pool (name: %s, path: %s)", name, path)
-	var pool C.virStoragePoolPtr
-	if pool = C.virStoragePoolCreateXML(conn, cPoolXML, 0); pool == nil {
-		return nil, GetLibvirtLastError()
+	pool, err := tool.CreateFromXML(poolXML)
+	if err != nil {
+		return nil, err
 	}
-	return &Pool{pool: pool, volumesDir: path, poolType: poolType}, nil
+	return &Pool{tool: tool, pool: pool, volumesDir: path, poolType: poolType}, nil
 }
 
-func LookupStoragePool(conn C.virConnectPtr, name string) (*Pool, error) {
+func LookupStoragePool(tool StorageOperations, name string) (*Pool, error) {
 	poolInfo, exist := DefaultPools[name]
 	if !exist {
 		return nil, fmt.Errorf("pool with name '%s' is unknown", name)
 	}
 
-	cName := C.CString(name)
-	defer C.free(unsafe.Pointer(cName))
-	storagePool := C.virStoragePoolLookupByName(conn, cName)
-	if storagePool == nil {
-		return createPool(conn, name, poolInfo.volumesDir, poolInfo.poolType)
+	pool, _ := tool.LookupByName(name)
+	if pool == nil {
+		return createPool(tool, name, poolInfo.volumesDir, poolInfo.poolType)
 	}
 	// TODO: reset libvirt error
 
-	return &Pool{pool: storagePool, volumesDir: poolInfo.volumesDir, poolType: poolInfo.poolType}, nil
+	return &Pool{tool: tool, pool: pool, volumesDir: poolInfo.volumesDir, poolType: poolInfo.poolType}, nil
 }
 
 func (p *Pool) RemoveVolume(name string) error {
@@ -140,43 +121,32 @@ func (p *Pool) RemoveVolume(name string) error {
 }
 
 func (p *Pool) CreateVolume(name, volXML string) (*Volume, error) {
-	cVolXML := C.CString(volXML)
-	defer C.free(unsafe.Pointer(cVolXML))
-	vol := C.virStorageVolCreateXML(p.pool, cVolXML, 0)
-	if vol == nil {
-		return nil, GetLibvirtLastError()
+	vol, err := p.tool.CreateVolFromXML(p.pool, volXML)
+	if err != nil {
+		return nil, err
 	}
-	return &Volume{Name: name, volume: vol}, nil
+	return &Volume{tool: p.tool, Name: name, volume: vol}, nil
 }
 
 func (p *Pool) LookupVolume(name string) (*Volume, error) {
-	cName := C.CString(name)
-	defer C.free(unsafe.Pointer(cName))
-	vol := C.virStorageVolLookupByName(p.pool, cName)
-	if vol == nil {
-		return nil, GetLibvirtLastError()
+	vol, err := p.tool.LookupVolumeByName(p.pool, name)
+	if err != nil {
+		return nil, err
 	}
-	return &Volume{Name: name, volume: vol}, nil
+	return &Volume{tool: p.tool, Name: name, volume: vol}, nil
 }
 
 func (p *Pool) ListVolumes() ([]*VolumeInfo, error) {
-	var cList *C.virStorageVolPtr
-	count := C.virStoragePoolListAllVolumes(p.pool, (**C.virStorageVolPtr)(&cList), 0)
-	if count < 0 {
-		return nil, GetLibvirtLastError()
+	volumes, err := p.tool.ListAllVolumes(p.pool)
+	if err != nil {
+		return nil, err
 	}
-	header := reflect.SliceHeader{
-		Data: uintptr(unsafe.Pointer(cList)),
-		Len:  int(count),
-		Cap:  int(count),
-	}
-	cVolumes := *(*[]C.virStorageVolPtr)(unsafe.Pointer(&header))
 
-	volumeInfos := make([]*VolumeInfo, 0, count)
+	volumeInfos := make([]*VolumeInfo, 0, len(volumes))
 
-	for _, cVolume := range cVolumes {
-		name := C.GoString(C.virStorageVolGetName(cVolume))
-		volInfo, err := volumeInfo(name, cVolume)
+	for _, volume := range volumes {
+		name, err := p.tool.VolumeGetName(&volume)
+		volInfo, err := volumeInfo(p.tool, name, &volume)
 		if err != nil {
 			return nil, err
 		}
@@ -189,16 +159,17 @@ func (p *Pool) ListVolumes() ([]*VolumeInfo, error) {
 
 type StorageTool struct {
 	name string
-	conn C.virConnectPtr
+	tool StorageOperations
 	pool *Pool
 }
 
-func NewStorageTool(conn C.virConnectPtr, poolName string) (*StorageTool, error) {
-	pool, err := LookupStoragePool(conn, poolName)
+func NewStorageTool(conn *libvirt.Connect, poolName string) (*StorageTool, error) {
+	tool := NewLibvirtStorageOperations(conn)
+	pool, err := LookupStoragePool(tool, poolName)
 	if err != nil {
 		return nil, err
 	}
-	return &StorageTool{name: poolName, conn: conn, pool: pool}, nil
+	return &StorageTool{name: poolName, tool: tool, pool: pool}, nil
 }
 
 func (s *StorageTool) GenerateVolumeXML(shortName string, capacity int, capacityUnit string, path string) string {
@@ -261,13 +232,5 @@ func (s *StorageTool) PullImageToVolume(path, volumeName string) error {
 	libvirtFilePath := fmt.Sprintf("/var/lib/libvirt/images/%s", volumeName)
 	volXML := s.GenerateVolumeXML(volumeName, 5, "G", libvirtFilePath)
 
-	cShortName := C.CString(volumeName)
-	defer C.free(unsafe.Pointer(cShortName))
-	cFilepath := C.CString(path)
-	defer C.free(unsafe.Pointer(cFilepath))
-	cVolXML := C.CString(volXML)
-	defer C.free(unsafe.Pointer(cVolXML))
-
-	status := C.pullImage(s.conn, s.pool.pool, cShortName, cFilepath, cVolXML)
-	return cErrorHandler.Convert(status)
+	return s.tool.PullImageToVolume(s.pool.pool, volumeName, path, volXML)
 }

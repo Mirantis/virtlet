@@ -1,5 +1,5 @@
 /*
-Copyright 2016 Mirantis
+Copyright 2016-2017 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,25 +16,16 @@ limitations under the License.
 
 package libvirttools
 
-/*
-#include <libvirt/libvirt.h>
-#include <libvirt/virterror.h>
-#include <stdlib.h>
-#include "virtualization.h"
-*/
-import "C"
-
 import (
 	"bytes"
 	"errors"
 	"fmt"
 	"os"
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
-	"unsafe"
 
+	libvirt "github.com/libvirt/libvirt-go"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
 	"encoding/xml"
@@ -291,17 +282,18 @@ func (v *VirtualizationTool) createVolumes(containerName string, mounts []*kubea
 }
 
 type VirtualizationTool struct {
-	conn           C.virConnectPtr
+	tool           DomainOperations
 	volumeStorage  *StorageTool
 	volumePoolName string
 }
 
-func NewVirtualizationTool(conn C.virConnectPtr, poolName string) (*VirtualizationTool, error) {
+func NewVirtualizationTool(conn *libvirt.Connect, poolName string) (*VirtualizationTool, error) {
 	storageTool, err := NewStorageTool(conn, poolName)
 	if err != nil {
 		return nil, err
 	}
-	return &VirtualizationTool{conn: conn, volumeStorage: storageTool}, nil
+	tool := NewLibvirtDomainOperations(conn)
+	return &VirtualizationTool{tool: tool, volumeStorage: storageTool}, nil
 }
 
 func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, in *kubeapi.CreateContainerRequest, imageFilepath, netNSPath, cniConfig string) (string, error) {
@@ -318,9 +310,9 @@ func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, i
 	} else {
 		// check whether the domain with such name already exists, if so - return it's uuid
 		domainName := sandboxId + "-" + name
-		domain, _ := v.GetDomainByName(domainName)
+		domain, _ := v.tool.LookupByName(domainName)
 		if domain != nil {
-			if domainID, err := v.GetDomainUUID(domain); err == nil {
+			if domainID, err := v.tool.GetUUIDString(domain); err == nil {
 				// TODO: This is temp workaround for returning existent domain on create container call to overcome SyncPod issues
 				return domainID, nil
 			} else {
@@ -362,95 +354,53 @@ func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, i
 
 	domXML = strings.Replace(domXML, "\"", "'", -1)
 	glog.V(2).Infof("Creating domain:\n%s", domXML)
-	cDomXML := C.CString(domXML)
-	defer C.free(unsafe.Pointer(cDomXML))
-
-	status := C.defineDomain(v.conn, cDomXML)
-	if err := cErrorHandler.Convert(status); err != nil {
+	if _, err := v.tool.DefineFromXML(domXML); err != nil {
 		return "", err
 	}
 
-	cContainerId := C.CString(uuid)
-	defer C.free(unsafe.Pointer(cContainerId))
-	domain := C.virDomainLookupByUUIDString(v.conn, cContainerId)
-	if domain == nil {
-		return "", GetLibvirtLastError()
+	domain, err := v.tool.LookupByUUIDString(uuid)
+	if err != nil {
+		return "", err
 	}
-	defer C.virDomainFree(domain)
-	var domainInfo C.virDomainInfo
-	if status := C.virDomainGetInfo(domain, &domainInfo); status < 0 {
-		return "", GetLibvirtLastError()
+
+	if _, err := v.tool.GetDomainInfo(domain); err != nil {
+		return "", err
 	}
 
 	return uuid, nil
 }
 
-func (v *VirtualizationTool) GetDomainByName(name string) (C.virDomainPtr, error) {
-	cName := C.CString(name)
-	defer C.free(unsafe.Pointer(cName))
-
-	domain := C.virDomainLookupByName(v.conn, cName)
-
-	if domain == nil {
-		return nil, GetLibvirtLastError()
-	}
-
-	return domain, nil
-}
-
-func (v *VirtualizationTool) GetDomainUUID(domain C.virDomainPtr) (string, error) {
-	uuid := make([]byte, C.VIR_UUID_STRING_BUFLEN)
-
-	if status := C.virDomainGetUUIDString(domain, (*C.char)(unsafe.Pointer(&uuid[0]))); status < 0 {
-		return "", GetLibvirtLastError()
-	}
-
-	return string(uuid[:len(uuid)-1]), nil
-}
-
 func (v *VirtualizationTool) StartContainer(containerId string) error {
-	cContainerId := C.CString(containerId)
-	defer C.free(unsafe.Pointer(cContainerId))
-
-	status := C.createDomain(v.conn, cContainerId)
-	if err := cErrorHandler.Convert(status); err != nil {
+	domain, err := v.tool.LookupByUUIDString(containerId)
+	if err != nil {
 		return err
 	}
 
-	return nil
+	return v.tool.Create(domain)
 }
 
 func (v *VirtualizationTool) StopContainer(containerId string) error {
-	cContainerId := C.CString(containerId)
-	defer C.free(unsafe.Pointer(cContainerId))
-
-	status := C.stopDomain(v.conn, cContainerId)
-	if err := cErrorHandler.Convert(status); err != nil {
+	domain, err := v.tool.LookupByUUIDString(containerId)
+	if err != nil {
+		return err
+	}
+	if err := v.tool.Shutdown(domain); err != nil {
 		return err
 	}
 
 	// Wait until domain is really stopped or timeout after 10 sec.
 	return utils.WaitLoop(func() (bool, error) {
-		domain := C.virDomainLookupByUUIDString(v.conn, cContainerId)
-		if domain == nil {
-			// There must be an error
-			lastLibvirtErr := C.virGetLastError()
-			if lastLibvirtErr == nil {
-				return false, errors.New("libvirt returned no domain and no error - this is incorrect")
-			}
-			defer C.virResetError(lastLibvirtErr)
-
-			err := errors.New(C.GoString(lastLibvirtErr.message))
-			return false, err
+		domain, err := v.tool.LookupByUUIDString(containerId)
+		if err != nil {
+			return true, err
 		}
-		defer C.virDomainFree(domain)
 
-		state, err := getDomainState(domain)
+		di, err := v.tool.GetDomainInfo(domain)
 		if err != nil {
 			return false, err
 		}
 
-		return state == C.VIR_DOMAIN_SHUTDOWN, nil
+		return di.State == libvirt.DOMAIN_SHUTDOWN, nil
 	}, 10*time.Second)
 }
 
@@ -462,62 +412,64 @@ func (v *VirtualizationTool) RemoveContainer(containerId string) error {
 	// TODO: handle errors - there could be e.x. connection error
 	v.StopContainer(containerId)
 
-	cContainerId := C.CString(containerId)
-	defer C.free(unsafe.Pointer(cContainerId))
+	domain, err := v.tool.LookupByUUIDString(containerId)
+	if err != nil {
+		return err
+	}
 
-	status := C.destroyAndUndefineDomain(v.conn, cContainerId)
-	if err := cErrorHandler.Convert(status); err != nil {
+	if err := v.tool.Destroy(domain); err != nil {
+		return err
+	}
+
+	if err := v.tool.Undefine(domain); err != nil {
 		return err
 	}
 
 	// Wait until domain is really removed or timeout after 5 sec.
 	return utils.WaitLoop(func() (bool, error) {
-		domain := C.virDomainLookupByUUIDString(v.conn, cContainerId)
-		if domain != nil {
-			C.virDomainFree(domain)
+		domain, err := v.tool.LookupByUUIDString(containerId)
+		if domain != nil && err != nil {
 			return false, nil
 		}
 
 		// There must be an error
-		lastLibvirtErr := C.virGetLastError()
-		if lastLibvirtErr == nil {
+		if err == nil {
 			return false, errors.New("libvirt returned no domain and no error - this is incorrect")
 		}
-		defer C.virResetError(lastLibvirtErr)
 
-		if lastLibvirtErr.code == C.VIR_ERR_NO_DOMAIN {
+		lastLibvirtErr := v.tool.GetLastError()
+		if lastLibvirtErr.Code == libvirt.ERR_NO_DOMAIN {
 			return true, nil
 		}
 
 		// Other error occured
-		err := errors.New(C.GoString(lastLibvirtErr.message))
 		return false, err
 	}, 5*time.Second)
 }
 
-func libvirtToKubeState(domainState uint8, lastState kubeapi.ContainerState) kubeapi.ContainerState {
+func libvirtToKubeState(domainState libvirt.DomainState, lastState kubeapi.ContainerState) kubeapi.ContainerState {
 	var containerState kubeapi.ContainerState
 
 	switch domainState {
-	case C.VIR_DOMAIN_RUNNING:
+	case libvirt.DOMAIN_RUNNING:
 		containerState = kubeapi.ContainerState_CONTAINER_RUNNING
-	case C.VIR_DOMAIN_PAUSED:
+	case libvirt.DOMAIN_PAUSED:
 		if lastState == kubeapi.ContainerState_CONTAINER_CREATED {
 			containerState = kubeapi.ContainerState_CONTAINER_CREATED
 		} else {
 			containerState = kubeapi.ContainerState_CONTAINER_EXITED
 		}
-	case C.VIR_DOMAIN_SHUTDOWN:
+	case libvirt.DOMAIN_SHUTDOWN:
 		containerState = kubeapi.ContainerState_CONTAINER_EXITED
-	case C.VIR_DOMAIN_SHUTOFF:
+	case libvirt.DOMAIN_SHUTOFF:
 		if lastState == kubeapi.ContainerState_CONTAINER_CREATED {
 			containerState = kubeapi.ContainerState_CONTAINER_CREATED
 		} else {
 			containerState = kubeapi.ContainerState_CONTAINER_EXITED
 		}
-	case C.VIR_DOMAIN_CRASHED:
+	case libvirt.DOMAIN_CRASHED:
 		containerState = kubeapi.ContainerState_CONTAINER_EXITED
-	case C.VIR_DOMAIN_PMSUSPENDED:
+	case libvirt.DOMAIN_PMSUSPENDED:
 		containerState = kubeapi.ContainerState_CONTAINER_EXITED
 	default:
 		containerState = kubeapi.ContainerState_CONTAINER_UNKNOWN
@@ -526,17 +478,7 @@ func libvirtToKubeState(domainState uint8, lastState kubeapi.ContainerState) kub
 	return containerState
 }
 
-func getDomainState(domain *C.struct__virDomain) (uint8, error) {
-	var domainInfo C.virDomainInfo
-
-	if status := C.virDomainGetInfo(domain, &domainInfo); status < 0 {
-		return 255, GetLibvirtLastError()
-	}
-
-	return uint8(domainInfo.state), nil
-}
-
-func getContainerInfo(boltClient *bolttools.BoltClient, domain *C.struct__virDomain, containerId string) (*bolttools.ContainerInfo, error) {
+func (v *VirtualizationTool) getContainerInfo(boltClient *bolttools.BoltClient, domain *libvirt.Domain, containerId string) (*bolttools.ContainerInfo, error) {
 	containerInfo, err := boltClient.GetContainerInfo(containerId)
 	if err != nil {
 		return nil, err
@@ -545,12 +487,12 @@ func getContainerInfo(boltClient *bolttools.BoltClient, domain *C.struct__virDom
 		return nil, nil
 	}
 
-	domainState, err := getDomainState(domain)
+	domainInfo, err := v.tool.GetDomainInfo(domain)
 	if err != nil {
 		return nil, err
 	}
 
-	containerState := libvirtToKubeState(domainState, containerInfo.State)
+	containerState := libvirtToKubeState(domainInfo.State, containerInfo.State)
 	if containerInfo.State != containerState {
 		if err := boltClient.UpdateState(containerId, byte(containerState)); err != nil {
 			return nil, err
@@ -585,13 +527,13 @@ func filterContainer(container *kubeapi.Container, filter *kubeapi.ContainerFilt
 	return true
 }
 
-func (v *VirtualizationTool) getContainer(boltClient *bolttools.BoltClient, domain *C.struct__virDomain) (*kubeapi.Container, error) {
-	containerId, err := v.GetDomainUUID(domain)
+func (v *VirtualizationTool) getContainer(boltClient *bolttools.BoltClient, domain *libvirt.Domain) (*kubeapi.Container, error) {
+	containerId, err := v.tool.GetUUIDString(domain)
 	if err != nil {
 		return nil, err
 	}
 
-	containerInfo, err := getContainerInfo(boltClient, domain, containerId)
+	containerInfo, err := v.getContainerInfo(boltClient, domain, containerId)
 	if err != nil {
 		return nil, err
 	}
@@ -635,13 +577,12 @@ func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, fi
 
 			// Query libvirt for domain found in bolt
 			// TODO: Distinguish lack of domain from other errors
-			domainPtr, err := v.GetDomainPointerById(filter.GetId())
-			defer C.virDomainFree(domainPtr)
+			domain, err := v.tool.LookupByUUIDString(filter.GetId())
 			if err != nil {
 				// There's no such domain - looks like it's already removed, so return an empty list
 				return containers, nil
 			}
-			container, err := v.getContainer(boltClient, domainPtr)
+			container, err := v.getContainer(boltClient, domain)
 			if err != nil {
 				return nil, err
 			}
@@ -670,13 +611,12 @@ func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, fi
 			}
 
 			// TODO: Distinguish lack of domain from other errors
-			domainPtr, err := v.GetDomainPointerById(domainID)
-			defer C.virDomainFree(domainPtr)
+			domain, err := v.tool.LookupByUUIDString(domainID)
 			if err != nil {
 				// There's no such domain - looks like it's already removed, so return an empty list
 				return containers, nil
 			}
-			container, err := v.getContainer(boltClient, domainPtr)
+			container, err := v.getContainer(boltClient, domain)
 			if err != nil {
 				return nil, err
 			}
@@ -688,20 +628,12 @@ func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, fi
 	}
 
 	// Get list of all defined domains from libvirt and check each container against remained filter settings
-	var cList *C.virDomainPtr
-	count := C.virConnectListAllDomains(v.conn, (**C.virDomainPtr)(&cList), 0)
-	if count < 0 {
-		return nil, GetLibvirtLastError()
+	domains, err := v.tool.ListAll()
+	if err != nil {
+		return nil, err
 	}
-	header := reflect.SliceHeader{
-		Data: uintptr(unsafe.Pointer(cList)),
-		Len:  int(count),
-		Cap:  int(count),
-	}
-	domains := *(*[]C.virDomainPtr)(unsafe.Pointer(&header))
-
-	for _, domainPtr := range domains {
-		container, err := v.getContainer(boltClient, domainPtr)
+	for _, domain := range domains {
+		container, err := v.getContainer(boltClient, &domain)
 		if err != nil {
 			return nil, err
 		}
@@ -714,26 +646,13 @@ func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, fi
 	return containers, nil
 }
 
-func (v *VirtualizationTool) GetDomainPointerById(containerId string) (*C.struct__virDomain, error) {
-	cContainerId := C.CString(containerId)
-	defer C.free(unsafe.Pointer(cContainerId))
-
-	domain := C.virDomainLookupByUUIDString(v.conn, cContainerId)
-	if domain == nil {
-		// TODO: Distinguish lack of domain from other errors
-		return nil, GetLibvirtLastError()
-	}
-	return domain, nil
-}
-
 func (v *VirtualizationTool) ContainerStatus(boltClient *bolttools.BoltClient, containerId string) (*kubeapi.ContainerStatus, error) {
-	domain, err := v.GetDomainPointerById(containerId)
-	defer C.virDomainFree(domain)
+	domain, err := v.tool.LookupByUUIDString(containerId)
 	if err != nil {
 		return nil, err
 	}
 
-	containerInfo, err := getContainerInfo(boltClient, domain, containerId)
+	containerInfo, err := v.getContainerInfo(boltClient, domain, containerId)
 	if err != nil {
 		return nil, err
 	}
