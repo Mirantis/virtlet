@@ -1,5 +1,5 @@
 /*
-Copyright 2016 Mirantis
+Copyright 2017 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,17 +16,12 @@ limitations under the License.
 
 package libvirttools
 
-/*
-#include <libvirt/libvirt.h>
-#include <libvirt/virterror.h>
-*/
-import "C"
-
 import (
 	"net/url"
 	"strings"
 
 	"github.com/Mirantis/virtlet/pkg/download"
+	libvirt "github.com/libvirt/libvirt-go"
 )
 
 func stripTagFromImageName(imageName string) string {
@@ -48,7 +43,7 @@ type ImageTool struct {
 	tool *StorageTool
 }
 
-func NewImageTool(conn C.virConnectPtr, poolName string) (*ImageTool, error) {
+func NewImageTool(conn *libvirt.Connect, poolName string) (*ImageTool, error) {
 	storageTool, err := NewStorageTool(conn, poolName)
 	if err != nil {
 		return nil, err

@@ -25,3 +25,4 @@ import:
   version: ~1.0.0
   subpackages:
   - difflib
+- package: github.com/libvirt/libvirt-go

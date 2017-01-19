@@ -1,5 +1,5 @@
-hash: 2e99359afe089edfde09dae29a2ba5d6e8a7d5bc0b5d464bda13b33ddc98e795
-updated: 2016-12-27T17:30:04.84118858+03:00
+hash: 9739db49ae71fa598fd4733433e8023a143fbf53a2d5e572cdd3eaa082a8a1b5
+updated: 2017-01-13T09:49:54.162567305+01:00
 imports:
 - name: github.com/boltdb/bolt
   version: dfb21201d9270c1082d5fb0f07f500311ff72f18
@@ -54,6 +54,8 @@ imports:
   subpackages:
   - jsonpb
   - proto
+- name: github.com/libvirt/libvirt-go
+  version: 73c68e67965b65c920e93535bdef7020d79baf6c
 - name: github.com/nu7hatch/gouuid
   version: 179d4d0c4d8d407a32af483c2354df1d2c91e6c3
 - name: github.com/pmezard/go-difflib

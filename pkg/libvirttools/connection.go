@@ -1,5 +1,5 @@
 /*
-Copyright 2016 Mirantis
+Copyright 2016-2017 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,27 +16,22 @@ limitations under the License.
 
 package libvirttools
 
-/*
-#include <libvirt/libvirt.h>
-#include <libvirt/virterror.h>
-#include <stdlib.h>
-*/
-import "C"
-
 import (
-	"unsafe"
+	libvirt "github.com/libvirt/libvirt-go"
 )
 
 type ConnectionTool struct {
-	Conn C.virConnectPtr
+	connection *libvirt.Connect
 }
 
 func NewConnectionTool(uri string) (*ConnectionTool, error) {
-	cUri := C.CString(uri)
-	defer C.free(unsafe.Pointer(cUri))
-	conn := C.virConnectOpen(cUri)
-	if conn == nil {
-		return nil, GetLibvirtLastError()
+	conn, err := libvirt.NewConnect(uri)
+	if err != nil {
+		return nil, err
 	}
-	return &ConnectionTool{Conn: conn}, nil
+	return &ConnectionTool{connection: conn}, nil
+}
+
+func (c *ConnectionTool) Connection() *libvirt.Connect {
+	return c.connection
 }
