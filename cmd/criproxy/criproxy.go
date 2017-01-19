@@ -74,9 +74,9 @@ func startDockerShim() (string, error) {
 	pluginSettings := dockershim.NetworkPluginSettings{
 		HairpinMode:       componentconfig.HairpinNone, // kubeCfg.HairpinMode, --- XXX
 		NonMasqueradeCIDR: kubeCfg.NonMasqueradeCIDR,   // XXX: was being taken from kubelet object
-		PluginName:        kubeCfg.NetworkPluginName,
-		PluginConfDir:     kubeCfg.CNIConfDir,
-		PluginBinDir:      kubeCfg.NetworkPluginDir, // XXX: cniBinDir
+		PluginName:        "cni",
+		PluginConfDir:     "/etc/kubernetes/cni/net.d",
+		PluginBinDir:      "/usr/lib/kubernetes/cni/bin", // XXX: cniBinDir
 		MTU:               int(kubeCfg.NetworkPluginMTU),
 	}
 	dockerClient := dockertools.ConnectToDockerOrDie(kubeCfg.DockerEndpoint, kubeCfg.RuntimeRequestTimeout.Duration)
