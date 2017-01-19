@@ -54,6 +54,10 @@ spec:
         # FIXME: E0102 08:26:02.959687      32 virtlet.go:50] Initializing server failed: cannot open path '/var/lib/libvirt/images': No such file or directory
         # - mountPath: /var/lib/libvirt
         #   name: libvirt
+        - mountPath: /etc/cni
+          name: cniconf
+        - mountPath: /opt/cni/bin
+          name: cnibin
         securityContext:
           privileged: true
         env:
@@ -80,3 +84,9 @@ spec:
       - hostPath:
           path: /var/lib/libvirt
         name: libvirt
+      - hostPath:
+          path: /etc/kubernetes/cni
+        name: cniconf
+      - hostPath:
+          path: /usr/lib/kubernetes/cni/bin
+        name: cnibin
