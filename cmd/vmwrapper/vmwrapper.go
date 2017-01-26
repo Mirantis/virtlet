@@ -162,6 +162,10 @@ func main() {
 		default:
 		}
 
+		if err := nettools.TeardownContainerSideNetwork(info); err != nil {
+			return err
+		}
+
 		runHook("/vmwrapper-after-qemu.sh")
 
 		if err != nil {
