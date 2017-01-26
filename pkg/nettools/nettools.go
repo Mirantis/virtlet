@@ -282,6 +282,23 @@ func bringUpLoopback() error {
 	return nil
 }
 
+func operateOnEbtables(interfaceName, command string) error {
+	// block/unblock DHCP traffic from/to CNI-provided link
+	for _, item := range []struct{ chain, opt string }{
+		// dhcp responses originate from bridge itself
+		{"OUTPUT", "--ip-source-port"},
+		// dhcp requests originate from the VM
+		{"FORWARD", "--ip-destination-port"},
+	} {
+		if out, err := exec.Command("ebtables", command, item.chain, "-p", "IPV4", "--ip-protocol", "UDP",
+			item.opt, "67", "--out-if", interfaceName, "-j", "DROP").CombinedOutput(); err != nil {
+			return fmt.Errorf("ebtables failed: %v\nOut:\n%s", err, out)
+		}
+	}
+
+	return nil
+}
+
 // SetupContainerSideNetwork sets up networking in container
 // namespace.  It does so by calling ExtractLinkInfo() first unless
 // non-nil info argument is provided and then preparing the following
@@ -318,7 +335,7 @@ func SetupContainerSideNetwork(info *types.Result) (*types.Result, error) {
 	if err := netlink.LinkAdd(tap); err != nil {
 		return nil, fmt.Errorf("failed to create tap interface: %v", err)
 	}
-	if err = netlink.LinkSetUp(tap); err != nil {
+	if err := netlink.LinkSetUp(tap); err != nil {
 		return nil, fmt.Errorf("failed to set %q up: %v", tapInterfaceName, err)
 	}
 
@@ -327,21 +344,13 @@ func SetupContainerSideNetwork(info *types.Result) (*types.Result, error) {
 		return nil, fmt.Errorf("failed to create bridge: %v", err)
 	}
 
-	if err = netlink.AddrAdd(br, mustParseAddr(internalDhcpAddr)); err != nil {
+	if err := netlink.AddrAdd(br, mustParseAddr(internalDhcpAddr)); err != nil {
 		return nil, fmt.Errorf("failed to set address for the bridge: %v", err)
 	}
 
-	// block DHCP traffic from/to CNI-provided link
-	for _, item := range []struct{ chain, opt string }{
-		// dhcp responses originate from bridge itself
-		{"OUTPUT", "--ip-source-port"},
-		// dhcp requests originate from the VM
-		{"FORWARD", "--ip-destination-port"},
-	} {
-		if out, err := exec.Command("ebtables", "-A", item.chain, "-p", "IPV4", "--ip-protocol", "UDP",
-			item.opt, "67", "--out-if", contVeth.Attrs().Name, "-j", "DROP").CombinedOutput(); err != nil {
-			return nil, fmt.Errorf("ebtables failed: %v\nOut:\n%s", err, out)
-		}
+	// Add ebtables DHCP blocking rules
+	if err := operateOnEbtables(contVeth.Attrs().Name, "-A"); err != nil {
+		return nil, err
 	}
 
 	if err := bringUpLoopback(); err != nil {
@@ -349,6 +358,86 @@ func SetupContainerSideNetwork(info *types.Result) (*types.Result, error) {
 	}
 
 	return info, nil
+}
+
+// TeardownBridge removes links from bridge and turns it down
+func TeardownBridge(bridge netlink.Link, links []netlink.Link) error {
+	for _, link := range links {
+		if err := netlink.LinkSetNoMaster(link); err != nil {
+			return err
+		}
+	}
+
+	return netlink.LinkSetDown(bridge)
+}
+
+// ConfigureLink adds ip address and routes link basing on data in info.
+func ConfigureLink(link netlink.Link, info *types.Result) error {
+	if err := netlink.AddrAdd(link, mustParseAddr(info.IP4.IP.String())); err != nil {
+		return err
+	}
+
+	for _, route := range info.IP4.Routes {
+		err := netlink.RouteAdd(&netlink.Route{
+			LinkIndex: link.Attrs().Index,
+			Scope:     netlink.SCOPE_UNIVERSE,
+			Dst:       &route.Dst,
+			Gw:        route.GW,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// TeardownContainerSideNetwork cleans up container network configuration.
+// It does it by calling tear down funcs in opposite direction to that from
+// SetupContainerSideNetwork. At the end - network configuration in container
+// namespace should match situation from before SetupContainerSideNetwork call.
+func TeardownContainerSideNetwork(info *types.Result) error {
+	contVeth, err := FindVeth()
+	if err != nil {
+		return err
+	}
+
+	// Remove ebtables DHCP rules
+	if err := operateOnEbtables(contVeth.Attrs().Name, "-D"); err != nil {
+		return nil
+	}
+
+	tap, err := netlink.LinkByName(tapInterfaceName)
+	if err != nil {
+		return err
+	}
+
+	br, err := netlink.LinkByName(containerBridgeName)
+	if err != nil {
+		return err
+	}
+
+	if err := netlink.AddrDel(br, mustParseAddr(internalDhcpAddr)); err != nil {
+		return err
+	}
+
+	if err := TeardownBridge(br, []netlink.Link{contVeth, tap}); err != nil {
+		return err
+	}
+
+	if err := netlink.LinkDel(br); err != nil {
+		return err
+	}
+
+	if err := netlink.LinkSetDown(tap); err != nil {
+		return err
+	}
+
+	if err := netlink.LinkDel(tap); err != nil {
+		return err
+	}
+
+	return ConfigureLink(contVeth, info)
 }
 
 // copied from:
