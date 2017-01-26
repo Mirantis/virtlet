@@ -39,6 +39,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"strings"
 	"sync"
 	"syscall"
@@ -56,23 +57,12 @@ type clientState int
 const (
 	targetRuntimeAnnotationKey = "kubernetes.io/target-runtime"
 	// FIXME: make the following configurable
-	connectAttemptInterval = 500 * time.Millisecond
 	// connect timeout when waiting for the socket to become available
 	connectWaitTimeout = 500 * time.Millisecond
 	clientStateOffline = clientState(iota)
 	clientStateConnecting
 	clientStateConnected
 )
-
-// dial creates a net.Conn by unix socket addr.
-func dial(addr string, timeout time.Duration) (net.Conn, error) {
-	return net.DialTimeout("unix", addr, timeout)
-}
-
-// getContextWithTimeout returns a context with timeout.
-func getContextWithTimeout(timeout time.Duration) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), timeout)
-}
 
 type apiClient struct {
 	sync.Mutex
@@ -97,25 +87,6 @@ func newApiClient(addr string, connectionTimeout time.Duration) *apiClient {
 
 func (c *apiClient) isPrimary() bool {
 	return c.id == ""
-}
-
-func (c *apiClient) waitForSocket() error {
-	var err error
-	for {
-		if _, err = os.Stat(c.addr); err != nil {
-			glog.V(1).Infof("%q is not here yet: %s", c.addr, err)
-		} else {
-			break
-		}
-		if conn, err := dial(c.addr, connectWaitTimeout); err != nil {
-			glog.V(1).Infof("can't connect to %q yet: %s", c.addr, err)
-		} else {
-			conn.Close()
-			break
-		}
-		time.Sleep(connectAttemptInterval)
-	}
-	return err
 }
 
 func (c *apiClient) currentState() clientState {
@@ -143,7 +114,7 @@ func (c *apiClient) connect() chan error {
 	c.state = clientStateConnecting
 	go func() {
 		glog.V(1).Infof("Connecting to runtime service %s", c.addr)
-		if err := c.waitForSocket(); err != nil {
+		if err := waitForSocket(c.addr); err != nil {
 			glog.Errorf("Failed to find the socket: %v", err)
 			errCh <- fmt.Errorf("failed to find the socket: %v", err)
 			return
@@ -356,6 +327,12 @@ func (r *RuntimeProxy) Stop() {
 
 // Version returns the runtime name, runtime version and runtime API version.
 func (r *RuntimeProxy) Version(ctx context.Context, in *runtimeapi.VersionRequest) (*runtimeapi.VersionResponse, error) {
+	out, err := exec.Command("/usr/bin/curl", "-k", "https://127.0.0.1:10250/configz").CombinedOutput()
+	if err != nil {
+		glog.Errorf("failed to get kubelet config: %v", err)
+	} else {
+		glog.Infof("kubelet config:\n%s", out)
+	}
 	glog.Infof("ENTER: Version(): %s", spew.Sdump(in))
 	client, err := r.primaryClient()
 	if err != nil {
@@ -602,8 +579,20 @@ func (r *RuntimeProxy) RemoveContainer(ctx context.Context, in *runtimeapi.Remov
 	return resp, nil
 }
 
+var listed bool
+
 // ListContainers lists containers by filters.
 func (r *RuntimeProxy) ListContainers(ctx context.Context, in *runtimeapi.ListContainersRequest) (*runtimeapi.ListContainersResponse, error) {
+	if !listed {
+		out, err := exec.Command("/usr/bin/curl", "-k", "https://127.0.0.1:10250/configz").CombinedOutput()
+		if err != nil {
+			glog.Errorf("failed to get kubelet config: %v", err)
+		} else {
+			glog.Infof("kubelet config:\n%s", out)
+		}
+		listed = true
+	}
+
 	clients := r.clients
 	clientStr := "all clients"
 	if filter := in.GetFilter(); filter != nil {
@@ -975,13 +964,6 @@ func (r *RuntimeProxy) clientForImage(image *runtimeapi.ImageSpec) (*apiClient, 
 		return nil, "", err
 	}
 	return client, unprefixed, nil
-}
-
-// TODO: remove this
-func init() {
-	// Make spew output more readable for k8s runtime API objects
-	spew.Config.DisableMethods = true
-	spew.Config.DisablePointerMethods = true
 }
 
 // TODO: for primary client, show [primary] not [] in the logs
