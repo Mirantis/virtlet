@@ -369,8 +369,5 @@ func TestInstallCriProxyContainer(t *testing.T) {
 // That's 'readOnlyPort' -- may use this to get node name,
 // then access configz via the proxy. (/stats/exec is also available via configz)
 //
-// "k8s.io/kubernetes/pkg/api" (perhaps try using client-go instead?)
-// api.Scheme.Default
-// TODO: test 'don't patch config again'
 // TODO: patching kubelet config from existing configmap
 // (see setKubeletConfiguration in k8s' test/e2e_node/util.go)

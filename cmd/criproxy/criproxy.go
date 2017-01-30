@@ -129,6 +129,5 @@ func main() {
 	}
 }
 
-// TODO: fix waiting for proxy socket
 // Testing:
 // /criproxy -alsologtostderr -v 2 -install -apiserver=http://172.30.0.2:8080
