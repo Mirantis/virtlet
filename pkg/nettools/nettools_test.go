@@ -365,3 +365,85 @@ func TestLoopbackInterface(t *testing.T) {
 		}
 	})
 }
+
+func stringInList(expected string, list []string) bool {
+	for _, element := range list {
+		if element == expected {
+			return true
+		}
+	}
+
+	return false
+}
+
+func verifyNoLinks(t *testing.T, linkNames []string) {
+	links, err := netlink.LinkList()
+	if err != nil {
+		log.Panicf("netlink.LinkList failed: %v", err)
+	}
+
+	for _, link := range links {
+		linkName := link.Attrs().Name
+		if stringInList(linkName, linkNames) {
+			t.Errorf("there should not be interface called %s in container namespace", linkName)
+		}
+	}
+}
+
+func verifyVethHaveConfiguration(t *testing.T, info *types.Result) {
+	contVeth, err := FindVeth()
+	if err != nil {
+		log.Panicf("FindVeth() failed: %v", err)
+	}
+
+	addrList, err := netlink.AddrList(contVeth, netlink.FAMILY_V4)
+	if err != nil {
+		log.Panicf("AddrList() failed: %v", err)
+	}
+
+	if len(addrList) != 1 {
+		t.Errorf("veth should have single address but have: %d", len(addrList))
+	}
+	if !addrList[0].IP.Equal(info.IP4.IP.IP) {
+		t.Errorf("veth has ip %s wherever expected is %s", addrList[0].IP.String(), info.IP4.IP.IP.String())
+	}
+	addrMaskSize := addrList[0].Mask.String()
+	desiredMaskSize := info.IP4.IP.Mask.String()
+	if addrMaskSize != desiredMaskSize {
+		t.Errorf("veth has ipmask %s wherever expected is %s", addrMaskSize, desiredMaskSize)
+	}
+
+	routeList, err := netlink.RouteList(contVeth, netlink.FAMILY_V4)
+	if err != nil {
+		log.Panicf("RouteList() failed: %v", err)
+	}
+
+	for _, route := range routeList {
+		if route.Dst != nil {
+			if route.Dst.String() == info.IP4.Routes[1].Dst.String() {
+				return
+			}
+		}
+	}
+
+	t.Errorf("not found desired route to: %s", info.IP4.Routes[1].Dst.String())
+}
+
+func TestTeardownContainerSideNetwork(t *testing.T) {
+	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+		if err := StripLink(origContVeth); err != nil {
+			log.Panicf("StripLink() failed: %v", err)
+		}
+		returnedInfo, err := SetupContainerSideNetwork(&expectedExtractedLinkInfo)
+		if err != nil {
+			log.Panicf("failed to set up container side network: %v", err)
+		}
+
+		if err := TeardownContainerSideNetwork(returnedInfo); err != nil {
+			log.Panicf("failed to tear down container side network: %v", err)
+		}
+
+		verifyNoLinks(t, []string{"br0", "tap0"})
+		verifyVethHaveConfiguration(t, &expectedExtractedLinkInfo)
+	})
+}
