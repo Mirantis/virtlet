@@ -44,8 +44,7 @@ func waitForSocket(path string) error {
 	for {
 		if _, err = os.Stat(path); err != nil {
 			glog.V(1).Infof("%q is not here yet: %s", path, err)
-		}
-		if conn, err := dial(path, connectWaitTimeout); err != nil {
+		} else if conn, err := dial(path, connectWaitTimeout); err != nil {
 			glog.V(1).Infof("can't connect to %q yet: %s", path, err)
 		} else {
 			conn.Close()
