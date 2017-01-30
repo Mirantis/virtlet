@@ -101,35 +101,56 @@ func writeJson(data interface{}, file string) error {
 	return nil
 }
 
-func getKubeletConfig(configzBaseUrl string) (map[string]interface{}, error) {
-	cfg, err := loadJson(configzBaseUrl, "/configz")
-	if err != nil {
-		return nil, err
-	}
-	kubeletCfg, ok := cfg["componentconfig"].(map[string]interface{})
-	if !ok {
-		return nil, errors.New("couldn't get componentconfig from /configz")
-	}
-	return kubeletCfg, nil
+type BootstrapConfig struct {
+	ApiServerHost   string
+	ConfigzBaseUrl  string
+	StatsBaseUrl    string
+	SavedConfigPath string
+	ProxyPath       string
+	ProxyArgs       []string
+	ProxySocketPath string
 }
 
-func kubeletUpdated(kubeletCfg map[string]interface{}) bool {
+type Bootstrap struct {
+	config     *BootstrapConfig
+	clientset  clientset.Interface
+	kubeletCfg map[string]interface{}
+}
+
+func NewBootstrap(config *BootstrapConfig, cs clientset.Interface) *Bootstrap {
+	return &Bootstrap{config: config, clientset: cs}
+}
+
+func (b *Bootstrap) obtainKubeletConfig() error {
+	cfg, err := loadJson(b.config.ConfigzBaseUrl, "/configz")
+	if err != nil {
+		return err
+	}
+	var ok bool
+	b.kubeletCfg, ok = cfg["componentconfig"].(map[string]interface{})
+	if !ok {
+		return errors.New("couldn't get componentconfig from /configz")
+	}
+	return nil
+}
+
+func (b *Bootstrap) kubeletUpdated() bool {
 	for k, v := range kubeletSettingsForCriProxy {
-		if kubeletCfg[k] != v {
+		if b.kubeletCfg[k] != v {
 			return false
 		}
 	}
 	return true
 }
 
-func updateKubeletConfig(kubeletCfg map[string]interface{}) {
+func (b *Bootstrap) updateKubeletConfig() {
 	for k, v := range kubeletSettingsForCriProxy {
-		kubeletCfg[k] = v
+		b.kubeletCfg[k] = v
 	}
 }
 
-func getNodeNameFromKubelet(statsBaseUrl string) (string, error) {
-	stats, err := loadJson(statsBaseUrl, "/stats/summary")
+func (b *Bootstrap) getNodeNameFromKubelet() (string, error) {
+	stats, err := loadJson(b.config.StatsBaseUrl, "/stats/summary")
 	if err != nil {
 		return "", err
 	}
@@ -144,8 +165,8 @@ func getNodeNameFromKubelet(statsBaseUrl string) (string, error) {
 	return nodeName, nil
 }
 
-func buildConfigMap(nodeName string, kubeletCfg map[string]interface{}) *api.ConfigMap {
-	text, err := json.Marshal(kubeletCfg)
+func (b *Bootstrap) buildConfigMap(nodeName string) *api.ConfigMap {
+	text, err := json.Marshal(b.kubeletCfg)
 	if err != nil {
 		log.Panicf("couldn't marshal kubelet config: %v", err)
 	}
@@ -160,52 +181,55 @@ func buildConfigMap(nodeName string, kubeletCfg map[string]interface{}) *api.Con
 	}
 }
 
-func putConfigMap(cs clientset.Interface, configMap *api.ConfigMap) error {
+func (b *Bootstrap) putConfigMap(configMap *api.ConfigMap) error {
 	glog.V(1).Infof("Putting ConfigMap %q in namespace %q", configMap.Name, configMap.Namespace)
-	_, err := cs.Core().ConfigMaps("kube-system").Create(configMap)
+	_, err := b.clientset.Core().ConfigMaps("kube-system").Create(configMap)
 	return err
 }
 
-func patchKubeletConfig(configzBaseUrl, statsBaseUrl, savedConfigPath string, cs clientset.Interface) (patched bool, dockerEndpoint string, err error) {
-	_, err = os.Stat(savedConfigPath)
+func (b *Bootstrap) needToPatch() (bool, error) {
+	_, err := os.Stat(b.config.SavedConfigPath)
 	if err == nil {
-		glog.V(1).Infof("config file already exists: %q", savedConfigPath)
-		return false, "", nil
+		glog.V(1).Infof("config file already exists: %q", b.config.SavedConfigPath)
+		return false, nil
 	}
-	if !os.IsNotExist(err) {
-		return false, "", fmt.Errorf("failed to check for existing config: %v", err)
+	if os.IsNotExist(err) {
+		return true, nil
 	}
-
-	kubeletCfg, err := getKubeletConfig(configzBaseUrl)
-	if err != nil {
-		return false, "", err
-	}
-	if kubeletUpdated(kubeletCfg) {
-		return false, "", fmt.Errorf("kubelet already configured for CRI, but no saved config")
-	}
-	if err := writeJson(kubeletCfg, savedConfigPath); err != nil {
-		return false, "", err
-	}
-	updateKubeletConfig(kubeletCfg)
-
-	dockerEp, ok := kubeletCfg["dockerEndpoint"].(string)
-	if !ok {
-		return false, "", errors.New("failed to retrieve docker endpoint from kubelet config")
-	}
-	glog.V(1).Infof("Using docker endpoint %q", dockerEp)
-
-	nodeName, err := getNodeNameFromKubelet(statsBaseUrl)
-	if err != nil {
-		return false, "", err
-	}
-	glog.V(1).Infof("Node name: %q", nodeName)
-	if err := putConfigMap(cs, buildConfigMap(nodeName, kubeletCfg)); err != nil {
-		return false, "", fmt.Errorf("failed to put ConfigMap: %v", err)
-	}
-	return true, dockerEp, nil
+	return false, fmt.Errorf("failed to check for existing config: %v", err)
 }
 
-func installCriProxyContainer(dockerEndpoint, endpointToPass, proxyPath string, args []string) (string, error) {
+func (b *Bootstrap) dockerEndpoint() (string, error) {
+	dockerEp, ok := b.kubeletCfg["dockerEndpoint"].(string)
+	if !ok {
+		return "", errors.New("failed to retrieve docker endpoint from kubelet config")
+	}
+	glog.V(1).Infof("Using docker endpoint %q", dockerEp)
+	return dockerEp, nil
+}
+
+func (b *Bootstrap) saveKubeletConfig() error {
+	return writeJson(b.kubeletCfg, b.config.SavedConfigPath)
+}
+
+func (b *Bootstrap) patchKubeletConfig() error {
+	if b.kubeletUpdated() {
+		return fmt.Errorf("kubelet already configured for CRI, but no saved config")
+	}
+	b.updateKubeletConfig()
+
+	nodeName, err := b.getNodeNameFromKubelet()
+	if err != nil {
+		return err
+	}
+	glog.V(1).Infof("Node name: %q", nodeName)
+	if err := b.putConfigMap(b.buildConfigMap(nodeName)); err != nil {
+		return fmt.Errorf("failed to put ConfigMap: %v", err)
+	}
+	return nil
+}
+
+func (b *Bootstrap) installCriProxyContainer(dockerEndpoint, endpointToPass string) (string, error) {
 	// CRI proxy container actually uses host namespaces to run.
 	// It just uses docker's 'always' restart policy as a poor man's
 	// substitute for a process manager.
@@ -245,8 +269,8 @@ func installCriProxyContainer(dockerEndpoint, endpointToPass, proxyPath string, 
 			"nsenter",
 			"--mount=/proc/1/ns/mnt",
 			"--",
-			proxyPath,
-		}, args...),
+			b.config.ProxyPath,
+		}, b.config.ProxyArgs...),
 	}, &dockercontainer.HostConfig{
 		Privileged:  true,
 		NetworkMode: "host",
@@ -271,61 +295,73 @@ func installCriProxyContainer(dockerEndpoint, endpointToPass, proxyPath string, 
 	return resp.ID, nil
 }
 
-type BootstrapConfig struct {
-	ApiServerHost   string
-	ConfigzBaseUrl  string
-	StatsBaseUrl    string
-	SavedConfigPath string
-	ProxyPath       string
-	ProxyArgs       []string
-	ProxySocketPath string
+func (b *Bootstrap) initClientset() error {
+	var err error
+	var config *restclient.Config
+	if b.config.ApiServerHost == "" {
+		config, err = restclient.InClusterConfig()
+		if err != nil {
+			return fmt.Errorf("failed to get REST client config: %v", err)
+		}
+	} else {
+		config = &restclient.Config{Host: b.config.ApiServerHost}
+	}
+	b.clientset, err = clientset.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("failed to create ClientSet: %v", err)
+	}
+	return nil
 }
 
-func EnsureCRIProxy(bootConfig *BootstrapConfig) (bool, error) {
-	if bootConfig.ConfigzBaseUrl == "" || bootConfig.StatsBaseUrl == "" || bootConfig.ProxyPath == "" || bootConfig.ProxySocketPath == "" {
+func (b *Bootstrap) EnsureCRIProxy() (bool, error) {
+	if b.config.ConfigzBaseUrl == "" || b.config.StatsBaseUrl == "" || b.config.ProxyPath == "" || b.config.ProxySocketPath == "" {
 		return false, errors.New("invalid BootstrapConfig")
 	}
 
-	if !strings.HasPrefix(path.Clean(bootConfig.ProxySocketPath), "/run/") {
-		return false, fmt.Errorf("proxy socket path %q not under /run", bootConfig.ProxySocketPath)
+	if !strings.HasPrefix(path.Clean(b.config.ProxySocketPath), "/run/") {
+		return false, fmt.Errorf("proxy socket path %q not under /run", b.config.ProxySocketPath)
 	}
 
-	var err error
-	var config *restclient.Config
-	if bootConfig.ApiServerHost == "" {
-		config, err = restclient.InClusterConfig()
-		if err != nil {
-			return false, fmt.Errorf("failed to get REST client config: %v", err)
-		}
-	} else {
-		config = &restclient.Config{Host: bootConfig.ApiServerHost}
-	}
-
-	clientset, err := clientset.NewForConfig(config)
-	if err != nil {
-		return false, fmt.Errorf("failed to create ClientSet: %v", err)
-	}
-
-	patched, dockerEndpoint, err := patchKubeletConfig(bootConfig.ConfigzBaseUrl, bootConfig.StatsBaseUrl, bootConfig.SavedConfigPath, clientset)
-	if err != nil {
-		return false, err
-	}
-	if !patched {
+	if needToPatch, err := b.needToPatch(); !needToPatch || err != nil {
 		glog.V(1).Infof("Kubelet configuration already patched, exiting")
-		return false, nil
-	}
-
-	_, err = installCriProxyContainer(dockerEndpoint, dockerEndpoint, bootConfig.ProxyPath, bootConfig.ProxyArgs)
-
-	if err != nil {
 		return false, err
 	}
 
-	err = waitForSocket(bootConfig.ProxySocketPath)
-	if err == nil {
-		glog.V(1).Info("CRI proxy bootstrap complete")
+	if err := b.obtainKubeletConfig(); err != nil {
+		return false, err
 	}
-	return err == nil, err
+
+	// Need to have kubelet config saved at this point
+	// so it can be used by the container below.
+	if err := b.saveKubeletConfig(); err != nil {
+		return false, err
+	}
+
+	dockerEndpoint, err := b.dockerEndpoint()
+	if err != nil {
+		return false, err
+	}
+	if _, err = b.installCriProxyContainer(dockerEndpoint, dockerEndpoint); err != nil {
+		return false, err
+	}
+
+	if err = waitForSocket(b.config.ProxySocketPath); err != nil {
+		return false, err
+	}
+
+	// We don't try to patch kubelet config before the container
+	// is installed, because this process may die with kubelet
+	// restart
+	if err := b.initClientset(); err != nil {
+		return false, err
+	}
+	if err := b.patchKubeletConfig(); err != nil {
+		return false, err
+	}
+
+	glog.V(1).Info("CRI proxy bootstrap complete")
+
+	return true, nil
 }
 
 func LoadKubeletConfig(path string) (*cfg.KubeletConfiguration, error) {
@@ -339,8 +375,3 @@ func LoadKubeletConfig(path string) (*cfg.KubeletConfiguration, error) {
 	}
 	return &cfg, err
 }
-
-// TODO: kubectl label node "${node_name}" extraRuntime=virtlet
-// but 'virtlet' part should be customizable
-// OR: rather keep it in the script. It should determine
-// on which nodes to deploy the ds

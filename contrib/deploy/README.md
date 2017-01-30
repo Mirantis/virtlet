@@ -7,8 +7,7 @@
 ```
 3. Create image server Deployment and Service:
 ```
-kubectl create -f image-server.yaml
-kubectl create -f image-service.yaml
+kubectl create -f image-server.yaml -f image-service.yaml
 ```
 4. Wait for image-server pod to become Running (this is important for virtlet initialization due to host network + cluster DNS [issue](https://github.com/kubernetes/kubernetes/issues/17406)):
 ```

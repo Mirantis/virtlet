@@ -90,7 +90,7 @@ func runCriProxy(connect, listen, savedConfigPath string) error {
 }
 
 func installCriProxy(execPath, savedConfigPath string) error {
-	changed, err := criproxy.EnsureCRIProxy(&criproxy.BootstrapConfig{
+	bootstrap := criproxy.NewBootstrap(&criproxy.BootstrapConfig{
 		ApiServerHost:   *apiServerHost,
 		ConfigzBaseUrl:  "https://127.0.0.1:10250",
 		StatsBaseUrl:    "http://127.0.0.1:10255",
@@ -105,8 +105,9 @@ func installCriProxy(execPath, savedConfigPath string) error {
 			"docker,virtlet:/run/virtlet.sock",
 		},
 		ProxySocketPath: "/run/criproxy.sock",
-	})
-	if !changed {
+	}, nil)
+	changed, err := bootstrap.EnsureCRIProxy()
+	if err == nil && !changed {
 		glog.V(1).Infof("Node configuration unchanged")
 	}
 	return err

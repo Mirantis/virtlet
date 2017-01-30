@@ -1,3 +1,9 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: virtlet
+---
 apiVersion: extensions/v1beta1 
 kind: DaemonSet
 metadata:
@@ -27,9 +33,48 @@ spec:
               }
             }
           }
+        # The init container checks if there's already saved kubelet config
+        # and considers that bootstrap is already done if it exists.
+        # If it doesn't, it drops criproxy binary into /opt/criproxy/bin/
+        # if it's not already there and then starts criproxy installation.
+        # The possibility to put criproxy binary in advance into
+        # /opt/criproxy/bin may be helpful for the purpose of
+        # debugging criproxy.
+        pod.beta.kubernetes.io/init-containers: >
+          [
+            {
+              "name": "bootstrap",
+              "image": "mirantis/virtlet",
+              "imagePullPolicy": "IfNotPresent",
+              "securityContext": { "privileged": true },
+              "command": ["/bin/sh", "-c", "if [ -f /etc/criproxy/kubelet.conf ]; then exit 0; fi; if [ ! -f /opt/criproxy/bin/criproxy ]; then cp /criproxy /opt/criproxy/bin/criproxy; fi; /opt/criproxy/bin/criproxy -alsologtostderr -v 2 -install && sleep Infinity"],
+              "volumeMounts": [
+                {
+                  "name": "criproxybin",
+                  "mountPath": "/opt/criproxy/bin"
+                },
+                {
+                  "name": "run",
+                  "mountPath": "/run"
+                },
+                {
+                  "name": "dockersock",
+                  "mountPath": "/var/run/docker.sock"
+                },
+                {
+                  "name": "criproxyconf",
+                  "mountPath": "/etc/criproxy"
+                }
+              ]
+            }
+          ]
     spec:
-      # TODO: hostPID: true for VMs to survive libvirt restart
       hostNetwork: true
+      # hostPID is true to (1) enable VMs to survive virtlet container restart
+      # (to be checked) and (2) to enable the use of nsenter in init container
+      hostPID: true
+      # bootstrap procedure needs admin access to apiserver
+      serviceAccountName: virtlet
       containers:
       - name: virtlet
         image: mirantis/virtlet
@@ -80,6 +125,12 @@ spec:
       - hostPath:
           path: /run
         name: run
+      # TODO: don't hardcode docker socket location here
+      # This will require CRI proxy installation to run
+      # in host mount namespace.
+      - hostPath:
+          path: /var/run/docker.sock
+        name: dockersock
       - hostPath:
           path: /var/lib/virtlet
         name: virtlet
@@ -95,3 +146,9 @@ spec:
       - hostPath:
           path: /var/lib/cni
         name: cnidata
+      - hostPath:
+          path: /opt/criproxy/bin
+        name: criproxybin
+      - hostPath:
+          path: /etc/criproxy
+        name: criproxyconf

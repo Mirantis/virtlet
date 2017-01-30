@@ -110,9 +110,24 @@ func TestPatchKubeletConfig(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	confFileName := path.Join(tmpDir, "kubelet.conf")
 
-	patched, dockerEndpoint, err := patchKubeletConfig(s.URL, s.URL, confFileName, tc)
-	if err != nil {
-		t.Fatalf("patchKubeletConfig(): %v", err)
+	b := NewBootstrap(&BootstrapConfig{
+		ConfigzBaseUrl:  s.URL,
+		StatsBaseUrl:    s.URL,
+		SavedConfigPath: confFileName,
+	}, tc)
+
+	if needToPatch, err := b.needToPatch(); err != nil {
+		t.Errorf("needToPatch(): %v", err)
+	} else if !needToPatch {
+		t.Errorf("needToPatch() reports no need to patch for unpatched config")
+	}
+
+	if err := b.obtainKubeletConfig(); err != nil {
+		t.Fatalf("obtainKubeletConfig(): %v", err)
+	}
+
+	if err := b.saveKubeletConfig(); err != nil {
+		t.Fatalf("saveKubeletConfig(): %v", err)
 	}
 
 	savedCfg, err := LoadKubeletConfig(confFileName)
@@ -120,16 +135,18 @@ func TestPatchKubeletConfig(t *testing.T) {
 		t.Fatalf("loadKubeletConfig: %v", err)
 	}
 
+	if err := b.patchKubeletConfig(); err != nil {
+		t.Fatalf("patchKubeletConfig(): %v", err)
+	}
+
 	if string(mustMarshalJson(savedCfg)) != string(mustMarshalJson(kubeCfg)) {
 		t.Fatalf("bad saved kubelet config: %s", spew.Sdump(savedCfg))
 	}
 
-	if dockerEndpoint != "unix:///var/run/docker.sock" {
+	if dockerEndpoint, err := b.dockerEndpoint(); err != nil {
+		t.Errorf("dockerEndpoint(): %v", err)
+	} else if dockerEndpoint != "unix:///var/run/docker.sock" {
 		t.Errorf("unexpected dockerEndpoint: %q", dockerEndpoint)
-	}
-
-	if !patched {
-		t.Errorf("patchKubeletConfig returned false")
 	}
 
 	actions := tc.Fake.Actions()
@@ -162,13 +179,10 @@ func TestPatchKubeletConfig(t *testing.T) {
 		t.Errorf("bad kubelet config diff:\n%s", m)
 	}
 
-	kubeCfg = newKubeCfg
-	patched, _, err = patchKubeletConfig(s.URL, s.URL, confFileName, tc)
-	if err != nil {
-		t.Errorf("Calling patchKubeletConfig() with already patched config failed: %v", err)
-	}
-	if patched {
-		t.Errorf("patchKubeletConfig() with already patched config call returned true")
+	if needToPatch, err := b.needToPatch(); err != nil {
+		t.Errorf("needToPatch(): %v", err)
+	} else if needToPatch {
+		t.Errorf("needToPatch() reports the need to patch for the patched config")
 	}
 }
 
@@ -337,7 +351,11 @@ func TestInstallCriProxyContainer(t *testing.T) {
 	checkerScript := writeScript(t, strings.Replace(checkerScriptText, "@@", checkFile, -1))
 	rm = append(rm, checkerScript)
 
-	containerId, err := installCriProxyContainer(dockerEndpoint, endpointToPass, fakeProxyScript, []string{"a", "b"})
+	b := NewBootstrap(&BootstrapConfig{
+		ProxyPath: fakeProxyScript,
+		ProxyArgs: []string{"a", "b"},
+	}, nil)
+	containerId, err := b.installCriProxyContainer(dockerEndpoint, endpointToPass)
 	if err != nil {
 		t.Fatalf("Failed to install CRI proxy container: %v", err)
 	}
