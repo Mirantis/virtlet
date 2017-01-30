@@ -17,29 +17,19 @@ limitations under the License.
 package main
 
 import (
-	"errors"
 	"flag"
-	"net"
-	"net/http"
+	"fmt"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/Mirantis/virtlet/pkg/criproxy"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	cfg "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
-	"k8s.io/kubernetes/pkg/kubelet/dockershim"
-	dockerremote "k8s.io/kubernetes/pkg/kubelet/dockershim/remote"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
-	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
-
 	"github.com/golang/glog"
 )
 
 const (
-	// XXX: fix this
+	// XXX: don't hardcode
 	connectionTimeout = 30 * time.Second
-	dockerShimSocket  = "/var/run/proxy-dockershim.sock"
 )
 
 var (
@@ -47,102 +37,97 @@ var (
 		"The unix socket to listen on, e.g. /run/virtlet.sock")
 	connect = flag.String("connect", "/var/run/dockershim.sock",
 		"CRI runtime ids and unix socket(s) to connect to, e.g. /var/run/dockershim.sock,alt:/var/run/another.sock")
+	kubeletConfigPath = flag.String("kletcfg", "/etc/criproxy/kubelet.conf", "path to saved kubelet config file")
+	apiServerHost     = flag.String("apiserver", "", "apiserver URL")
 )
 
-func getAddressForStreaming() (string, error) {
-	// FIXME: see kubelet.setNodeAddress
-	hostname, err := os.Hostname()
-	if err != nil {
-		return "", err
-	}
-	addrs, err := net.LookupIP(hostname)
-	for _, addr := range addrs {
-		if !addr.IsLoopback() && addr.To4() != nil {
-			return addr.String(), nil
-		}
-	}
-	return "", errors.New("unable to get IP address")
-}
-
-func startDockerShim() (string, error) {
-	streamingAddr, err := getAddressForStreaming()
-	if err != nil {
-		return "", err
-	}
-	var kubeCfg cfg.KubeletConfiguration
-	cfg.SetDefaults_KubeletConfiguration(&kubeCfg)
-	pluginSettings := dockershim.NetworkPluginSettings{
-		HairpinMode:       componentconfig.HairpinNone, // kubeCfg.HairpinMode, --- XXX
-		NonMasqueradeCIDR: kubeCfg.NonMasqueradeCIDR,   // XXX: was being taken from kubelet object
-		PluginName:        "cni",
-		PluginConfDir:     "/etc/kubernetes/cni/net.d",
-		PluginBinDir:      "/usr/lib/kubernetes/cni/bin", // XXX: cniBinDir
-		MTU:               int(kubeCfg.NetworkPluginMTU),
-	}
-	dockerClient := dockertools.ConnectToDockerOrDie(kubeCfg.DockerEndpoint, kubeCfg.RuntimeRequestTimeout.Duration)
-
-	streamingConfig := &streaming.Config{
-		Addr:                  streamingAddr + ":12345", // FIXME
-		StreamIdleTimeout:     kubeCfg.StreamingConnectionIdleTimeout.Duration,
-		StreamCreationTimeout: streaming.DefaultConfig.StreamCreationTimeout,
-		SupportedProtocols:    streaming.DefaultConfig.SupportedProtocols,
-	}
-
-	ds, err := dockershim.NewDockerService(dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage, streamingConfig, &pluginSettings, kubeCfg.RuntimeCgroups)
-	if err != nil {
-		return "", err
-	}
-
-	httpServer := &http.Server{
-		Addr:    streamingConfig.Addr,
-		Handler: ds,
-		// TODO: TLSConfig?
-	}
-	go func() {
-		if err := httpServer.ListenAndServe(); err != nil {
-			glog.Errorf("Failed to start http server: %v", err)
-		}
-	}()
-
-	server := dockerremote.NewDockerServer(dockerShimSocket, ds)
-	glog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
-	if err := server.Start(); err != nil {
-		return "", err
-	}
-
-	return dockerShimSocket, nil
-}
-
-func main() {
-	flag.Parse()
-
-	addrs := strings.Split(*connect, ",")
+func runCriProxy(connect, listen, savedConfigPath string) error {
+	addrs := strings.Split(connect, ",")
 	dockerStarted := false
+
+	kubeCfg, err := criproxy.LoadKubeletConfig(savedConfigPath)
+	if err != nil {
+		return err
+	}
+
 	for n, addr := range addrs {
 		if addr != "docker" {
 			continue
 		}
 		if dockerStarted {
-			glog.Errorf("More than one 'docker' endpoint is specified")
-			os.Exit(1)
+			return fmt.Errorf("More than one 'docker' endpoint is specified")
 		}
-		dockerEndpoint, err := startDockerShim()
+
+		dockerEndpoint, err := criproxy.StartDockerShim(kubeCfg)
 		if err != nil {
-			glog.Errorf("Failed to start docker-shim: %v", err)
-			os.Exit(1)
+			return fmt.Errorf("Failed to start docker-shim: %v", err)
 		}
 		addrs[n] = dockerEndpoint
 		dockerStarted = true
 	}
 
-	proxy, err := criproxy.NewRuntimeProxy(addrs, connectionTimeout)
+	cleanupDone := false
+	proxy, err := criproxy.NewRuntimeProxy(addrs, connectionTimeout, func() {
+		if cleanupDone {
+			return
+		}
+		// Perform the cleanup only when we're completely sure that kubelet
+		// with proper runtime is active. Otherwise the old containers may
+		// get recreated.
+		if err := criproxy.RemoveContainersFromDefaultDockerRuntime(kubeCfg); err != nil {
+			glog.Errorf("Container cleanup error: %v", err)
+		}
+		cleanupDone = true
+	})
 	if err != nil {
-		glog.Errorf("Error starting CRI proxy: %v", err)
-		os.Exit(1)
+		return fmt.Errorf("Error starting CRI proxy: %v", err)
 	}
-	glog.V(1).Infof("Starting CRI proxy on socket %s", *listen)
-	if err := proxy.Serve(*listen, nil); err != nil {
-		glog.Errorf("Serving failed: %v", err)
+	glog.V(1).Infof("Starting CRI proxy on socket %s", listen)
+	if err := proxy.Serve(listen, nil); err != nil {
+		return fmt.Errorf("Serving failed: %v", err)
+	}
+	return nil
+}
+
+func installCriProxy(execPath, savedConfigPath string) error {
+	changed, err := criproxy.EnsureCRIProxy(&criproxy.BootstrapConfig{
+		ApiServerHost:   *apiServerHost,
+		ConfigzBaseUrl:  "https://127.0.0.1:10250",
+		StatsBaseUrl:    "http://127.0.0.1:10255",
+		SavedConfigPath: savedConfigPath,
+		ProxyPath:       execPath,
+		ProxyArgs: []string{
+			// TODO: don't hardcode
+			"-v",
+			"3",
+			"-alsologtostderr",
+			"-connect",
+			"docker,virtlet:/run/virtlet.sock",
+		},
+		ProxySocketPath: "/run/criproxy.sock",
+	})
+	if !changed {
+		glog.V(1).Infof("Node configuration unchanged")
+	}
+	return err
+}
+
+func main() {
+	install := flag.Bool("install", false, "install criproxy container")
+	flag.Parse()
+
+	var err error
+	if *install {
+		err = installCriProxy(os.Args[0], *kubeletConfigPath)
+	} else {
+		err = runCriProxy(*connect, *listen, *kubeletConfigPath)
+	}
+	if err != nil {
+		glog.Error(err)
 		os.Exit(1)
 	}
 }
+
+// TODO: fix waiting for proxy socket
+// Testing:
+// /criproxy -alsologtostderr -v 2 -install -apiserver=http://172.30.0.2:8080

@@ -84,6 +84,8 @@ func mustMarshalJson(data interface{}) []byte {
 func TestPatchKubeletConfig(t *testing.T) {
 	var kubeCfg cfg.KubeletConfiguration
 	api.Scheme.Default(&kubeCfg)
+	kubeCfg.CNIConfDir = "/etc/kubernetes/cni/net.d"
+	kubeCfg.CNIBinDir = "/usr/lib/kubernetes/cni/bin"
 
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var v interface{}
@@ -204,14 +206,14 @@ func runCommandViaDocker(t *testing.T, shellCommand, stdin string) string {
 		t.Fatalf("Can't create Docker client: %v", err)
 	}
 
-	if err := pullImage(ctx, client, busyboxImageName, false); err != nil {
+	if err := pullImage(ctx, client, BusyboxImageName, false); err != nil {
 		t.Fatalf("Failed to pull busybox image: %v", err)
 	}
 
 	haveStdin := stdin != ""
 	containerName := fmt.Sprintf("criproxy-test-%d", time.Now().UnixNano())
 	resp, err := client.ContainerCreate(ctx, &dockercontainer.Config{
-		Image:       busyboxImageName,
+		Image:       BusyboxImageName,
 		Cmd:         []string{"/bin/sh", "-c", shellCommand},
 		AttachStdin: haveStdin,
 		OpenStdin:   haveStdin,
@@ -289,11 +291,11 @@ const (
 	fakeProxyScriptText = `#!/bin/sh
 if [ ! -f @@ ]; then
   # the checker will have to wait
-  echo >&2 "/run not mounted"
+  echo >&2 "fail: host /run not accessible"
 elif [ "$1" != a -o "$2" != b ]; then
   echo "fail: args not passed" >@@
 elif [ ! -S /var/run/docker.sock ]; then
-  echo "Failed to locate /var/run/docker.sock" >@@
+  echo "fail: can't locate /var/run/docker.sock" >@@
 else
   echo ok > @@
 fi
@@ -303,6 +305,7 @@ sleep 10000
 for i in $(seq 1 60); do
   if grep fail @@; then
     cat >&2 @@
+    exit 1
   elif grep ok @@; then
     exit 0
   fi

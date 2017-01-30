@@ -22,16 +22,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
+	"path"
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
+
 	// TODO: switch to https://github.com/docker/docker/tree/master/client
 	// Docker version used in k8s is too old for it
-	dockermessage "github.com/docker/docker/pkg/jsonmessage"
 	dockerclient "github.com/docker/engine-api/client"
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
@@ -46,12 +48,12 @@ import (
 )
 
 const (
+	BusyboxImageName = "busybox:1.26.2"
 	// TODO: use the same constant/setting in different parts of code
 	proxyRuntimeEndpoint    = "/run/criproxy.sock"
-	internalDockerEndpoint  = "/var/run/docker.sock"
-	busyboxImageName        = "busybox:1.26.2"
 	proxyStopTimeoutSeconds = 5
 	confFileMode            = 0600
+	confDirMode             = 0700
 )
 
 var kubeletSettingsForCriProxy map[string]interface{} = map[string]interface{}{
@@ -63,6 +65,7 @@ var kubeletSettingsForCriProxy map[string]interface{} = map[string]interface{}{
 
 func loadJson(baseUrl, suffix string) (map[string]interface{}, error) {
 	url := strings.TrimSuffix(baseUrl, "/") + suffix
+	glog.V(1).Infof("Loading url %q", url)
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
@@ -82,13 +85,18 @@ func loadJson(baseUrl, suffix string) (map[string]interface{}, error) {
 	return r, nil
 }
 
-func writeJson(data interface{}, path string) error {
+func writeJson(data interface{}, file string) error {
+	glog.V(1).Infof("Writing config file: %q", file)
+	dir := path.Dir(file)
+	if err := os.MkdirAll(dir, confDirMode); err != nil {
+		return fmt.Errorf("failed to make conf dir: %v", err)
+	}
 	bs, err := json.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("failed to marshal json: %v", err)
 	}
-	if err := ioutil.WriteFile(path, bs, confFileMode); err != nil {
-		return fmt.Errorf("error writing %q: %v", path, err)
+	if err := ioutil.WriteFile(file, bs, confFileMode); err != nil {
+		return fmt.Errorf("error writing %q: %v", file, err)
 	}
 	return nil
 }
@@ -113,6 +121,7 @@ func kubeletUpdated(kubeletCfg map[string]interface{}) bool {
 	}
 	return true
 }
+
 func updateKubeletConfig(kubeletCfg map[string]interface{}) {
 	for k, v := range kubeletSettingsForCriProxy {
 		kubeletCfg[k] = v
@@ -152,17 +161,27 @@ func buildConfigMap(nodeName string, kubeletCfg map[string]interface{}) *api.Con
 }
 
 func putConfigMap(cs clientset.Interface, configMap *api.ConfigMap) error {
+	glog.V(1).Infof("Putting ConfigMap %q in namespace %q", configMap.Name, configMap.Namespace)
 	_, err := cs.Core().ConfigMaps("kube-system").Create(configMap)
 	return err
 }
 
 func patchKubeletConfig(configzBaseUrl, statsBaseUrl, savedConfigPath string, cs clientset.Interface) (patched bool, dockerEndpoint string, err error) {
+	_, err = os.Stat(savedConfigPath)
+	if err == nil {
+		glog.V(1).Infof("config file already exists: %q", savedConfigPath)
+		return false, "", nil
+	}
+	if !os.IsNotExist(err) {
+		return false, "", fmt.Errorf("failed to check for existing config: %v", err)
+	}
+
 	kubeletCfg, err := getKubeletConfig(configzBaseUrl)
 	if err != nil {
 		return false, "", err
 	}
 	if kubeletUpdated(kubeletCfg) {
-		return false, "", nil
+		return false, "", fmt.Errorf("kubelet already configured for CRI, but no saved config")
 	}
 	if err := writeJson(kubeletCfg, savedConfigPath); err != nil {
 		return false, "", err
@@ -173,44 +192,23 @@ func patchKubeletConfig(configzBaseUrl, statsBaseUrl, savedConfigPath string, cs
 	if !ok {
 		return false, "", errors.New("failed to retrieve docker endpoint from kubelet config")
 	}
+	glog.V(1).Infof("Using docker endpoint %q", dockerEp)
 
 	nodeName, err := getNodeNameFromKubelet(statsBaseUrl)
 	if err != nil {
 		return false, "", err
 	}
+	glog.V(1).Infof("Node name: %q", nodeName)
 	if err := putConfigMap(cs, buildConfigMap(nodeName, kubeletCfg)); err != nil {
 		return false, "", fmt.Errorf("failed to put ConfigMap: %v", err)
 	}
 	return true, dockerEp, nil
 }
 
-func pullImage(ctx context.Context, client *dockerclient.Client, imageName string, print bool) error {
-	resp, err := client.ImagePull(ctx, imageName, dockertypes.ImagePullOptions{})
-	if err != nil {
-		return fmt.Errorf("Failed to pull busybox image: %v", err)
-	}
-
-	decoder := json.NewDecoder(resp)
-	for {
-		var msg dockermessage.JSONMessage
-		err := decoder.Decode(&msg)
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return fmt.Errorf("error decoding docker message: %v", err)
-		}
-		if msg.Error != nil {
-			return msg.Error
-		}
-		if print {
-			fmt.Println(msg.Status)
-		}
-	}
-	return nil
-}
-
 func installCriProxyContainer(dockerEndpoint, endpointToPass, proxyPath string, args []string) (string, error) {
+	// CRI proxy container actually uses host namespaces to run.
+	// It just uses docker's 'always' restart policy as a poor man's
+	// substitute for a process manager.
 	ctx := context.Background()
 
 	client, err := dockerclient.NewClient(dockerEndpoint, "", nil, nil)
@@ -225,6 +223,7 @@ func installCriProxyContainer(dockerEndpoint, endpointToPass, proxyPath string, 
 	})
 	if len(containers) > 0 {
 		for _, container := range containers {
+			glog.V(1).Infof("Removing old CRI proxy container %s", container.ID)
 			if err := client.ContainerRemove(ctx, container.ID, dockertypes.ContainerRemoveOptions{
 				Force: true,
 			}); err != nil {
@@ -233,30 +232,28 @@ func installCriProxyContainer(dockerEndpoint, endpointToPass, proxyPath string, 
 		}
 	}
 
-	if err := pullImage(ctx, client, busyboxImageName, true); err != nil {
+	if err := pullImage(ctx, client, BusyboxImageName, true); err != nil {
 		return "", fmt.Errorf("failed to pull busybox image: %v", err)
 	}
 
-	binds := []string{
-		"/run:/run",
-		fmt.Sprintf("%s:%s", proxyPath, "/criproxy"),
-	}
-	if strings.HasPrefix(endpointToPass, "unix://") {
-		// mount the endpoint as a fixed path into the proxy container
-		socketPath := strings.TrimPrefix(endpointToPass, "unix://")
-		binds = append(binds, fmt.Sprintf("%s:%s", socketPath, internalDockerEndpoint))
-		endpointToPass = "unix://" + internalDockerEndpoint
-	}
 	containerName := fmt.Sprintf("criproxy-%d", time.Now().UnixNano())
 	resp, err := client.ContainerCreate(ctx, &dockercontainer.Config{
-		Image:  busyboxImageName,
+		Image:  BusyboxImageName,
 		Labels: map[string]string{"criproxy": "true"},
 		Env:    []string{"DOCKER_HOST=" + endpointToPass},
-		Cmd:    append([]string{"/criproxy"}, args...),
+		Cmd: append([]string{
+			"nsenter",
+			"--mount=/proc/1/ns/mnt",
+			"--",
+			proxyPath,
+		}, args...),
 	}, &dockercontainer.HostConfig{
-		// the proxy should be able to connect to a docker endpoint on localhost, too
+		Privileged:  true,
 		NetworkMode: "host",
-		Binds:       binds,
+		UTSMode:     "host",
+		PidMode:     "host",
+		IpcMode:     "host",
+		UsernsMode:  "host",
 		RestartPolicy: dockercontainer.RestartPolicy{
 			Name: "always",
 		},
@@ -270,10 +267,12 @@ func installCriProxyContainer(dockerEndpoint, endpointToPass, proxyPath string, 
 		})
 		return "", fmt.Errorf("failed to start CRI proxy container: %v", err)
 	}
+	glog.Infof("Started container %s", resp.ID)
 	return resp.ID, nil
 }
 
 type BootstrapConfig struct {
+	ApiServerHost   string
 	ConfigzBaseUrl  string
 	StatsBaseUrl    string
 	SavedConfigPath string
@@ -286,9 +285,20 @@ func EnsureCRIProxy(bootConfig *BootstrapConfig) (bool, error) {
 	if bootConfig.ConfigzBaseUrl == "" || bootConfig.StatsBaseUrl == "" || bootConfig.ProxyPath == "" || bootConfig.ProxySocketPath == "" {
 		return false, errors.New("invalid BootstrapConfig")
 	}
-	config, err := restclient.InClusterConfig()
-	if err != nil {
-		return false, fmt.Errorf("failed to get REST client config: %v", err)
+
+	if !strings.HasPrefix(path.Clean(bootConfig.ProxySocketPath), "/run/") {
+		return false, fmt.Errorf("proxy socket path %q not under /run", bootConfig.ProxySocketPath)
+	}
+
+	var err error
+	var config *restclient.Config
+	if bootConfig.ApiServerHost == "" {
+		config, err = restclient.InClusterConfig()
+		if err != nil {
+			return false, fmt.Errorf("failed to get REST client config: %v", err)
+		}
+	} else {
+		config = &restclient.Config{Host: bootConfig.ApiServerHost}
 	}
 
 	clientset, err := clientset.NewForConfig(config)
@@ -301,6 +311,7 @@ func EnsureCRIProxy(bootConfig *BootstrapConfig) (bool, error) {
 		return false, err
 	}
 	if !patched {
+		glog.V(1).Infof("Kubelet configuration already patched, exiting")
 		return false, nil
 	}
 
@@ -311,6 +322,9 @@ func EnsureCRIProxy(bootConfig *BootstrapConfig) (bool, error) {
 	}
 
 	err = waitForSocket(bootConfig.ProxySocketPath)
+	if err == nil {
+		glog.V(1).Info("CRI proxy bootstrap complete")
+	}
 	return err == nil, err
 }
 
@@ -325,3 +339,8 @@ func LoadKubeletConfig(path string) (*cfg.KubeletConfiguration, error) {
 	}
 	return &cfg, err
 }
+
+// TODO: kubectl label node "${node_name}" extraRuntime=virtlet
+// but 'virtlet' part should be customizable
+// OR: rather keep it in the script. It should determine
+// on which nodes to deploy the ds

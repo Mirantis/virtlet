@@ -277,12 +277,19 @@ type RuntimeProxy struct {
 }
 
 // NewRuntimeProxy creates a new internalapi.RuntimeService.
-func NewRuntimeProxy(addrs []string, connectionTimout time.Duration) (*RuntimeProxy, error) {
+func NewRuntimeProxy(addrs []string, connectionTimout time.Duration, hook func()) (*RuntimeProxy, error) {
 	if len(addrs) == 0 {
 		return nil, errors.New("no sockets specified to connect to")
 	}
 
-	r := &RuntimeProxy{server: grpc.NewServer()}
+	var opts []grpc.ServerOption
+	if hook != nil {
+		opts = append(opts, grpc.UnaryInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+			hook()
+			return handler(ctx, req)
+		}))
+	}
+	r := &RuntimeProxy{server: grpc.NewServer(opts...)}
 	for _, addr := range addrs {
 		r.clients = append(r.clients, newApiClient(addr, connectionTimout))
 	}
