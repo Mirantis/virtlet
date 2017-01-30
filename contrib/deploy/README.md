@@ -1,6 +1,10 @@
 # Deploying virtlet as a DaemonSet
 
-1. Start [kubeadm-dind-cluster](https://github.com/Mirants/kubeadm-dind-cluster) on [this k8s fork](https://github.com/ivan4th/kubernetes/tree/mixed-container-runtime-mode)
+1. Start [kubeadm-dind-cluster](https://github.com/Mirants/kubeadm-dind-cluster).
+   Virtlet may work with other cluster deployment methods too,
+   but the important part is passing
+   `--feature-gates=StreamingProxyRedirects=true` to apiserver and
+   `--feature-gates=DynamicKubeletConfig=true` to kubelet.
 2. 'Virtletify' `kube-node-1`:
 ```
 ./virtletify-dind-node.sh
