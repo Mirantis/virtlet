@@ -58,6 +58,8 @@ spec:
           name: cniconf
         - mountPath: /opt/cni/bin
           name: cnibin
+        - mountPath: /var/lib/cni
+          name: cnidata
         securityContext:
           privileged: true
         env:
@@ -90,3 +92,6 @@ spec:
       - hostPath:
           path: /usr/lib/kubernetes/cni/bin
         name: cnibin
+      - hostPath:
+          path: /var/lib/cni
+        name: cnidata
