@@ -117,6 +117,10 @@ type Bootstrap struct {
 	kubeletCfg map[string]interface{}
 }
 
+// NewBootstrap creates a new Bootstrap object used for CRI proxy
+// bootstrap using the specified BootstrapConfig. cs argument
+// is used to pass a fake Clientset during tests, it should
+// be nil when performing real bootstrap.
 func NewBootstrap(config *BootstrapConfig, cs clientset.Interface) *Bootstrap {
 	return &Bootstrap{config: config, clientset: cs}
 }
@@ -313,6 +317,8 @@ func (b *Bootstrap) initClientset() error {
 	return nil
 }
 
+// EnsureCRIProxy checks whether kubelet configuration file exists
+// and performs CRI proxy bootstrap procedure if it doesn't.
 func (b *Bootstrap) EnsureCRIProxy() (bool, error) {
 	if b.config.ConfigzBaseUrl == "" || b.config.StatsBaseUrl == "" || b.config.ProxyPath == "" || b.config.ProxySocketPath == "" {
 		return false, errors.New("invalid BootstrapConfig")
@@ -364,6 +370,7 @@ func (b *Bootstrap) EnsureCRIProxy() (bool, error) {
 	return true, nil
 }
 
+// LoadKubeletConfig loads kubelet configuration from a json file
 func LoadKubeletConfig(path string) (*cfg.KubeletConfiguration, error) {
 	bs, err := ioutil.ReadFile(path)
 	if err != nil {

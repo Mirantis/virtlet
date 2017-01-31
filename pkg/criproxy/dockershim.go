@@ -87,6 +87,8 @@ func getAddressForStreaming() (string, error) {
 	return "", errors.New("unable to get IP address")
 }
 
+// StartDockerShim starts in-process docker-shim using the specified
+// kubelet configuration
 func StartDockerShim(kubeCfg *cfg.KubeletConfiguration) (string, error) {
 	hairpinMode, err := effectiveHairpinMode(componentconfig.HairpinMode(kubeCfg.HairpinMode), kubeCfg.ContainerRuntime, kubeCfg.NetworkPluginName)
 	if err != nil {
