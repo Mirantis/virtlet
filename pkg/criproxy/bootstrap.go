@@ -172,7 +172,7 @@ func (b *Bootstrap) getNodeNameFromKubelet() (string, error) {
 func (b *Bootstrap) buildConfigMap(nodeName string) *api.ConfigMap {
 	text, err := json.Marshal(b.kubeletCfg)
 	if err != nil {
-		log.Panicf("couldn't marshal kubelet config: %v", err)
+		log.Panicf("Couldn't marshal kubelet config: %v", err)
 	}
 	return &api.ConfigMap{
 		ObjectMeta: api.ObjectMeta{
@@ -194,7 +194,7 @@ func (b *Bootstrap) putConfigMap(configMap *api.ConfigMap) error {
 func (b *Bootstrap) needToPatch() (bool, error) {
 	_, err := os.Stat(b.config.SavedConfigPath)
 	if err == nil {
-		glog.V(1).Infof("config file already exists: %q", b.config.SavedConfigPath)
+		glog.V(1).Infof("Config file already exists: %q", b.config.SavedConfigPath)
 		return false, nil
 	}
 	if os.IsNotExist(err) {

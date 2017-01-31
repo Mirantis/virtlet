@@ -53,7 +53,7 @@ func getStruct(s interface{}) reflect.Value {
 		v = v.Elem()
 	}
 	if v.Kind() != reflect.Struct {
-		log.Panicf("struct or pointer to struct expected, but got %#v", s)
+		log.Panicf("Struct or pointer to struct expected, but got %#v", s)
 	}
 	return v
 }
@@ -62,7 +62,7 @@ func diffStructs(old, new interface{}) map[string]interface{} {
 	vOld := getStruct(old)
 	vNew := getStruct(new)
 	if vOld.Type() != vNew.Type() {
-		log.Panicf("got different struct types")
+		log.Panicf("Got different struct types")
 	}
 	r := make(map[string]interface{})
 	for i, n := 0, vOld.NumField(); i < n; i++ {
