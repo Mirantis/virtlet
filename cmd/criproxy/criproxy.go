@@ -37,7 +37,7 @@ var (
 		"The unix socket to listen on, e.g. /run/virtlet.sock")
 	connect = flag.String("connect", "/var/run/dockershim.sock",
 		"CRI runtime ids and unix socket(s) to connect to, e.g. /var/run/dockershim.sock,alt:/var/run/another.sock")
-	kubeletConfigPath = flag.String("kletcfg", "/etc/criproxy/kubelet.conf", "path to saved kubelet config file")
+	kubeletConfigPath = flag.String("kubeletcfg", "/etc/criproxy/kubelet.conf", "path to saved kubelet config file")
 	apiServerHost     = flag.String("apiserver", "", "apiserver URL")
 )
 
