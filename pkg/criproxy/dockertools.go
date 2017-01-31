@@ -83,5 +83,3 @@ func pullImage(ctx context.Context, client *dockerclient.Client, imageName strin
 	}
 	return nil
 }
-
-// TODO: remove containers by label(s)
