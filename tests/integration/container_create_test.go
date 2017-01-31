@@ -18,6 +18,8 @@ package integration
 
 import (
 	"os"
+	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/Mirantis/virtlet/tests/criapi"
@@ -30,7 +32,7 @@ func inTravis() bool {
 	return os.Getenv("TRAVIS") == "true"
 }
 
-func TestContainerCreateStart(t *testing.T) {
+func TestContainerCreateStartListRemove(t *testing.T) {
 	if inTravis() {
 		// Env vars are not passed to /vmwrapper
 		// QEMU fails with:
@@ -164,6 +166,9 @@ func TestContainerCreateStart(t *testing.T) {
 			Image:  imageSpecs[ind],
 			Mounts: []*kubeapi.Mount{{HostPath: &hostPath}},
 			Labels: containers[ind].Labels,
+			Metadata: &kubeapi.ContainerMetadata {
+				Name: sandboxes[ind].Metadata.Name,
+			},
 		}
 		containerIn := &kubeapi.CreateContainerRequest{
 			PodSandboxId:  sandboxOut.PodSandboxId,
@@ -173,23 +178,22 @@ func TestContainerCreateStart(t *testing.T) {
 
 		createContainerOut, err := runtimeServiceClient.CreateContainer(context.Background(), containerIn)
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("Creating container %s failure: %v", *sandboxes[ind].Metadata.Name, err)
 		}
-
+		t.Logf("Container created Sandbox: %v\n", sandbox)
 		containers[ind].ContainerId = *createContainerOut.ContainerId
 
 		_, err = runtimeServiceClient.StartContainer(context.Background(), &kubeapi.StartContainerRequest{ContainerId: &containers[ind].ContainerId})
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("Starting container %s failure: %v", containers[ind].ContainerId, err)
 		}
 	}
-
 	for _, tc := range filterTests {
 		listContainersRequest := &kubeapi.ListContainersRequest{Filter: tc.containerFilter}
 
 		listContainersOut, err := runtimeServiceClient.ListContainers(context.Background(), listContainersRequest)
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("Listing containers failure: %v", err)
 		}
 
 		if len(listContainersOut.Containers) != len(tc.expectedIds) {
@@ -207,6 +211,36 @@ func TestContainerCreateStart(t *testing.T) {
 			if !found {
 				t.Errorf("Didn't find expected sandbox id %s in returned containers list %v", *id, listContainersOut.Containers)
 			}
+		}
+	}
+	for _, container := range containers {
+                //Stop container request
+		containerStopIn := &kubeapi.StopContainerRequest {
+			ContainerId: &container.ContainerId,
+		}
+		_, err = runtimeServiceClient.StopContainer(context.Background(), containerStopIn)
+		if err != nil {
+			t.Fatalf("Stopping container %s failure: %v", container.ContainerId, err)
+		}
+
+		//Remove container request
+		containerRemoveIn := &kubeapi.RemoveContainerRequest {
+			ContainerId: &container.ContainerId,
+		}
+		_, err = runtimeServiceClient.RemoveContainer(context.Background(), containerRemoveIn)
+		if err != nil {
+			t.Fatalf("Removing container %s failure: %v", container.ContainerId, err)
+		}
+		//check all volumes related to VM have been removed
+		cmd := "virsh vol-list --pool volumes | grep " + container.ContainerId + " | wc -l"
+		t.Logf("Formed CMD to lookup volumes: %s\n", cmd)
+		out, err := exec.Command("bash","-c",cmd).Output()
+		if err != nil {
+			 t.Fatalf("Failed to execute command: %s", cmd)
+		}
+		outRes := strings.TrimSpace(string(out))
+		if outRes != "0" {
+			t.Errorf("Expected no ephemeral volumes for %s doamin but instead found %s!", container.ContainerId, outRes)
 		}
 	}
 }
