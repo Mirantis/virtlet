@@ -27,6 +27,8 @@ function ensure_build_image {
 function vcmd {
     ensure_build_image
     cd "${project_dir}"
+    # need to mount docker socket into the container because of
+    # CRI proxy deployment tests
     tar -C "${project_dir}" "${exclude[@]}" -cz . |
         docker run --rm --privileged -i \
                -l virtlet_build \
@@ -35,7 +37,9 @@ function vcmd {
                -v /sys/fs/cgroup:/sys/fs/cgroup \
                -v /lib/modules:/lib/modules:ro \
                -v /boot:/boot:ro \
+               -v /var/run/docker.sock:/var/run/docker.sock \
                -e TRAVIS="${TRAVIS:-}" \
+               -e CRIPROXY_TEST_REMOTE_DOCKER_ENDPOINT="${CRIPROXY_TEST_REMOTE_DOCKER_ENDPOINT:-}" \
                --name ${container_name} \
                "${build_image}" bash -c "tar -C '${remote_project_dir}' -xz && $*"
 }

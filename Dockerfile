@@ -24,3 +24,4 @@ CMD ["/start.sh"]
 # in build/test image and production one
 COPY _output/virtlet /usr/local/bin
 COPY _output/vmwrapper /
+COPY _output/criproxy /

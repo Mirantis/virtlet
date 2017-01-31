@@ -1,5 +1,5 @@
 /*
-Copyright 2016 Mirantis
+Copyright 2017 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/pmezard/go-difflib/difflib"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -55,9 +56,10 @@ type ServerWithReadinessFeedback interface {
 
 func startServer(t *testing.T, s ServerWithReadinessFeedback, addr string) {
 	readyCh := make(chan struct{})
-	errCh := make(chan error)
+	errCh := make(chan error, 1)
 	go func() {
 		if err := s.Serve(addr, readyCh); err != nil {
+			glog.Errorf("error starting server @ %q: %v", addr, err)
 			errCh <- err
 		}
 	}()
@@ -89,18 +91,15 @@ func puint64(v uint64) *uint64 {
 }
 
 type proxyTester struct {
-	journal *proxytest.SimpleJournal
-	servers []*proxytest.FakeCriServer
-	proxy   *RuntimeProxy
-	conn    *grpc.ClientConn
+	hookCallCount int
+	journal       *proxytest.SimpleJournal
+	servers       []*proxytest.FakeCriServer
+	proxy         *RuntimeProxy
+	conn          *grpc.ClientConn
 }
 
 func newProxyTester(t *testing.T) *proxyTester {
 	journal := proxytest.NewSimpleJournal()
-	proxy, err := NewRuntimeProxy([]string{fakeCriSocketPath1, altSocketSpec}, connectionTimeoutForTests)
-	if err != nil {
-		t.Fatalf("failed to create runtime proxy: %v", err)
-	}
 	servers := []*proxytest.FakeCriServer{
 		proxytest.NewFakeCriServer(proxytest.NewPrefixJournal(journal, "1/")),
 		proxytest.NewFakeCriServer(proxytest.NewPrefixJournal(journal, "2/")),
@@ -114,11 +113,19 @@ func newProxyTester(t *testing.T) *proxyTester {
 	servers[1].SetFakeImages(fakeImageNames2)
 	servers[1].SetFakeImageSize(fakeImageSize2)
 
-	return &proxyTester{
+	tester := &proxyTester{
 		journal: journal,
 		servers: servers,
-		proxy:   proxy,
 	}
+	var err error
+	tester.proxy, err = NewRuntimeProxy([]string{fakeCriSocketPath1, altSocketSpec}, connectionTimeoutForTests, func() {
+		tester.hookCallCount++
+	})
+	if err != nil {
+		t.Fatalf("failed to create runtime proxy: %v", err)
+	}
+
+	return tester
 }
 
 func (tester *proxyTester) startServers(t *testing.T, which int) {
@@ -206,7 +213,7 @@ func TestCriProxy(t *testing.T) {
 	tester.startProxy(t)
 	tester.connectToProxy(t)
 
-	for _, step := range []struct {
+	testCases := []struct {
 		name, method string
 		in, resp     interface{}
 		ins          []interface{}
@@ -1092,7 +1099,10 @@ func TestCriProxy(t *testing.T) {
 			},
 			journal: []string{"1/image/ListImages", "2/image/ListImages"},
 		},
-	} {
+	}
+
+	nCalls := 0
+	for _, step := range testCases {
 		var ins []interface{}
 		if step.ins == nil {
 			ins = []interface{}{step.in}
@@ -1108,11 +1118,15 @@ func TestCriProxy(t *testing.T) {
 			if len(ins) > 1 {
 				name = fmt.Sprintf("%s [%d]", name, n+1)
 			}
+			nCalls++
 			t.Run(name, func(t *testing.T) {
 				tester.verifyCall(t, step.method, in, step.resp, step.error)
 				tester.verifyJournal(t, step.journal)
 			})
 		}
+	}
+	if tester.hookCallCount != nCalls {
+		t.Errorf("unexpected hook call count: %d instead of %d", tester.hookCallCount, nCalls)
 	}
 }
 
