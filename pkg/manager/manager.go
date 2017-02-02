@@ -355,6 +355,13 @@ func (v *VirtletManager) RemoveContainer(ctx context.Context, in *kubeapi.Remove
 		return nil, err
 	}
 
+	storagePool := v.libvirtVirtualizationTool.GetStoragePool()
+	if virtletVolsDesc, exists := containerInfo.SandBoxAnnotations[libvirttools.VirtletVolumesAnnotationKeyName]; exists {
+		if err := storagePool.CleanAttachedVolumes(virtletVolsDesc, containerId); err != nil {
+			return nil, err
+		}
+	}
+
 	response := &kubeapi.RemoveContainerResponse{}
 	return response, nil
 }

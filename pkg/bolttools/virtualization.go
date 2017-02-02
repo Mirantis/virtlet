@@ -34,6 +34,7 @@ type ContainerInfo struct {
 	RootImageSnapshotName string
 	Labels                map[string]string
 	Annotations           map[string]string
+	SandBoxAnnotations    map[string]string
 	State                 kubeapi.ContainerState
 }
 
@@ -207,6 +208,22 @@ func (b *BoltClient) GetContainerInfo(containerId string) (*ContainerInfo, error
 			return err
 		}
 
+		// Get Annotations from SandBox
+		sandboxBucket := tx.Bucket([]byte("sandbox"))
+		if sandboxBucket == nil {
+			return fmt.Errorf("bucket 'sandbox' doesn't exist")
+		}
+
+		sandboxIDBucket := sandboxBucket.Bucket([]byte(sandboxId))
+		if sandboxIDBucket == nil {
+			return fmt.Errorf("Sandbox bucket '%s' doesn't exist", sandboxId)
+		}
+
+		byteSandBoxAnnotations, err := get(sandboxIDBucket, []byte("annotations"))
+		if err != nil {
+			return err
+		}
+
 		rootImageSnapshotName, err := getString(bucket, "rootImageSnapshotName")
 		if err != nil {
 			return err
@@ -237,6 +254,11 @@ func (b *BoltClient) GetContainerInfo(containerId string) (*ContainerInfo, error
 			return err
 		}
 
+		var sandBoxAnnotations map[string]string
+		if err := json.Unmarshal(byteSandBoxAnnotations, &sandBoxAnnotations); err != nil {
+			return err
+		}
+
 		byteState, err := get(bucket, []byte("state"))
 		if err != nil {
 			return err
@@ -249,6 +271,7 @@ func (b *BoltClient) GetContainerInfo(containerId string) (*ContainerInfo, error
 			Image:     image,
 			RootImageSnapshotName: rootImageSnapshotName,
 			Labels:                labels,
+			SandBoxAnnotations:    sandBoxAnnotations,
 			Annotations:           annotations,
 			State:                 kubeapi.ContainerState(byteState[0]),
 		}
