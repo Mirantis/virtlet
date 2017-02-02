@@ -17,10 +17,13 @@ limitations under the License.
 package libvirttools
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/golang/glog"
 	libvirt "github.com/libvirt/libvirt-go"
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 const (
@@ -33,6 +36,32 @@ type Volume struct {
 	tool   StorageOperations
 	Name   string
 	volume *libvirt.StorageVol
+}
+
+type VirtletVolume struct {
+	Name string         `json:"Name"`
+	Format string       `json:"Format"`
+	Capacity int        `json:"Capacity"`
+	CapacityUnit string `json:"CapacityUnit"`
+}
+
+func (vol *VirtletVolume) UnmarshalJSON(data []byte) error {
+	// volAlias is needed to prevent recursive calls to UnmarshalJSON
+	type volAlias VirtletVolume
+	volWithDefaults := &volAlias{
+		Format: "qcow2",
+		Capacity: defaultCapacity,
+		CapacityUnit: defaultCapacityUnit,
+	}
+
+	err := json.Unmarshal(data, volWithDefaults)
+
+	if (err == nil && volWithDefaults.Name == "") {
+		return fmt.Errorf("Validation failed for volumes definition within pod's annotations: volume name is mandatory.")
+	}
+
+	*vol = VirtletVolume(*volWithDefaults)
+	return err
 }
 
 func (v *Volume) Remove() error {
@@ -226,6 +255,63 @@ func (s *StorageTool) RemoveVolume(name string) error {
 
 func (s *StorageTool) ListVolumes() ([]*VolumeInfo, error) {
 	return s.pool.ListVolumes()
+}
+
+func (s *StorageTool) CleanAttachedVolumes(virtletVolsDesc string, containerId string) error {
+
+	var vols []VirtletVolume
+	if err := json.Unmarshal([]byte(virtletVolsDesc), &vols); err != nil {
+		glog.Errorf("Error when unmarshalling json string with volumes description '%s' for container %s: %v", virtletVolsDesc, containerId, err)
+	}
+
+	for _, virtletVol := range vols {
+		volName := containerId + "-" + virtletVol.Name
+		if err := s.RemoveVolume(volName); err != nil {
+			glog.Errorf("Error during removal of volume '%s' for container %s: %v", volName, containerId, err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *StorageTool) CreateVolumesToBeAttached(virtletVolsDesc string, containerId string) ([]string, error) {
+	var volumesXML []string
+	var virtletVols []VirtletVolume
+	if err := json.Unmarshal([]byte(virtletVolsDesc), &virtletVols); err != nil {
+		glog.Errorf("Error when unmarshalling json string with volumes description '%s' for container %s: %v", virtletVolsDesc, containerId, err)
+	}
+
+	diskLetter := strings.Split("bcdefghijklmnopqrstu", "")
+
+	for ind, virtletVol := range virtletVols {
+		if ind == len(diskLetter) {
+			fmt.Errorf("Had to omit creating and attaching of one ore more volumes. Limit on number is: %d", ind)
+			break
+		}
+
+		volName := containerId + "-" + virtletVol.Name
+		vol, err := s.CreateVolume(volName, defaultCapacity, defaultCapacityUnit)
+		if err != nil {
+			glog.Errorf("Error during creation of volume'%s' with virtlet description %s: %v", volName, virtletVol, err)
+			return nil, err
+		}
+
+		path, err := vol.GetPath()
+		if err != nil {
+			return nil, err
+		}
+
+		err = utils.FormatDisk(path)
+		if err != nil {
+			return nil, err
+		}
+
+		volXML := fmt.Sprintf(volXMLTemplate, path, "vd" + diskLetter[ind])
+		volumesXML = append(volumesXML, volXML)
+	}
+
+	return volumesXML, nil
 }
 
 func (s *StorageTool) PullImageToVolume(path, volumeName string) error {

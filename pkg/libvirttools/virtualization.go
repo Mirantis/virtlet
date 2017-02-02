@@ -43,6 +43,8 @@ const (
 	defaultEmulator   = "/usr/bin/kvm"
 	noKvmDomainType   = "qemu"
 	noKvmEmulator     = "/usr/bin/qemu-system-x86_64"
+
+	VirtletVolumesAnnotationKeyName = "VirtletVolumes"
 )
 
 type Driver struct {
@@ -210,11 +212,11 @@ func generateDomXML(useKvm bool, name string, memory int64, memoryUnit string, u
 	return fmt.Sprintf(domXML, domainType, uuid, name, uuid, memoryUnit, memory, cpuNum, cpuShare, cpuPeriod, cpuQuota, imageFilepath, emulator, netNSPath, cniConfigEscaped)
 }
 
-var volXML string = `
+var volXMLTemplate string = `
 <disk type='file' device='disk'>
     <driver name='qemu' type='raw'/>
     <source file='%s'/>
-    <target dev='vda' bus='virtio'/>
+    <target dev='%s' bus='virtio'/>
 </disk>`
 
 func (v *VirtualizationTool) createBootImageSnapshot(imageName, backingStorePath string) (string, error) {
@@ -227,11 +229,8 @@ func (v *VirtualizationTool) createBootImageSnapshot(imageName, backingStorePath
 	return vol.GetPath()
 }
 
-func (v *VirtualizationTool) createVolumes(containerName string, mounts []*kubeapi.Mount, domXML string) (string, error) {
+func (v *VirtualizationTool) addAttachedVolumesXML(uuid string, virtletVolsDesc string, domXML string) (string, error) {
 	copyDomXML := domXML
-	if len(mounts) == 0 {
-		return domXML, nil
-	}
 	glog.V(3).Infof("INPUT domain:\n%s\n\n", domXML)
 	domainXML := &Domain{}
 	err := xml.Unmarshal([]byte(domXML), domainXML)
@@ -239,31 +238,14 @@ func (v *VirtualizationTool) createVolumes(containerName string, mounts []*kubea
 		return domXML, err
 	}
 
-	for _, mount := range mounts {
-		volumeName := containerName + "_" + strings.Replace(mount.GetContainerPath(), "/", "_", -1)
-		if mount.GetHostPath() != "" {
-			vol, err := v.volumeStorage.LookupVolume(volumeName)
-			if vol == nil {
-				vol, err = v.volumeStorage.CreateVolume(volumeName, defaultCapacity, defaultCapacityUnit)
-			}
-			if err != nil {
-				return domXML, err
-			}
+	volumesXML, err := v.volumeStorage.CreateVolumesToBeAttached(virtletVolsDesc, uuid)
+	if err != nil {
+		return domXML, err
+	}
 
-			path, err := vol.GetPath()
-			if err != nil {
-				return copyDomXML, err
-			}
-
-			err = utils.FormatDisk(path)
-			if err != nil {
-				return copyDomXML, err
-			}
-
-			volXML = fmt.Sprintf(volXML, path)
+	for _, volXML := range volumesXML {
 			disk := &Disk{}
 			err = xml.Unmarshal([]byte(volXML), disk)
-			disk.Target.TargetDev = "vdc"
 			if err != nil {
 				return domXML, err
 			}
@@ -275,8 +257,6 @@ func (v *VirtualizationTool) createVolumes(containerName string, mounts []*kubea
 			}
 
 			domXML = string(outArr[:])
-			break
-		}
 	}
 	return domXML, nil
 }
@@ -305,6 +285,11 @@ func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, i
 	config := in.GetConfig()
 	name := config.GetMetadata().GetName()
 	sandboxId := in.GetPodSandboxId()
+	sandBoxAnnotations, err := boltClient.GetPodSandboxAnnotations(sandboxId)
+	if err != nil {
+		return "", err
+	}
+
 	if name == "" {
 		name = uuid
 	} else {
@@ -347,9 +332,12 @@ func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, i
 	cpuQuota := config.GetLinux().GetResources().GetCpuQuota()
 
 	domXML := generateDomXML(canUseKvm(), name, memory, memoryUnit, uuid, cpuNum, cpuShares, cpuPeriod, cpuQuota, snapshotImage, netNSPath, cniConfig)
-	domXML, err = v.createVolumes(name, in.Config.Mounts, domXML)
-	if err != nil {
-		return "", err
+
+	if virtletVolsDesc, exists := sandBoxAnnotations[VirtletVolumesAnnotationKeyName]; exists {
+		domXML, err = v.addAttachedVolumesXML(uuid, virtletVolsDesc, domXML)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	domXML = strings.Replace(domXML, "\"", "'", -1)
@@ -676,4 +664,8 @@ func (v *VirtualizationTool) ContainerStatus(boltClient *bolttools.BoltClient, c
 
 func (v *VirtualizationTool) RemoveVolume(name string) error {
 	return v.volumeStorage.RemoveVolume(name)
+}
+
+func (v *VirtualizationTool) GetStoragePool() *StorageTool {
+	return v.volumeStorage
 }
