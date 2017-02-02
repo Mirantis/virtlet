@@ -18,11 +18,14 @@ package integration
 
 import (
 	"os"
+	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/Mirantis/virtlet/tests/criapi"
 	"golang.org/x/net/context"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"fmt"
 )
 
 func inTravis() bool {
@@ -30,7 +33,7 @@ func inTravis() bool {
 	return os.Getenv("TRAVIS") == "true"
 }
 
-func TestContainerCreateStart(t *testing.T) {
+func TestContainerCreateStartListRemove(t *testing.T) {
 	if inTravis() {
 		// Env vars are not passed to /vmwrapper
 		// QEMU fails with:
@@ -50,6 +53,9 @@ func TestContainerCreateStart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to generate array of sandbox configs: %v", err)
 	}
+
+	sandboxes[0].Annotations["VirtletVolumes"]=`[{"Name": "vol1"}, {"Name": "vol2"}, {"Name": "vol3"}]`
+	sandboxes[0].Annotations["VirtletVolumes"]=`[{"Name": "vol1"}, {"Name": "vol2"}]`
 
 	containers, err := criapi.GetContainersConfig(sandboxes)
 	if err != nil {
@@ -164,6 +170,9 @@ func TestContainerCreateStart(t *testing.T) {
 			Image:  imageSpecs[ind],
 			Mounts: []*kubeapi.Mount{{HostPath: &hostPath}},
 			Labels: containers[ind].Labels,
+			Metadata: &kubeapi.ContainerMetadata {
+				Name: sandboxes[ind].Metadata.Name,
+			},
 		}
 		containerIn := &kubeapi.CreateContainerRequest{
 			PodSandboxId:  sandboxOut.PodSandboxId,
@@ -175,15 +184,31 @@ func TestContainerCreateStart(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-
+		t.Logf("Container created Sandbox: %v\n", sandbox)
 		containers[ind].ContainerId = *createContainerOut.ContainerId
 
 		_, err = runtimeServiceClient.StartContainer(context.Background(), &kubeapi.StartContainerRequest{ContainerId: &containers[ind].ContainerId})
 		if err != nil {
 			t.Fatal(err)
 		}
-	}
 
+		// Check attached volumes
+		vmName := *createContainerOut.ContainerId + "-" + *sandboxes[ind].Metadata.Name
+		cmd := "virsh domblklist " + vmName + " | grep " + *createContainerOut.ContainerId + "-vol.* | wc -l"
+		t.Logf("Formed CMD to lookup attached volumes: %s\n", cmd)
+		expRes := "0"
+		if _, exists := sandbox.Annotations["VirtletVolumes"]; exists {
+			expRes = fmt.Sprintf("%d", len(strings.Split(sandbox.Annotations["VirtletVolumes"], ",")))
+		}
+		out, err := exec.Command("bash","-c",cmd).Output()
+		if err != nil {
+			t.Fatalf("Failed to execute command: %s", cmd)
+		}
+		outRes := strings.TrimSpace(string(out))
+		if outRes != expRes {
+			t.Errorf("Expected %s attached ephemeral volumes, instead got %s!", expRes, outRes)
+		}
+	}
 	for _, tc := range filterTests {
 		listContainersRequest := &kubeapi.ListContainersRequest{Filter: tc.containerFilter}
 

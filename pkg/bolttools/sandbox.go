@@ -201,8 +201,8 @@ func (b *BoltClient) RemovePodSandbox(podId string) error {
 	})
 }
 
-func (b *BoltClient) GetPodSandboxContainerID(podId string) (string, error) {
-	var contID string
+func (b *BoltClient) fetchSandBoxValueByKey(podId string, key string) ([]byte, error ){
+	var value []byte
 	err := b.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte("sandbox"))
 		if bucket == nil {
@@ -215,11 +215,34 @@ func (b *BoltClient) GetPodSandboxContainerID(podId string) (string, error) {
 		}
 
 		var err error
-		contID, err = getString(sandboxBucket, "ContainerID")
+		value, err = get(sandboxBucket, []byte(key))
 
 		return err
 	})
-	return contID, err
+
+	return value, err
+}
+
+
+func (b *BoltClient) GetPodSandboxContainerID(podId string) (string, error) {
+	byteContID, err := b.fetchSandBoxValueByKey(podId, "ContainerID")
+	if err != nil {
+		return "", err
+	}
+	return string(byteContID), nil
+}
+
+func (b *BoltClient) GetPodSandboxAnnotations(podId string) (map[string]string, error) {
+	byteAnnotations, err := b.fetchSandBoxValueByKey(podId, "annotations")
+	if err != nil {
+		return nil, err
+	}
+
+	var annotations map[string]string
+	if err := json.Unmarshal(byteAnnotations, &annotations); err != nil {
+		return nil, err
+	}
+	return annotations, nil
 }
 
 func (b *BoltClient) GetPodSandboxStatus(podId string) (*kubeapi.PodSandboxStatus, error) {
