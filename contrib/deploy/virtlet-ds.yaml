@@ -47,7 +47,7 @@ spec:
               "image": "mirantis/virtlet",
               "imagePullPolicy": "IfNotPresent",
               "securityContext": { "privileged": true },
-              "command": ["/bin/sh", "-c", "if [ -f /etc/criproxy/kubelet.conf ]; then exit 0; fi; if [ ! -f /opt/criproxy/bin/criproxy ]; then cp /criproxy /opt/criproxy/bin/criproxy; fi; /opt/criproxy/bin/criproxy -alsologtostderr -v 2 -install && sleep Infinity"],
+              "command": ["/bin/sh", "-c", "if [ -f /etc/criproxy/kubelet.conf ]; then exit 0; fi; if [ ! -f /opt/criproxy/bin/criproxy ]; then mkdir -p /opt/criproxy/bin; cp /criproxy /opt/criproxy/bin/criproxy; fi; /opt/criproxy/bin/criproxy -alsologtostderr -v 2 -install && sleep Infinity"],
               "volumeMounts": [
                 {
                   "name": "criproxybin",
