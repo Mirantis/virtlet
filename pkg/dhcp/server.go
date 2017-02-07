@@ -1,5 +1,5 @@
 /*
-Copyright 2016 Mirantis
+Copyright 2016-2017 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 
 	"github.com/golang/glog"
 	"go.universe.tf/netboot/dhcp4"
@@ -207,6 +208,13 @@ func (s *Server) prepareResponse(pkt *dhcp4.Packet, serverIP net.IP, mt dhcp4.Me
 			p.Options[dhcp4.OptDNSServers] = defaultDNS
 		}
 	}
+	if len(s.config.CNIResult.DNS.Search) != 0 {
+		// https://tools.ietf.org/search/rfc3397
+		p.Options[119], err = compressedDomainList(s.config.CNIResult.DNS.Search)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	return p, nil
 }
@@ -270,4 +278,28 @@ func toDestinationDescriptor(network net.IPNet) []byte {
 
 func widthOfMaskToSignificantOctets(mask int) int {
 	return (mask + 7) / 8
+}
+
+func compressedDomainList(domainList []string) ([]byte, error) {
+	// https://tools.ietf.org/search/rfc1035#section-4.1.4
+	// simplified version, only encoding, without real compression
+	var b bytes.Buffer
+	for n, domain := range domainList {
+		// add '\0' between entries
+		if n > 0 {
+			b.WriteByte(0)
+		}
+
+		// encode domain parts as (single byte length)(string)
+		parts := strings.Split(domain, ".")
+		for _, part := range parts {
+			if len(part) > 254 {
+				return nil, fmt.Errorf("domain name element '%s' exceeds 254 length limit", part)
+			}
+			b.WriteByte(byte(len(part)))
+			b.WriteString(part)
+		}
+	}
+
+	return b.Bytes(), nil
 }
