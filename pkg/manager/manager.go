@@ -140,6 +140,17 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 		return nil, err
 	}
 
+	// Mimic kubelet's method of handling nameservers.
+	// As of k8s 1.5.2, kubelet doesn't use any nameserver information from CNI.
+	// CNI is used just to configure the network namespace and CNI DNS
+	// info is ignored. Instead of this, DnsConfig from PodSandboxConfig
+	// is used to configure container's resolv.conf.
+	if config.DnsConfig != nil {
+		netConfig.DNS.Nameservers = config.DnsConfig.GetServers()
+		netConfig.DNS.Search = config.DnsConfig.GetSearches()
+		netConfig.DNS.Options = config.DnsConfig.GetOptions()
+	}
+
 	bytesNetConfig, err := cni.ResultToBytes(netConfig)
 	if err != nil {
 		glog.Errorf("Error during network configuration result marshaling for pod %s (%s): %v", name, podId, err)
