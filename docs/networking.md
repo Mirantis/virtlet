@@ -1,5 +1,9 @@
+# Networking
 
-**Netwoking scheme**
+For now the only supported configuration is the use of [CNI plugins](https://github.com/containernetworking/cni). To use custom CNI configuration, mount your `/etc/cni` and optionally `/opt/cni` into the virtlet container.
+Virtlet have the same behavior and default values for `--cni-bin-dir` and `--cni-conf-dir` as described in kubelet network plugins [documentation](http://kubernetes.io/docs/admin/network-plugins/).
+
+## Netwoking scheme
 
 ```
 +--------------------------------------------------------------------------------------------------+
@@ -23,7 +27,7 @@
 +--------------------------------------------------------------------------------------------------+
 ```
 
-Current workflow using CNI plugin which is expected to create veth pair with one end belongs to pod network namespace
+Current workflow using CNI plugin which is expected to create veth pair with one end belongs to pod network namespace:
 
  - On RunPodSandBox request virtlet creates ne netns with name equal to PodId and calls CNI plugin to create veth pair and allocate ips
  - On StartContainer request virtlet prepares domain xml definition with emulator set to VMWrapper (separate binary to prepare network for VM using CNI veth pair and ips) and several env vars set thru qemu commandline
@@ -36,7 +40,7 @@ Current workflow using CNI plugin which is expected to create veth pair with one
       <env name='VIRTLET_EMULATOR' value='%s'/>
       <env name='VIRTLET_NS' value='%s'/>
       <env name='VIRTLET_CNI_CONFIG' value='%s'/>
-</commandline>	  
+</commandline>
 ...
 
 where 
@@ -50,9 +54,7 @@ In more details, VMWrapper inside pod's netns performs the following:
     2. runs dhcp-server to pass ip to VM's eth stipped from veth and default routes
 
 
-
-**NOTE:**
- Currently we ignore hostNetwork setting, i.e. on RunPodSandBox request from kubelet new network namespace will be created by virtlet with name=PodId regardless of hostNetwork setting. As it's kubelet's work to decide when and which api request should be called, if hostNetwork setting will be changed for the running VM, kubelet SyncPod workflow will kill and re-create everything despite of fact that it won't change networking for VM.
+**NOTE:** Currently we ignore hostNetwork setting, i.e. on RunPodSandBox request from kubelet new network namespace will be created by virtlet with name=PodId regardless of hostNetwork setting. As it's kubelet's work to decide when and which api request should be called, if hostNetwork setting will be changed for the running VM, kubelet SyncPod workflow will kill and re-create everything despite of fact that it won't change networking for VM.
 
 In containers world hostNetwok=true means pods with such setting will have the same host ip and it's the responsibility of user then to watch for port overlapping of processes run inside containers.
 

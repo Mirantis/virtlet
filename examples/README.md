@@ -1,7 +1,7 @@
 # virtlet pod examples
 
 To be able to use the following pod definitions, please fetch the images and serve
-them via HTTP server. This can be done like this:
+them via HTTP server. Example how to do this:
 
 ```sh
 wget http://download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img -O cirros
