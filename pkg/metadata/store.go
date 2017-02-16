@@ -33,15 +33,15 @@ type ContainerInfo struct {
 	State                 kubeapi.ContainerState
 }
 
-// MetadataStore contains methods to store/retrieve metadata
-// for images/sandboxes/containers
-type MetadataStore interface {
-	// images
+// ImageMetadataStore contains methods to operate on VM images
+type ImageMetadataStore interface {
 	SetImageName(volumeName, imageName string) error
 	GetImageName(volumeName string) (string, error)
 	RemoveImage(volumeName string) error
+}
 
-	// sandbox
+// SandboxMetadataStore contains methods to operate on POD sandboxes
+type SandboxMetadataStore interface {
 	SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConfiguration []byte) error
 	UpdatePodState(podId string, state byte) error
 	RemovePodSandbox(podId string) error
@@ -50,11 +50,20 @@ type MetadataStore interface {
 	GetPodSandboxStatus(podId string) (*kubeapi.PodSandboxStatus, error)
 	ListPodSandbox(filter *kubeapi.PodSandboxFilter) ([]*kubeapi.PodSandbox, error)
 	GetPodNetworkConfigurationAsBytes(podId string) ([]byte, error)
+}
 
-	// containers - virtualization
+// ContainerMetadataStore contains methods to operate on containers (VMs)
+type ContainerMetadataStore interface {
 	SetContainer(containerId, sandboxId, image, rootImageSnapshotName string, labels, annotations map[string]string) error
 	UpdateStartedAt(containerId string, startedAt string) error
 	UpdateState(containerId string, state byte) error
 	GetContainerInfo(containerId string) (*ContainerInfo, error)
 	RemoveContainer(containerId string) error
+}
+
+// MetadataStore provides single interface for metadata storage implementation
+type MetadataStore interface {
+	ImageMetadataStore
+	SandboxMetadataStore
+	ContainerMetadataStore
 }
