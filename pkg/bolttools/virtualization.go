@@ -24,19 +24,9 @@ import (
 
 	"github.com/boltdb/bolt"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-)
 
-type ContainerInfo struct {
-	CreatedAt             int64
-	StartedAt             int64
-	SandboxId             string
-	Image                 string
-	RootImageSnapshotName string
-	Labels                map[string]string
-	Annotations           map[string]string
-	SandBoxAnnotations    map[string]string
-	State                 kubeapi.ContainerState
-}
+	"github.com/Mirantis/virtlet/pkg/metadata"
+)
 
 func (b *BoltClient) EnsureVirtualizationSchema() error {
 	err := b.db.Update(func(tx *bolt.Tx) error {
@@ -167,8 +157,8 @@ func (b *BoltClient) UpdateState(containerId string, state byte) error {
 	return err
 }
 
-func (b *BoltClient) GetContainerInfo(containerId string) (*ContainerInfo, error) {
-	var containerInfo *ContainerInfo
+func (b *BoltClient) GetContainerInfo(containerId string) (*metadata.ContainerInfo, error) {
+	var containerInfo *metadata.ContainerInfo
 
 	if err := b.db.View(func(tx *bolt.Tx) error {
 		parentBucket := tx.Bucket([]byte("virtualization"))
@@ -264,7 +254,7 @@ func (b *BoltClient) GetContainerInfo(containerId string) (*ContainerInfo, error
 			return err
 		}
 
-		containerInfo = &ContainerInfo{
+		containerInfo = &metadata.ContainerInfo{
 			CreatedAt: createdAt,
 			StartedAt: startedAt,
 			SandboxId: sandboxId,
