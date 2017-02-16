@@ -31,6 +31,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/bolttools"
 	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
+	"github.com/Mirantis/virtlet/pkg/metadata"
 )
 
 const (
@@ -45,13 +46,13 @@ type VirtletManager struct {
 	libvirtConnTool           *libvirttools.ConnectionTool
 	libvirtImageTool          *libvirttools.ImageTool
 	libvirtVirtualizationTool *libvirttools.VirtualizationTool
-	// bolt
-	boltClient *bolttools.BoltClient
+	// metadata
+	metadataStore metadata.MetadataStore
 	// cni
 	cniClient *cni.Client
 }
 
-func NewVirtletManager(libvirtUri, poolName, storageBackend, boltPath, cniPluginsDir, cniConfigsDir string) (*VirtletManager, error) {
+func NewVirtletManager(libvirtUri, poolName, storageBackend, metadataPath, cniPluginsDir, cniConfigsDir string) (*VirtletManager, error) {
 	libvirtConnTool, err := libvirttools.NewConnectionTool(libvirtUri)
 	if err != nil {
 		return nil, err
@@ -68,7 +69,7 @@ func NewVirtletManager(libvirtUri, poolName, storageBackend, boltPath, cniPlugin
 		return nil, err
 	}
 
-	boltClient, err := bolttools.NewBoltClient(boltPath)
+	metadataStore, err := bolttools.NewBoltClient(metadataPath)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +84,7 @@ func NewVirtletManager(libvirtUri, poolName, storageBackend, boltPath, cniPlugin
 		libvirtConnTool:           libvirtConnTool,
 		libvirtImageTool:          libvirtImageTool,
 		libvirtVirtualizationTool: libvirtVirtualizationTool,
-		boltClient:                boltClient,
+		metadataStore:             metadataStore,
 		cniClient:                 cniClient,
 	}
 
@@ -161,7 +162,7 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 	}
 	glog.V(3).Infof("CNI configuration for pod %s (%s): %s", name, podId, string(bytesNetConfig))
 
-	if err := v.boltClient.SetPodSandbox(config, bytesNetConfig); err != nil {
+	if err := v.metadataStore.SetPodSandbox(config, bytesNetConfig); err != nil {
 		glog.Errorf("Error when creating pod sandbox for pod %s (%s): %v", name, podId, err)
 		return nil, err
 	}
@@ -176,7 +177,7 @@ func (v *VirtletManager) StopPodSandbox(ctx context.Context, in *kubeapi.StopPod
 	podSandboxId := in.GetPodSandboxId()
 	glog.V(2).Infof("StopPodSandbox called for pod %s", in.GetPodSandboxId())
 	glog.V(3).Infof("StopPodSandbox: %s", spew.Sdump(in))
-	if err := v.boltClient.UpdatePodState(podSandboxId, byte(kubeapi.PodSandboxState_SANDBOX_NOTREADY)); err != nil {
+	if err := v.metadataStore.UpdatePodState(podSandboxId, byte(kubeapi.PodSandboxState_SANDBOX_NOTREADY)); err != nil {
 		glog.Errorf("Error when stopping pod sandbox '%s': %v", podSandboxId, err)
 		return nil, err
 	}
@@ -190,7 +191,7 @@ func (v *VirtletManager) RemovePodSandbox(ctx context.Context, in *kubeapi.Remov
 	glog.V(2).Infof("RemovePodSandbox called for pod %s", podSandboxId)
 	glog.V(3).Infof("RemovePodSandbox: %s", spew.Sdump(in))
 
-	if err := v.boltClient.RemovePodSandbox(podSandboxId); err != nil {
+	if err := v.metadataStore.RemovePodSandbox(podSandboxId); err != nil {
 		glog.Errorf("Error when removing pod sandbox '%s': %v", podSandboxId, err)
 		return nil, err
 	}
@@ -214,13 +215,13 @@ func (v *VirtletManager) PodSandboxStatus(ctx context.Context, in *kubeapi.PodSa
 	glog.V(3).Infof("PodSandboxStatusStatus: %s", spew.Sdump(in))
 	podSandboxId := in.GetPodSandboxId()
 
-	status, err := v.boltClient.GetPodSandboxStatus(podSandboxId)
+	status, err := v.metadataStore.GetPodSandboxStatus(podSandboxId)
 	if err != nil {
 		glog.Errorf("Error when getting pod sandbox '%s': %v", podSandboxId, err)
 		return nil, err
 	}
 
-	netAsBytes, err := v.boltClient.GetPodNetworkConfigurationAsBytes(podSandboxId)
+	netAsBytes, err := v.metadataStore.GetPodNetworkConfigurationAsBytes(podSandboxId)
 	if err != nil {
 		glog.Errorf("Error when retrieving pod network configuration for sandbox '%s': %v", podSandboxId, err)
 		return nil, err
@@ -247,7 +248,7 @@ func (v *VirtletManager) PodSandboxStatus(ctx context.Context, in *kubeapi.PodSa
 func (v *VirtletManager) ListPodSandbox(ctx context.Context, in *kubeapi.ListPodSandboxRequest) (*kubeapi.ListPodSandboxResponse, error) {
 	filter := in.GetFilter()
 	glog.V(3).Infof("Listing sandboxes with filter: %s", spew.Sdump(filter))
-	podSandboxList, err := v.boltClient.ListPodSandbox(filter)
+	podSandboxList, err := v.metadataStore.ListPodSandbox(filter)
 	if err != nil {
 		glog.Errorf("Error when listing (with filter: %s) pod sandboxes: %v", spew.Sdump(filter), err)
 		return nil, err
@@ -284,7 +285,7 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 	}
 
 	// TODO: get it as string
-	netAsBytes, err := v.boltClient.GetPodNetworkConfigurationAsBytes(podSandboxId)
+	netAsBytes, err := v.metadataStore.GetPodNetworkConfigurationAsBytes(podSandboxId)
 	if err != nil {
 		glog.Errorf("Error when retrieving pod network configuration for sandbox '%s': %v", podSandboxId, err)
 		return nil, err
@@ -302,7 +303,7 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 	// TODO: we should not pass whole "in" to CreateContainer - we should pass there only needed info for CreateContainer
 	// without whole data container
 	// TODO: use network configuration by CreateContainer
-	uuid, err := v.libvirtVirtualizationTool.CreateContainer(v.boltClient, in, imageFilePath, netNSPath, string(netAsBytes))
+	uuid, err := v.libvirtVirtualizationTool.CreateContainer(v.metadataStore, in, imageFilePath, netNSPath, string(netAsBytes))
 	if err != nil {
 		glog.Errorf("Error when creating container %s: %v", name, err)
 		return nil, err
@@ -350,14 +351,14 @@ func (v *VirtletManager) RemoveContainer(ctx context.Context, in *kubeapi.Remove
 		return nil, err
 	}
 
-	containerInfo, err := v.boltClient.GetContainerInfo(containerId)
+	containerInfo, err := v.metadataStore.GetContainerInfo(containerId)
 	if err != nil {
-		glog.Errorf("Error when retrieving container '%s' info from bolt: %v", containerId, err)
+		glog.Errorf("Error when retrieving container '%s' info from metadata store: %v", containerId, err)
 		return nil, err
 	}
 
-	if err := v.boltClient.RemoveContainer(containerId); err != nil {
-		glog.Errorf("Error when removing container '%s' from bolt: %v", containerId, err)
+	if err := v.metadataStore.RemoveContainer(containerId); err != nil {
+		glog.Errorf("Error when removing container '%s' from metadata store: %v", containerId, err)
 		return nil, err
 	}
 
@@ -381,7 +382,7 @@ func (v *VirtletManager) ListContainers(ctx context.Context, in *kubeapi.ListCon
 	filter := in.GetFilter()
 	glog.V(3).Infof("Listing containers with filter: %s", spew.Sdump(filter))
 	glog.V(3).Infof("ListContainers: %s", spew.Sdump(in))
-	containers, err := v.libvirtVirtualizationTool.ListContainers(v.boltClient, filter)
+	containers, err := v.libvirtVirtualizationTool.ListContainers(v.metadataStore, filter)
 	if err != nil {
 		glog.Errorf("Error when listing containers with filter %s: %v", spew.Sdump(filter), err)
 		return nil, err
@@ -394,7 +395,7 @@ func (v *VirtletManager) ListContainers(ctx context.Context, in *kubeapi.ListCon
 func (v *VirtletManager) ContainerStatus(ctx context.Context, in *kubeapi.ContainerStatusRequest) (*kubeapi.ContainerStatusResponse, error) {
 	containerId := in.GetContainerId()
 	glog.V(3).Infof("ContainerStatus: %s", spew.Sdump(in))
-	status, err := v.libvirtVirtualizationTool.ContainerStatus(v.boltClient, containerId)
+	status, err := v.libvirtVirtualizationTool.ContainerStatus(v.metadataStore, containerId)
 	if err != nil {
 		glog.Errorf("Error when getting container '%s' status: %v", containerId, err)
 		return nil, err
@@ -455,7 +456,7 @@ func (v *VirtletManager) Status(context.Context, *kubeapi.StatusRequest) (*kubea
 //
 
 func (v *VirtletManager) imageFromVolumeInfo(volumeInfo *libvirttools.VolumeInfo) (*kubeapi.Image, error) {
-	imageName, err := v.boltClient.GetImageName(volumeInfo.Name)
+	imageName, err := v.metadataStore.GetImageName(volumeInfo.Name)
 	if err != nil {
 		glog.Errorf("Error when checking for existing image with volume %q: %v", volumeInfo.Name, err)
 		return nil, err
@@ -517,7 +518,7 @@ func (v *VirtletManager) ImageStatus(ctx context.Context, in *kubeapi.ImageStatu
 	// This query is also done in imageFromVolumeInfo() so images
 	// that have volumes but aren't in virtlet db will not be retuned
 	// anyway.
-	existingImageName, err := v.boltClient.GetImageName(volumeName)
+	existingImageName, err := v.metadataStore.GetImageName(volumeName)
 	if err != nil {
 		glog.Errorf("Error when checking for existing image with volume %q: %v", volumeName, err)
 		return nil, err
@@ -563,7 +564,7 @@ func (v *VirtletManager) PullImage(ctx context.Context, in *kubeapi.PullImageReq
 	// 2. PullIfNotPresent
 	// So need to check whether the image with such URL was already downloaded
 
-	existingImageName, err := v.boltClient.GetImageName(volumeName)
+	existingImageName, err := v.metadataStore.GetImageName(volumeName)
 	if err != nil {
 		glog.Errorf("PullImage: error when checking for existing image %q: %v", imageName, err)
 		return nil, err
@@ -579,7 +580,7 @@ func (v *VirtletManager) PullImage(ctx context.Context, in *kubeapi.PullImageReq
 		return nil, err
 	}
 
-	err = v.boltClient.SetImageName(volumeName, imageName)
+	err = v.metadataStore.SetImageName(volumeName, imageName)
 	if err != nil {
 		glog.Errorf("Error when setting image name %q for volume %q: %v", imageName, volumeName, err)
 		return nil, err
@@ -604,7 +605,7 @@ func (v *VirtletManager) RemoveImage(ctx context.Context, in *kubeapi.RemoveImag
 		return nil, err
 	}
 
-	if err = v.boltClient.RemoveImage(volumeName); err != nil {
+	if err = v.metadataStore.RemoveImage(volumeName); err != nil {
 		glog.Errorf("Error removing image %q from bolt: %v", imageName, volumeName, err)
 		return nil, err
 	}

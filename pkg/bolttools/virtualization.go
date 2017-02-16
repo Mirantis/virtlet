@@ -24,21 +24,11 @@ import (
 
 	"github.com/boltdb/bolt"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+
+	"github.com/Mirantis/virtlet/pkg/metadata"
 )
 
-type ContainerInfo struct {
-	CreatedAt             int64
-	StartedAt             int64
-	SandboxId             string
-	Image                 string
-	RootImageSnapshotName string
-	Labels                map[string]string
-	Annotations           map[string]string
-	SandBoxAnnotations    map[string]string
-	State                 kubeapi.ContainerState
-}
-
-func (b *BoltClient) EnsureVirtualizationSchema() error {
+func (b BoltClient) EnsureVirtualizationSchema() error {
 	err := b.db.Update(func(tx *bolt.Tx) error {
 		if _, err := tx.CreateBucketIfNotExists([]byte("virtualization")); err != nil {
 			return err
@@ -50,7 +40,7 @@ func (b *BoltClient) EnsureVirtualizationSchema() error {
 	return err
 }
 
-func (b *BoltClient) SetContainer(containerId, sandboxId, image, rootImageSnapshotName string, labels, annotations map[string]string) error {
+func (b BoltClient) SetContainer(containerId, sandboxId, image, rootImageSnapshotName string, labels, annotations map[string]string) error {
 	strLabels, err := json.Marshal(labels)
 	if err != nil {
 		return err
@@ -121,7 +111,7 @@ func (b *BoltClient) SetContainer(containerId, sandboxId, image, rootImageSnapsh
 	return err
 }
 
-func (b *BoltClient) UpdateStartedAt(containerId string, startedAt string) error {
+func (b BoltClient) UpdateStartedAt(containerId string, startedAt string) error {
 	err := b.db.Update(func(tx *bolt.Tx) error {
 		parentBucket := tx.Bucket([]byte("virtualization"))
 		if parentBucket == nil {
@@ -144,7 +134,7 @@ func (b *BoltClient) UpdateStartedAt(containerId string, startedAt string) error
 	return err
 }
 
-func (b *BoltClient) UpdateState(containerId string, state byte) error {
+func (b BoltClient) UpdateState(containerId string, state byte) error {
 	err := b.db.Update(func(tx *bolt.Tx) error {
 		parentBucket := tx.Bucket([]byte("virtualization"))
 		if parentBucket == nil {
@@ -167,8 +157,8 @@ func (b *BoltClient) UpdateState(containerId string, state byte) error {
 	return err
 }
 
-func (b *BoltClient) GetContainerInfo(containerId string) (*ContainerInfo, error) {
-	var containerInfo *ContainerInfo
+func (b BoltClient) GetContainerInfo(containerId string) (*metadata.ContainerInfo, error) {
+	var containerInfo *metadata.ContainerInfo
 
 	if err := b.db.View(func(tx *bolt.Tx) error {
 		parentBucket := tx.Bucket([]byte("virtualization"))
@@ -264,7 +254,7 @@ func (b *BoltClient) GetContainerInfo(containerId string) (*ContainerInfo, error
 			return err
 		}
 
-		containerInfo = &ContainerInfo{
+		containerInfo = &metadata.ContainerInfo{
 			CreatedAt: createdAt,
 			StartedAt: startedAt,
 			SandboxId: sandboxId,
@@ -284,7 +274,7 @@ func (b *BoltClient) GetContainerInfo(containerId string) (*ContainerInfo, error
 	return containerInfo, nil
 }
 
-func (b *BoltClient) RemoveContainer(containerId string) error {
+func (b BoltClient) RemoveContainer(containerId string) error {
 	return b.db.Batch(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte("virtualization"))
 		if bucket == nil {

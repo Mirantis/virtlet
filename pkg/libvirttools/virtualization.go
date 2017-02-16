@@ -18,6 +18,7 @@ package libvirttools
 
 import (
 	"bytes"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"os"
@@ -25,15 +26,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
 	libvirt "github.com/libvirt/libvirt-go"
+	"k8s.io/kubernetes/pkg/fields"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
-	"encoding/xml"
-
-	"github.com/Mirantis/virtlet/pkg/bolttools"
+	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/utils"
-	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/fields"
 )
 
 const (
@@ -244,19 +243,19 @@ func (v *VirtualizationTool) addAttachedVolumesXML(uuid string, virtletVolsDesc 
 	}
 
 	for _, volXML := range volumesXML {
-			disk := &Disk{}
-			err = xml.Unmarshal([]byte(volXML), disk)
-			if err != nil {
-				return domXML, err
-			}
+		disk := &Disk{}
+		err = xml.Unmarshal([]byte(volXML), disk)
+		if err != nil {
+			return domXML, err
+		}
 
-			domainXML.Devs.DiskList = append(domainXML.Devs.DiskList, *disk)
-			outArr, err := xml.MarshalIndent(domainXML, " ", "  ")
-			if err != nil {
-				return copyDomXML, err
-			}
+		domainXML.Devs.DiskList = append(domainXML.Devs.DiskList, *disk)
+		outArr, err := xml.MarshalIndent(domainXML, " ", "  ")
+		if err != nil {
+			return copyDomXML, err
+		}
 
-			domXML = string(outArr[:])
+		domXML = string(outArr[:])
 	}
 	return domXML, nil
 }
@@ -276,7 +275,7 @@ func NewVirtualizationTool(conn *libvirt.Connect, poolName string) (*Virtualizat
 	return &VirtualizationTool{tool: tool, volumeStorage: storageTool}, nil
 }
 
-func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, in *kubeapi.CreateContainerRequest, imageFilepath, netNSPath, cniConfig string) (string, error) {
+func (v *VirtualizationTool) CreateContainer(metadataStore metadata.MetadataStore, in *kubeapi.CreateContainerRequest, imageFilepath, netNSPath, cniConfig string) (string, error) {
 	uuid, err := utils.NewUuid()
 	if err != nil {
 		return "", err
@@ -285,7 +284,7 @@ func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, i
 	config := in.GetConfig()
 	name := config.GetMetadata().GetName()
 	sandboxId := in.GetPodSandboxId()
-	sandBoxAnnotations, err := boltClient.GetPodSandboxAnnotations(sandboxId)
+	sandBoxAnnotations, err := metadataStore.GetPodSandboxAnnotations(sandboxId)
 	if err != nil {
 		return "", err
 	}
@@ -313,7 +312,7 @@ func (v *VirtualizationTool) CreateContainer(boltClient *bolttools.BoltClient, i
 		return "", err
 	}
 
-	boltClient.SetContainer(uuid, sandboxId, config.GetImage().GetImage(), snapshotName, config.Labels, config.Annotations)
+	metadataStore.SetContainer(uuid, sandboxId, config.GetImage().GetImage(), snapshotName, config.Labels, config.Annotations)
 
 	memory := config.GetLinux().GetResources().GetMemoryLimitInBytes()
 	memoryUnit := "b"
@@ -466,8 +465,8 @@ func libvirtToKubeState(domainState libvirt.DomainState, lastState kubeapi.Conta
 	return containerState
 }
 
-func (v *VirtualizationTool) getContainerInfo(boltClient *bolttools.BoltClient, domain *libvirt.Domain, containerId string) (*bolttools.ContainerInfo, error) {
-	containerInfo, err := boltClient.GetContainerInfo(containerId)
+func (v *VirtualizationTool) getContainerInfo(metadataStore metadata.MetadataStore, domain *libvirt.Domain, containerId string) (*metadata.ContainerInfo, error) {
+	containerInfo, err := metadataStore.GetContainerInfo(containerId)
 	if err != nil {
 		return nil, err
 	}
@@ -482,13 +481,13 @@ func (v *VirtualizationTool) getContainerInfo(boltClient *bolttools.BoltClient, 
 
 	containerState := libvirtToKubeState(domainInfo.State, containerInfo.State)
 	if containerInfo.State != containerState {
-		if err := boltClient.UpdateState(containerId, byte(containerState)); err != nil {
+		if err := metadataStore.UpdateState(containerId, byte(containerState)); err != nil {
 			return nil, err
 		}
 		startedAt := time.Now().UnixNano()
 		if containerState == kubeapi.ContainerState_CONTAINER_RUNNING {
 			strStartedAt := strconv.FormatInt(startedAt, 10)
-			if err := boltClient.UpdateStartedAt(containerId, strStartedAt); err != nil {
+			if err := metadataStore.UpdateStartedAt(containerId, strStartedAt); err != nil {
 				return nil, err
 			}
 		}
@@ -515,13 +514,13 @@ func filterContainer(container *kubeapi.Container, filter *kubeapi.ContainerFilt
 	return true
 }
 
-func (v *VirtualizationTool) getContainer(boltClient *bolttools.BoltClient, domain *libvirt.Domain) (*kubeapi.Container, error) {
+func (v *VirtualizationTool) getContainer(metadataStore metadata.MetadataStore, domain *libvirt.Domain) (*kubeapi.Container, error) {
 	containerId, err := v.tool.GetUUIDString(domain)
 	if err != nil {
 		return nil, err
 	}
 
-	containerInfo, err := v.getContainerInfo(boltClient, domain, containerId)
+	containerInfo, err := v.getContainerInfo(metadataStore, domain, containerId)
 	if err != nil {
 		return nil, err
 	}
@@ -548,13 +547,13 @@ func (v *VirtualizationTool) getContainer(boltClient *bolttools.BoltClient, doma
 	return container, nil
 }
 
-func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, filter *kubeapi.ContainerFilter) ([]*kubeapi.Container, error) {
+func (v *VirtualizationTool) ListContainers(metadataStore metadata.MetadataStore, filter *kubeapi.ContainerFilter) ([]*kubeapi.Container, error) {
 	containers := make([]*kubeapi.Container, 0)
 
 	if filter != nil {
 		if filter.GetId() != "" {
 			// Verify if there is container metadata
-			containerInfo, err := boltClient.GetContainerInfo(filter.GetId())
+			containerInfo, err := metadataStore.GetContainerInfo(filter.GetId())
 			if err != nil {
 				return nil, err
 			}
@@ -563,14 +562,14 @@ func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, fi
 				return containers, nil
 			}
 
-			// Query libvirt for domain found in bolt
+			// Query libvirt for domain found in metadata store
 			// TODO: Distinguish lack of domain from other errors
 			domain, err := v.tool.LookupByUUIDString(filter.GetId())
 			if err != nil {
 				// There's no such domain - looks like it's already removed, so return an empty list
 				return containers, nil
 			}
-			container, err := v.getContainer(boltClient, domain)
+			container, err := v.getContainer(metadataStore, domain)
 			if err != nil {
 				return nil, err
 			}
@@ -583,13 +582,13 @@ func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, fi
 			}
 			return containers, nil
 		} else if filter.GetPodSandboxId() != "" {
-			domainID, err := boltClient.GetPodSandboxContainerID(filter.GetPodSandboxId())
+			domainID, err := metadataStore.GetPodSandboxContainerID(filter.GetPodSandboxId())
 			if err != nil {
 				// There's no such sandbox - looks like it's already removed, so return an empty list
 				return containers, nil
 			}
 			// Verify if there is container metadata
-			containerInfo, err := boltClient.GetContainerInfo(domainID)
+			containerInfo, err := metadataStore.GetContainerInfo(domainID)
 			if err != nil {
 				return nil, err
 			}
@@ -604,7 +603,7 @@ func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, fi
 				// There's no such domain - looks like it's already removed, so return an empty list
 				return containers, nil
 			}
-			container, err := v.getContainer(boltClient, domain)
+			container, err := v.getContainer(metadataStore, domain)
 			if err != nil {
 				return nil, err
 			}
@@ -621,7 +620,7 @@ func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, fi
 		return nil, err
 	}
 	for _, domain := range domains {
-		container, err := v.getContainer(boltClient, &domain)
+		container, err := v.getContainer(metadataStore, &domain)
 		if err != nil {
 			return nil, err
 		}
@@ -634,13 +633,13 @@ func (v *VirtualizationTool) ListContainers(boltClient *bolttools.BoltClient, fi
 	return containers, nil
 }
 
-func (v *VirtualizationTool) ContainerStatus(boltClient *bolttools.BoltClient, containerId string) (*kubeapi.ContainerStatus, error) {
+func (v *VirtualizationTool) ContainerStatus(metadataStore metadata.MetadataStore, containerId string) (*kubeapi.ContainerStatus, error) {
 	domain, err := v.tool.LookupByUUIDString(containerId)
 	if err != nil {
 		return nil, err
 	}
 
-	containerInfo, err := v.getContainerInfo(boltClient, domain, containerId)
+	containerInfo, err := v.getContainerInfo(metadataStore, domain, containerId)
 	if err != nil {
 		return nil, err
 	}

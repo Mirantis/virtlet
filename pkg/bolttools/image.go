@@ -32,7 +32,7 @@ func getKey(name string) string {
 	return hex.EncodeToString(hash.Sum(nil))
 }
 
-func (b *BoltClient) EnsureImageSchema() error {
+func (b BoltClient) EnsureImageSchema() error {
 	err := b.db.Update(func(tx *bolt.Tx) error {
 		if _, err := tx.CreateBucketIfNotExists([]byte(imageBucket)); err != nil {
 			return err
@@ -44,7 +44,7 @@ func (b *BoltClient) EnsureImageSchema() error {
 	return err
 }
 
-func (b *BoltClient) SetImageName(volumeName, imageName string) error {
+func (b BoltClient) SetImageName(volumeName, imageName string) error {
 	key := getKey(volumeName)
 	return b.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(imageBucket))
@@ -60,7 +60,7 @@ func (b *BoltClient) SetImageName(volumeName, imageName string) error {
 	})
 }
 
-func (b *BoltClient) GetImageName(volumeName string) (string, error) {
+func (b BoltClient) GetImageName(volumeName string) (string, error) {
 	imageName := ""
 	key := getKey(volumeName)
 	err := b.db.View(func(tx *bolt.Tx) error {
@@ -79,7 +79,7 @@ func (b *BoltClient) GetImageName(volumeName string) (string, error) {
 	return imageName, err
 }
 
-func (b *BoltClient) RemoveImage(volumeName string) error {
+func (b BoltClient) RemoveImage(volumeName string) error {
 	key := getKey(volumeName)
 	return b.db.Batch(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(imageBucket))

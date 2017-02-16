@@ -28,7 +28,7 @@ import (
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
-func (b *BoltClient) EnsureSandboxSchema() error {
+func (b BoltClient) EnsureSandboxSchema() error {
 	return b.db.Update(func(tx *bolt.Tx) error {
 		if _, err := tx.CreateBucketIfNotExists([]byte("sandbox")); err != nil {
 			return err
@@ -38,7 +38,7 @@ func (b *BoltClient) EnsureSandboxSchema() error {
 	})
 }
 
-func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConfiguration []byte) error {
+func (b BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConfiguration []byte) error {
 	podId := config.Metadata.GetUid()
 
 	strLabels, err := json.Marshal(config.GetLabels())
@@ -166,7 +166,7 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConf
 	})
 }
 
-func (b *BoltClient) UpdatePodState(podId string, state byte) error {
+func (b BoltClient) UpdatePodState(podId string, state byte) error {
 	return b.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte("sandbox"))
 		if bucket == nil {
@@ -186,7 +186,7 @@ func (b *BoltClient) UpdatePodState(podId string, state byte) error {
 	})
 }
 
-func (b *BoltClient) RemovePodSandbox(podId string) error {
+func (b BoltClient) RemovePodSandbox(podId string) error {
 	return b.db.Batch(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte("sandbox"))
 		if bucket == nil {
@@ -201,7 +201,7 @@ func (b *BoltClient) RemovePodSandbox(podId string) error {
 	})
 }
 
-func (b *BoltClient) fetchSandBoxValueByKey(podId string, key string) ([]byte, error ){
+func (b BoltClient) fetchSandBoxValueByKey(podId string, key string) ([]byte, error) {
 	var value []byte
 	err := b.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte("sandbox"))
@@ -223,8 +223,7 @@ func (b *BoltClient) fetchSandBoxValueByKey(podId string, key string) ([]byte, e
 	return value, err
 }
 
-
-func (b *BoltClient) GetPodSandboxContainerID(podId string) (string, error) {
+func (b BoltClient) GetPodSandboxContainerID(podId string) (string, error) {
 	byteContID, err := b.fetchSandBoxValueByKey(podId, "ContainerID")
 	if err != nil {
 		return "", err
@@ -232,7 +231,7 @@ func (b *BoltClient) GetPodSandboxContainerID(podId string) (string, error) {
 	return string(byteContID), nil
 }
 
-func (b *BoltClient) GetPodSandboxAnnotations(podId string) (map[string]string, error) {
+func (b BoltClient) GetPodSandboxAnnotations(podId string) (map[string]string, error) {
 	byteAnnotations, err := b.fetchSandBoxValueByKey(podId, "annotations")
 	if err != nil {
 		return nil, err
@@ -245,7 +244,7 @@ func (b *BoltClient) GetPodSandboxAnnotations(podId string) (map[string]string, 
 	return annotations, nil
 }
 
-func (b *BoltClient) GetPodSandboxStatus(podId string) (*kubeapi.PodSandboxStatus, error) {
+func (b BoltClient) GetPodSandboxStatus(podId string) (*kubeapi.PodSandboxStatus, error) {
 	var podSandboxStatus *kubeapi.PodSandboxStatus
 
 	err := b.db.View(func(tx *bolt.Tx) error {
@@ -427,7 +426,7 @@ func filterPodSandbox(sandbox *kubeapi.PodSandbox, filter *kubeapi.PodSandboxFil
 	return true
 }
 
-func (b *BoltClient) getPodSandbox(sandboxId []byte, filter *kubeapi.PodSandboxFilter) (*kubeapi.PodSandbox, bool, error) {
+func (b BoltClient) getPodSandbox(sandboxId []byte, filter *kubeapi.PodSandboxFilter) (*kubeapi.PodSandbox, bool, error) {
 	var podSandbox *kubeapi.PodSandbox
 
 	err := b.db.View(func(tx *bolt.Tx) error {
@@ -527,7 +526,7 @@ func (b *BoltClient) getPodSandbox(sandboxId []byte, filter *kubeapi.PodSandboxF
 	return podSandbox, match, nil
 }
 
-func (b *BoltClient) ListPodSandbox(filter *kubeapi.PodSandboxFilter) ([]*kubeapi.PodSandbox, error) {
+func (b BoltClient) ListPodSandbox(filter *kubeapi.PodSandboxFilter) ([]*kubeapi.PodSandbox, error) {
 	sandboxIds := make([][]byte, 0)
 	sandboxes := make([]*kubeapi.PodSandbox, 0)
 
@@ -566,7 +565,7 @@ func (b *BoltClient) ListPodSandbox(filter *kubeapi.PodSandboxFilter) ([]*kubeap
 	return sandboxes, nil
 }
 
-func (b *BoltClient) GetPodNetworkConfigurationAsBytes(podId string) ([]byte, error) {
+func (b BoltClient) GetPodNetworkConfigurationAsBytes(podId string) ([]byte, error) {
 	var config []byte
 	err := b.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte("sandbox"))

@@ -24,26 +24,26 @@ type BoltClient struct {
 	db *bolt.DB
 }
 
-func NewBoltClient(path string) (*BoltClient, error) {
+func NewBoltClient(path string) (BoltClient, error) {
 	db, err := bolt.Open(path, 0600, nil)
 	if err != nil {
-		return nil, err
+		return BoltClient{}, err
 	}
 
-	client := &BoltClient{db: db}
+	client := BoltClient{db: db}
 	if err := client.EnsureImageSchema(); err != nil {
-		return nil, err
+		return BoltClient{}, err
 	}
 	if err := client.EnsureSandboxSchema(); err != nil {
-		return nil, err
+		return BoltClient{}, err
 	}
 	if err := client.EnsureVirtualizationSchema(); err != nil {
-		return nil, err
+		return BoltClient{}, err
 	}
 
 	return client, nil
 }
 
-func (b *BoltClient) Close() error {
+func (b BoltClient) Close() error {
 	return b.db.Close()
 }
