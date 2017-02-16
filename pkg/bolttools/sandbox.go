@@ -201,7 +201,7 @@ func (b *BoltClient) RemovePodSandbox(podId string) error {
 	})
 }
 
-func (b *BoltClient) fetchSandBoxValueByKey(podId string, key string) ([]byte, error ){
+func (b *BoltClient) fetchSandBoxValueByKey(podId string, key string) ([]byte, error) {
 	var value []byte
 	err := b.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte("sandbox"))
@@ -222,7 +222,6 @@ func (b *BoltClient) fetchSandBoxValueByKey(podId string, key string) ([]byte, e
 
 	return value, err
 }
-
 
 func (b *BoltClient) GetPodSandboxContainerID(podId string) (string, error) {
 	byteContID, err := b.fetchSandBoxValueByKey(podId, "ContainerID")
