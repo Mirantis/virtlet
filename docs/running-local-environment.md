@@ -53,3 +53,10 @@ export CONTAINER_RUNTIME=remote
 export CONTAINER_RUNTIME_ENDPOINT=/run/virtlet.sock
 ./hack/local-up-cluster.sh
 ```
+
+## Cleanup
+
+Between multiple runs of local environment (especially during development process)
+there could be useful to use cleanup procedure, which will remove any residues
+after not clean container stopping.
+To call it, simply add `-e LIBVIRT_CLEANUP=true` to docker parameters.
