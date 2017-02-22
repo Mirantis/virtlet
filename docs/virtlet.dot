@@ -1,0 +1,36 @@
+digraph criproxy {
+        compound=true;
+        edge [fontsize=10];
+        ranksep=0.0001;
+
+        subgraph cluster_0 {
+                color=black;
+                label="CRI Proxy Process";
+                criproxy [label="CRI Proxy\nServer"];
+                docker_shim [label="docker-shim\nServer"];
+                criproxy -> docker_shim [label=" CRI API (gRPC)  "];
+        }
+        cni [shape=rectangle, label="Container\nNetwork\nInterface"];
+        subgraph cluster_1 {
+                label="Virtlet container";
+                labeljust="r";
+                virtlet [label=" Virtlet process",shape=rectangle];
+                libvirt [shape=rectangle];
+                vmwrapper [shape=rectangle, label="vmwrapper\n0..n"];
+                qemu_kvm [shape=rectangle, label="qemu-kvm\n0..n"];
+                virtlet -> libvirt [label=" libvirt API"];
+                virtlet -> vmwrapper [label="Network namespace\n & config"];
+                libvirt -> vmwrapper [label="Runs"];
+                vmwrapper -> qemu_kvm [label=" Runs", shape=rectangle];
+                {rank=same virtlet libvirt}
+                {rank=same vmwrapper qemu_kvm}
+        }
+        kubelet [shape=rectangle];
+        docker [shape=rectangle];
+        virtlet -> cni [label=" Uses                             \nfor VM pod                             \nnetwork                             \n configuration                             "];
+        kubelet -> cni [label=" Uses for pod\n network configuration"];
+        kubelet -> criproxy [label=" CRI API (gRPC)"];
+        criproxy -> virtlet [label="     CRI API (gRPC)"];
+        docker_shim -> docker [label="   Docker API"];
+        //docker -> vmwrapper [label=" Manages", lhead=cluster_1];
+}
