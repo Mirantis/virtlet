@@ -30,6 +30,7 @@ all:
 	mkdir -p $(builddir)/_output $(builddir)/contrib/images/libvirt/_output
 	go build -o $(builddir)/_output/virtlet ./cmd/virtlet
 	go build -o $(builddir)/_output/vmwrapper ./cmd/vmwrapper
+	go build -o $(builddir)/_output/inner_vmwrapper ./cmd/inner_vmwrapper
 	go build -o $(builddir)/_output/criproxy ./cmd/criproxy
 
 verify-glide-installation:

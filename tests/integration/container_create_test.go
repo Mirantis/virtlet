@@ -236,7 +236,7 @@ func TestContainerCreateStartListRemove(t *testing.T) {
 		}
 	}
 	for _, container := range containers {
-		//Stop container request
+		// Stop container request
 		containerStopIn := &kubeapi.StopContainerRequest{
 			ContainerId: &container.ContainerId,
 		}
@@ -245,7 +245,7 @@ func TestContainerCreateStartListRemove(t *testing.T) {
 			t.Fatalf("Stopping container %s failure: %v", container.ContainerId, err)
 		}
 
-		//Remove container request
+		// Remove container request
 		containerRemoveIn := &kubeapi.RemoveContainerRequest{
 			ContainerId: &container.ContainerId,
 		}
@@ -253,7 +253,7 @@ func TestContainerCreateStartListRemove(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Removing container %s failure: %v", container.ContainerId, err)
 		}
-		//check all volumes related to VM have been removed
+		// Check all volumes related to VM have been removed
 		cmd := "virsh vol-list --pool volumes | grep " + container.ContainerId + " | wc -l"
 		t.Logf("Formed CMD to lookup volumes: %s\n", cmd)
 		out, err := exec.Command("bash", "-c", cmd).Output()
@@ -262,7 +262,7 @@ func TestContainerCreateStartListRemove(t *testing.T) {
 		}
 		outRes := strings.TrimSpace(string(out))
 		if outRes != "0" {
-			t.Errorf("Expected no ephemeral volumes for %s doamin but instead found %s!", container.ContainerId, outRes)
+			t.Errorf("Expected no ephemeral volumes for %s domain but instead found %s!", container.ContainerId, outRes)
 		}
 	}
 }
