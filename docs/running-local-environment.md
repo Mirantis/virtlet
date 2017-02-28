@@ -47,7 +47,7 @@ Currently the only supported version of Kubernetes is specified in glide.yaml fi
 Assuming standard configuration for Kubernetes sources location, use following commands:
 
 ```sh
-cd $GOPATH/k8s.io/kubernetes
+cd $GOPATH/src/k8s.io/kubernetes
 export KUBERNETES_PROVIDER=local
 export CONTAINER_RUNTIME=remote
 export CONTAINER_RUNTIME_ENDPOINT=/run/virtlet.sock
