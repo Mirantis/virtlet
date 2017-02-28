@@ -16,4 +16,10 @@ export KUBERNETES_PROVIDER=local
 export EXPERIMENTAL_CRI=true
 export CONTAINER_RUNTIME=remote
 export CONTAINER_RUNTIME_ENDPOINT=/run/virtlet.sock
+while true
+do
+   echo "Waiting for $CONTAINER_RUNTIME_ENDPOINT"
+   [ -e "$CONTAINER_RUNTIME_ENDPOINT" ] && break
+   sleep 2
+done
 hack/local-up-cluster.sh -o _output/local/bin/linux/amd64

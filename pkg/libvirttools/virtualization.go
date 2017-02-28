@@ -371,12 +371,13 @@ func (v *VirtualizationTool) StopContainer(containerId string) error {
 	if err != nil {
 		return err
 	}
-	if err := v.tool.Shutdown(domain); err != nil {
-		return err
-	}
 
-	// Wait until domain is really stopped or timeout after 10 sec.
+	// Wait until domain is capable of processing shutdown signal or timeout after 60 sec.
+	// Repeat sending of shutdown request several times with 10 sec interval
+	// To process cases when VM is booting and is not in the state to process shutdown signal
 	return utils.WaitLoop(func() (bool, error) {
+		v.tool.Shutdown(domain)
+
 		domain, err := v.tool.LookupByUUIDString(containerId)
 		if err != nil {
 			return true, err
@@ -386,9 +387,8 @@ func (v *VirtualizationTool) StopContainer(containerId string) error {
 		if err != nil {
 			return false, err
 		}
-
-		return di.State == libvirt.DOMAIN_SHUTDOWN, nil
-	}, 10*time.Second)
+		return di.State == libvirt.DOMAIN_SHUTDOWN || di.State == libvirt.DOMAIN_SHUTOFF, nil
+	}, 10*time.Second, 60*time.Second)
 }
 
 // RemoveContainer tries to gracefully stop domain, then forcibly removes it
@@ -396,16 +396,17 @@ func (v *VirtualizationTool) StopContainer(containerId string) error {
 // it waits up to 5 sec for doing the job by libvirt
 func (v *VirtualizationTool) RemoveContainer(containerId string) error {
 	// Give a chance to gracefully stop domain
-	// TODO: handle errors - there could be e.x. connection error
-	v.StopContainer(containerId)
+	// TODO: handle errors - there could be e.x. connection errori
 
 	domain, err := v.tool.LookupByUUIDString(containerId)
 	if err != nil {
 		return err
 	}
 
-	if err := v.tool.Destroy(domain); err != nil {
-		return err
+	if err := v.StopContainer(containerId); err != nil {
+		if err := v.tool.Destroy(domain); err != nil {
+			return err
+		}
 	}
 
 	if err := v.tool.Undefine(domain); err != nil {
@@ -424,14 +425,17 @@ func (v *VirtualizationTool) RemoveContainer(containerId string) error {
 			return false, errors.New("libvirt returned no domain and no error - this is incorrect")
 		}
 
-		lastLibvirtErr := v.tool.GetLastError()
+		lastLibvirtErr, ok := err.(libvirt.Error)
+		if !ok {
+			return false, errors.New("Failed to cast error to libvirt.Error type")
+		}
 		if lastLibvirtErr.Code == libvirt.ERR_NO_DOMAIN {
 			return true, nil
 		}
 
 		// Other error occured
 		return false, err
-	}, 5*time.Second)
+	}, 500*time.Millisecond, 5*time.Second)
 }
 
 func libvirtToKubeState(domainState libvirt.DomainState, lastState kubeapi.ContainerState) kubeapi.ContainerState {

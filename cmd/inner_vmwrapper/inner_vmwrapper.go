@@ -20,8 +20,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/containernetworking/cni/pkg/ns"
 	"github.com/containernetworking/cni/pkg/types"
@@ -38,34 +42,88 @@ const (
 	cniConfigEnvVar = "VIRTLET_CNI_CONFIG"
 )
 
-func runCommand(name string, args []string) error {
+var exitEOF = make(chan bool, 1)
+var sigTERM = make(chan os.Signal)
+
+// Spawn child process and wait for its termination
+// If during waiting for the child termination process
+// will recieve EOF on pipe from parent or SIGTERM
+// it will send SIGKILL or SIGTERM to child accordingly
+func runCommand(name string, args []string) (error, bool) {
+	var err error
 	cmd := exec.Command(name, args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start %q: %v", name, err)
+	if err = cmd.Start(); err != nil {
+		glog.Errorf("Failed to start %q: %v", name, err)
+		return err, false
 	}
-	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("failed to run %q: %v", name, err)
+
+	done := make(chan bool, 1)
+	go func() {
+		if err = cmd.Wait(); err != nil {
+			glog.Errorf("Failed to run %q: %v", name, err)
+		}
+		done <- true
+	}()
+	procTerminated := false
+
+L:
+	for {
+		select {
+		case <-done:
+			break L
+		case <-exitEOF:
+			glog.Infof("Recieved EOF on pipe from outer wrapper. Sending to child SIGKILL.")
+			if err := cmd.Process.Signal(syscall.SIGKILL); err != nil {
+				glog.Infof("Error on sending SIGKILL to child %v!", err)
+			}
+			procTerminated = true
+		case <-sigTERM:
+			glog.Infof("Recieved SIGTERM. Sending to child and wait the process to stop.!")
+			if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+				glog.Infof("Error on sending SIGTERM to child %v!", err)
+			}
+			procTerminated = true
+		}
 	}
-	return nil
+	return err, procTerminated
 }
 
-func runCommandIfExists(path string, args []string) error {
+func runCommandIfExists(path string, args []string) (error, bool) {
 	_, err := os.Stat(path)
 	switch {
 	case err == nil:
 		return runCommand(path, args)
 	case os.IsNotExist(err):
-		return nil
+		return nil, false
 	default:
-		return fmt.Errorf("os.Stat(): %v", err)
+		return fmt.Errorf("os.Stat(): %v", err), false
 	}
+}
+
+func catchParentKilled() {
+	// Process has been spawned by outer wrapper with setting for child
+	// file descriptor of the read end of created pipe to the '3'
+	pipeR := os.NewFile(uintptr(3), "pipe")
+
+	data := make([]byte, 1)
+	for {
+		_, err := pipeR.Read(data)
+		if err == io.EOF {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	exitEOF <- true
 }
 
 func main() {
 	var info *types.Result
+
+	go catchParentKilled()
+	signal.Notify(sigTERM, syscall.SIGTERM)
 
 	emulatorArgs := os.Args[1:]
 
@@ -83,14 +141,29 @@ func main() {
 		// TODO: use per-emulator symlinks to vmwrapper to determine
 		// the necessary binary instead of using fixed defaultEmulator
 		// here
-		if err := runCommand(defaultEmulator, emulatorArgs); err != nil {
+		if err, _ := runCommand(defaultEmulator, emulatorArgs); err != nil {
 			glog.Errorf("Emulator %q failed: %v", defaultEmulator, err)
 			os.Exit(1)
 		}
 		return
 	}
 
-	runCommandIfExists("/vmwrapper-entry.sh", append([]string{emulator, nsPath, os.Getenv(cniConfigEnvVar)}, emulatorArgs...))
+	// TODO: use cleaner way to do this
+	runHook := func(name string) {
+		err, procTerminated := runCommandIfExists(name, append([]string{emulator, nsPath, os.Getenv(cniConfigEnvVar)}, emulatorArgs...))
+		if err != nil {
+			glog.Errorf("Hook %q: %v", name, err)
+			if procTerminated {
+				os.Exit(1)
+			}
+		}
+		if procTerminated {
+			glog.Errorf("Hook %q was terminated either forcibly or gracefully. Terminate execution.", name)
+			os.Exit(0)
+		}
+	}
+
+	runHook("/vmwrapper-entry.sh")
 
 	vmNS, err := ns.GetNS(nsPath)
 	if err != nil {
@@ -112,14 +185,6 @@ func main() {
 		}
 	}
 
-	// TODO: use cleaner way to do this
-	runHook := func(name string) {
-		if err := runCommandIfExists(name, append([]string{emulator, nsPath, os.Getenv(cniConfigEnvVar)}, emulatorArgs...)); err != nil {
-			glog.Errorf("Hook %q: %v", name, err)
-		}
-	}
-	runHook("/vmwrapper-pre-ns.sh")
-
 	if err := vmNS.Do(func(ns.NetNS) error {
 		info, err = nettools.SetupContainerSideNetwork(info)
 		if err != nil {
@@ -131,7 +196,7 @@ func main() {
 		}
 		dhcpServer := dhcp.NewServer(dhcpConfg)
 		if err := dhcpServer.SetupListener("0.0.0.0"); err != nil {
-			return fmt.Errorf("failed to set up dhcp listener: %v", err)
+			return fmt.Errorf("Failed to set up dhcp listener: %v", err)
 		}
 
 		runHook("/vmwrapper-pre-qemu.sh")
@@ -150,7 +215,12 @@ func main() {
 			"-device",
 			"virtio-net-pci,netdev=tap0,id=net0,mac=" + peerHwAddr.String(),
 		}
-		err := runCommand(emulator, append(emulatorArgs, netArgs...))
+
+		// Running qemu process
+		// On domain's shutdown/destroy libvirt terminates corresponding qemu process by using SIGTERM or SIGKILL
+		// SIGKILL will be detected by catching up EOF on pipe from outer wrapper designed only with this single aim
+		// On catching SIGTERM just re-send it to spawned qemu process and wait for its termination
+		err, _ := runCommand(emulator, append(emulatorArgs, netArgs...))
 
 		select {
 		case dhcpErr := <-errCh:
