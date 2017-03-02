@@ -103,6 +103,7 @@ func TestDhcpServer(t *testing.T) {
 				},
 				DNS: types.DNS{
 					Nameservers: []string{"10.1.90.99"},
+					Search:      []string{"test.address"},
 				},
 			},
 			expectedSubstrings: []string{
@@ -113,6 +114,7 @@ func TestDhcpServer(t *testing.T) {
 				"new_dhcp_renewal_time='43200'",
 				"new_dhcp_server_identifier='169.254.254.2'",
 				"new_domain_name_servers='10.1.90.99'",
+				"new_domain_search='test.address'",
 				"new_ip_address='10.1.90.5'",
 				"new_network_number='10.1.90.0'",
 				"new_routers='169.254.1.1'",
