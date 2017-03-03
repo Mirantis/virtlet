@@ -1,5 +1,5 @@
 /*
-Copyright 2016 Mirantis
+Copyright 2016-2017 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
-	"github.com/davecgh/go-spew/spew"
 	"k8s.io/kubernetes/pkg/fields"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
@@ -52,24 +51,8 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConf
 	}
 
 	metadata := config.GetMetadata()
-	if metadata == nil {
-		return fmt.Errorf("sandbox config is missing Metadata attribute: %s", spew.Sdump(config))
-	}
-
 	linuxSandbox := config.GetLinux()
-	if linuxSandbox == nil {
-		return fmt.Errorf("sandbox config is missing Linux attribute: %s", spew.Sdump(config))
-	}
-
-	if linuxSandbox.GetSecurityContext() == nil {
-		// XXX: is this correct ?
-		return fmt.Errorf("Linux sandbox config is missing SecurityContext attribute: %s", spew.Sdump(config))
-	}
-
 	namespaceOptions := linuxSandbox.GetSecurityContext().GetNamespaceOptions()
-	if namespaceOptions == nil {
-		return fmt.Errorf("SecurityContext is missing Namespaces attribute: %s", spew.Sdump(config))
-	}
 
 	return b.db.Batch(func(tx *bolt.Tx) error {
 		parentBucket := tx.Bucket([]byte("sandbox"))
