@@ -1,5 +1,5 @@
 /*
-Copyright 2016 Mirantis
+Copyright 2016-2017 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,36 +24,6 @@ import (
 
 	"github.com/Mirantis/virtlet/tests/criapi"
 )
-
-func TestSetSandBoxValidation(t *testing.T) {
-	invalidSandboxes, err := criapi.GetSandboxes(4)
-	if err != nil {
-		t.Fatalf("Failed to generate array of sandbox configs: %v", err)
-	}
-
-	//Now let's make generated configs to be invalid
-	invalidSandboxes[0].Metadata = nil
-	invalidSandboxes[1].Linux = nil
-	invalidSandboxes[2].Linux.SecurityContext = nil
-	invalidSandboxes[3].Linux.SecurityContext.NamespaceOptions = nil
-
-	b, err := NewFakeBoltClient()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := b.EnsureSandboxSchema(); err != nil {
-		t.Fatal(err)
-	}
-
-	for _, sandbox := range invalidSandboxes {
-		if sandbox != nil {
-			if err := b.SetPodSandbox(sandbox, []byte{}); err == nil {
-				t.Fatalf("Expected to recieve error on attempt to set invalid sandbox %v", sandbox)
-			}
-		}
-	}
-}
 
 func TestRemovePodSandbox(t *testing.T) {
 	sandboxes, err := criapi.GetSandboxes(1)

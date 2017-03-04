@@ -1,5 +1,5 @@
 /*
-Copyright 2016 Mirantis
+Copyright 2016-2017 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package manager
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"syscall"
@@ -162,6 +163,10 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 	}
 	glog.V(3).Infof("CNI configuration for pod %s (%s): %s", name, podId, string(bytesNetConfig))
 
+	if err := validatePodSandboxConfig(config); err != nil {
+		glog.Errorf("Invalid pod config while creating pod sandbox for pod %s (%s): %v", name, podId, err)
+		return nil, err
+	}
 	if err := v.metadataStore.SetPodSandbox(config, bytesNetConfig); err != nil {
 		glog.Errorf("Error when creating pod sandbox for pod %s (%s): %v", name, podId, err)
 		return nil, err
@@ -171,6 +176,29 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 		PodSandboxId: &podId,
 	}
 	return response, nil
+}
+
+func validatePodSandboxConfig(config *kubeapi.PodSandboxConfig) error {
+	metadata := config.GetMetadata()
+	if metadata == nil {
+		return fmt.Errorf("sandbox config is missing Metadata attribute: %s", spew.Sdump(config))
+	}
+
+	linuxSandbox := config.GetLinux()
+	if linuxSandbox == nil {
+		return fmt.Errorf("sandbox config is missing Linux attribute: %s", spew.Sdump(config))
+	}
+
+	if linuxSandbox.GetSecurityContext() == nil {
+		return fmt.Errorf("Linux sandbox config is missing SecurityContext attribute: %s", spew.Sdump(config))
+	}
+
+	namespaceOptions := linuxSandbox.GetSecurityContext().GetNamespaceOptions()
+	if namespaceOptions == nil {
+		return fmt.Errorf("SecurityContext is missing Namespaces attribute: %s", spew.Sdump(config))
+	}
+
+	return nil
 }
 
 func (v *VirtletManager) StopPodSandbox(ctx context.Context, in *kubeapi.StopPodSandboxRequest) (*kubeapi.StopPodSandboxResponse, error) {
