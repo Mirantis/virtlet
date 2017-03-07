@@ -22,8 +22,8 @@ import (
 )
 
 // WaitLoop executes test func in loop until it returns error, true, or timeout passes
-func WaitLoop(test func() (bool, error), timeout time.Duration) error {
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(500 * time.Millisecond) {
+func WaitLoop(test func() (bool, error), retryPeriod time.Duration, timeout time.Duration) error {
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(retryPeriod) {
 		result, err := test()
 		if err != nil {
 			return err

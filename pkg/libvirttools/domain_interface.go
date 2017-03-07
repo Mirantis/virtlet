@@ -20,6 +20,10 @@ import (
 	libvirt "github.com/libvirt/libvirt-go"
 )
 
+// NOTE: Implementation of GetLastError in libvirt-go resets error at the end.
+// All DomainOperations methods invoke GetLastError, so
+// repeated call returns no error and doesn't make sense.
+
 type DomainOperations interface {
 	Create(domain *libvirt.Domain) error
 	DefineFromXML(xmlConfig string) (*libvirt.Domain, error)
@@ -31,8 +35,6 @@ type DomainOperations interface {
 	LookupByUUIDString(uuid string) (*libvirt.Domain, error)
 	GetDomainInfo(domain *libvirt.Domain) (*libvirt.DomainInfo, error)
 	GetUUIDString(domain *libvirt.Domain) (string, error)
-
-	GetLastError() libvirt.Error
 }
 
 type LibvirtDomainOperations struct {
@@ -41,10 +43,6 @@ type LibvirtDomainOperations struct {
 
 func NewLibvirtDomainOperations(conn *libvirt.Connect) DomainOperations {
 	return LibvirtDomainOperations{conn: conn}
-}
-
-func (l LibvirtDomainOperations) GetLastError() libvirt.Error {
-	return libvirt.GetLastError()
 }
 
 func (l LibvirtDomainOperations) Create(domain *libvirt.Domain) error {
