@@ -7,4 +7,3 @@ This directory holds files containing documentation.
     * [Description of SyncPod workflow](sync-pod-workflow.md)
     * [Volumes handling](volumes.md)
     * [CRI proxy](criproxy.md) overview
-* [How to contribute in virtlet](contributing.md)
