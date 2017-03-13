@@ -16,7 +16,7 @@ If you will encounter any issue when using Virtlet please look into our [issue t
 
 ## Contributing
 
-Virtlet is an open source project and any contributions are welcomed. Look into [CONTRIBUTING](docs/contributing.md) document for our guidelines and further instructions on how to set up Virtlet development environment.
+Virtlet is an open source project and any contributions are welcomed. Look into [Contributing guidelines](CONTRIBUTING.md) document for our guidelines and further instructions on how to set up Virtlet development environment.
 
 ## Licensing
 
