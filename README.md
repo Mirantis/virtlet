@@ -18,6 +18,13 @@ You can watch and listen to Virtlet introduction and description video that was 
 
 You can watch sample usage session under [this](https://asciinema.org/a/1a6xp5j4o22rnsx9wpvumd4kt) link.
 
+You can also give Virtlet a quick try using our demo script (requires Docker 1.12+):
+```
+wget https://cdn.rawgit.com/Mirantis/virtlet/ivan4th/kubeadm-dind-cluster-deployment/deploy/demo.sh
+chmod +x demo.sh
+./demo.sh
+```
+
 ## Need any help with Virtlet?
 
 If you will encounter any issue when using Virtlet please look into our [issue tracker](http://github.com/Mirantis/virtlet/issues) on github. If your case is not mentioned there - please fill new issue for it.
