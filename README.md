@@ -2,7 +2,7 @@
 
 Virtlet is a Kubernetes runtime server which allows you to run VM workloads, based on QCOW2 images.
 
-At this stage (pre-alpha), it's possible to run Virtlet by following the instructions from either [Running local environment](docs/running-local-environment.md) or [Deploy using DaemonSets](contrib/deploy/README.md) documents.
+At this stage (pre-alpha), it's possible to run Virtlet by following the instructions from either [Running local environment](docs/running-local-environment.md) or [Deploy using DaemonSets](deploy/README.md) documents.
 
 [See here](docs/architecture.md) for the description of Virtlet architecture.
 
