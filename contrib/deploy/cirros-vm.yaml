@@ -25,4 +25,4 @@ metadata:
 spec:
   containers:
     - name: cirros-vm
-      image: virtlet/image-service/cirros
+      image: virtlet/image-service.default/cirros
