@@ -3,11 +3,13 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: virtlet
+  namespace: kube-system
 ---
 apiVersion: extensions/v1beta1 
 kind: DaemonSet
 metadata:
   name: virtlet
+  namespace: kube-system
 spec:
   template:
     metadata:
@@ -82,7 +84,9 @@ spec:
         command:
           - "/bin/bash"
           - "-c"
-          - "echo ${IMAGE_SERVICE_SERVICE_HOST} image-service >>/etc/hosts && /start.sh"
+          # TODO: should not be needed in 1.6
+          # See https://github.com/kubernetes/kubernetes/issues/17406
+          - "echo -e \"nameserver ${KUBE_DNS_SERVICE_HOST}\nsearch kube-system.svc.cluster.local svc.cluster.local cluster.local\">/etc/resolv.conf && /start.sh"
         volumeMounts:
         - mountPath: /sys/fs/cgroup
           name: cgroup

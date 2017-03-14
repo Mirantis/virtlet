@@ -2,6 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: image-service
+  namespace: default
 spec:
   selector:
     role: image-server
