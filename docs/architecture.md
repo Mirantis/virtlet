@@ -13,7 +13,7 @@ Virtlet consists of the following components:
 
 In addition to the above, our example setup provides the following:
 
-* [Image service](../contrib/deploy/image-service.yaml) which provides VM images accessible through HTTP in local cluster environment. It's only used as an optional helper, because Virtlet manager can pull images from any HTTP server accessible from the node.
+* [Image service](../deploy/image-service.yaml) which provides VM images accessible through HTTP in local cluster environment. It's only used as an optional helper, because Virtlet manager can pull images from any HTTP server accessible from the node.
 * [CRI proxy](../cmd/criproxy) which provides the possibility to mix docker-shim and VM based workloads on the same k8s node.
 
 ## Virtlet manager

@@ -1,8 +1,0 @@
-apiVersion: v1
-kind: Pod
-metadata:
-  name: virtlet-example
-spec:
-  containers:
-    - name: fedora
-      image: 172.19.0.1/fedora
