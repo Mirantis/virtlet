@@ -1,40 +1,27 @@
 # Deploying virtlet as a DaemonSet
 
-1. Start [kubeadm-dind-cluster](https://github.com/Mirants/kubeadm-dind-cluster).
-   Virtlet may work with other cluster deployment methods too,
-   but the important part is passing
-   `--feature-gates=StreamingProxyRedirects=true` to apiserver and
-   `--feature-gates=DynamicKubeletConfig=true` to kubelet.
-2. 'Virtletify' `kube-node-1`:
+The steps described here are performed automatically by
+[demo.sh](demo.sh) script.
+
+1. Start [kubeadm-dind-cluster](https://github.com/Mirants/kubeadm-dind-cluster)
+   with Kubernetes version 1.5 (you're not required to download it to your home directory):
 ```
-./virtletify-dind-node.sh
+$ wget -O ~/dind-cluster-v1.5.sh https://cdn.rawgit.com/Mirantis/kubeadm-dind-cluster/master/fixed/dind-cluster-v1.5.sh
+$ chmod +x ~/dind-cluster-v1.5.sh
+$ ~/dind-cluster-v1.5.sh up
+$ export PATH="$HOME/.kubeadm-dind-cluster:$PATH"
 ```
-3. Create image server Deployment and Service:
+   The cluster script stores appropriate kubectl version in `~/.kubeadm-dind-cluster`.
+2. Label a node to accept Virtlet pod:
 ```
-kubectl create -f image-server.yaml -f image-service.yaml
+kubectl label node kube-node-1 extraRuntime=virtlet
 ```
-4. Wait for image-server pod to become Running (this is important for virtlet initialization due to host network + cluster DNS [issue](https://github.com/kubernetes/kubernetes/issues/17406)):
-```
-kubectl get pods -w
-```
-5. Create Virtlet DaemonSet:
+3. Deploy Virtlet DaemonSet:
 ```
 kubectl create -f virtlet-ds.yaml
 ```
-6. Wait for Virtlet to start:
+4. Wait for Virtlet pod to activate:
 ```
-kubectl get pods -w
+kubectl get pods -w -n kube-system
 ```
-7. List libvirt domains:
-```
-./virsh.sh list
-```
-8. Connect to the VM console:
-```
-./virsh.sh console $(./virsh.sh list --name)
-```
-
-Notes:
-
-1. Currently CRI proxy doesn't survive node restart (need to add proper systemd unit to fix this).
-2. Trying to do `kubectl exec` in virtlet container may currently fail with unhelpful error message ("Error from server"). This is worked around in `virsh.sh` using plain `docker exec`.
+5. Go to `examples/` directory and follow [the instructions](../examples/README.md) from there.

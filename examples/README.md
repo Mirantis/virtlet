@@ -1,7 +1,8 @@
 # Virtlet image server and pod example
 
 In order to try out the example, do the following on a cluster that
-has nodes with Virtlet on it:
+has nodes with Virtlet on it (see [the instructions](../deploy/README.md) in
+`deploy/` directory):
 
 1. Create image server Deployment and Service:
 ```
