@@ -10,6 +10,14 @@ At this stage (pre-alpha), it's possible to run Virtlet by following the instruc
 
 To try out Virtlet follow the instructions from [Running local environment](docs/running-local-environment.md) and [try out examples](examples/README.md) documents.
 
+### Virtlet introduction video
+
+You can watch and listen to Virtlet introduction and description video that was recorded on Kubernetes Community Meeting [here](https://youtu.be/x5uBq-ugoio?t=38).
+
+### Virtlet usage demo
+
+You can watch sample usage session under [this](https://asciinema.org/a/1a6xp5j4o22rnsx9wpvumd4kt) link.
+
 ## Need any help with Virtlet?
 
 If you will encounter any issue when using Virtlet please look into our [issue tracker](http://github.com/Mirantis/virtlet/issues) on github. If your case is not mentioned there - please fill new issue for it.
@@ -22,6 +30,3 @@ Virtlet is an open source project and any contributions are welcomed. Look into 
 
 Unless specifically noted, all parts of this project are licensed under the [Apache 2.0 license](LICENSE).
 
-### Virtlet usage demo
-
-You can watch sample usage session under [this](https://asciinema.org/a/1a6xp5j4o22rnsx9wpvumd4kt) link.
