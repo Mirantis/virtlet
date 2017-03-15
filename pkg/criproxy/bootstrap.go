@@ -216,6 +216,15 @@ func (b *Bootstrap) saveKubeletConfig() error {
 	return writeJson(b.kubeletCfg, b.config.SavedConfigPath)
 }
 
+func (b *Bootstrap) deleteSavedKubeletConfig() {
+	if b.config.SavedConfigPath == "" {
+		return
+	}
+	if err := os.Remove(b.config.SavedConfigPath); err != nil {
+		glog.Errorf("Failed to remove saved kubelet config: %q", b.config.SavedConfigPath)
+	}
+}
+
 func (b *Bootstrap) patchKubeletConfig() error {
 	if b.kubeletUpdated() {
 		return fmt.Errorf("kubelet already configured for CRI, but no saved config")
@@ -343,6 +352,13 @@ func (b *Bootstrap) EnsureCRIProxy() (bool, error) {
 		return false, err
 	}
 
+	ok := false
+	defer func() {
+		if !ok {
+			b.deleteSavedKubeletConfig()
+		}
+	}()
+
 	dockerEndpoint, err := b.dockerEndpoint()
 	if err != nil {
 		return false, err
@@ -366,7 +382,7 @@ func (b *Bootstrap) EnsureCRIProxy() (bool, error) {
 	}
 
 	glog.V(1).Info("CRI proxy bootstrap complete")
-
+	ok = true
 	return true, nil
 }
 
