@@ -36,7 +36,7 @@ spec:
           httpGet:
             path: /ready
             port: 80
-          initialDelaySeconds: 1
+          initialDelaySeconds: 2
           periodSeconds: 2
         volumeMounts:
         - mountPath: /usr/share/nginx/html

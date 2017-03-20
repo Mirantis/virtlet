@@ -8,6 +8,8 @@ set -o errtrace
 dind_script="dind-cluster-v1.5.sh"
 kubectl="${HOME}/.kubeadm-dind-cluster/kubectl"
 base_url="https://raw.githubusercontent.com/Mirantis/virtlet/ivan4th/kubeadm-dind-cluster-deployment/"
+# Convenience setting for local testing:
+# base_url="${HOME}/work/kubernetes/src/github.com/Mirantis/virtlet"
 
 function demo::step {
   local OPTS=""
@@ -63,7 +65,7 @@ function demo::pods-ready {
 
 function demo::service-ready {
   local name="$1"
-  if ! "${kubectl}" describe service "${name}"|grep -q '^Endpoints'; then
+  if ! "${kubectl}" describe service "${name}"|grep -q '^Endpoints:.*[0-9]\.'; then
     return 1
   fi
 }
