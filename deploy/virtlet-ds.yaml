@@ -147,6 +147,8 @@ spec:
         name: libvirt
       - hostPath:
           path: /etc/kubernetes/cni
+          # after calico-flannel is landed in kubeadm-dind-cluster:
+          # path: /etc/cni
         name: cniconf
       - hostPath:
           path: /usr/lib/kubernetes/cni/bin
