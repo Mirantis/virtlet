@@ -69,11 +69,12 @@ function demo::service-ready {
 }
 
 function demo::wait-for {
-  local action="${1}"
-  local what="$2"
-  local title="$3"
+  local title="$1"
+  local action="$2"
+  local what="$3"
+  shift 3
   demo::step "Waiting for:" "${title}"
-  while ! "${action}" "${what}"; do
+  while ! "${action}" "${what}" "$@"; do
     echo -n "." >&2
     sleep 1
   done
@@ -105,7 +106,7 @@ function demo::vm-ready {
 function demo::start-virtlet {
   demo::step "Deploying Virtlet DaemonSet"
   "${kubectl}" create -f "${base_url}/deploy/virtlet-ds.yaml"
-  demo::wait-for demo::pods-ready runtime=virtlet "Virtlet DaemonSet"
+  demo::wait-for "Virtlet DaemonSet" demo::pods-ready runtime=virtlet
 }
 
 function demo::start-nginx {
@@ -115,13 +116,13 @@ function demo::start-nginx {
 function demo::start-image-server {
   demo::step "Starting Image Server"
   "${kubectl}" create -f "${base_url}/examples/image-server.yaml" -f "${base_url}/examples/image-service.yaml"
-  demo::wait-for demo::service-ready image-service "Image Service"
+  demo::wait-for "Image Service" demo::service-ready image-service
 }
 
 function demo::start-vm {
   demo::step "Starting sample CirrOS VM"
   "${kubectl}" create -f "${base_url}/examples/cirros-vm.yaml"
-  demo::wait-for demo::vm-ready cirros-vm "CirrOS VM"
+  demo::wait-for "CirrOS VM" demo::vm-ready cirros-vm
   demo::step "Entering the VM, press Enter if you don't see the prompt or OS boot messages"
   demo::virsh console $(demo::virsh list --name)
 }
