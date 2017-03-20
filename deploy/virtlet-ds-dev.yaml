@@ -1,0 +1,184 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: virtlet
+  namespace: kube-system
+---
+apiVersion: extensions/v1beta1 
+kind: DaemonSet
+metadata:
+  name: virtlet
+  namespace: kube-system
+spec:
+  template:
+    metadata:
+      name: virtlet
+      labels:
+        runtime: virtlet
+      annotations:
+        scheduler.alpha.kubernetes.io/affinity: >
+          {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "extraRuntime",
+                        "operator": "In",
+                        "values": ["virtlet"]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        # The init container checks if there's already saved kubelet config
+        # and considers that bootstrap is already done if it exists.
+        # If it doesn't, it drops criproxy binary into /opt/criproxy/bin/
+        # if it's not already there and then starts criproxy installation.
+        # The possibility to put criproxy binary in advance into
+        # /opt/criproxy/bin may be helpful for the purpose of
+        # debugging criproxy.
+        pod.beta.kubernetes.io/init-containers: >
+          [
+            {
+              "name": "bootstrap",
+              "image": "mirantis/virtlet",
+              "imagePullPolicy": "IfNotPresent",
+              "securityContext": { "privileged": true },
+              "command": ["/bin/sh", "-c", "if [ -f /etc/criproxy/kubelet.conf ]; then exit 0; fi; if [ ! -f /opt/criproxy/bin/criproxy ]; then mkdir -p /opt/criproxy/bin; cp /criproxy /opt/criproxy/bin/criproxy; fi; /opt/criproxy/bin/criproxy -alsologtostderr -v 20 -install >> /hostlog/criproxy-bootstrap.log 2>&1 && sleep Infinity"],
+              "volumeMounts": [
+                {
+                  "name": "criproxybin",
+                  "mountPath": "/opt/criproxy/bin"
+                },
+                {
+                  "name": "run",
+                  "mountPath": "/run"
+                },
+                {
+                  "name": "dockersock",
+                  "mountPath": "/var/run/docker.sock"
+                },
+                {
+                  "name": "criproxyconf",
+                  "mountPath": "/etc/criproxy"
+                },
+                {
+                  "name": "log",
+                  "mountPath": "/hostlog"
+                },
+                {
+                  "name": "criproxy-dev-bin",
+                  "mountPath": "/criproxy"
+                }
+              ]
+            }
+          ]
+    spec:
+      hostNetwork: true
+      # hostPID is true to (1) enable VMs to survive virtlet container restart
+      # (to be checked) and (2) to enable the use of nsenter in init container
+      hostPID: true
+      # bootstrap procedure needs admin access to apiserver
+      serviceAccountName: virtlet
+      containers:
+      - name: virtlet
+        image: mirantis/virtlet
+        # Workaround for https://github.com/kubernetes/kubernetes/issues/17406
+        command:
+          - "/bin/bash"
+          - "-c"
+          # TODO: should not be needed in 1.6
+          # See https://github.com/kubernetes/kubernetes/issues/17406
+          - "echo -e \"nameserver ${KUBE_DNS_SERVICE_HOST}\nsearch kube-system.svc.cluster.local svc.cluster.local cluster.local\">/etc/resolv.conf && /start.sh"
+        volumeMounts:
+        - mountPath: /sys/fs/cgroup
+          name: cgroup
+        - mountPath: /lib/modules
+          name: modules
+          readOnly: true
+        - mountPath: /boot
+          name: boot
+          readOnly: true
+        - mountPath: /run
+          name: run
+        - mountPath: /var/lib/virtlet
+          name: virtlet
+        # FIXME: E0102 08:26:02.959687      32 virtlet.go:50] Initializing server failed: cannot open path '/var/lib/libvirt/images': No such file or directory
+        # - mountPath: /var/lib/libvirt
+        #   name: libvirt
+        - mountPath: /etc/cni
+          name: cniconf
+        - mountPath: /opt/cni/bin
+          name: cnibin
+        - mountPath: /var/lib/cni
+          name: cnidata
+        - mountPath: /usr/local/bin/virtlet
+          name: virtlet-dev-bin
+        - mountPath: /vmwrapper
+          name: vmwrapper-dev-bin
+        securityContext:
+          privileged: true
+        env:
+        - name: VIRTLET_LOGLEVEL
+          value: "3"
+        - name: VIRTLET_DISABLE_KVM
+          value: "1"
+      volumes:
+      - hostPath:
+          path: /sys/fs/cgroup
+        name: cgroup
+      - hostPath:
+          path: /lib/modules
+        name: modules
+      - hostPath:
+          path: /boot
+        name: boot
+      - hostPath:
+          path: /run
+        name: run
+      # TODO: don't hardcode docker socket location here
+      # This will require CRI proxy installation to run
+      # in host mount namespace.
+      - hostPath:
+          path: /var/run/docker.sock
+        name: dockersock
+      - hostPath:
+          path: /var/lib/virtlet
+        name: virtlet
+      - hostPath:
+          path: /var/lib/libvirt
+        name: libvirt
+      - hostPath:
+          path: /etc/kubernetes/cni
+          # after calico-flannel is landed in kubeadm-dind-cluster:
+          # path: /etc/cni
+        name: cniconf
+      - hostPath:
+          path: /usr/lib/kubernetes/cni/bin
+        name: cnibin
+      - hostPath:
+          path: /var/lib/cni
+        name: cnidata
+      - hostPath:
+          path: /opt/criproxy/bin
+        name: criproxybin
+      - hostPath:
+          path: /etc/criproxy
+        name: criproxyconf
+      - hostPath:
+          path: /var/log
+        name: log
+      - hostPath:
+          path: /dind/virtlet
+        name: virtlet-dev-bin
+      - hostPath:
+          path: /dind/vmwrapper
+        name: vmwrapper-dev-bin
+      - hostPath:
+          path: /dind/criproxy
+        name: criproxy-dev-bin

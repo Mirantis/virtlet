@@ -31,8 +31,19 @@ Tests run is preceded by full build based on autotools.
 
 ## copy
 
-Extracts output binaries from build container into `_output/` in current
-directory.
+Extracts output binaries from build container into `_output/` in the
+current directory.
+
+## copy-dind
+
+Copies the binaries into kube-node-1 of `kubeadm-dind-cluster`. You need to
+do `dind-cluster...sh up` to be able to use this command.
+
+## start-dind
+
+Copies the binaries into kube-node-1 of `kubeadm-dind-cluster`. You
+need to do `dind-cluster...sh up` and `build/cmd.sh copy-dind` to be
+able to use this command.
 
 ## stop
 
