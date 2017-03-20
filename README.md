@@ -22,6 +22,7 @@ You can also give Virtlet a quick try using our demo script (requires Docker 1.1
 ```
 wget https://cdn.rawgit.com/Mirantis/virtlet/ivan4th/kubeadm-dind-cluster-deployment/deploy/demo.sh
 chmod +x demo.sh
+# './demo.sh --help' displays the description
 ./demo.sh
 ```
 

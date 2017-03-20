@@ -20,9 +20,9 @@ function demo::step {
   GREEN="$1"
   shift
   if [ -t 2 ] ; then
-    echo -e ${OPTS} "\x1B[97m* \x1B[92m${GREEN}\x1B[39m $*" 1>&2
+    echo -e ${OPTS} "\x1B[97m* \x1B[92m${GREEN}\x1B[39m $*" >&2
   else
-    echo ${OPTS} "* ${GREEN} $*" 1>&2
+    echo ${OPTS} "* ${GREEN} $*" >&2
   fi
 }
 
@@ -38,8 +38,8 @@ function demo::get-dind-cluster {
 
 function demo::start-dind-cluster {
   demo::step "Will now clear any kubeadm-dind-cluster data on the current Docker. Press Enter to continue or Ctrl-C to stop."
-  echo "VM console will be attached after Virtlet setup is complete, press Ctrl-] to detach."
-  echo "To clean up the cluster, use './dind-cluster-v1.5.sh clean'"
+  echo "VM console will be attached after Virtlet setup is complete, press Ctrl-] to detach." >&2
+  echo "To clean up the cluster, use './dind-cluster-v1.5.sh clean'" >&2
   read
   "./${dind_script}" clean
   "./${dind_script}" up
@@ -128,6 +128,23 @@ function demo::start-vm {
   demo::step "Entering the VM, press Enter if you don't see the prompt or OS boot messages"
   demo::virsh console $(demo::virsh list --name)
 }
+
+if [[ ${1:-} = "--help" || ${1:-} = "-h" ]]; then
+  cat <<EOF >&2
+Usage: ./demo.sh
+
+This script runs a simple demo of Virtlet[1] using kubeadm-dind-cluster[2]
+VM console will be attached after Virtlet setup is complete, Ctrl-]
+can be used to detach from it.
+Use 'curl http://nginx.default.svc.cluster.local' from VM console to test
+cluster networking.
+
+To clean up the cluster, use './dind-cluster-v1.5.sh clean'
+[1] https://github.com/Mirantis/virtlet
+[2] https://github.com/Mirantis/kubeadm-dind-cluster
+EOF
+  exit 0
+fi
 
 demo::get-dind-cluster
 demo::start-dind-cluster
