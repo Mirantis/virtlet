@@ -65,7 +65,7 @@ function demo::pods-ready {
 
 function demo::service-ready {
   local name="$1"
-  if ! "${kubectl}" describe service "${name}"|grep -q '^Endpoints:.*[0-9]\.'; then
+  if ! "${kubectl}" describe service -n kube-system "${name}"|grep -q '^Endpoints:.*[0-9]\.'; then
     return 1
   fi
 }
