@@ -7,9 +7,9 @@ set -o errtrace
 
 dind_script="dind-cluster-v1.5.sh"
 kubectl="${HOME}/.kubeadm-dind-cluster/kubectl"
-base_url="https://raw.githubusercontent.com/Mirantis/virtlet/ivan4th/kubeadm-dind-cluster-deployment/"
+BASE_LOCATION="${BASE_LOCATION:-https://raw.githubusercontent.com/Mirantis/virtlet/ivan4th/master/}"
 # Convenience setting for local testing:
-# base_url="${HOME}/work/kubernetes/src/github.com/Mirantis/virtlet"
+# BASE_LOCATION="${HOME}/work/kubernetes/src/github.com/Mirantis/virtlet"
 
 function demo::step {
   local OPTS=""
@@ -107,7 +107,7 @@ function demo::vm-ready {
 
 function demo::start-virtlet {
   demo::step "Deploying Virtlet DaemonSet"
-  "${kubectl}" create -f "${base_url}/deploy/virtlet-ds.yaml"
+  "${kubectl}" create -f "${BASE_LOCATION}/deploy/virtlet-ds.yaml"
   demo::wait-for "Virtlet DaemonSet" demo::pods-ready runtime=virtlet
 }
 
@@ -117,13 +117,13 @@ function demo::start-nginx {
 
 function demo::start-image-server {
   demo::step "Starting Image Server"
-  "${kubectl}" create -f "${base_url}/examples/image-server.yaml" -f "${base_url}/examples/image-service.yaml"
+  "${kubectl}" create -f "${BASE_LOCATION}/examples/image-server.yaml" -f "${BASE_LOCATION}/examples/image-service.yaml"
   demo::wait-for "Image Service" demo::service-ready image-service
 }
 
 function demo::start-vm {
   demo::step "Starting sample CirrOS VM"
-  "${kubectl}" create -f "${base_url}/examples/cirros-vm.yaml"
+  "${kubectl}" create -f "${BASE_LOCATION}/examples/cirros-vm.yaml"
   demo::wait-for "CirrOS VM" demo::vm-ready cirros-vm
   demo::step "Entering the VM, press Enter if you don't see the prompt or OS boot messages"
   demo::virsh console $(demo::virsh list --name)

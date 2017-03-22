@@ -20,7 +20,7 @@ You can watch sample usage session under [this](https://asciinema.org/a/1a6xp5j4
 
 You can also give Virtlet a quick try using our demo script (requires Docker 1.12+):
 ```
-wget https://cdn.rawgit.com/Mirantis/virtlet/ivan4th/kubeadm-dind-cluster-deployment/deploy/demo.sh
+wget https://cdn.rawgit.com/Mirantis/virtlet/ivan4th/master/deploy/demo.sh
 chmod +x demo.sh
 # './demo.sh --help' displays the description
 ./demo.sh
