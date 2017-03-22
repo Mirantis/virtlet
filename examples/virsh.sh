@@ -5,5 +5,5 @@ if [[ ${1:-} = "console" ]]; then
   # which makes it less useful
   opts="-it"
 fi
-pod=$(kubectl get pods -l runtime=virtlet -o name|head -1|sed 's@.*/@@')
-kubectl exec ${opts} "${pod}" -- virsh "$@"
+pod=$(kubectl get pods -n kube-system -l runtime=virtlet -o name|head -1|sed 's@.*/@@')
+kubectl exec ${opts} -n kube-system "${pod}" -- virsh "$@"

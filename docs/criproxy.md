@@ -126,7 +126,7 @@ in case of virtlet.
    It can also be used to set node affinity of VM pods.
 3. User loads Virtlet deployment yaml:
    ```
-   kubectl create -f contrib/deploy/virtlet-ds.yaml
+   kubectl create -f deploy/virtlet-ds.yaml
    ```
    The yaml file includes Virtlet DaemonSet and a ServiceAccount object used by
    CRI proxy bootstrap procedure to access apiserver.

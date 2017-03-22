@@ -25,4 +25,4 @@ node_name="$(docker exec "${container}" hostname --ip-address)"
 
 kubectl label node "${node_name}" extraRuntime=virtlet
 
-# kubectl create -f contrib/deploy/virtlet-ds.yaml
+# kubectl create -f deploy/virtlet-ds.yaml

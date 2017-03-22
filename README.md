@@ -2,7 +2,7 @@
 
 Virtlet is a Kubernetes runtime server which allows you to run VM workloads, based on QCOW2 images.
 
-At this stage (pre-alpha), it's possible to run Virtlet by following the instructions from either [Running local environment](docs/running-local-environment.md) or [Deploy using DaemonSets](contrib/deploy/README.md) documents.
+At this stage (pre-alpha), it's possible to run Virtlet by following the instructions from either [Running local environment](docs/running-local-environment.md) or [Deploy using DaemonSets](deploy/README.md) documents.
 
 [See here](docs/architecture.md) for the description of Virtlet architecture.
 
@@ -17,6 +17,18 @@ You can watch and listen to Virtlet introduction and description video that was 
 ### Virtlet usage demo
 
 You can watch sample usage session under [this](https://asciinema.org/a/1a6xp5j4o22rnsx9wpvumd4kt) link.
+
+You can also give Virtlet a quick try using our demo script (requires Docker 1.12+):
+```
+wget https://raw.githubusercontent.com/Mirantis/virtlet/master/deploy/demo.sh
+chmod +x demo.sh
+# './demo.sh --help' displays the description
+./demo.sh
+```
+
+The demo will start a test cluster, deploy Virtlet on it and then boot a [CirrOS](https://launchpad.net/cirros) VM there. You may access sample nginx server via `curl http://nginx.default.svc.cluster.local` from inside the VM. To detach from VM console, press `Ctrl-]`. After you detach from the VM you can remove the test cluster with `./dind-cluster-v1.5.sh clean`.
+
+The demo is based on [kubeadm-dind-cluster](https://github.com/Mirantis/kubeadm-dind-cluster) project. **Docker btrfs storage driver is currently unsupported.** Please refer to `kubeadm-dind-cluster` documentation for more info.
 
 ## Need any help with Virtlet?
 
