@@ -63,6 +63,26 @@ function copy_output {
         tar -xvz
 }
 
+function copy_dind {
+    if ! docker volume ls -q | grep -q '^kubeadm-dind-kube-node-1$'; then
+      echo "No active or snapshotted kubeadm-dind-cluster" >&2
+      exit 1
+    fi
+    ensure_build_image
+    cd "${project_dir}"
+    docker run --rm \
+           -v "virtlet_src:${remote_project_dir}" \
+           -v kubeadm-dind-kube-node-1:/dind \
+           --name ${container_name} \
+           "${build_image}" \
+           cp -av _output/* /dind
+}
+
+function start_dind {
+  kubectl label node kube-node-1 extraRuntime=virtlet
+  kubectl create -f "${project_dir}/deploy/virtlet-ds-dev.yaml"
+}
+
 function virtlet_subdir {
     local dir="${1:-$(pwd)}"
     local prefix="${project_dir}/"
@@ -91,6 +111,8 @@ function usage {
     echo >&2 "  $0 build"
     echo >&2 "  $0 test"
     echo >&2 "  $0 copy"
+    echo >&2 "  $0 copy-dind"
+    echo >&2 "  $0 start-dind"
     echo >&2 "  $0 stop"
     echo >&2 "  $0 clean"
     echo >&2 "  $0 gotest [TEST_ARGS...]"
@@ -129,6 +151,12 @@ case "${cmd}" in
         ;;
     copy)
         copy_output
+        ;;
+    copy-dind)
+        copy_dind
+        ;;
+    start-dind)
+        start_dind
         ;;
     *)
         usage
