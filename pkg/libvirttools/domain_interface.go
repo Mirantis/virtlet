@@ -27,6 +27,7 @@ import (
 type DomainOperations interface {
 	Create(domain *libvirt.Domain) error
 	DefineFromXML(xmlConfig string) (*libvirt.Domain, error)
+	DefineSecretFromXML(xmlConfig string) (*libvirt.Secret, error)
 	Destroy(domain *libvirt.Domain) error
 	Undefine(domain *libvirt.Domain) error
 	Shutdown(domain *libvirt.Domain) error
@@ -59,6 +60,10 @@ func (l LibvirtDomainOperations) Undefine(domain *libvirt.Domain) error {
 
 func (l LibvirtDomainOperations) DefineFromXML(xmlConfig string) (*libvirt.Domain, error) {
 	return l.conn.DomainDefineXML(xmlConfig)
+}
+
+func (l LibvirtDomainOperations) DefineSecretFromXML(xmlConfig string) (*libvirt.Secret, error) {
+	return l.conn.SecretDefineXML(xmlConfig, 0)
 }
 
 func (l LibvirtDomainOperations) Shutdown(domain *libvirt.Domain) error {
