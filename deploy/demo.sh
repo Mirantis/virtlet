@@ -48,7 +48,9 @@ function demo::get-dind-cluster {
 
 function demo::start-dind-cluster {
   demo::step "Will now clear any kubeadm-dind-cluster data on the current Docker"
-  echo "VM console will be attached after Virtlet setup is complete, press Ctrl-] to detach." >&2
+  if [[ ! ${NONINTERACTIVE} ]]; then
+    echo "VM console will be attached after Virtlet setup is complete, press Ctrl-] to detach." >&2
+  fi
   echo "To clean up the cluster, use './dind-cluster-v1.5.sh clean'" >&2
   demo::ask-before-continuing
   "./${dind_script}" clean
