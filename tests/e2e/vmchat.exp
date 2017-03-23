@@ -38,11 +38,40 @@ expect {
 sleep 3
 send "letmein\r"
 
+# display network config for the purpose of diagnostics
 expect {
     timeout { puts "shell prompt timeout"; exit 1 }
     -re "\n\\$"
 }
-send "/sbin/ifconfig\r"
+send "ip a\r"
+
+expect {
+    timeout { puts "shell prompt timeout"; exit 1 }
+    -re "\n\\$"
+}
+send "ip r\r"
+
+expect {
+    timeout { puts "shell prompt timeout"; exit 1 }
+    -re "\n\\$"
+}
+send "ping -c1 8.8.8.8\r"
+
+expect {
+    timeout { puts "timed out waiting for proper ping response"; exit 1 }
+    "1 packets transmitted, 1 packets received, 0% packet loss"
+}
+
+expect {
+    timeout { puts "shell prompt timeout"; exit 1 }
+    -re "\n\\$"
+}
+send "curl http://nginx.default.svc.cluster.local\r"
+
+expect {
+    timeout { puts "timed out waiting for nginx response"; exit 1 }
+    "Thank you for using nginx."
+}
 
 expect {
     timeout { puts "shell prompt timeout"; exit 1 }
@@ -54,3 +83,5 @@ expect {
     timeout { puts "login prompt timeout"; exit 1 }
     "login:"
 }
+send "\035\r"
+expect eof
