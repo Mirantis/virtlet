@@ -12,15 +12,11 @@ fi
 
 cd "$(dirname "$(readlinkf "${BASH_SOURCE}")")"
 
-function dcompose {
-    docker-compose -f contrib/docker-compose-test/docker-compose.yml "$@"
-}
-
 build/cmd.sh build
 build/cmd.sh copy
 build/cmd.sh test
 
-dcompose down -v
-dcompose build
-dcompose run e2e_test
-dcompose down -v
+docker build -t mirantis/virtlet .
+
+NONINTERACTIVE=1 NO_VM_CONSOLE=1 INJECT_LOCAL_IMAGE=1 deploy/demo.sh
+tests/e2e/e2e.sh
