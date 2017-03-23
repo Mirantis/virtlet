@@ -5,6 +5,9 @@ set -o nounset
 set -o pipefail
 set -o errtrace
 
+NONINTERACTIVE="${NONINTERACTIVE:-}"
+NO_VM_CONSOLE="${NO_VM_CONSOLE:-}"
+INJECT_LOCAL_IMAGE="${INJECT_LOCAL_IMAGE:-}"
 dind_script="dind-cluster-v1.5.sh"
 kubectl="${HOME}/.kubeadm-dind-cluster/kubectl"
 BASE_LOCATION="${BASE_LOCATION:-https://raw.githubusercontent.com/Mirantis/virtlet/master/}"
@@ -26,23 +29,37 @@ function demo::step {
   fi
 }
 
+function demo::ask-before-continuing {
+  if [[ ! ${NONINTERACTIVE} ]]; then
+    echo "Press Enter to continue or Ctrl-C to stop." >&2
+    read
+  fi
+}
+
 function demo::get-dind-cluster {
   if [[ -f ${dind_script} ]]; then
     return 0
   fi
-  demo::step "Will download dind-cluster-v1.5.sh into current directory. Press Enter to continue or Ctrl-C to stop."
-  read
+  demo::step "Will download dind-cluster-v1.5.sh into current directory"
+  demo::ask-before-continuing
   wget "https://raw.githubusercontent.com/Mirantis/kubeadm-dind-cluster/master/fixed/${dind_script}"
   chmod +x "${dind_script}"
 }
 
 function demo::start-dind-cluster {
-  demo::step "Will now clear any kubeadm-dind-cluster data on the current Docker. Press Enter to continue or Ctrl-C to stop."
-  echo "VM console will be attached after Virtlet setup is complete, press Ctrl-] to detach." >&2
+  demo::step "Will now clear any kubeadm-dind-cluster data on the current Docker"
+  if [[ ! ${NONINTERACTIVE} ]]; then
+    echo "VM console will be attached after Virtlet setup is complete, press Ctrl-] to detach." >&2
+  fi
   echo "To clean up the cluster, use './dind-cluster-v1.5.sh clean'" >&2
-  read
+  demo::ask-before-continuing
   "./${dind_script}" clean
   "./${dind_script}" up
+}
+
+function demo::inject-local-image {
+  demo::step "Copying local mirantis/virtlet image into kube-node-1 container"
+  docker save mirantis/virtlet | docker exec -i kube-node-1 docker load
 }
 
 function demo::label-node {
@@ -125,8 +142,10 @@ function demo::start-vm {
   demo::step "Starting sample CirrOS VM"
   "${kubectl}" create -f "${BASE_LOCATION}/examples/cirros-vm.yaml"
   demo::wait-for "CirrOS VM" demo::vm-ready cirros-vm
-  demo::step "Entering the VM, press Enter if you don't see the prompt or OS boot messages"
-  demo::virsh console $(demo::virsh list --name)
+  if [[ ! "${NO_VM_CONSOLE:-}" ]]; then
+    demo::step "Entering the VM, press Enter if you don't see the prompt or OS boot messages"
+    demo::virsh console $(demo::virsh list --name)
+  fi
 }
 
 if [[ ${1:-} = "--help" || ${1:-} = "-h" ]]; then
@@ -148,6 +167,9 @@ fi
 
 demo::get-dind-cluster
 demo::start-dind-cluster
+if [[ ${INJECT_LOCAL_IMAGE:-} ]]; then
+  demo::inject-local-image
+fi
 demo::label-node
 demo::start-virtlet
 demo::start-nginx
