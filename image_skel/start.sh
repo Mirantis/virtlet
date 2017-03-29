@@ -38,5 +38,10 @@ done
 PROTOCOL="${VIRTLET_DOWNLOAD_PROTOCOL:-https}"
 
 if [[ ${1:-} != -novirtlet ]]; then
+    FLEXVOLUME_DIR=/usr/libexec/kubernetes/kubelet-plugins/volume/exec
+    if [ -d ${FLEXVOLUME_DIR} ]; then
+      mkdir ${FLEXVOLUME_DIR}/kubernetes.io~libvirt_driver
+      cp /libvirt_driver ${FLEXVOLUME_DIR}/kubernetes.io~libvirt_driver/libvirt_driver
+    fi
     /usr/local/bin/virtlet -v=${VIRTLET_LOGLEVEL:-2} -logtostderr=true -libvirt-uri=qemu+tcp://localhost/system -image-download-protocol="${PROTOCOL}"
 fi

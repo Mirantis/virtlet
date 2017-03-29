@@ -36,3 +36,10 @@ done
 
 cd "${SCRIPT_DIR}"
 "${SCRIPT_DIR}/vmchat.exp" $("${virsh}" list --name)
+
+# Run one-node ceph cluster
+${SCRIPT_DIR}/run_ceph.sh ${SCRIPT_DIR}
+kubectl create -f ${SCRIPT_DIR}/substituted-cirros-vm-rbd-volume.yaml
+if [ "$(${virsh} domblklist 2 | grep rbd-test-volume | wc -l)" != "1" ]; then
+  exit 1
+fi
