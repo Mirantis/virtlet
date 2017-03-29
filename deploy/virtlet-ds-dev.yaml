@@ -5,7 +5,7 @@ metadata:
   name: virtlet
   namespace: kube-system
 ---
-apiVersion: extensions/v1beta1 
+apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
   name: virtlet
@@ -121,6 +121,8 @@ spec:
           name: virtlet-dev-bin
         - mountPath: /vmwrapper
           name: vmwrapper-dev-bin
+        - mountPath: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
+          name: k8s-flexvolume-plugins-dir
         securityContext:
           privileged: true
         env:
@@ -182,3 +184,6 @@ spec:
       - hostPath:
           path: /dind/criproxy
         name: criproxy-dev-bin
+      - hostPath:
+          path: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
+        name: k8s-flexvolume-plugins-dir
