@@ -336,9 +336,8 @@ func (v *VirtualizationTool) addAttachedVolumesXML(podID string, uuid string, vi
 	if len(flexVolumeInfos) >= len(diskLetter) {
 		return domXML, nil
 	}
-	ind := len(diskLetter) - len(flexVolumeInfos) - 1
 
-	volumesXML, err := v.volumeStorage.CreateVolumesToBeAttached(virtletVolsDesc, uuid, diskLetter[ind:], len(diskLetter))
+	volumesXML, err := v.volumeStorage.CreateVolumesToBeAttached(virtletVolsDesc, uuid, diskLetter[len(flexVolumeInfos):], len(diskLetter))
 	if err != nil {
 		return domXML, err
 	}

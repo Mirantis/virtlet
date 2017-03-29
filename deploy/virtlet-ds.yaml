@@ -5,7 +5,7 @@ metadata:
   name: virtlet
   namespace: kube-system
 ---
-apiVersion: extensions/v1beta1 
+apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
   name: virtlet
@@ -84,6 +84,7 @@ spec:
       containers:
       - name: virtlet
         image: mirantis/virtlet
+
         # Workaround for https://github.com/kubernetes/kubernetes/issues/17406
         command:
           - "/bin/bash"
@@ -113,6 +114,8 @@ spec:
           name: cnibin
         - mountPath: /var/lib/cni
           name: cnidata
+        - mountPath: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
+          name: k8s-flexvolume-plugins-dir
         securityContext:
           privileged: true
         env:
@@ -166,3 +169,6 @@ spec:
       - hostPath:
           path: /var/log
         name: log
+      - hostPath:
+          path: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
+        name: k8s-flexvolume-plugins-dir

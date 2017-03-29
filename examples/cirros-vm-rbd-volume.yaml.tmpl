@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cirros-vm
+  annotations:
+    kubernetes.io/target-runtime: virtlet
+    scheduler.alpha.kubernetes.io/affinity: >
+      {
+        \"nodeAffinity\": {
+          \"requiredDuringSchedulingIgnoredDuringExecution\": {
+            \"nodeSelectorTerms\": [
+              {
+                \"matchExpressions\": [
+                  {
+                    \"key\": \"extraRuntime\",
+                    \"operator\": \"In\",
+                    \"values\": [\"virtlet\"]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+spec:
+  containers:
+    - name: cirros-vm
+      image: virtlet/image-service.kube-system/cirros
+  volumes:
+    - name: test
+      flexVolume:
+        driver: "kubernetes.io/libvirt_driver"
+        options:
+          Monitor: $MON_IP:6789
+          User: libvirt
+          Secret: $SECRET
+          Volume: rbd-test-volume
+          Pool: libvirt-pool
