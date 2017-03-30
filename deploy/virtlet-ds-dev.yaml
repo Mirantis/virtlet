@@ -95,6 +95,8 @@ spec:
           # TODO: should not be needed in 1.6
           # See https://github.com/kubernetes/kubernetes/issues/17406
           - "echo -e \"nameserver ${KUBE_DNS_SERVICE_HOST}\nsearch kube-system.svc.cluster.local svc.cluster.local cluster.local\">/etc/resolv.conf && /start.sh"
+        # In case we inject local virtlet image we want to use it not officially available one
+        imagePullPolicy: IfNotPresent
         volumeMounts:
         - mountPath: /sys/fs/cgroup
           name: cgroup
