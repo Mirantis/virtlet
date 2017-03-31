@@ -57,8 +57,26 @@ type Driver struct {
 	DriverType string `xml:"type,attr"`
 }
 
+type Secret struct {
+	Type string `xml:"type,attr"`
+	UUID string `xml:"uuid,attr"`
+}
+
+type Auth struct {
+	Username string `xml:"username,attr"`
+	Secret   Secret `xml:"secret"`
+}
+
+type SourceHost struct {
+	Name string `xml:"name,attr"`
+	Port string `xml:"port,attr"`
+}
+
 type Source struct {
-	SrcFile string `xml:"file,attr"`
+	SrcFile  string       `xml:"file,attr"`
+	Protocol string       `xml:"protocol,attr"`
+	Name     string       `xml:"name,attr"`
+	Hosts    []SourceHost `xml:"host"`
 }
 
 type Target struct {
@@ -71,6 +89,7 @@ type Disk struct {
 	DiskDevice string `xml:"device,attr"`
 	Driver     Driver `xml:"driver"`
 	Src        Source `xml:"source"`
+	Auth       Auth   `xml:"auth"`
 	Target     Target `xml:"target"`
 }
 
