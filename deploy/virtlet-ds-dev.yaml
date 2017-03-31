@@ -35,7 +35,10 @@ spec:
               }
             }
           }
-        # The init container checks if there's already saved kubelet config
+        # The init container "deploy-flexvolume" copies flexvolume libvirt driver
+        # to default kubelet's plugin dir to have it in place on kubelet initialization.
+
+        # The init container "bootstrap" checks if there's already saved kubelet config
         # and considers that bootstrap is already done if it exists.
         # If it doesn't, it drops criproxy binary into /opt/criproxy/bin/
         # if it's not already there and then starts criproxy installation.
@@ -44,6 +47,18 @@ spec:
         # debugging criproxy.
         pod.beta.kubernetes.io/init-containers: >
           [
+            {
+              "name": "deploy_flexvolume",
+              "image": "mirantis/virtlet",
+              "imagePullPolicy": "IfNotPresent",
+              "command": ["/bin/sh", "-c", "PLUGIN_DIR=/kubelet-volume-plugins/kubernetes.io~libvirt_driver; if [ ! -d ${PLUGIN_DIR} ]; then mkdir ${PLUGIN_DIR} && cp /libvirt_driver ${PLUGIN_DIR}/libvirt_driver; fi"],
+              "volumeMounts": [
+                {
+                  "name": "k8s-flexvolume-plugins-dir",
+                  "mountPath": "/kubelet-volume-plugins"
+                }
+              ]
+            },
             {
               "name": "bootstrap",
               "image": "mirantis/virtlet",
@@ -123,8 +138,12 @@ spec:
           name: virtlet-dev-bin
         - mountPath: /vmwrapper
           name: vmwrapper-dev-bin
+        - mountPath: /libvirt_dirver
+          name: flexvolume-libvirt-driver-dev-bin
         - mountPath: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
           name: k8s-flexvolume-plugins-dir
+        - mountPath: /var/lib/kubelet/pods
+          name: k8s-pods-dir
         securityContext:
           privileged: true
         env:
@@ -185,5 +204,11 @@ spec:
           path: /dind/criproxy
         name: criproxy-dev-bin
       - hostPath:
+          path: /dind/libvirt_driver
+        name: flexvolume-libvirt-driver-dev-bin
+      - hostPath:
           path: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
         name: k8s-flexvolume-plugins-dir
+      - hostPath:
+          path: /var/lib/kubelet/pods
+        name: k8s-pods-dir

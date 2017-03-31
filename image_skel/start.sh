@@ -37,7 +37,7 @@ done
 
 if [[ ${1:-} != -novirtlet ]]; then
     FLEXVOLUME_DIR=/usr/libexec/kubernetes/kubelet-plugins/volume/exec
-    if [ -d ${FLEXVOLUME_DIR} ]; then
+    if [ ! -d ${FLEXVOLUME_DIR}/kubernetes.io~libvirt_driver ]; then
       mkdir ${FLEXVOLUME_DIR}/kubernetes.io~libvirt_driver
       cp /libvirt_driver ${FLEXVOLUME_DIR}/kubernetes.io~libvirt_driver/libvirt_driver
     fi
