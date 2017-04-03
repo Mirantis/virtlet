@@ -36,3 +36,8 @@ func waitForSocket(filepath string) error {
 
 	return fmt.Errorf("Socket %s doesn't exist", filepath)
 }
+
+func inTravis() bool {
+	// https://docs.travis-ci.com/user/environment-variables/#Default-Environment-Variables
+	return os.Getenv("TRAVIS") == "true"
+}

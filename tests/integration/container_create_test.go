@@ -18,7 +18,6 @@ package integration
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -27,11 +26,6 @@ import (
 	"golang.org/x/net/context"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
-
-func inTravis() bool {
-	// https://docs.travis-ci.com/user/environment-variables/#Default-Environment-Variables
-	return os.Getenv("TRAVIS") == "true"
-}
 
 func TestContainerCreateStartListRemove(t *testing.T) {
 	if inTravis() {
