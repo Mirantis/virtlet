@@ -18,7 +18,9 @@ package main
 
 import (
 	"flag"
+	"math/rand"
 	"os"
+	"time"
 
 	"github.com/Mirantis/virtlet/pkg/manager"
 
@@ -44,6 +46,8 @@ var (
 
 func main() {
 	flag.Parse()
+
+	rand.Seed(time.Now().UnixNano())
 
 	server, err := manager.NewVirtletManager(*libvirtUri, *pool, *storageBackend, *boltPath, *cniPluginsDir, *cniConfigsDir)
 	if err != nil {
