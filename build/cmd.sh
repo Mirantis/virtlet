@@ -75,7 +75,7 @@ function copy_dind {
            -v kubeadm-dind-kube-node-1:/dind \
            --name ${container_name} \
            "${build_image}" \
-           cp -av _output/* /dind
+           /bin/sh -c "cp -av _output/* /dind"
 }
 
 function start_dind {
