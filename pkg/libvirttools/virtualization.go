@@ -18,6 +18,7 @@ package libvirttools
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -53,30 +54,30 @@ const (
 )
 
 type Driver struct {
-	DriverName string `xml:"name,attr"`
-	DriverType string `xml:"type,attr"`
+	DriverName string `xml:"name,attr,omitempty"`
+	DriverType string `xml:"type,attr,omitempty"`
 }
 
 type Secret struct {
-	Type string `xml:"type,attr"`
-	UUID string `xml:"uuid,attr"`
+	Type string `xml:"type,attr,omitempty"`
+	UUID string `xml:"uuid,attr,omitempty"`
 }
 
 type Auth struct {
-	Username string `xml:"username,attr"`
+	Username string `xml:"username,attr,omitempty"`
 	Secret   Secret `xml:"secret"`
 }
 
 type SourceHost struct {
-	Name string `xml:"name,attr"`
-	Port string `xml:"port,attr"`
+	Name string `xml:"name,attr,omitempty"`
+	Port string `xml:"port,attr,omitempty"`
 }
 
 type Source struct {
-	SrcFile  string       `xml:"file,attr"`
-	Protocol string       `xml:"protocol,attr"`
-	Name     string       `xml:"name,attr"`
-	Hosts    []SourceHost `xml:"host"`
+	SrcFile  string       `xml:"file,attr,omitempty"`
+	Protocol string       `xml:"protocol,attr,omitempty"`
+	Name     string       `xml:"name,attr,omitempty"`
+	Hosts    []SourceHost `xml:"host,omitempty"`
 }
 
 type Target struct {
@@ -89,7 +90,7 @@ type Disk struct {
 	DiskDevice string `xml:"device,attr"`
 	Driver     Driver `xml:"driver"`
 	Src        Source `xml:"source"`
-	Auth       Auth   `xml:"auth"`
+	Auth       *Auth  `xml:"auth"`
 	Target     Target `xml:"target"`
 }
 
@@ -262,16 +263,21 @@ func (v *VirtualizationTool) createBootImageSnapshot(imageName, backingStorePath
 func gatherFlexvolumeDriverVolumeDefinitions(podID string, diskLetter []string) ([]FlexVolumeInfo, error) {
 	var flexInfos []FlexVolumeInfo
 	dir := fmt.Sprintf("/var/lib/kubelet/pods/%s/volumes/kubernetes.io~libvirt_driver", podID)
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
+	_, err := os.Stat(dir)
+	if os.IsNotExist(err) {
 		return flexInfos, nil
+	} else if err != nil {
+		return flexInfos, err
 	}
+
+	glog.V(2).Info("Processing FlexVolumes for libvirt_driver")
 	vols, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return flexInfos, err
 	}
 
 	ind := 0
-
+	glog.V(2).Infof("Found FlexVolumes definitions at %s:\n%v", dir, vols)
 	for _, vol := range vols {
 		fileInfo, err := os.Stat(path.Join(dir, vol.Name()))
 		if err != nil {
@@ -283,6 +289,7 @@ func gatherFlexvolumeDriverVolumeDefinitions(podID string, diskLetter []string) 
 				return flexInfos, nil
 			}
 			volInfos, err := ioutil.ReadDir(path.Join(dir, vol.Name()))
+			glog.V(2).Infof("Found FlexVolume definition parts in nested dir %s:\n %v", vol.Name(), volInfos)
 			if err != nil {
 				return flexInfos, err
 			}
@@ -301,7 +308,7 @@ func gatherFlexvolumeDriverVolumeDefinitions(podID string, diskLetter []string) 
 					flexvol.Key = string(content)
 				}
 			}
-			flexvol.DiskXML = fmt.Sprintf(flexvol.DiskXML, diskLetter[ind])
+			flexvol.DiskXML = fmt.Sprintf(flexvol.DiskXML, "vd"+diskLetter[ind])
 			ind++
 			flexInfos = append(flexInfos, flexvol)
 		}
@@ -309,17 +316,20 @@ func gatherFlexvolumeDriverVolumeDefinitions(podID string, diskLetter []string) 
 	return flexInfos, nil
 }
 
-func addDiskToDomainDefinition(domain *Domain, domXML string, volXML string) (string, error) {
+func addDiskToDomainDefinition(domain *Domain, volXML string) error {
 	disk := &Disk{}
 	err := xml.Unmarshal([]byte(volXML), disk)
 	if err != nil {
-		return domXML, err
+		return err
 	}
-
 	domain.Devs.DiskList = append(domain.Devs.DiskList, *disk)
+	return nil
+}
+
+func marshalToXML(domain *Domain) (string, error) {
 	outArr, err := xml.MarshalIndent(domain, " ", "  ")
 	if err != nil {
-		return domXML, err
+		return "", err
 	}
 	return string(outArr[:]), nil
 }
@@ -330,44 +340,50 @@ func (v *VirtualizationTool) addAttachedVolumesXML(podID string, uuid string, vi
 	domain := &Domain{}
 	err := xml.Unmarshal([]byte(domXML), domain)
 	if err != nil {
-		return domXML, err
+		return "", err
 	}
 
 	flexVolumeInfos, err := gatherFlexvolumeDriverVolumeDefinitions(podID, diskLetter)
 	if err != nil {
-		return domXML, err
+		return "", err
 	}
 
+	glog.V(2).Infof("FlexVolumes set to process: %v", flexVolumeInfos)
 	for _, flexVolumeInfo := range flexVolumeInfos {
 		if flexVolumeInfo.SecretXML != "" {
 			secret, err := v.tool.DefineSecretFromXML(flexVolumeInfo.SecretXML)
 			if err != nil {
-				return domXML, err
+				return "", err
 			}
-			secret.SetValue([]byte(flexVolumeInfo.Key), 0)
+			key, err := base64.StdEncoding.DecodeString(flexVolumeInfo.Key)
+			if err != nil {
+				return "", err
+			}
+			secret.SetValue(key, 0)
 		}
-		domXML, err = addDiskToDomainDefinition(domain, domXML, flexVolumeInfo.DiskXML)
+		err = addDiskToDomainDefinition(domain, flexVolumeInfo.DiskXML)
 		if err != nil {
-			return domXML, err
+			return "", err
 		}
 	}
 
 	if len(flexVolumeInfos) >= len(diskLetter) {
-		return domXML, nil
+		return marshalToXML(domain)
 	}
 
 	volumesXML, err := v.volumeStorage.CreateVolumesToBeAttached(virtletVolsDesc, uuid, diskLetter[len(flexVolumeInfos):], len(diskLetter))
 	if err != nil {
-		return domXML, err
+		return "", err
 	}
 
 	for _, volXML := range volumesXML {
-		domXML, err = addDiskToDomainDefinition(domain, domXML, volXML)
+		err = addDiskToDomainDefinition(domain, volXML)
 		if err != nil {
-			return domXML, err
+			return "", err
 		}
 	}
-	return domXML, nil
+
+	return marshalToXML(domain)
 }
 
 type VirtualizationTool struct {
@@ -442,11 +458,10 @@ func (v *VirtualizationTool) CreateContainer(metadataStore metadata.MetadataStor
 
 	domXML := generateDomXML(canUseKvm(), name, memory, memoryUnit, uuid, cpuNum, cpuShares, cpuPeriod, cpuQuota, snapshotImage, netNSPath, cniConfig)
 
-	if virtletVolsDesc, exists := sandBoxAnnotations[VirtletVolumesAnnotationKeyName]; exists {
-		domXML, err = v.addAttachedVolumesXML(*in.PodSandboxId, uuid, virtletVolsDesc, domXML)
-		if err != nil {
-			return "", err
-		}
+	virtletVolsDesc, _ := sandBoxAnnotations[VirtletVolumesAnnotationKeyName]
+	domXML, err = v.addAttachedVolumesXML(*in.PodSandboxId, uuid, virtletVolsDesc, domXML)
+	if err != nil {
+		return "", err
 	}
 
 	domXML = strings.Replace(domXML, "\"", "'", -1)
