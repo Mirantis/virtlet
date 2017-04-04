@@ -40,11 +40,13 @@ rbd default format = 2" >> /etc/ceph/ceph.conf'
 
 # Add rbd pool and volume
 docker exec ${container_name} ceph osd pool create libvirt-pool 8 8
-docker exec ${container_name} rbd create --size 10240 libvirt-pool/rbd-test-image
+docker exec ceph_cluster /bin/bash -c "apt-get update && apt-get install -y qemu-utils"
+docker exec ${container_name} qemu-img create -f rbd rbd:libvirt-pool/rbd-test-image 2G
 
 # Add user for virtlet
 docker exec ${container_name} ceph auth get-or-create client.libvirt
-SECRET=$(docker exec ${container_name} ceph auth get-key client.libvirt | base64)
+docker exec ceph_cluster ceph auth caps client.libvirt mon "allow *" osd "allow *" msd "allow *"
+SECRET=$(docker exec ${container_name} ceph auth get-key client.libvirt)
 
 # Put secret into definition
 IFS='%'; while read line; do eval echo \"$line\"; done < ${SCRIPT_DIR}/../../examples/cirros-vm-rbd-volume.yaml.tmpl > ${SCRIPT_DIR}/substituted-cirros-vm-rbd-volume.yaml

@@ -11,6 +11,7 @@ else
 fi
 
 cd "$(dirname "$(readlinkf "${BASH_SOURCE}")")"
+SCRIPT_DIR="$(cd $(dirname "$(readlinkf "${BASH_SOURCE}")"); pwd)"
 
 build/cmd.sh build
 build/cmd.sh copy
@@ -18,5 +19,5 @@ build/cmd.sh test
 
 docker build -t mirantis/virtlet .
 
-NONINTERACTIVE=1 NO_VM_CONSOLE=1 INJECT_LOCAL_IMAGE=1 deploy/demo.sh
+NONINTERACTIVE=1 NO_VM_CONSOLE=1 INJECT_LOCAL_IMAGE=1 BASE_LOCATION=${SCRIPT_DIR} deploy/demo.sh
 tests/e2e/e2e.sh
