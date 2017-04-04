@@ -21,6 +21,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math/rand"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -278,6 +279,8 @@ func child(exitEOF chan bool, sigTERM chan os.Signal) {
 }
 
 func main() {
+	rand.Seed(time.Now().UnixNano())
+
 	exitEOF := make(chan bool, 1)
 	sigTERM := make(chan os.Signal)
 	signal.Notify(sigTERM, syscall.SIGTERM)
