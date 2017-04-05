@@ -48,3 +48,10 @@ $ docker build -t mirantis/virtlet .
 $ # copy the image to the DIND node
 $ docker save mirantis/virtlet | docker exec -i kube-node-1 docker load
 ```
+
+You may use [flannel](https://github.com/coreos/flannel) instead of
+default CNI bridge networking for the test cluster. To do so,
+set `CNI_PLUGIN` environment variable:
+```
+$ export CNI_PLUGIN=flannel
+```
