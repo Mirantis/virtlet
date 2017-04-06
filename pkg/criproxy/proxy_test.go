@@ -68,6 +68,10 @@ func startServer(t *testing.T, s ServerWithReadinessFeedback, addr string) {
 		t.Fatalf("Failed to start fake CRI server: %v", err)
 	case <-readyCh:
 	}
+	// TODO: don't use readiness feedback channel, it doesn't help much
+	if err := waitForSocket(addr); err != nil {
+		t.Fatalf("Waiting for socket %q failed: %v", addr, err)
+	}
 }
 
 func pstr(s string) *string {
