@@ -49,7 +49,9 @@ kubectl exec $pod_name --namespace=kube-system -- ln -s /usr/bin/qemu-system-x86
 # Run one-node ceph cluster
 ${SCRIPT_DIR}/run_ceph.sh ${SCRIPT_DIR}
 kubectl create -f ${SCRIPT_DIR}/substituted-cirros-vm-rbd-volume.yaml
-sleep 5
+while ! "${virsh}" list | grep -q cirros-vm-rbd; do
+  sleep 1
+done
 if [ "$(${virsh} domblklist 2 | grep rbd-test-image | wc -l)" != "1" ]; then
   exit 1
 fi
