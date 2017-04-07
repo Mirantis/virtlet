@@ -18,25 +18,37 @@ set -o nounset
 set -o pipefail
 set -o errtrace
 
-SCRIPT_DIR=$1
+SCRIPT_DIR="${1}"
 # Get default gateway ip from kube-master node deployed by kubeadm-dind tool
 MON_IP=$(docker exec kube-master route | grep default | awk '{print $2}')
 CEPH_PUBLIC_NETWORK=${MON_IP}/16
 container_name="ceph_cluster"
 
+if docker ps | grep -q ${container_name}; then
+  docker stop ${container_name}
+  docker rm -f -v ${container_name}
+fi
+
 docker run -d --net=host -e MON_IP=${MON_IP} -e CEPH_PUBLIC_NETWORK=${CEPH_PUBLIC_NETWORK} --name ${container_name} ceph/demo
 
 # Check cluster is running
 set +e
-if ! docker exec ${container_name} ceph -s 2> /dev/null 1> /dev/null; then
-   echo "Failed to get ceph cluster status. Cluster is not running."
-   exit 1
-fi
+ntries=5
+echo -e -n "\tWaiting for ceph cluster..."
+while ! docker exec ${container_name} ceph -s 2> /dev/null 1> /dev/null; do
+  if [ $ntries -eq 0 ]; then
+    echo "Failed to get ceph cluster status. Cluster is not running."
+    exit 1
+  fi
+  sleep 2
+  ((ntries = ntries - 1))
+  echo -n "."
+done
+echo "Cluster started!"
 set -e
 
 # Adjust ceph configs
-docker exec ${container_name} /bin/bash -c 'echo "rbd default features = 1
-rbd default format = 2" >> /etc/ceph/ceph.conf'
+docker exec ${container_name} /bin/bash -c 'echo "rbd default features = 1\nrbd default format = 2" >> /etc/ceph/ceph.conf'
 
 # Add rbd pool and volume
 docker exec ${container_name} ceph osd pool create libvirt-pool 8 8

@@ -51,7 +51,10 @@ const (
 	domainShutdownTimeout           = 60 * time.Second
 	domainDestroyCheckInterval      = 500 * time.Millisecond
 	domainDestroyTimeout            = 5 * time.Second
+	diskLetterStr                   = "bcdefghijklmnopqrstu"
 )
+
+var diskLetters = strings.Split(diskLetterStr, "")
 
 type Driver struct {
 	DriverName string `xml:"name,attr,omitempty"`
@@ -260,44 +263,43 @@ func (v *VirtualizationTool) createBootImageSnapshot(imageName, backingStorePath
 	return vol.GetPath()
 }
 
-func gatherFlexvolumeDriverVolumeDefinitions(podID string, diskLetter []string) ([]FlexVolumeInfo, error) {
+func gatherFlexvolumeDriverVolumeDefinitions(podID string, lettersInd int) ([]FlexVolumeInfo, error) {
 	var flexInfos []FlexVolumeInfo
-	dir := fmt.Sprintf("/var/lib/kubelet/pods/%s/volumes/kubernetes.io~libvirt_driver", podID)
+	dir := fmt.Sprintf("/var/lib/kubelet/pods/%s/volumes/virtlet~flexvolume_driver", podID)
 	_, err := os.Stat(dir)
 	if os.IsNotExist(err) {
 		return flexInfos, nil
 	} else if err != nil {
-		return flexInfos, err
+		return nil, err
 	}
 
-	glog.V(2).Info("Processing FlexVolumes for libvirt_driver")
+	glog.V(2).Info("Processing FlexVolumes for flexvolume_driver")
 	vols, err := ioutil.ReadDir(dir)
 	if err != nil {
-		return flexInfos, err
+		return nil, err
 	}
 
-	ind := 0
 	glog.V(2).Infof("Found FlexVolumes definitions at %s:\n%v", dir, vols)
 	for _, vol := range vols {
 		fileInfo, err := os.Stat(path.Join(dir, vol.Name()))
 		if err != nil {
-			return flexInfos, err
+			return nil, err
 		}
 		if fileInfo.IsDir() {
-			if ind == len(diskLetter) {
-				glog.Errorf("Had to omit attaching of one ore more flex volumes. Limit on number is: %d", ind)
+			if lettersInd == len(diskLetters) {
+				glog.Errorf("Had to omit attaching of one ore more flex volumes. Limit on number is: %d", lettersInd)
 				return flexInfos, nil
 			}
 			volInfos, err := ioutil.ReadDir(path.Join(dir, vol.Name()))
 			glog.V(2).Infof("Found FlexVolume definition parts in nested dir %s:\n %v", vol.Name(), volInfos)
 			if err != nil {
-				return flexInfos, err
+				return nil, err
 			}
 			var flexvol FlexVolumeInfo
 			for _, volInfo := range volInfos {
 				content, err := ioutil.ReadFile(path.Join(dir, vol.Name(), volInfo.Name()))
 				if err != nil {
-					return flexInfos, err
+					return nil, err
 				}
 				switch volInfo.Name() {
 				case "disk.xml":
@@ -308,8 +310,8 @@ func gatherFlexvolumeDriverVolumeDefinitions(podID string, diskLetter []string) 
 					flexvol.Key = string(content)
 				}
 			}
-			flexvol.DiskXML = fmt.Sprintf(flexvol.DiskXML, "vd"+diskLetter[ind])
-			ind++
+			flexvol.DiskXML = fmt.Sprintf(flexvol.DiskXML, "vd"+diskLetters[lettersInd])
+			lettersInd++
 			flexInfos = append(flexInfos, flexvol)
 		}
 	}
@@ -317,12 +319,11 @@ func gatherFlexvolumeDriverVolumeDefinitions(podID string, diskLetter []string) 
 }
 
 func addDiskToDomainDefinition(domain *Domain, volXML string) error {
-	disk := &Disk{}
-	err := xml.Unmarshal([]byte(volXML), disk)
-	if err != nil {
+	disk := Disk{}
+	if err := xml.Unmarshal([]byte(volXML), &disk); err != nil {
 		return err
 	}
-	domain.Devs.DiskList = append(domain.Devs.DiskList, *disk)
+	domain.Devs.DiskList = append(domain.Devs.DiskList, disk)
 	return nil
 }
 
@@ -335,7 +336,6 @@ func marshalToXML(domain *Domain) (string, error) {
 }
 
 func (v *VirtualizationTool) addAttachedVolumesXML(podID string, uuid string, virtletVolsDesc string, domXML string) (string, error) {
-	diskLetter := strings.Split("bcdefghijklmnopqrstu", "")
 	glog.V(3).Infof("INPUT domain:\n%s\n\n", domXML)
 	domain := &Domain{}
 	err := xml.Unmarshal([]byte(domXML), domain)
@@ -343,7 +343,7 @@ func (v *VirtualizationTool) addAttachedVolumesXML(podID string, uuid string, vi
 		return "", err
 	}
 
-	flexVolumeInfos, err := gatherFlexvolumeDriverVolumeDefinitions(podID, diskLetter)
+	flexVolumeInfos, err := gatherFlexvolumeDriverVolumeDefinitions(podID, 0)
 	if err != nil {
 		return "", err
 	}
@@ -361,17 +361,16 @@ func (v *VirtualizationTool) addAttachedVolumesXML(podID string, uuid string, vi
 			}
 			secret.SetValue(key, 0)
 		}
-		err = addDiskToDomainDefinition(domain, flexVolumeInfo.DiskXML)
-		if err != nil {
+		if err = addDiskToDomainDefinition(domain, flexVolumeInfo.DiskXML); err != nil {
 			return "", err
 		}
 	}
 
-	if len(flexVolumeInfos) >= len(diskLetter) {
+	if len(flexVolumeInfos) == len(diskLetters) {
 		return marshalToXML(domain)
 	}
 
-	volumesXML, err := v.volumeStorage.CreateVolumesToBeAttached(virtletVolsDesc, uuid, diskLetter[len(flexVolumeInfos):], len(diskLetter))
+	volumesXML, err := v.volumeStorage.CreateVolumesToBeAttached(virtletVolsDesc, uuid, len(flexVolumeInfos))
 	if err != nil {
 		return "", err
 	}

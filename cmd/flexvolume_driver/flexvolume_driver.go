@@ -19,6 +19,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strings"
 
@@ -36,27 +37,16 @@ type AttachOpts struct {
 	Protocol  string `json:protocol`
 }
 
-func PrintResult(status string, message string, device string) {
+func PrintResult(status string, message string) {
 	data := map[string]string{
 		"status":  status,
 		"message": message,
 	}
-	if device != "" {
-		data["device"] = device
-	}
-	result, _ := json.Marshal(data)
-	fmt.Printf("%s\n", result)
-}
-
-func writeToFile(filePath, stringToWrite string) error {
-	f, err := os.Create(filePath)
+	result, err := json.Marshal(data)
 	if err != nil {
-		return err
+		result = []byte(fmt.Sprintf("{\"status\": \"Failure\", \"message\": \"Json marshal error: %s\"}", err.Error()))
 	}
-	defer f.Close()
-
-	_, err = f.WriteString(stringToWrite)
-	return err
+	fmt.Printf("%s\n", result)
 }
 
 func NewUuid() (string, error) {
@@ -81,12 +71,12 @@ func AddVolumeDefinitions(target string, opts AttachOpts) error {
   </usage>
 </secret>
 `
-	if err := writeToFile(target+"/secret.xml", fmt.Sprintf(secretXML, uuid, opts.User)); err != nil {
+	if err := ioutil.WriteFile(target+"/secret.xml", []byte(fmt.Sprintf(secretXML, uuid, opts.User)), 0644); err != nil {
 		return err
 	}
 
 	// Will be removed right after creating appropriate secret in libvirt
-	if err := writeToFile(target+"/key", opts.Secret); err != nil {
+	if err := ioutil.WriteFile(target+"/key", []byte(opts.Secret), 0644); err != nil {
 		return err
 	}
 
@@ -107,60 +97,85 @@ func AddVolumeDefinitions(target string, opts AttachOpts) error {
 		return fmt.Errorf("Invalid format of ceph monitor setting: %s. Expected in form ip:port", opts.Monitor)
 	}
 	// Note: target dev name wiil be specified later by virtlet diring combining domain xml definition
-	if err := writeToFile(target+"/disk.xml", fmt.Sprintf(diskXML, opts.User, uuid, opts.Pool, opts.Volume, pairIPPort[0], pairIPPort[1], "%s")); err != nil {
+	if err := ioutil.WriteFile(target+"/disk.xml", []byte(fmt.Sprintf(diskXML, opts.User, uuid, opts.Pool, opts.Volume, pairIPPort[0], pairIPPort[1], "%s")), 0644); err != nil {
 		return err
 	}
 	return nil
 }
 
-func Init() {
-	PrintResult("Success", "No initialization logic needed", "")
+func Init(args []string) {
+	PrintResult("Success", "No initialization logic needed")
 }
 
-func Attach(jsonArgStr string) {
-	PrintResult("Success", "No logic needed", "")
+func Attach(args []string) {
+	PrintResult("Success", "No logic needed")
 }
 
-func Mount(target string, device string, jsonArgStr string) {
+func Mount(args []string) {
+	target := args[0]
+	// device := args[1]
+	jsonArgStr := args[2]
 	var jsonArgs AttachOpts
 	_ = json.Unmarshal([]byte(jsonArgStr), &jsonArgs)
 	if err := os.MkdirAll(target, 0700); err != nil {
-		PrintResult("Failure", err.Error(), "")
+		PrintResult("Failure", err.Error())
 		return
 	}
 	if err := AddVolumeDefinitions(target, jsonArgs); err != nil {
-		PrintResult("Failure", err.Error(), "")
+		PrintResult("Failure", err.Error())
 		return
 	}
-	PrintResult("Success", "Volume mounted", "")
+	PrintResult("Success", "Volume mounted")
 }
 
-func Detach() {
-	PrintResult("Success", "No detachment logic needed", "")
+func Detach(args []string) {
+	PrintResult("Success", "No detachment logic needed")
 }
 
-func Unmount(path string) {
+func Unmount(args []string) {
+	path := args[0]
 	if err := os.RemoveAll(path); err != nil {
-		PrintResult("Failure", err.Error(), "")
+		PrintResult("Failure", err.Error())
 		return
 	}
 
-	PrintResult("Success", "Volume unmounted", "")
+	PrintResult("Success", "Volume unmounted")
+}
+
+type driverFunc func([]string)
+
+type cmdInfo struct {
+	argsNum     int
+	processFunc driverFunc
+}
+
+var cmdArgsMatrix = map[string]cmdInfo{
+	"init":    cmdInfo{0, Init},
+	"attach":  cmdInfo{1, Attach},
+	"detach":  cmdInfo{0, Detach},
+	"mount":   cmdInfo{3, Mount},
+	"unmount": cmdInfo{1, Unmount},
 }
 
 func main() {
-	switch os.Args[1] {
-	case "init":
-		Init()
-	case "attach":
-		Attach(os.Args[2])
-	case "detach":
-		Detach()
-	case "mount":
-		Mount(os.Args[2], os.Args[3], os.Args[4])
-	case "unmount":
-		Unmount(os.Args[2])
-	default:
-		PrintResult("Failed", "Invalid command", "")
+	if len(os.Args) == 1 {
+		PrintResult("Failed", "No command name to execute was provided.")
+		return
+	}
+	funcName := os.Args[1]
+	argsNum := len(os.Args) - 2
+
+	if cmdInfo, found := cmdArgsMatrix[funcName]; found {
+		if cmdInfo.argsNum == argsNum {
+			funcArgs := []string{}
+			if argsNum > 0 {
+				funcArgs = os.Args[2:]
+			}
+			cmdInfo.processFunc(funcArgs)
+		} else {
+			PrintResult("Failed", fmt.Sprintf("Unexpected number of args %d (expected %d) for func '%s'", argsNum, cmdInfo.argsNum, funcName))
+		}
+	} else {
+		PrintResult("Failed", "Unknown func name "+os.Args[1])
 	}
 }
