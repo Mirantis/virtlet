@@ -51,7 +51,7 @@ spec:
               "name": "deploy-flexvolume",
               "image": "mirantis/virtlet",
               "imagePullPolicy": "IfNotPresent",
-              "command": ["/bin/sh", "-c", "PLUGIN_DIR=/kubelet-volume-plugins/kubernetes.io~libvirt_driver; if [ ! -d ${PLUGIN_DIR} ]; then mkdir ${PLUGIN_DIR} && cp /libvirt_driver ${PLUGIN_DIR}/libvirt_driver; fi"],
+              "command": ["/bin/sh", "-c", "PLUGIN_DIR=/kubelet-volume-plugins/virtlet~flexvolume_driver; if [ ! -d ${PLUGIN_DIR} ]; then mkdir ${PLUGIN_DIR} && cp /flexvolume_driver ${PLUGIN_DIR}/flexvolume_driver; fi"],
               "volumeMounts": [
                 {
                   "name": "k8s-flexvolume-plugins-dir",

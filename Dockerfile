@@ -16,7 +16,7 @@ RUN mkdir -p /var/data/virtlet /var/lib/virtlet /opt/cni/bin && \
       tar zxC /opt/cni/bin
 
 COPY image_skel /.
-COPY _output/libvirt_driver /
+COPY _output/flexvolume_driver /
 
 CMD ["/start.sh"]
 

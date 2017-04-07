@@ -51,7 +51,7 @@ spec:
               "name": "deploy_flexvolume",
               "image": "mirantis/virtlet",
               "imagePullPolicy": "IfNotPresent",
-              "command": ["/bin/sh", "-c", "PLUGIN_DIR=/kubelet-volume-plugins/kubernetes.io~libvirt_driver; if [ ! -d ${PLUGIN_DIR} ]; then mkdir ${PLUGIN_DIR} && cp /libvirt_driver ${PLUGIN_DIR}/libvirt_driver; fi"],
+              "command": ["/bin/sh", "-c", "PLUGIN_DIR=/kubelet-volume-plugins/virtlet~flexvolume_driver; if [ ! -d ${PLUGIN_DIR} ]; then mkdir ${PLUGIN_DIR} && cp /flexvolume_driver ${PLUGIN_DIR}/flexvolume_driver; fi"],
               "volumeMounts": [
                 {
                   "name": "k8s-flexvolume-plugins-dir",
@@ -138,7 +138,7 @@ spec:
           name: virtlet-dev-bin
         - mountPath: /vmwrapper
           name: vmwrapper-dev-bin
-        - mountPath: /libvirt_dirver
+        - mountPath: /flexvolume_driver
           name: flexvolume-libvirt-driver-dev-bin
         - mountPath: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
           name: k8s-flexvolume-plugins-dir
@@ -206,7 +206,7 @@ spec:
           path: /dind/criproxy
         name: criproxy-dev-bin
       - hostPath:
-          path: /dind/libvirt_driver
+          path: /dind/flexvolume_driver
         name: flexvolume-libvirt-driver-dev-bin
       - hostPath:
           path: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
