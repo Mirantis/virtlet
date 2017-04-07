@@ -29,7 +29,7 @@ spec:
   volumes:
     - name: test
       flexVolume:
-        driver: "kubernetes.io/libvirt_driver"
+        driver: "virtlet/flexvolume_driver"
         options:
           Monitor: $MON_IP:6789
           User: libvirt

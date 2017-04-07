@@ -274,16 +274,16 @@ func (s *StorageTool) CleanAttachedVolumes(virtletVolsDesc string, containerId s
 	return nil
 }
 
-func (s *StorageTool) CreateVolumesToBeAttached(virtletVolsDesc string, containerId string, diskLetter []string, limitNum int) ([]string, error) {
+func (s *StorageTool) CreateVolumesToBeAttached(virtletVolsDesc string, containerId string, letterInd int) ([]string, error) {
 	var volumesXML []string
 	var virtletVols []VirtletVolume
 	if err := json.Unmarshal([]byte(virtletVolsDesc), &virtletVols); err != nil {
 		glog.Errorf("Error when unmarshalling json string with volumes description '%s' for container %s: %v", virtletVolsDesc, containerId, err)
 	}
 
-	for ind, virtletVol := range virtletVols {
-		if ind == len(diskLetter) {
-			fmt.Errorf("Had to omit creating and attaching of one ore more volumes. Limit on number is: %d", limitNum)
+	for _, virtletVol := range virtletVols {
+		if letterInd == len(diskLetters) {
+			fmt.Errorf("Had to omit creating and attaching of one ore more volumes. Limit on number is: %d", letterInd)
 			break
 		}
 
@@ -304,7 +304,7 @@ func (s *StorageTool) CreateVolumesToBeAttached(virtletVolsDesc string, containe
 			return nil, err
 		}
 
-		volXML := fmt.Sprintf(volXMLTemplate, path, "vd"+diskLetter[ind])
+		volXML := fmt.Sprintf(volXMLTemplate, path, "vd"+diskLetters[letterInd])
 		volumesXML = append(volumesXML, volXML)
 	}
 
