@@ -38,7 +38,9 @@ function demo::ask-before-continuing {
 
 function demo::get-dind-cluster {
   if [[ -f ${dind_script} ]]; then
-    return 0
+    demo::step "Will now clear existent ${dind_script} to be sure it is up to date"
+    demo::ask-before-continuing
+    rm "${dind_script}"
   fi
   demo::step "Will download dind-cluster-v1.5.sh into current directory"
   demo::ask-before-continuing
