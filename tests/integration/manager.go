@@ -79,6 +79,7 @@ func (v *VirtletManager) Run() error {
 		listenParam,
 		"-v=3",
 		"-logtostderr=true",
+		"-image-download-protocol=http",
 	}, &syscall.ProcAttr{
 		Dir:   virtletDir,
 		Env:   createEnviron(),

@@ -35,6 +35,8 @@ while ! nc -z -v -w1 localhost 16509 >& /dev/null; do
     sleep 0.3
 done
 
+PROTOCOL="${VIRTLET_DOWNLOAD_PROTOCOL:-https}"
+
 if [[ ${1:-} != -novirtlet ]]; then
-    /usr/local/bin/virtlet -v=${VIRTLET_LOGLEVEL:-2} -logtostderr=true -libvirt-uri=qemu+tcp://localhost/system
+    /usr/local/bin/virtlet -v=${VIRTLET_LOGLEVEL:-2} -logtostderr=true -libvirt-uri=qemu+tcp://localhost/system -image-download-protocol=${PROTOCOL}
 fi
