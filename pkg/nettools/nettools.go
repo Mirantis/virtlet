@@ -39,8 +39,10 @@ import (
 	"log"
 	"math/rand"
 	"net"
+	"os"
 	"os/exec"
 	"syscall"
+	"unsafe"
 
 	"github.com/containernetworking/cni/pkg/ip"
 	"github.com/containernetworking/cni/pkg/ns"
@@ -54,7 +56,17 @@ const (
 	loopbackInterfaceName = "lo"
 	// Address for dhcp server internal interface
 	internalDhcpAddr = "169.254.254.2/24"
+
+	SizeOfIfReq = 40
+	IFNAMSIZ    = 16
 )
+
+// Had to duplicate ifReq here as it's not exported
+type ifReq struct {
+	Name  [IFNAMSIZ]byte
+	Flags uint16
+	pad   [SizeOfIfReq - IFNAMSIZ - 2]byte
+}
 
 type Route struct {
 	Destination *net.IPNet
@@ -69,6 +81,29 @@ type InterfaceInfo struct {
 type ContainerNetwork struct {
 	Info   *types.Result
 	DhcpNS ns.NetNS
+}
+
+func OpenTAP(devName string) (*os.File, error) {
+	tapFile, err := os.OpenFile("/dev/net/tun", os.O_RDWR, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	var req ifReq
+
+	// set IFF_NO_PI to not provide packet information
+	// If flag IFF_NO_PI is not set each frame format is:
+	// Flags [2 bytes]
+	// Proto [2 bytes]
+	// Raw protocol ethernet frame.
+	// This extra 4-byte header breaks connectivity as in this case kernel truncates initial package
+	req.Flags = uint16(syscall.IFF_TAP | syscall.IFF_NO_PI | syscall.IFF_ONE_QUEUE)
+	copy(req.Name[:15], "tap0")
+	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, tapFile.Fd(), uintptr(syscall.TUNSETIFF), uintptr(unsafe.Pointer(&req)))
+	if errno != 0 {
+		return nil, fmt.Errorf("Tuntap IOCTL TUNSETIFF failed, errno %v", errno)
+	}
+	return tapFile, nil
 }
 
 // CreateEscapeVethPair creates a veth pair with innerVeth residing in
@@ -309,19 +344,19 @@ func updateEbTables(interfaceName, command string) error {
 // for dhcp server.
 // The function should be called from within container namespace.
 // Returns container network info (CNI Result) and error, if any
-func SetupContainerSideNetwork(info *types.Result) (*types.Result, error) {
+func SetupContainerSideNetwork(info *types.Result) (*types.Result, *os.File, error) {
 	contVeth, err := FindVeth()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if info == nil {
 		info, err = ExtractLinkInfo(contVeth)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 	if err := StripLink(contVeth); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	tap := &netlink.Tuntap{
@@ -333,31 +368,37 @@ func SetupContainerSideNetwork(info *types.Result) (*types.Result, error) {
 		Mode: netlink.TUNTAP_MODE_TAP,
 	}
 	if err := netlink.LinkAdd(tap); err != nil {
-		return nil, fmt.Errorf("failed to create tap interface: %v", err)
+		return nil, nil, fmt.Errorf("failed to create tap interface: %v", err)
 	}
+
 	if err := netlink.LinkSetUp(tap); err != nil {
-		return nil, fmt.Errorf("failed to set %q up: %v", tapInterfaceName, err)
+		return nil, nil, fmt.Errorf("failed to set %q up: %v", tapInterfaceName, err)
 	}
 
 	br, err := SetupBridge(containerBridgeName, []netlink.Link{contVeth, tap})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create bridge: %v", err)
+		return nil, nil, fmt.Errorf("failed to create bridge: %v", err)
 	}
 
 	if err := netlink.AddrAdd(br, mustParseAddr(internalDhcpAddr)); err != nil {
-		return nil, fmt.Errorf("failed to set address for the bridge: %v", err)
+		return nil, nil, fmt.Errorf("failed to set address for the bridge: %v", err)
 	}
 
 	// Add ebtables DHCP blocking rules
 	if err := updateEbTables(contVeth.Attrs().Name, "-A"); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err := bringUpLoopback(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return info, nil
+	tapFile, err := OpenTAP(tapInterfaceName)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to open tap: %v", err)
+	}
+
+	return info, tapFile, nil
 }
 
 // TeardownBridge removes links from bridge and sets it down
