@@ -20,7 +20,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/Mirantis/virtlet/pkg/download"
+	"github.com/Mirantis/virtlet/pkg/utils"
 	libvirt "github.com/libvirt/libvirt-go"
 )
 
@@ -73,7 +73,7 @@ func (i *ImageTool) ImageAsVolumeInfo(volumeName string) (*VolumeInfo, error) {
 
 func (i *ImageTool) PullImageToVolume(imageName, volumeName string) error {
 	// TODO(nhlfr): Handle AuthConfig from PullImageRequest.
-	path, err := download.DownloadFile(stripTagFromImageName(imageName), volumeName)
+	path, err := utils.DownloadFile(stripTagFromImageName(imageName), volumeName)
 	if err != nil {
 		return err
 	}
