@@ -46,18 +46,34 @@ const (
 // Spawn child process and wait for its termination.
 // If process receives EOF on pipe from parent or SIGTERM
 // it forwards SIGKILL or SIGTERM to child accordingly.
-func runCommand(name string, args []string, exitEOF chan bool, sigTERM chan os.Signal) (error, bool) {
+func runCommand(name string, args []string, exitEOF chan bool, sigTERM chan os.Signal, tapFile *os.File) (error, bool) {
 	var err error
 	cmd := exec.Command(name, args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 
-	pipeR, _, _ := os.Pipe()
+	if len(args) >= 1 && args[0] == "-child" && tapFile != nil {
+		glog.Error("Unexpected combination of input args: '-child' and tapFile are set simultaneously")
+		return fmt.Errorf("Unexpected combination of input args: '-child' and tapFile are set simultaneously"), false
+	}
+
+	if tapFile != nil {
+		cmd.ExtraFiles = []*os.File{
+			tapFile,
+		}
+		defer tapFile.Close()
+	}
+
 	if len(args) >= 1 && args[0] == "-child" {
+		pipeR, _, err := os.Pipe()
+		if err != nil {
+			glog.Errorf("Failed to create pipe: %v", err)
+		}
 		cmd.ExtraFiles = []*os.File{
 			pipeR,
 		}
+		defer pipeR.Close()
 	}
 
 	if err = cmd.Start(); err != nil {
@@ -100,11 +116,11 @@ L:
 	return err, procTerminated
 }
 
-func runCommandIfExists(path string, args []string, exitEOF chan bool, sigTERM chan os.Signal) (error, bool) {
+func runCommandIfExists(path string, args []string, exitEOF chan bool, sigTERM chan os.Signal, tapFile *os.File) (error, bool) {
 	_, err := os.Stat(path)
 	switch {
 	case err == nil:
-		return runCommand(path, args, exitEOF, sigTERM)
+		return runCommand(path, args, exitEOF, sigTERM, tapFile)
 	case os.IsNotExist(err):
 		return nil, false
 	default:
@@ -160,7 +176,7 @@ func parent(exitEOF chan bool, sigTERM chan os.Signal) {
 	}
 
 	childArgs := append([]string{"-child"}, emulatorArgs...)
-	runCommandIfExists("/vmwrapper", childArgs, exitEOF, sigTERM)
+	runCommandIfExists("/vmwrapper", childArgs, exitEOF, sigTERM, nil)
 }
 
 func child(exitEOF chan bool, sigTERM chan os.Signal) {
@@ -179,7 +195,7 @@ func child(exitEOF chan bool, sigTERM chan os.Signal) {
 
 	// TODO: use cleaner way to do this
 	runHook := func(name string) {
-		err, procTerminated := runCommandIfExists(name, append([]string{emulator, nsPath, os.Getenv(cniConfigEnvVar)}, emulatorArgs...), exitEOF, sigTERM)
+		err, procTerminated := runCommandIfExists(name, append([]string{emulator, nsPath, os.Getenv(cniConfigEnvVar)}, emulatorArgs...), exitEOF, sigTERM, nil)
 		if err != nil {
 			glog.Errorf("Hook %q: %v", name, err)
 			if procTerminated {
@@ -214,8 +230,14 @@ func child(exitEOF chan bool, sigTERM chan os.Signal) {
 		}
 	}
 
+	virtletNS, err := ns.GetCurrentNS()
+	if err != nil {
+		glog.Errorf("Failed to get current naet namespace: %v", err)
+		os.Exit(1)
+	}
+
 	if err := vmNS.Do(func(ns.NetNS) error {
-		info, err = nettools.SetupContainerSideNetwork(info)
+		info, tapFile, err := nettools.SetupContainerSideNetwork(info)
 		if err != nil {
 			return err
 		}
@@ -240,16 +262,23 @@ func child(exitEOF chan bool, sigTERM chan os.Signal) {
 
 		netArgs := []string{
 			"-netdev",
-			"tap,id=tap0,ifname=tap0,script=no,downscript=no",
+			// Qemu process is started with 3d FD set to already opened TAP device
+			"tap,id=tap0,fd=3",
 			"-device",
 			"virtio-net-pci,netdev=tap0,id=net0,mac=" + peerHwAddr.String(),
 		}
 
-		// Running qemu process
+		// Running qemu process inside virtlet' net namespace
 		// On domain's shutdown/destroy libvirt terminates corresponding qemu process using SIGTERM or SIGKILL.
 		// SIGKILL is detected by catching EOF on a pipe from parent process.
 		// On catching SIGTERM just forward it to qemu process and wait for it to exit.
-		err, _ := runCommand(emulator, append(emulatorArgs, netArgs...), exitEOF, sigTERM)
+
+		if err = virtletNS.Do(func(ns.NetNS) error {
+			err, _ := runCommand(emulator, append(emulatorArgs, netArgs...), exitEOF, sigTERM, tapFile)
+			return err
+		}); err != nil {
+			glog.Error("Error occurred while running VM network namespace: %s", err)
+		}
 
 		select {
 		case dhcpErr := <-errCh:

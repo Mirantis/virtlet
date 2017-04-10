@@ -12,9 +12,9 @@ fi
 
 cd "$(dirname "$(readlinkf "${BASH_SOURCE}")")"
 
-build/cmd.sh build
-build/cmd.sh copy
-build/cmd.sh test
+#build/cmd.sh build
+#build/cmd.sh copy
+#build/cmd.sh test
 
 docker build -t mirantis/virtlet .
 
