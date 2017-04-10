@@ -40,15 +40,19 @@ func ImageNameToVolumeName(imageName string) (string, error) {
 }
 
 type ImageTool struct {
-	tool *StorageTool
+	protocol string
+	tool     *StorageTool
 }
 
-func NewImageTool(conn *libvirt.Connect, poolName string) (*ImageTool, error) {
+func NewImageTool(conn *libvirt.Connect, poolName, protocol string) (*ImageTool, error) {
 	storageTool, err := NewStorageTool(conn, poolName)
 	if err != nil {
 		return nil, err
 	}
-	return &ImageTool{tool: storageTool}, nil
+	if protocol == "" {
+		protocol = "https"
+	}
+	return &ImageTool{tool: storageTool, protocol: protocol}, nil
 }
 
 func (i *ImageTool) ListImagesAsVolumeInfos() ([]*VolumeInfo, error) {
@@ -73,7 +77,7 @@ func (i *ImageTool) ImageAsVolumeInfo(volumeName string) (*VolumeInfo, error) {
 
 func (i *ImageTool) PullImageToVolume(imageName, volumeName string) error {
 	// TODO(nhlfr): Handle AuthConfig from PullImageRequest.
-	path, err := utils.DownloadFile(stripTagFromImageName(imageName), volumeName)
+	path, err := utils.DownloadFile(i.protocol, stripTagFromImageName(imageName), volumeName)
 	if err != nil {
 		return err
 	}
