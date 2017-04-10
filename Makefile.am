@@ -16,7 +16,7 @@ export GO15VENDOREXPERIMENT=1
 export CGO_CFLAGS=$(CFLAGS)
 export CGO_LDFLAGS=$(LDFLAGS) $(LIBS)
 
-SUBDIRS = pkg/bolttools pkg/download pkg/libvirttools pkg/manager pkg/nettools pkg/criproxy tests/integration tests/network
+SUBDIRS = pkg/bolttools pkg/libvirttools pkg/manager pkg/nettools pkg/criproxy tests/integration tests/network
 
 # FIXME: add back dockerfilelint.test
 # (as of now, it requires Docker)
