@@ -17,6 +17,7 @@ limitations under the License.
 package utils
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -24,9 +25,9 @@ import (
 	"github.com/golang/glog"
 )
 
-func DownloadFile(url, fileName string) (string, error) {
-	// TODO(nhlfr): Use SSL.
-	url = "http://" + url
+// DownloadFile saves pointed by protocol/location raw data under fileName in /tmp
+func DownloadFile(protocol, location, fileName string) (string, error) {
+	url := fmt.Sprintf("%s://%s", protocol, location)
 
 	path := "/tmp/" + fileName
 	fp, err := os.Create(path)
