@@ -126,8 +126,9 @@ spec:
         env:
         - name: VIRTLET_LOGLEVEL
           value: "3"
+        # comment out the following to enable KVM
         - name: VIRTLET_DISABLE_KVM
-          value: "1"
+          value: "y"
       volumes:
       - hostPath:
           path: /sys/fs/cgroup

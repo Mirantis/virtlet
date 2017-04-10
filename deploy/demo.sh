@@ -122,9 +122,26 @@ function demo::vm-ready {
   fi
 }
 
+function demo::kvm-ok {
+  demo::step "Checking for KVM support..."
+  # The check is done inside node-1 container because it has proper /lib/modules
+  # from the docker host. Also, it'll have to use mirantis/virtlet image
+  # later anyway.
+  if ! docker exec kube-node-1 docker run --privileged --rm -v /lib/modules:/lib/modules mirantis/virtlet kvm-ok; then
+    return 1
+  fi
+}
+
 function demo::start-virtlet {
-  demo::step "Deploying Virtlet DaemonSet"
-  "${kubectl}" create -f "${BASE_LOCATION}/deploy/virtlet-ds.yaml"
+  if demo::kvm-ok; then
+    demo::step "Deploying Virtlet DaemonSet with KVM support"
+    "${kubectl}" create -f "${BASE_LOCATION}/deploy/virtlet-ds.yaml"
+  else
+    demo::step "Deploying Virtlet DaemonSet *without* KVM support"
+    "${kubectl}" convert -f "${BASE_LOCATION}/deploy/virtlet-ds.yaml" --local -o json |
+        docker exec -i kube-master jq '.items[1].spec.template.spec.containers[0].env|=.+[{"name": "VIRTLET_DISABLE_KVM","value":"y"}]' |
+        "${kubectl}" create -f -
+  fi
   demo::wait-for "Virtlet DaemonSet" demo::pods-ready runtime=virtlet
 }
 

@@ -138,7 +138,7 @@ case "${cmd}" in
         ( vcmd "./autogen.sh && ./configure && make" )
         ;;
     test)
-        ( vcmd 'VIRTLET_DISABLE_KVM=1 build/do-test.sh' )
+        ( vcmd 'VIRTLET_DISABLE_KVM=y build/do-test.sh' )
         ;;
     run)
         vcmd "$*"
