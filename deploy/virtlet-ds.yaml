@@ -120,6 +120,8 @@ spec:
           value: "3"
         - name: VIRTLET_DISABLE_KVM
           value: "1"
+        - name: VIRTLET_DOWNLOAD_PROTOCOL
+          value: "https"
       volumes:
       - hostPath:
           path: /sys/fs/cgroup
