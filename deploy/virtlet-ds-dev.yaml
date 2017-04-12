@@ -126,10 +126,11 @@ spec:
         env:
         - name: VIRTLET_LOGLEVEL
           value: "3"
-        - name: VIRTLET_DISABLE_KVM
-          value: "1"
         - name: VIRTLET_DOWNLOAD_PROTOCOL
           value: "http"
+        # comment out the following to enable KVM
+        - name: VIRTLET_DISABLE_KVM
+          value: "y"
       volumes:
       - hostPath:
           path: /sys/fs/cgroup

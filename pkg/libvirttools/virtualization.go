@@ -147,7 +147,7 @@ type Sound struct {
 
 func canUseKvm() bool {
 	if os.Getenv("VIRTLET_DISABLE_KVM") != "" {
-		glog.V(2).Infof("VIRTLET_DISABLE_KVM env var not empty, using plain qemu")
+		glog.V(0).Infof("VIRTLET_DISABLE_KVM env var not empty, using plain qemu")
 		return false
 	}
 	return true

@@ -55,3 +55,8 @@ set `CNI_PLUGIN` environment variable:
 ```
 $ export CNI_PLUGIN=flannel
 ```
+
+Note that KVM is disabled by default for the development environment.
+In order to enable it, comment out `VIRTLET_DISABLE_KVM` environment
+variable setting in `deploy/virtlet-ds-dev.yaml` before doing
+`build/cmd.sh start-dind`.
