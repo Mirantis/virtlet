@@ -1,5 +1,5 @@
 /*
-Copyright 2016 Mirantis
+Copyright 2017 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -42,6 +42,8 @@ var (
 		"Path to CNI plugin binaries")
 	cniConfigsDir = flag.String("cni-conf-dir", "/etc/cni/net.d",
 		"Location of CNI configurations (first file name in lexicographic order will be chosen)")
+	imageDownloadProtocol = flag.String("image-download-protocol", "https",
+		"Image download protocol. Can be https (default) or http.")
 )
 
 func main() {
@@ -49,7 +51,7 @@ func main() {
 
 	rand.Seed(time.Now().UnixNano())
 
-	server, err := manager.NewVirtletManager(*libvirtUri, *pool, *storageBackend, *boltPath, *cniPluginsDir, *cniConfigsDir)
+	server, err := manager.NewVirtletManager(*libvirtUri, *pool, *imageDownloadProtocol, *storageBackend, *boltPath, *cniPluginsDir, *cniConfigsDir)
 	if err != nil {
 		glog.Errorf("Initializing server failed: %v", err)
 		os.Exit(1)

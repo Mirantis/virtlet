@@ -53,13 +53,13 @@ type VirtletManager struct {
 	cniClient *cni.Client
 }
 
-func NewVirtletManager(libvirtUri, poolName, storageBackend, metadataPath, cniPluginsDir, cniConfigsDir string) (*VirtletManager, error) {
+func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, metadataPath, cniPluginsDir, cniConfigsDir string) (*VirtletManager, error) {
 	libvirtConnTool, err := libvirttools.NewConnectionTool(libvirtUri)
 	if err != nil {
 		return nil, err
 	}
 
-	libvirtImageTool, err := libvirttools.NewImageTool(libvirtConnTool.Connection(), poolName)
+	libvirtImageTool, err := libvirttools.NewImageTool(libvirtConnTool.Connection(), poolName, downloadProtocol)
 	if err != nil {
 		return nil, err
 	}

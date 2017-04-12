@@ -1,5 +1,5 @@
 /*
-Copyright 2016 Mirantis
+Copyright 2017 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package download
+package utils
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -24,9 +25,10 @@ import (
 	"github.com/golang/glog"
 )
 
-func DownloadFile(url, fileName string) (string, error) {
-	// TODO(nhlfr): Use SSL.
-	url = "http://" + url
+// DownloadFile downloads a file via an URL constructed as 'protocol://location'
+// and saves it under the specified fileName in /tmp
+func DownloadFile(protocol, location, fileName string) (string, error) {
+	url := fmt.Sprintf("%s://%s", protocol, location)
 
 	path := "/tmp/" + fileName
 	fp, err := os.Create(path)

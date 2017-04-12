@@ -1,4 +1,4 @@
-# Copyright 2016 Mirantis
+# Copyright 2017 Mirantis
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@ export GO15VENDOREXPERIMENT=1
 export CGO_CFLAGS=$(CFLAGS)
 export CGO_LDFLAGS=$(LDFLAGS) $(LIBS)
 
-SUBDIRS = pkg/bolttools pkg/download pkg/libvirttools pkg/manager pkg/nettools pkg/criproxy tests/integration tests/network
+SUBDIRS = pkg/bolttools pkg/libvirttools pkg/manager pkg/nettools pkg/criproxy tests/integration tests/network
 
 # FIXME: add back dockerfilelint.test
 # (as of now, it requires Docker)

@@ -124,7 +124,9 @@ function demo::vm-ready {
 
 function demo::start-virtlet {
   demo::step "Deploying Virtlet DaemonSet"
-  "${kubectl}" create -f "${BASE_LOCATION}/deploy/virtlet-ds.yaml"
+  "${kubectl}" convert -f "${BASE_LOCATION}/deploy/virtlet-ds.yaml" --local -o json |
+          docker exec -i kube-master jq '.items[1].spec.template.spec.containers[0].env|=.+[{"name": "VIRTLET_DOWNLOAD_PROTOCOL","value":"http"}]' |
+          "${kubectl}" create -f -
   demo::wait-for "Virtlet DaemonSet" demo::pods-ready runtime=virtlet
 }
 
