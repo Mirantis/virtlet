@@ -31,6 +31,7 @@ all:
 	go build -o $(builddir)/_output/virtlet ./cmd/virtlet
 	go build -o $(builddir)/_output/vmwrapper ./cmd/vmwrapper
 	go build -o $(builddir)/_output/criproxy ./cmd/criproxy
+	go build -o $(builddir)/_output/flexvolume_driver ./cmd/flexvolume_driver
 
 verify-glide-installation:
 	@which glide || go get github.com/Masterminds/glide

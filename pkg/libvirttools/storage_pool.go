@@ -19,11 +19,10 @@ package libvirttools
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
+	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/golang/glog"
 	libvirt "github.com/libvirt/libvirt-go"
-	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 const (
@@ -39,9 +38,9 @@ type Volume struct {
 }
 
 type VirtletVolume struct {
-	Name string         `json:"Name"`
-	Format string       `json:"Format"`
-	Capacity int        `json:"Capacity"`
+	Name         string `json:"Name"`
+	Format       string `json:"Format"`
+	Capacity     int    `json:"Capacity"`
 	CapacityUnit string `json:"CapacityUnit"`
 }
 
@@ -49,14 +48,14 @@ func (vol *VirtletVolume) UnmarshalJSON(data []byte) error {
 	// volAlias is needed to prevent recursive calls to UnmarshalJSON
 	type volAlias VirtletVolume
 	volWithDefaults := &volAlias{
-		Format: "qcow2",
-		Capacity: defaultCapacity,
+		Format:       "qcow2",
+		Capacity:     defaultCapacity,
 		CapacityUnit: defaultCapacityUnit,
 	}
 
 	err := json.Unmarshal(data, volWithDefaults)
 
-	if (err == nil && volWithDefaults.Name == "") {
+	if err == nil && volWithDefaults.Name == "" {
 		return fmt.Errorf("Validation failed for volumes definition within pod's annotations: volume name is mandatory.")
 	}
 
@@ -275,18 +274,16 @@ func (s *StorageTool) CleanAttachedVolumes(virtletVolsDesc string, containerId s
 	return nil
 }
 
-func (s *StorageTool) CreateVolumesToBeAttached(virtletVolsDesc string, containerId string) ([]string, error) {
+func (s *StorageTool) CreateVolumesToBeAttached(virtletVolsDesc string, containerId string, letterInd int) ([]string, error) {
 	var volumesXML []string
 	var virtletVols []VirtletVolume
 	if err := json.Unmarshal([]byte(virtletVolsDesc), &virtletVols); err != nil {
 		glog.Errorf("Error when unmarshalling json string with volumes description '%s' for container %s: %v", virtletVolsDesc, containerId, err)
 	}
 
-	diskLetter := strings.Split("bcdefghijklmnopqrstu", "")
-
-	for ind, virtletVol := range virtletVols {
-		if ind == len(diskLetter) {
-			fmt.Errorf("Had to omit creating and attaching of one ore more volumes. Limit on number is: %d", ind)
+	for _, virtletVol := range virtletVols {
+		if letterInd == len(diskLetters) {
+			fmt.Errorf("Had to omit creating and attaching of one ore more volumes. Limit on number is: %d", letterInd)
 			break
 		}
 
@@ -307,7 +304,7 @@ func (s *StorageTool) CreateVolumesToBeAttached(virtletVolsDesc string, containe
 			return nil, err
 		}
 
-		volXML := fmt.Sprintf(volXMLTemplate, path, "vd" + diskLetter[ind])
+		volXML := fmt.Sprintf(volXMLTemplate, path, "vd"+diskLetters[letterInd])
 		volumesXML = append(volumesXML, volXML)
 	}
 

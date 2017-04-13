@@ -36,3 +36,25 @@ done
 
 cd "${SCRIPT_DIR}"
 "${SCRIPT_DIR}/vmchat.exp" $("${virsh}" list --name)
+
+# NOTE: Temp workaround for testing functionality
+# until connectivity issues caused by qemu is inside
+# separate network namespace will be resolved
+
+pod_name=$(kubectl get pods --namespace=kube-system | grep virtlet | awk '{print $1}')
+kubectl exec $pod_name --namespace=kube-system -- cp /vmwrapper /vmwrapper_orig
+kubectl exec $pod_name --namespace=kube-system -- rm /vmwrapper
+kubectl exec $pod_name --namespace=kube-system -- ln -s /usr/bin/qemu-system-x86_64 /vmwrapper
+
+# Run one-node ceph cluster
+${SCRIPT_DIR}/run_ceph.sh ${SCRIPT_DIR}
+kubectl create -f ${SCRIPT_DIR}/substituted-cirros-vm-rbd-volume.yaml
+while ! "${virsh}" list | grep -q cirros-vm-rbd; do
+  sleep 1
+done
+if [ "$(${virsh} domblklist 2 | grep rbd-test-image | wc -l)" != "1" ]; then
+  exit 1
+fi
+if ! kubectl exec $pod_name --namespace=kube-system -- /bin/sh -c "virsh list | grep cirros-vm-rbd.*running"; then
+  exit 1
+fi
