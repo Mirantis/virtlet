@@ -19,6 +19,7 @@ package libvirttools
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/golang/glog"
@@ -200,7 +201,7 @@ func NewStorageTool(conn *libvirt.Connect, poolName string) (*StorageTool, error
 	return &StorageTool{name: poolName, tool: tool, pool: pool}, nil
 }
 
-func (s *StorageTool) GenerateVolumeXML(shortName string, capacity int, capacityUnit string, path string) string {
+func (s *StorageTool) GenerateVolumeXML(shortName string, capacity int64, capacityUnit string, path string) string {
 	volXML := `
 <volume>
     <name>%s</name>
@@ -312,8 +313,20 @@ func (s *StorageTool) CreateVolumesToBeAttached(virtletVolsDesc string, containe
 }
 
 func (s *StorageTool) PullImageToVolume(path, volumeName string) error {
+	imageSize, err := getFileSize(path)
+	if err != nil {
+		return err
+	}
 	libvirtFilePath := fmt.Sprintf("/var/lib/libvirt/images/%s", volumeName)
-	volXML := s.GenerateVolumeXML(volumeName, 5, "G", libvirtFilePath)
+	volXML := s.GenerateVolumeXML(volumeName, imageSize, "B", libvirtFilePath)
 
 	return s.tool.PullImageToVolume(s.pool.pool, volumeName, path, volXML)
+}
+
+func getFileSize(path string) (int64, error) {
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		return 0, err
+	}
+	return fileInfo.Size(), nil
 }
