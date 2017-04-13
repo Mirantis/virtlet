@@ -6,25 +6,33 @@ Virtlet have the same behavior and default values for `--cni-bin-dir` and `--cni
 ## Netwoking scheme
 
 ```
-+--------------------------------------------------------------------------------------------------+
-| +-------------------+                                                                            |
-| | VM                |                                                                            |
-| |                   |                                                                            |
-| | +---+ eth0        |                                                                            |
-| | +---+ ip addr set |                                                                            |
-| |   |               |                                                                            |
-| +---|---------------+                                                                            |
-|     |                                                      virtlet-eth0 (veth netns end          |                 veth0 (veth host end
-|     |    +---+ tap0            +---+ br0             +---+ created by CNI)                       |           +---+ created by CNI)
-|     +----|   |-----------------|   |-----------------|   |---------------------------------------------------|   | ip addr set
-|          +---+                 +---+                 +---+                                       |           +---+
-|                              169.254.254.2/24                                                    |
-|                                                                                                  |
-|                                                                                                  |
-|                +-------------------+                                                             |
-|                |local dhcp server  |                                                             |
-|                +-------------------+                                      pod's netns            |            
-+--------------------------------------------------------------------------------------------------+
++--------------------------------------------------------------------------------------------------------------------------------------------------------------+
+|               +-------------------+                                                                                             Virlet                       |
+|               | VM                |                                                                                             network                      |
+|               |                   | Qemu process                                                                                namespace                    |
+|               | +---+ eth0        |                                                                                                                          |
+|               | +---+ ip addr set |                                                                                                                          |
+|               |   /\              |                                                                                                                          |
+|               +---||--------------+                                                                                                                          |
+|                   \/                                                                                                                                         |
+|               FD of the tap device                                                                                                                           |
+|                                                                                                                                                              |
+|                                                                                                                                                              |
+|               +--------------------------------------------------------------------------------------------------+                                           |
+|               |                                                                                                  |                                           |
+|               |                                                            virtlet-eth0 (veth netns end          |                 veth0 (veth host end      |
+|               |          +---+ tap0            +---+ br0             +---+ created by CNI)                       |           +---+ created by CNI)           |
+|               |          |   |-----------------|   |-----------------|   |---------------------------------------------------|   | ip addr set               |
+|               |          +---+                 +---+                 +---+                                       |           +---+                           |
+|               |                              169.254.254.2/24                                                    |                                           |
+|               |                                                                                                  |                                           |
+|               |                                                                                                  |                                           |
+|               |                +-------------------+                                                             |                                           |
+|               |                |local dhcp server  |                                                             |                                           |
+|               |                +-------------------+                                      pod's netns            |                                           |
+|               +--------------------------------------------------------------------------------------------------+                                           |
+|                                                                                                                                                              |
++--------------------------------------------------------------------------------------------------------------------------------------------------------------+
 ```
 
 Current workflow using CNI plugin which is expected to create veth pair with one end belongs to pod network namespace:
@@ -43,16 +51,18 @@ Current workflow using CNI plugin which is expected to create veth pair with one
 </commandline>
 ...
 
-where 
-- VIRTLET_EMULATOR - the fully qualified path to the device model emulator binary, ex: /usr/bin/kvm. 
+where
+- VIRTLET_EMULATOR - the fully qualified path to the device model emulator binary, ex: /usr/bin/kvm.
 - VIRTLET_NS - the fully qualified path to the netns, ex: /var/run/netns/8d6f7a19-c865-11e6-ae2c-02424d6b591d
 - VIRTLET_CNI_CONFIG - json sting with CNI settings, ex: {"ip4":{"ip":"10.1.91.2/24","gateway":"10.1.91.1","routes":[{"dst":"0.0.0.0/0"}]},"dns":{}}
 ```
- - On CreateContainer request virlet calls libvirt api to start domain, which in its turn leads to running VMwrapper with all qemu args. Using info from set env vars VMWrapper sets up networking and runs dhcp-server and VM inside pod's netns.
+ - On CreateContainer request virlet calls libvirt api to start domain, which in its turn leads to running VMwrapper with all qemu args. Using info from set env vars VMWrapper sets up networking and runs dhcp-server inside pod's netns. The qemu-kvm process of running VM is started inside virtlet's base netns to provide inbound and outbound connectivity.
 In more details, VMWrapper inside pod's netns performs the following:
-    1. creates tap for domain and br0, strips ip from veth end inside netns
-    2. runs dhcp-server to pass ip to VM's eth stipped from veth and default routes
+    1. creates tap0 for domain and br0, strips ip and routes from veth end inside netns
+    2. opens tap0 device and keeps its FD
+    3. runs dhcp-server to pass ip to VM's eth stipped from veth and default routes
 
+Finally vmwrapper spawns qemu-kvm (or qemu, if KVM is disabled) inside original virtlet's netns and passes to it file descriptor corresponding to tap0 device.
 
 **NOTE:** Currently we ignore hostNetwork setting, i.e. on RunPodSandBox request from kubelet new network namespace will be created by virtlet with name=PodId regardless of hostNetwork setting. As it's kubelet's work to decide when and which api request should be called, if hostNetwork setting will be changed for the running VM, kubelet SyncPod workflow will kill and re-create everything despite of fact that it won't change networking for VM.
 
