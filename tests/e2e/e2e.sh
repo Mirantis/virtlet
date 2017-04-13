@@ -51,3 +51,19 @@ fi
 if ! kubectl exec "${virtlet_pod_name}" --namespace=kube-system -- /bin/sh -c "virsh list | grep cirros-vm-rbd.*running"; then
   exit 1
 fi
+
+# check vnc consoles are available for both domains
+if ! kubectl exec "${virtlet_pod_name}" --namespace=kube-system -- /bin/sh -c "apt-get install -y vncsnapshot"; then
+  echo "Failed to install vncsnapshot inside virtlet container"
+  exit 1
+fi
+
+if ! kubectl exec "${virtlet_pod_name}" --namespace=kube-system -- /bin/sh -c "vncsnapshot :0 /domain_1.jpeg"; then
+  echo "Failed to addtach and get screenshot for vnc console for domain with 1 id"
+  exit 1
+fi
+
+if ! kubectl exec "${virtlet_pod_name}" --namespace=kube-system -- /bin/sh -c "vncsnapshot :1 /domain_2.jpeg"; then
+  echo "Failed to addtach and get screenshot for vnc console for domain with 2 id"
+  exit 1
+fi

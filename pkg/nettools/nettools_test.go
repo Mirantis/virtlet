@@ -313,7 +313,7 @@ func TestExtractLinkInfo(t *testing.T) {
 }
 
 func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, info *types.Result) {
-	returnedInfo, err := SetupContainerSideNetwork(info)
+	returnedInfo, _, err := SetupContainerSideNetwork(info)
 	if err != nil {
 		log.Panicf("failed to set up container side network: %v", err)
 	}
@@ -434,7 +434,7 @@ func TestTeardownContainerSideNetwork(t *testing.T) {
 		if err := StripLink(origContVeth); err != nil {
 			log.Panicf("StripLink() failed: %v", err)
 		}
-		returnedInfo, err := SetupContainerSideNetwork(&expectedExtractedLinkInfo)
+		returnedInfo, _, err := SetupContainerSideNetwork(&expectedExtractedLinkInfo)
 		if err != nil {
 			log.Panicf("failed to set up container side network: %v", err)
 		}
