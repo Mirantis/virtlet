@@ -77,6 +77,7 @@ type SourceHost struct {
 }
 
 type Source struct {
+	Device   string       `xml:"dev,attr,omitempty"`
 	SrcFile  string       `xml:"file,attr,omitempty"`
 	Protocol string       `xml:"protocol,attr,omitempty"`
 	Name     string       `xml:"name,attr,omitempty"`
@@ -370,11 +371,7 @@ func (v *VirtualizationTool) addAttachedVolumesXML(podID string, uuid string, vi
 		}
 	}
 
-	if len(flexVolumeInfos) == len(diskLetters) {
-		return marshalToXML(domain)
-	}
-
-	volumesXML, err := v.volumeStorage.CreateVolumesToBeAttached(virtletVolsDesc, uuid, len(flexVolumeInfos))
+	volumesXML, err := v.volumeStorage.PrepareVolumesToBeAttached(virtletVolsDesc, uuid, len(flexVolumeInfos))
 	if err != nil {
 		return "", err
 	}
