@@ -253,8 +253,8 @@ var volXMLTemplate string = `
     <target dev='%s' bus='virtio'/>
 </disk>`
 
-func (v *VirtualizationTool) createBootImageSnapshot(imageName, backingStorePath string) (string, error) {
-	vol, err := v.volumeStorage.CreateSnapshot(imageName, defaultCapacity, defaultCapacityUnit, backingStorePath)
+func (v *VirtualizationTool) createBootImageSnapshot(imageName, backingStorePath string, size uint64) (string, error) {
+	vol, err := v.volumeStorage.CreateSnapshot(imageName, size, "B", backingStorePath)
 
 	if err != nil {
 		return "", err
@@ -399,7 +399,7 @@ func NewVirtualizationTool(conn *libvirt.Connect, poolName string) (*Virtualizat
 	return &VirtualizationTool{tool: tool, volumeStorage: storageTool}, nil
 }
 
-func (v *VirtualizationTool) CreateContainer(metadataStore metadata.MetadataStore, in *kubeapi.CreateContainerRequest, imageFilepath, netNSPath, cniConfig string) (string, error) {
+func (v *VirtualizationTool) CreateContainer(metadataStore metadata.MetadataStore, in *kubeapi.CreateContainerRequest, imageFilepath string, imageSize uint64, netNSPath, cniConfig string) (string, error) {
 	uuid, err := utils.NewUuid()
 	if err != nil {
 		return "", err
@@ -431,7 +431,7 @@ func (v *VirtualizationTool) CreateContainer(metadataStore metadata.MetadataStor
 	}
 
 	snapshotName := "snapshot_" + uuid
-	snapshotImage, err := v.createBootImageSnapshot(snapshotName, imageFilepath)
+	snapshotImage, err := v.createBootImageSnapshot(snapshotName, imageFilepath, imageSize)
 	if err != nil {
 		return "", err
 	}
