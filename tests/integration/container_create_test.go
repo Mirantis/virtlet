@@ -33,7 +33,7 @@ func TestContainerCreateStartListRemove(t *testing.T) {
 		// QEMU fails with:
 		// Failed to unlink socket /var/lib/libvirt/qemu/capabilities.monitor.sock: Permission denied
 		// Running libvirt in non-build container works though
-		t.Skip("TestContainerCreateStart fails in Travis due to a libvirt+qemu problem in build container")
+		t.Skip("TestContainerCreateStartListRemove fails in Travis due to a libvirt+qemu problem in build container")
 	}
 	manager := NewVirtletManager()
 	if err := manager.Run(); err != nil {
