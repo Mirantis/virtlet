@@ -261,14 +261,18 @@ func (s *StorageTool) CleanAttachedVolumes(virtletVolsDesc string, containerId s
 
 	var vols []VirtletVolume
 	if err := json.Unmarshal([]byte(virtletVolsDesc), &vols); err != nil {
-		glog.Errorf("Error when unmarshalling json string with volumes description '%s' for container %s: %v", virtletVolsDesc, containerId, err)
+		return fmt.Errorf("error when unmarshalling json string with volumes description '%s' for container %s: %v", virtletVolsDesc, containerId, err)
 	}
 
 	for _, virtletVol := range vols {
-		volName := containerId + "-" + virtletVol.Name
-		if err := s.RemoveVolume(volName); err != nil {
-			glog.Errorf("Error during removal of volume '%s' for container %s: %v", volName, containerId, err)
-			return err
+		switch virtletVol.Format {
+		case "qcow2":
+			volName := containerId + "-" + virtletVol.Name
+			if err := s.RemoveVolume(volName); err != nil {
+				return fmt.Errorf("error during removal of volume '%s' for container %s: %v", volName, containerId, err)
+			}
+		default:
+			return fmt.Errorf("unsupported volume format '%s' in volume '%s' definition", virtletVol.Format, virtletVol.Name)
 		}
 	}
 
@@ -276,40 +280,51 @@ func (s *StorageTool) CleanAttachedVolumes(virtletVolsDesc string, containerId s
 }
 
 func (s *StorageTool) CreateVolumesToBeAttached(virtletVolsDesc string, containerId string, letterInd int) ([]string, error) {
-	var volumesXML []string
-	var virtletVols []VirtletVolume
-	if err := json.Unmarshal([]byte(virtletVolsDesc), &virtletVols); err != nil {
-		glog.Errorf("Error when unmarshalling json string with volumes description '%s' for container %s: %v", virtletVolsDesc, containerId, err)
+	if virtletVolsDesc == "" {
+		return nil, nil
 	}
 
-	for _, virtletVol := range virtletVols {
-		if letterInd == len(diskLetters) {
-			fmt.Errorf("Had to omit creating and attaching of one ore more volumes. Limit on number is: %d", letterInd)
-			break
+	var volumesXMLs []string
+	var virtletVols []VirtletVolume
+	if err := json.Unmarshal([]byte(virtletVolsDesc), &virtletVols); err != nil {
+		return nil, fmt.Errorf("error when unmarshalling json string with volumes description '%s' for container %s: %v", virtletVolsDesc, containerId, err)
+	}
+
+	for i, virtletVol := range virtletVols {
+		if letterInd+i == len(diskLetters) {
+			return nil, fmt.Errorf("too much volumes, limit %d of them exceeded on volume '%s'", len(diskLetters), virtletVol.Name)
 		}
 
 		volName := containerId + "-" + virtletVol.Name
-		vol, err := s.CreateVolume(volName, defaultCapacity, defaultCapacityUnit)
-		if err != nil {
-			glog.Errorf("Error during creation of volume'%s' with virtlet description %s: %v", volName, virtletVol, err)
-			return nil, err
+		virtDev := "vd" + diskLetters[letterInd+i]
+		var volXML string
+		switch virtletVol.Format {
+		case "qcow2":
+			vol, err := s.CreateVolume(volName, defaultCapacity, defaultCapacityUnit)
+			if err != nil {
+				return nil, fmt.Errorf("Error during creation of volume '%s' with virtlet description %s: %v", volName, virtletVol.Name, err)
+			}
+
+			path, err := vol.GetPath()
+			if err != nil {
+				return nil, err
+			}
+
+			err = utils.FormatDisk(path)
+			if err != nil {
+				return nil, err
+			}
+
+			volXML = fmt.Sprintf(volXMLTemplate, path, virtDev)
+
+		default:
+			return nil, fmt.Errorf("unsupported volume format '%s' in volume '%s' definition", virtletVol.Format, virtletVol.Name)
 		}
 
-		path, err := vol.GetPath()
-		if err != nil {
-			return nil, err
-		}
-
-		err = utils.FormatDisk(path)
-		if err != nil {
-			return nil, err
-		}
-
-		volXML := fmt.Sprintf(volXMLTemplate, path, "vd"+diskLetters[letterInd])
-		volumesXML = append(volumesXML, volXML)
+		volumesXMLs = append(volumesXMLs, volXML)
 	}
 
-	return volumesXML, nil
+	return volumesXMLs, nil
 }
 
 func (s *StorageTool) PullImageToVolume(path, volumeName string) error {
