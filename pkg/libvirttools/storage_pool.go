@@ -201,7 +201,7 @@ func NewStorageTool(conn *libvirt.Connect, poolName string) (*StorageTool, error
 	return &StorageTool{name: poolName, tool: tool, pool: pool}, nil
 }
 
-func (s *StorageTool) GenerateVolumeXML(shortName string, capacity int64, capacityUnit string, path string) string {
+func (s *StorageTool) GenerateVolumeXML(shortName string, capacity uint64, capacityUnit string, path string) string {
 	volXML := `
 <volume>
     <name>%s</name>
@@ -214,7 +214,7 @@ func (s *StorageTool) GenerateVolumeXML(shortName string, capacity int64, capaci
 	return fmt.Sprintf(volXML, shortName, capacityUnit, capacity, path)
 }
 
-func (s *StorageTool) CreateVolume(name string, capacity int, capacityUnit string) (*Volume, error) {
+func (s *StorageTool) CreateVolume(name string, capacity uint64, capacityUnit string) (*Volume, error) {
 	volumeXML := `
 <volume>
     <name>%s</name>
@@ -226,7 +226,7 @@ func (s *StorageTool) CreateVolume(name string, capacity int, capacityUnit strin
 	return s.pool.CreateVolume(name, volumeXML)
 }
 
-func (s *StorageTool) CreateSnapshot(name string, capacity int, capacityUnit string, backingStorePath string) (*Volume, error) {
+func (s *StorageTool) CreateSnapshot(name string, capacity uint64, capacityUnit string, backingStorePath string) (*Volume, error) {
 	snapshotXML := `
 <volume type='file'>
     <name>%s</name>
@@ -338,10 +338,10 @@ func (s *StorageTool) PullImageToVolume(path, volumeName string) error {
 	return s.tool.PullImageToVolume(s.pool.pool, volumeName, path, volXML)
 }
 
-func getFileSize(path string) (int64, error) {
+func getFileSize(path string) (uint64, error) {
 	fileInfo, err := os.Stat(path)
 	if err != nil {
 		return 0, err
 	}
-	return fileInfo.Size(), nil
+	return uint64(fileInfo.Size()), nil
 }

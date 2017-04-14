@@ -312,6 +312,12 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 		return nil, err
 	}
 
+	volumeInfo, err := v.libvirtImageTool.ImageAsVolumeInfo(volumeName)
+	if err != nil {
+		glog.Errorf("Error when getting volume info for image %q (volume %q): %v", imageName, volumeName, err)
+		return nil, err
+	}
+
 	// TODO: get it as string
 	netAsBytes, err := v.metadataStore.GetPodNetworkConfigurationAsBytes(podSandboxId)
 	if err != nil {
@@ -331,7 +337,7 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 	// TODO: we should not pass whole "in" to CreateContainer - we should pass there only needed info for CreateContainer
 	// without whole data container
 	// TODO: use network configuration by CreateContainer
-	uuid, err := v.libvirtVirtualizationTool.CreateContainer(v.metadataStore, in, imageFilePath, netNSPath, string(netAsBytes))
+	uuid, err := v.libvirtVirtualizationTool.CreateContainer(v.metadataStore, in, imageFilePath, volumeInfo.Size, netNSPath, string(netAsBytes))
 	if err != nil {
 		glog.Errorf("Error when creating container %s: %v", name, err)
 		return nil, err
