@@ -112,10 +112,10 @@ func (v *VirtletManager) Version(ctx context.Context, in *kubeapi.VersionRequest
 	vRuntimeName := runtimeName
 	vRuntimeVersion := runtimeVersion
 	return &kubeapi.VersionResponse{
-		Version:           &vRuntimeAPIVersion,
-		RuntimeName:       &vRuntimeName,
-		RuntimeVersion:    &vRuntimeVersion,
-		RuntimeApiVersion: &vRuntimeVersion,
+		Version:           vRuntimeAPIVersion,
+		RuntimeName:       vRuntimeName,
+		RuntimeVersion:    vRuntimeVersion,
+		RuntimeApiVersion: vRuntimeVersion,
 	}, nil
 }
 
@@ -125,8 +125,8 @@ func (v *VirtletManager) Version(ctx context.Context, in *kubeapi.VersionRequest
 
 func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSandboxRequest) (*kubeapi.RunPodSandboxResponse, error) {
 	config := in.GetConfig()
-	podId := config.GetMetadata().GetUid()
-	name := config.GetMetadata().GetName()
+	podId := config.GetMetadata().Uid
+	name := config.GetMetadata().Name
 	glog.V(2).Infof("RunPodSandbox called for pod %s (%s)", name, podId)
 	glog.V(3).Infof("RunPodSandbox: %s", spew.Sdump(in))
 	glog.V(2).Infof("Sandbox config annotations: %v", config.GetAnnotations())
@@ -144,13 +144,14 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 
 	// Mimic kubelet's method of handling nameservers.
 	// As of k8s 1.5.2, kubelet doesn't use any nameserver information from CNI.
+	// (TODO: recheck this for 1.6)
 	// CNI is used just to configure the network namespace and CNI DNS
 	// info is ignored. Instead of this, DnsConfig from PodSandboxConfig
 	// is used to configure container's resolv.conf.
 	if config.DnsConfig != nil {
-		netConfig.DNS.Nameservers = config.DnsConfig.GetServers()
-		netConfig.DNS.Search = config.DnsConfig.GetSearches()
-		netConfig.DNS.Options = config.DnsConfig.GetOptions()
+		netConfig.DNS.Nameservers = config.DnsConfig.Servers
+		netConfig.DNS.Search = config.DnsConfig.Searches
+		netConfig.DNS.Options = config.DnsConfig.Options
 	}
 
 	bytesNetConfig, err := cni.ResultToBytes(netConfig)
@@ -173,7 +174,7 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 	}
 
 	response := &kubeapi.RunPodSandboxResponse{
-		PodSandboxId: &podId,
+		PodSandboxId: podId,
 	}
 	return response, nil
 }
@@ -202,8 +203,8 @@ func validatePodSandboxConfig(config *kubeapi.PodSandboxConfig) error {
 }
 
 func (v *VirtletManager) StopPodSandbox(ctx context.Context, in *kubeapi.StopPodSandboxRequest) (*kubeapi.StopPodSandboxResponse, error) {
-	podSandboxId := in.GetPodSandboxId()
-	glog.V(2).Infof("StopPodSandbox called for pod %s", in.GetPodSandboxId())
+	podSandboxId := in.PodSandboxId
+	glog.V(2).Infof("StopPodSandbox called for pod %s", in.PodSandboxId)
 	glog.V(3).Infof("StopPodSandbox: %s", spew.Sdump(in))
 	if err := v.metadataStore.UpdatePodState(podSandboxId, byte(kubeapi.PodSandboxState_SANDBOX_NOTREADY)); err != nil {
 		glog.Errorf("Error when stopping pod sandbox '%s': %v", podSandboxId, err)
@@ -215,7 +216,7 @@ func (v *VirtletManager) StopPodSandbox(ctx context.Context, in *kubeapi.StopPod
 }
 
 func (v *VirtletManager) RemovePodSandbox(ctx context.Context, in *kubeapi.RemovePodSandboxRequest) (*kubeapi.RemovePodSandboxResponse, error) {
-	podSandboxId := in.GetPodSandboxId()
+	podSandboxId := in.PodSandboxId
 	glog.V(2).Infof("RemovePodSandbox called for pod %s", podSandboxId)
 	glog.V(3).Infof("RemovePodSandbox: %s", spew.Sdump(in))
 
@@ -241,7 +242,7 @@ func (v *VirtletManager) RemovePodSandbox(ctx context.Context, in *kubeapi.Remov
 
 func (v *VirtletManager) PodSandboxStatus(ctx context.Context, in *kubeapi.PodSandboxStatusRequest) (*kubeapi.PodSandboxStatusResponse, error) {
 	glog.V(3).Infof("PodSandboxStatusStatus: %s", spew.Sdump(in))
-	podSandboxId := in.GetPodSandboxId()
+	podSandboxId := in.PodSandboxId
 
 	status, err := v.metadataStore.GetPodSandboxStatus(podSandboxId)
 	if err != nil {
@@ -264,7 +265,7 @@ func (v *VirtletManager) PodSandboxStatus(ctx context.Context, in *kubeapi.PodSa
 
 		if netResult.IP4 != nil {
 			ip := netResult.IP4.IP.IP.String()
-			status.Network = &kubeapi.PodSandboxNetworkStatus{Ip: &ip}
+			status.Network = &kubeapi.PodSandboxNetworkStatus{Ip: ip}
 		}
 	}
 
@@ -292,9 +293,9 @@ func (v *VirtletManager) ListPodSandbox(ctx context.Context, in *kubeapi.ListPod
 
 func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.CreateContainerRequest) (*kubeapi.CreateContainerResponse, error) {
 	config := in.GetConfig()
-	podSandboxId := in.GetPodSandboxId()
-	imageName := config.GetImage().GetImage()
-	name := config.GetMetadata().GetName()
+	podSandboxId := in.PodSandboxId
+	imageName := config.GetImage().Image
+	name := config.GetMetadata().Name
 
 	glog.V(2).Infof("CreateContainer called for name: %s", name)
 	glog.V(3).Infof("CreateContainer: %s", spew.Sdump(in))
@@ -343,18 +344,17 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 		return nil, err
 	}
 
-	response := &kubeapi.CreateContainerResponse{ContainerId: &uuid}
+	response := &kubeapi.CreateContainerResponse{ContainerId: uuid}
 	glog.V(3).Infof("CreateContainer response: %s", spew.Sdump(response))
 	return response, nil
 }
 
 func (v *VirtletManager) StartContainer(ctx context.Context, in *kubeapi.StartContainerRequest) (*kubeapi.StartContainerResponse, error) {
-	containerId := in.GetContainerId()
-	glog.V(2).Infof("StartContainer called for containerID: %s", containerId)
+	glog.V(2).Infof("StartContainer called for containerID: %s", in.ContainerId)
 	glog.V(3).Infof("StartContainer: %s", spew.Sdump(in))
 
-	if err := v.libvirtVirtualizationTool.StartContainer(containerId); err != nil {
-		glog.Errorf("Error when starting container %s: %v", containerId, err)
+	if err := v.libvirtVirtualizationTool.StartContainer(in.ContainerId); err != nil {
+		glog.Errorf("Error when starting container %s: %v", in.ContainerId, err)
 		return nil, err
 	}
 	response := &kubeapi.StartContainerResponse{}
@@ -362,37 +362,35 @@ func (v *VirtletManager) StartContainer(ctx context.Context, in *kubeapi.StartCo
 }
 
 func (v *VirtletManager) StopContainer(ctx context.Context, in *kubeapi.StopContainerRequest) (*kubeapi.StopContainerResponse, error) {
-	containerId := in.GetContainerId()
-	glog.V(2).Infof("StopContainer called for containerID: %s", containerId)
+	glog.V(2).Infof("StopContainer called for containerID: %s", in.ContainerId)
 	glog.V(3).Infof("StopContainer: %s", spew.Sdump(in))
 
-	if err := v.libvirtVirtualizationTool.StopContainer(containerId); err != nil {
-		glog.Errorf("Error when stopping container %s: %v", containerId, err)
+	if err := v.libvirtVirtualizationTool.StopContainer(in.ContainerId); err != nil {
+		glog.Errorf("Error when stopping container %s: %v", in.ContainerId, err)
 		return nil, err
 	}
 	response := &kubeapi.StopContainerResponse{}
-	glog.V(2).Info("Sending stop response for containerID: %s", containerId)
+	glog.V(2).Info("Sending stop response for containerID: %s", in.ContainerId)
 	return response, nil
 }
 
 func (v *VirtletManager) RemoveContainer(ctx context.Context, in *kubeapi.RemoveContainerRequest) (*kubeapi.RemoveContainerResponse, error) {
-	containerId := in.GetContainerId()
-	glog.V(2).Infof("RemoveContainer called for containerID: %s", containerId)
+	glog.V(2).Infof("RemoveContainer called for containerID: %s", in.ContainerId)
 	glog.V(3).Infof("RemoveContainer: %s", spew.Sdump(in))
 
-	if err := v.libvirtVirtualizationTool.RemoveContainer(*in.ContainerId); err != nil {
-		glog.Errorf("Error when removing container '%s': %v", containerId, err)
+	if err := v.libvirtVirtualizationTool.RemoveContainer(in.ContainerId); err != nil {
+		glog.Errorf("Error when removing container '%s': %v", in.ContainerId, err)
 		return nil, err
 	}
 
-	containerInfo, err := v.metadataStore.GetContainerInfo(containerId)
+	containerInfo, err := v.metadataStore.GetContainerInfo(in.ContainerId)
 	if err != nil {
-		glog.Errorf("Error when retrieving container '%s' info from metadata store: %v", containerId, err)
+		glog.Errorf("Error when retrieving container '%s' info from metadata store: %v", in.ContainerId, err)
 		return nil, err
 	}
 
-	if err := v.metadataStore.RemoveContainer(containerId); err != nil {
-		glog.Errorf("Error when removing container '%s' from metadata store: %v", containerId, err)
+	if err := v.metadataStore.RemoveContainer(in.ContainerId); err != nil {
+		glog.Errorf("Error when removing container '%s' from metadata store: %v", in.ContainerId, err)
 		return nil, err
 	}
 
@@ -403,7 +401,7 @@ func (v *VirtletManager) RemoveContainer(ctx context.Context, in *kubeapi.Remove
 
 	storagePool := v.libvirtVirtualizationTool.GetStoragePool()
 	if virtletVolsDesc, exists := containerInfo.SandBoxAnnotations[libvirttools.VirtletVolumesAnnotationKeyName]; exists {
-		if err := storagePool.CleanAttachedVolumes(virtletVolsDesc, containerId); err != nil {
+		if err := storagePool.CleanAttachedVolumes(virtletVolsDesc, in.ContainerId); err != nil {
 			return nil, err
 		}
 	}
@@ -427,11 +425,10 @@ func (v *VirtletManager) ListContainers(ctx context.Context, in *kubeapi.ListCon
 }
 
 func (v *VirtletManager) ContainerStatus(ctx context.Context, in *kubeapi.ContainerStatusRequest) (*kubeapi.ContainerStatusResponse, error) {
-	containerId := in.GetContainerId()
 	glog.V(3).Infof("ContainerStatus: %s", spew.Sdump(in))
-	status, err := v.libvirtVirtualizationTool.ContainerStatus(v.metadataStore, containerId)
+	status, err := v.libvirtVirtualizationTool.ContainerStatus(v.metadataStore, in.ContainerId)
 	if err != nil {
-		glog.Errorf("Error when getting container '%s' status: %v", containerId, err)
+		glog.Errorf("Error when getting container '%s' status: %v", in.ContainerId, err)
 		return nil, err
 	}
 
@@ -473,12 +470,12 @@ func (v *VirtletManager) Status(context.Context, *kubeapi.StatusRequest) (*kubea
 		Status: &kubeapi.RuntimeStatus{
 			Conditions: []*kubeapi.RuntimeCondition{
 				{
-					Type:   &runtimeReadyStr,
-					Status: &ready,
+					Type:   runtimeReadyStr,
+					Status: ready,
 				},
 				{
-					Type:   &networkReadyStr,
-					Status: &ready,
+					Type:   networkReadyStr,
+					Status: ready,
 				},
 			},
 		},
@@ -502,9 +499,9 @@ func (v *VirtletManager) imageFromVolumeInfo(volumeInfo *libvirttools.VolumeInfo
 	}
 
 	return &kubeapi.Image{
-		Id:       &volumeInfo.Name,
+		Id:       volumeInfo.Name,
 		RepoTags: []string{imageName},
-		Size_:    &volumeInfo.Size,
+		Size_:    volumeInfo.Size,
 	}, nil
 }
 
@@ -527,7 +524,7 @@ func (v *VirtletManager) ListImages(ctx context.Context, in *kubeapi.ListImagesR
 			continue
 		}
 		if filter := in.GetFilter(); filter != nil {
-			if filter.GetImage() != nil && filter.GetImage().GetImage() != image.RepoTags[0] {
+			if filter.GetImage() != nil && filter.GetImage().Image != image.RepoTags[0] {
 				continue
 			}
 		}
@@ -540,7 +537,7 @@ func (v *VirtletManager) ListImages(ctx context.Context, in *kubeapi.ListImagesR
 }
 
 func (v *VirtletManager) ImageStatus(ctx context.Context, in *kubeapi.ImageStatusRequest) (*kubeapi.ImageStatusResponse, error) {
-	imageName := in.GetImage().GetImage()
+	imageName := in.GetImage().Image
 	volumeName, err := libvirttools.ImageNameToVolumeName(imageName)
 	if err != nil {
 		glog.Errorf("ImageStatus: error getting volume name for image %q: %v", imageName, err)
@@ -583,7 +580,7 @@ func (v *VirtletManager) ImageStatus(ctx context.Context, in *kubeapi.ImageStatu
 }
 
 func (v *VirtletManager) PullImage(ctx context.Context, in *kubeapi.PullImageRequest) (*kubeapi.PullImageResponse, error) {
-	imageName := in.GetImage().GetImage()
+	imageName := in.GetImage().Image
 	glog.V(2).Infof("PullImage called for: %s", imageName)
 
 	volumeName, err := libvirttools.ImageNameToVolumeName(imageName)
@@ -620,12 +617,12 @@ func (v *VirtletManager) PullImage(ctx context.Context, in *kubeapi.PullImageReq
 		return nil, err
 	}
 
-	response := &kubeapi.PullImageResponse{}
+	response := &kubeapi.PullImageResponse{ImageRef: imageName}
 	return response, nil
 }
 
 func (v *VirtletManager) RemoveImage(ctx context.Context, in *kubeapi.RemoveImageRequest) (*kubeapi.RemoveImageResponse, error) {
-	imageName := in.GetImage().GetImage()
+	imageName := in.GetImage().Image
 	glog.V(2).Infof("RemoveImage called for: %s", imageName)
 
 	volumeName, err := libvirttools.ImageNameToVolumeName(imageName)

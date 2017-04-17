@@ -4,6 +4,18 @@ set -o nounset
 set -o pipefail
 set -o errtrace
 
+if [[ -f /dind/virtlet ]]; then
+  ln -fs /dind/virtlet /usr/local/bin/virtlet
+fi
+
+if [[ -f /dind/vmwrapper ]]; then
+  ln -fs /dind/vmwrapper /vmwrapper
+fi
+
+if [[ -f /dind/flexvolume_driver ]]; then
+  ln -fs /dind/flexvolume_driver /flexvolume_driver
+fi
+
 if [[ ! ${VIRTLET_DISABLE_KVM:-} ]]; then
   if ! kvm-ok >&/dev/null; then
     # try to fix the environment by loading appropriate modules

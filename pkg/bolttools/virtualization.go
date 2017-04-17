@@ -40,7 +40,7 @@ func (b *BoltClient) EnsureVirtualizationSchema() error {
 	return err
 }
 
-func (b *BoltClient) SetContainer(containerId, sandboxId, image, rootImageSnapshotName string, labels, annotations map[string]string) error {
+func (b *BoltClient) SetContainer(name, containerId, sandboxId, image, rootImageSnapshotName string, labels, annotations map[string]string) error {
 	strLabels, err := json.Marshal(labels)
 	if err != nil {
 		return err
@@ -59,6 +59,10 @@ func (b *BoltClient) SetContainer(containerId, sandboxId, image, rootImageSnapsh
 
 		bucket, err := parentBucket.CreateBucketIfNotExists([]byte(containerId))
 		if err != nil {
+			return err
+		}
+
+		if err := bucket.Put([]byte("name"), []byte(name)); err != nil {
 			return err
 		}
 
@@ -172,6 +176,11 @@ func (b *BoltClient) GetContainerInfo(containerId string) (*metadata.ContainerIn
 			return nil
 		}
 
+		name, err := getString(bucket, "name")
+		if err != nil {
+			return err
+		}
+
 		strCreatedAt, err := getString(bucket, "createdAt")
 		if err != nil {
 			return err
@@ -255,6 +264,7 @@ func (b *BoltClient) GetContainerInfo(containerId string) (*metadata.ContainerIn
 		}
 
 		containerInfo = &metadata.ContainerInfo{
+			Name:      name,
 			CreatedAt: createdAt,
 			StartedAt: startedAt,
 			SandboxId: sandboxId,

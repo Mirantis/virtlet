@@ -7,6 +7,7 @@ import (
 )
 
 type ContainerTestConfigSet struct {
+	Name                  string
 	SandboxId             string
 	ContainerId           string
 	Image                 string
@@ -29,24 +30,24 @@ func GetSandboxes(sandboxNum int) ([]*kubeapi.PodSandboxConfig, error) {
 		namespace := "default"
 		attempt := uint32(0)
 		metadata := &kubeapi.PodSandboxMetadata{
-			Name:      &name,
-			Uid:       &uid,
-			Namespace: &namespace,
-			Attempt:   &attempt,
+			Name:      name,
+			Uid:       uid,
+			Namespace: namespace,
+			Attempt:   attempt,
 		}
 
 		hostNetwork := false
 		hostPid := false
 		hostIpc := false
 		namespaceOptions := &kubeapi.NamespaceOption{
-			HostNetwork: &hostNetwork,
-			HostPid:     &hostPid,
-			HostIpc:     &hostIpc,
+			HostNetwork: hostNetwork,
+			HostPid:     hostPid,
+			HostIpc:     hostIpc,
 		}
 
 		cgroupParent := ""
 		linuxSandbox := &kubeapi.LinuxPodSandboxConfig{
-			CgroupParent: &cgroupParent,
+			CgroupParent: cgroupParent,
 			SecurityContext: &kubeapi.LinuxSandboxSecurityContext{
 				NamespaceOptions: namespaceOptions,
 			},
@@ -56,8 +57,8 @@ func GetSandboxes(sandboxNum int) ([]*kubeapi.PodSandboxConfig, error) {
 		logDirectory := "/var/log/test_log_directory"
 		sandboxConfig := &kubeapi.PodSandboxConfig{
 			Metadata:     metadata,
-			Hostname:     &hostname,
-			LogDirectory: &logDirectory,
+			Hostname:     hostname,
+			LogDirectory: logDirectory,
 			Labels: map[string]string{
 				"foo":  "bar",
 				"fizz": "buzz",
@@ -85,7 +86,8 @@ func GetContainersConfig(sandboxConfigs []*kubeapi.PodSandboxConfig) ([]*Contain
 			return nil, err
 		}
 		containerConf := &ContainerTestConfigSet{
-			SandboxId: *sandbox.Metadata.Uid,
+			Name:      "container-for-" + sandbox.Metadata.Name,
+			SandboxId: sandbox.Metadata.Uid,
 			Image:     "testImage",
 			RootImageSnapshotName: "sample_name",
 			ContainerId:           uid,

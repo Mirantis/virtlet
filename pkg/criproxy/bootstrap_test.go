@@ -39,12 +39,15 @@ import (
 	dockercontainer "github.com/docker/engine-api/types/container"
 
 	// TODO: use client-go
-	"k8s.io/kubernetes/pkg/api"
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/pkg/api/v1"
+	testingcore "k8s.io/client-go/testing"
+	k8sapi "k8s.io/kubernetes/pkg/api"
+	// testapi is needed to get default values in kubelet config
 	_ "k8s.io/kubernetes/pkg/api/testapi"
-	cfg "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
-	clientsetfake "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	testingcore "k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
+
+	cfg "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 )
 
 func getStruct(s interface{}) reflect.Value {
@@ -83,7 +86,7 @@ func mustMarshalJson(data interface{}) []byte {
 
 func TestPatchKubeletConfig(t *testing.T) {
 	var kubeCfg cfg.KubeletConfiguration
-	api.Scheme.Default(&kubeCfg)
+	k8sapi.Scheme.Default(&kubeCfg)
 	kubeCfg.CNIConfDir = "/etc/kubernetes/cni/net.d"
 	kubeCfg.CNIBinDir = "/usr/lib/kubernetes/cni/bin"
 
@@ -154,7 +157,7 @@ func TestPatchKubeletConfig(t *testing.T) {
 		t.Fatalf("invalid clientset actions: %s", spew.Sdump(actions))
 	}
 	o := actions[0].(testingcore.CreateAction).GetObject()
-	cfgMap, ok := o.(*api.ConfigMap)
+	cfgMap, ok := o.(*v1.ConfigMap)
 	if !ok || cfgMap.Name != "kubelet-samplenode" || cfgMap.Namespace != "kube-system" || cfgMap.Data["kubelet.config"] == "" {
 		t.Fatalf("invalid object created: %s", spew.Sdump(o))
 	}
@@ -165,7 +168,6 @@ func TestPatchKubeletConfig(t *testing.T) {
 	}
 
 	expectedDiff := map[string]interface{}{
-		"EnableCRI":             true,
 		"ContainerRuntime":      "remote",
 		"RemoteRuntimeEndpoint": "/run/criproxy.sock",
 		"RemoteImageEndpoint":   "/run/criproxy.sock",
