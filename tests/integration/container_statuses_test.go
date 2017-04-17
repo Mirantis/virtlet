@@ -59,7 +59,7 @@ func TestContainerStatuses(t *testing.T) {
 	imageServiceClient := kubeapi.NewImageServiceClient(manager.conn)
 
 	imageSpec := &kubeapi.ImageSpec{
-		Image: &imageCirrosUrl,
+		Image: imageCirrosUrl,
 	}
 
 	in := &kubeapi.PullImageRequest{
@@ -94,19 +94,19 @@ func TestContainerStatuses(t *testing.T) {
 
 	createContainerOut, err := runtimeServiceClient.CreateContainer(context.Background(), containerIn)
 	if err != nil {
-		t.Fatalf("Creating container %s failure: %v", *sandbox.Metadata.Name, err)
+		t.Fatalf("Creating container %s failure: %v", sandbox.Metadata.Name, err)
 	}
 	t.Logf("Container created Sandbox: %v\n", sandbox)
-	container.ContainerId = *createContainerOut.ContainerId
+	container.ContainerId = createContainerOut.ContainerId
 
-	_, err = runtimeServiceClient.StartContainer(context.Background(), &kubeapi.StartContainerRequest{ContainerId: &container.ContainerId})
+	_, err = runtimeServiceClient.StartContainer(context.Background(), &kubeapi.StartContainerRequest{ContainerId: container.ContainerId})
 	if err != nil {
 		t.Fatalf("Starting container %s failure: %v", container.ContainerId, err)
 	}
 
 	listContainersRequest := &kubeapi.ListContainersRequest{
 		Filter: &kubeapi.ContainerFilter{
-			Id: &container.ContainerId,
+			Id: container.ContainerId,
 		},
 	}
 
@@ -119,13 +119,13 @@ func TestContainerStatuses(t *testing.T) {
 		t.Errorf("Expected single container, instead got: %d", len(listContainersOut.Containers))
 	}
 
-	if *listContainersOut.Containers[0].Id != container.ContainerId {
+	if listContainersOut.Containers[0].Id != container.ContainerId {
 		t.Errorf("Didn't find expected container id %s in returned containers list %v", container.ContainerId, listContainersOut.Containers)
 	}
 
 	// Wait up to 20 seconds for container ready status
 	containerStatusRequest := &kubeapi.ContainerStatusRequest{
-		ContainerId: &container.ContainerId,
+		ContainerId: container.ContainerId,
 	}
 	err = utils.WaitLoop(func() (bool, error) {
 		status, err := runtimeServiceClient.ContainerStatus(context.Background(), containerStatusRequest)
@@ -133,7 +133,7 @@ func TestContainerStatuses(t *testing.T) {
 			return false, err
 		}
 
-		if status.GetStatus().GetState() == kubeapi.ContainerState_CONTAINER_RUNNING {
+		if status.GetStatus().State == kubeapi.ContainerState_CONTAINER_RUNNING {
 			return true, nil
 		}
 
@@ -146,7 +146,7 @@ func TestContainerStatuses(t *testing.T) {
 
 	// Stop container request
 	containerStopIn := &kubeapi.StopContainerRequest{
-		ContainerId: &containers[0].ContainerId,
+		ContainerId: containers[0].ContainerId,
 	}
 	_, err = runtimeServiceClient.StopContainer(context.Background(), containerStopIn)
 	if err != nil {
@@ -155,7 +155,7 @@ func TestContainerStatuses(t *testing.T) {
 
 	// Remove container request
 	containerRemoveIn := &kubeapi.RemoveContainerRequest{
-		ContainerId: &container.ContainerId,
+		ContainerId: container.ContainerId,
 	}
 	_, err = runtimeServiceClient.RemoveContainer(context.Background(), containerRemoveIn)
 	if err != nil {

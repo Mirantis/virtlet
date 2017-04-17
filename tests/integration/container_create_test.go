@@ -61,72 +61,72 @@ func TestContainerCreateStartListRemove(t *testing.T) {
 
 	filterTests := []struct {
 		containerFilter *kubeapi.ContainerFilter
-		expectedIds     []*string
+		expectedIds     []string
 	}{
 		{
 			containerFilter: &kubeapi.ContainerFilter{
-				Id: &containers[0].ContainerId,
+				Id: containers[0].ContainerId,
 			},
-			expectedIds: []*string{&containers[0].ContainerId},
+			expectedIds: []string{containers[0].ContainerId},
 		},
 		{
 			containerFilter: &kubeapi.ContainerFilter{
-				PodSandboxId: &containers[0].SandboxId,
+				PodSandboxId: containers[0].SandboxId,
 			},
-			expectedIds: []*string{&containers[0].ContainerId},
+			expectedIds: []string{containers[0].ContainerId},
 		},
 		{
 			containerFilter: &kubeapi.ContainerFilter{
-				PodSandboxId:  &containers[0].SandboxId,
+				PodSandboxId:  containers[0].SandboxId,
 				LabelSelector: map[string]string{"unique": "first", "common": "both"},
 			},
-			expectedIds: []*string{&containers[0].ContainerId},
+			expectedIds: []string{containers[0].ContainerId},
 		},
 		{
 			containerFilter: &kubeapi.ContainerFilter{
-				PodSandboxId:  &containers[0].SandboxId,
+				PodSandboxId:  containers[0].SandboxId,
 				LabelSelector: map[string]string{"unique": "nomatch"},
 			},
-			expectedIds: []*string{},
+			expectedIds: []string{},
 		},
 		{
 			containerFilter: &kubeapi.ContainerFilter{
-				Id:           &containers[0].ContainerId,
-				PodSandboxId: &containers[0].SandboxId,
+				Id:           containers[0].ContainerId,
+				PodSandboxId: containers[0].SandboxId,
 			},
-			expectedIds: []*string{&containers[0].ContainerId},
+			expectedIds: []string{containers[0].ContainerId},
 		},
 		{
 			containerFilter: &kubeapi.ContainerFilter{
-				Id:            &containers[0].ContainerId,
-				PodSandboxId:  &containers[0].SandboxId,
+				Id:            containers[0].ContainerId,
+				PodSandboxId:  containers[0].SandboxId,
 				LabelSelector: map[string]string{"unique": "first", "common": "both"},
 			},
-			expectedIds: []*string{&containers[0].ContainerId},
+			expectedIds: []string{containers[0].ContainerId},
 		},
 		{
 			containerFilter: &kubeapi.ContainerFilter{
-				Id:            &containers[0].ContainerId,
-				PodSandboxId:  &containers[0].SandboxId,
+				Id:            containers[0].ContainerId,
+				PodSandboxId:  containers[0].SandboxId,
 				LabelSelector: map[string]string{"unique": "nomatch"},
 			},
-			expectedIds: []*string{},
+			expectedIds: []string{},
 		},
 		{
 			containerFilter: &kubeapi.ContainerFilter{
 				LabelSelector: map[string]string{"unique": "first", "common": "both"},
 			},
-			expectedIds: []*string{&containers[0].ContainerId},
+			expectedIds: []string{containers[0].ContainerId},
 		},
 		{
 			containerFilter: &kubeapi.ContainerFilter{
 				LabelSelector: map[string]string{"common": "both"},
 			},
-			expectedIds: []*string{&containers[0].ContainerId, &containers[1].ContainerId},
+			expectedIds: []string{containers[0].ContainerId, containers[1].ContainerId},
 		},
 		{
 			containerFilter: &kubeapi.ContainerFilter{},
-			expectedIds:     []*string{&containers[0].ContainerId, &containers[1].ContainerId},
+			expectedIds:     []string{containers[0].ContainerId, containers[1].ContainerId},
 		},
 	}
 
@@ -134,8 +134,8 @@ func TestContainerCreateStartListRemove(t *testing.T) {
 	imageServiceClient := kubeapi.NewImageServiceClient(manager.conn)
 
 	imageSpecs := []*kubeapi.ImageSpec{
-		{Image: &imageCirrosUrl},
-		{Image: &imageCirrosUrl2},
+		{Image: imageCirrosUrl},
+		{Image: imageCirrosUrl2},
 	}
 
 	for _, ispec := range imageSpecs {
@@ -162,7 +162,7 @@ func TestContainerCreateStartListRemove(t *testing.T) {
 		hostPath := "/var/lib/virtlet"
 		config := &kubeapi.ContainerConfig{
 			Image:  imageSpecs[ind],
-			Mounts: []*kubeapi.Mount{{HostPath: &hostPath}},
+			Mounts: []*kubeapi.Mount{{HostPath: hostPath}},
 			Labels: containers[ind].Labels,
 			Metadata: &kubeapi.ContainerMetadata{
 				Name: sandboxes[ind].Metadata.Name,
@@ -176,19 +176,19 @@ func TestContainerCreateStartListRemove(t *testing.T) {
 
 		createContainerOut, err := runtimeServiceClient.CreateContainer(context.Background(), containerIn)
 		if err != nil {
-			t.Fatalf("Creating container %s failure: %v", *sandboxes[ind].Metadata.Name, err)
+			t.Fatalf("Creating container %s failure: %v", sandboxes[ind].Metadata.Name, err)
 		}
 		t.Logf("Container created Sandbox: %v\n", sandbox)
-		containers[ind].ContainerId = *createContainerOut.ContainerId
+		containers[ind].ContainerId = createContainerOut.ContainerId
 
-		_, err = runtimeServiceClient.StartContainer(context.Background(), &kubeapi.StartContainerRequest{ContainerId: &containers[ind].ContainerId})
+		_, err = runtimeServiceClient.StartContainer(context.Background(), &kubeapi.StartContainerRequest{ContainerId: containers[ind].ContainerId})
 		if err != nil {
 			t.Fatalf("Starting container %s failure: %v", containers[ind].ContainerId, err)
 		}
 
 		// Check attached volumes
-		vmName := *createContainerOut.ContainerId + "-" + *sandboxes[ind].Metadata.Name
-		cmd := "virsh domblklist " + vmName + " | grep " + *createContainerOut.ContainerId + "-vol.* | wc -l"
+		vmName := createContainerOut.ContainerId + "-" + sandboxes[ind].Metadata.Name
+		cmd := "virsh domblklist " + vmName + " | grep " + createContainerOut.ContainerId + "-vol.* | wc -l"
 		t.Logf("Formed CMD to lookup attached volumes: %s\n", cmd)
 		expRes := "0"
 		if _, exists := sandbox.Annotations["VirtletVolumes"]; exists {
@@ -218,20 +218,20 @@ func TestContainerCreateStartListRemove(t *testing.T) {
 		for _, id := range tc.expectedIds {
 			found := false
 			for _, container := range listContainersOut.Containers {
-				if *container.Id == *id {
+				if container.Id == id {
 					found = true
 					break
 				}
 			}
 			if !found {
-				t.Errorf("Didn't find expected sandbox id %s in returned containers list %v", *id, listContainersOut.Containers)
+				t.Errorf("Didn't find expected sandbox id %s in returned containers list %v", id, listContainersOut.Containers)
 			}
 		}
 	}
 	for _, container := range containers {
 		// Stop container request
 		containerStopIn := &kubeapi.StopContainerRequest{
-			ContainerId: &container.ContainerId,
+			ContainerId: container.ContainerId,
 		}
 		_, err = runtimeServiceClient.StopContainer(context.Background(), containerStopIn)
 		if err != nil {
@@ -240,7 +240,7 @@ func TestContainerCreateStartListRemove(t *testing.T) {
 
 		// Remove container request
 		containerRemoveIn := &kubeapi.RemoveContainerRequest{
-			ContainerId: &container.ContainerId,
+			ContainerId: container.ContainerId,
 		}
 		_, err = runtimeServiceClient.RemoveContainer(context.Background(), containerRemoveIn)
 		if err != nil {

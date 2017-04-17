@@ -57,13 +57,15 @@ func TestRemovePodSandbox(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		uid := ""
 		if tc.sandbox != nil {
+			uid = tc.sandbox.GetMetadata().Uid
 			if err := b.SetPodSandbox(tc.sandbox, []byte{}); err != nil {
 				t.Fatal(err)
 			}
 		}
 		dumpDB(t, b.db)
-		if err := b.RemovePodSandbox(tc.sandbox.GetMetadata().GetUid()); err != nil {
+		if err := b.RemovePodSandbox(uid); err != nil {
 			if tc.error {
 				continue
 			}
@@ -82,12 +84,12 @@ func TestSetGetPodSandboxStatus(t *testing.T) {
 	b := SetUpBolt(t, sandboxes, []*criapi.ContainerTestConfigSet{})
 
 	for _, sandbox := range sandboxes {
-		status, err := b.GetPodSandboxStatus(sandbox.GetMetadata().GetUid())
+		status, err := b.GetPodSandboxStatus(sandbox.GetMetadata().Uid)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if status.GetState() != kubeapi.PodSandboxState_SANDBOX_READY {
+		if status.State != kubeapi.PodSandboxState_SANDBOX_READY {
 			t.Errorf("Sandbox state not ready")
 		}
 
@@ -99,8 +101,8 @@ func TestSetGetPodSandboxStatus(t *testing.T) {
 			t.Errorf("Expected %v, instead got %v", sandbox.GetAnnotations(), status.GetAnnotations())
 		}
 
-		if status.GetMetadata().GetName() != sandbox.GetMetadata().GetName() {
-			t.Errorf("Expected %s, instead got %s", sandbox.GetMetadata().GetName(), status.GetMetadata().GetName())
+		if status.GetMetadata().Name != sandbox.GetMetadata().Name {
+			t.Errorf("Expected %s, instead got %s", sandbox.GetMetadata().Name, status.GetMetadata().Name)
 		}
 	}
 }
@@ -127,23 +129,23 @@ func TestListPodSandbox(t *testing.T) {
 	}{
 		{
 			filter:      &kubeapi.PodSandboxFilter{},
-			expectedIds: []string{*firstSandboxConfig.Metadata.Uid, *secondSandboxConfig.Metadata.Uid},
+			expectedIds: []string{firstSandboxConfig.Metadata.Uid, secondSandboxConfig.Metadata.Uid},
 		},
 		{
 			filter: &kubeapi.PodSandboxFilter{
 				Id: firstSandboxConfig.Metadata.Uid,
 			},
-			expectedIds: []string{*firstSandboxConfig.Metadata.Uid},
+			expectedIds: []string{firstSandboxConfig.Metadata.Uid},
 		},
 		{
 			filter: &kubeapi.PodSandboxFilter{
-				State: &stateReady,
+				State: &kubeapi.PodSandboxStateValue{State: stateReady},
 			},
-			expectedIds: []string{*firstSandboxConfig.Metadata.Uid, *secondSandboxConfig.Metadata.Uid},
+			expectedIds: []string{firstSandboxConfig.Metadata.Uid, secondSandboxConfig.Metadata.Uid},
 		},
 		{
 			filter: &kubeapi.PodSandboxFilter{
-				State: &stateNotReady,
+				State: &kubeapi.PodSandboxStateValue{State: stateNotReady},
 			},
 			expectedIds: []string{},
 		},
@@ -151,19 +153,19 @@ func TestListPodSandbox(t *testing.T) {
 			filter: &kubeapi.PodSandboxFilter{
 				LabelSelector: map[string]string{"unique": "first"},
 			},
-			expectedIds: []string{*firstSandboxConfig.Metadata.Uid},
+			expectedIds: []string{firstSandboxConfig.Metadata.Uid},
 		},
 		{
 			filter: &kubeapi.PodSandboxFilter{
 				LabelSelector: map[string]string{"common": "both"},
 			},
-			expectedIds: []string{*firstSandboxConfig.Metadata.Uid, *secondSandboxConfig.Metadata.Uid},
+			expectedIds: []string{firstSandboxConfig.Metadata.Uid, secondSandboxConfig.Metadata.Uid},
 		},
 		{
 			filter: &kubeapi.PodSandboxFilter{
 				LabelSelector: map[string]string{"unique": "second", "common": "both"},
 			},
-			expectedIds: []string{*secondSandboxConfig.Metadata.Uid},
+			expectedIds: []string{secondSandboxConfig.Metadata.Uid},
 		},
 		{
 			filter: &kubeapi.PodSandboxFilter{
@@ -177,14 +179,14 @@ func TestListPodSandbox(t *testing.T) {
 				Id:            firstSandboxConfig.Metadata.Uid,
 				LabelSelector: map[string]string{"unique": "first", "common": "both"},
 			},
-			expectedIds: []string{*firstSandboxConfig.Metadata.Uid},
+			expectedIds: []string{firstSandboxConfig.Metadata.Uid},
 		},
 		{
 			filter: &kubeapi.PodSandboxFilter{
 				Id:            firstSandboxConfig.Metadata.Uid,
 				LabelSelector: map[string]string{"common": "both"},
 			},
-			expectedIds: []string{*firstSandboxConfig.Metadata.Uid},
+			expectedIds: []string{firstSandboxConfig.Metadata.Uid},
 		},
 	}
 
@@ -203,7 +205,7 @@ func TestListPodSandbox(t *testing.T) {
 		for _, id := range tc.expectedIds {
 			found := false
 			for _, podSandbox := range sandboxes {
-				if id == *podSandbox.Id {
+				if id == podSandbox.Id {
 					found = true
 					break
 				}

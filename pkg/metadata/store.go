@@ -22,6 +22,7 @@ import (
 
 // ContainerInfo contains metadata informations about container instance
 type ContainerInfo struct {
+	Name                  string
 	CreatedAt             int64
 	StartedAt             int64
 	SandboxId             string
@@ -54,7 +55,7 @@ type SandboxMetadataStore interface {
 
 // ContainerMetadataStore contains methods to operate on containers (VMs)
 type ContainerMetadataStore interface {
-	SetContainer(containerId, sandboxId, image, rootImageSnapshotName string, labels, annotations map[string]string) error
+	SetContainer(name, containerId, sandboxId, image, rootImageSnapshotName string, labels, annotations map[string]string) error
 	UpdateStartedAt(containerId string, startedAt string) error
 	UpdateState(containerId string, state byte) error
 	GetContainerInfo(containerId string) (*ContainerInfo, error)

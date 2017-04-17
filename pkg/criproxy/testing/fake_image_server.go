@@ -60,8 +60,8 @@ func NewFakeImageServer(journal Journal) *FakeImageServer {
 
 func (r *FakeImageServer) makeFakeImage(image string) *runtimeapi.Image {
 	return &runtimeapi.Image{
-		Id:       &image,
-		Size_:    &r.FakeImageSize,
+		Id:       image,
+		Size_:    r.FakeImageSize,
 		RepoTags: []string{image},
 	}
 }
@@ -81,9 +81,10 @@ func (r *FakeImageServer) ListImages(ctx context.Context, in *runtimeapi.ListIma
 	filter := in.GetFilter()
 	images := make([]*runtimeapi.Image, 0)
 	for _, name := range imageNames {
-		img := r.Images[name]
+		// make a copy of the image struct
+		img := *r.Images[name]
 		if filter != nil && filter.Image != nil {
-			imageName := filter.Image.GetImage()
+			imageName := filter.Image.Image
 			found := false
 			for _, tag := range img.RepoTags {
 				if imageName == tag {
@@ -96,7 +97,7 @@ func (r *FakeImageServer) ListImages(ctx context.Context, in *runtimeapi.ListIma
 			}
 		}
 
-		images = append(images, img)
+		images = append(images, &img)
 	}
 	return &runtimeapi.ListImagesResponse{Images: images}, nil
 }
@@ -108,7 +109,9 @@ func (r *FakeImageServer) ImageStatus(ctx context.Context, in *runtimeapi.ImageS
 	r.journal.Record("ImageStatus")
 
 	image := in.GetImage()
-	return &runtimeapi.ImageStatusResponse{Image: r.Images[image.GetImage()]}, nil
+	// make a copy of the image struct
+	img := *r.Images[image.Image]
+	return &runtimeapi.ImageStatusResponse{Image: &img}, nil
 }
 
 func (r *FakeImageServer) PullImage(ctx context.Context, in *runtimeapi.PullImageRequest) (*runtimeapi.PullImageResponse, error) {
@@ -120,9 +123,9 @@ func (r *FakeImageServer) PullImage(ctx context.Context, in *runtimeapi.PullImag
 	// ImageID should be randomized for real container runtime, but here just use
 	// image's name for easily making fake images.
 	image := in.GetImage()
-	imageID := image.GetImage()
+	imageID := image.Image
 	if _, ok := r.Images[imageID]; !ok {
-		r.Images[imageID] = r.makeFakeImage(image.GetImage())
+		r.Images[imageID] = r.makeFakeImage(image.Image)
 	}
 
 	return &runtimeapi.PullImageResponse{}, nil
@@ -136,7 +139,7 @@ func (r *FakeImageServer) RemoveImage(ctx context.Context, in *runtimeapi.Remove
 
 	// Remove the image
 	image := in.GetImage()
-	delete(r.Images, image.GetImage())
+	delete(r.Images, image.Image)
 
 	return &runtimeapi.RemoveImageResponse{}, nil
 }

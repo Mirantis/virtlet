@@ -112,16 +112,28 @@ func StartDockerShim(kubeCfg *cfg.KubeletConfiguration) (string, error) {
 		PluginBinDir:      cniBinDir,
 		MTU:               int(kubeCfg.NetworkPluginMTU),
 	}
-	dockerClient := dockertools.ConnectToDockerOrDie(kubeCfg.DockerEndpoint, kubeCfg.RuntimeRequestTimeout.Duration)
+	dockerClient := dockertools.ConnectToDockerOrDie(kubeCfg.DockerEndpoint, kubeCfg.RuntimeRequestTimeout.Duration, kubeCfg.ImagePullProgressDeadline.Duration)
 
 	streamingConfig := &streaming.Config{
-		Addr:                  streamingAddr + ":12345", // FIXME
-		StreamIdleTimeout:     kubeCfg.StreamingConnectionIdleTimeout.Duration,
-		StreamCreationTimeout: streaming.DefaultConfig.StreamCreationTimeout,
-		SupportedProtocols:    streaming.DefaultConfig.SupportedProtocols,
+		Addr:                            streamingAddr + ":12345", // FIXME
+		StreamIdleTimeout:               kubeCfg.StreamingConnectionIdleTimeout.Duration,
+		StreamCreationTimeout:           streaming.DefaultConfig.StreamCreationTimeout,
+		SupportedRemoteCommandProtocols: streaming.DefaultConfig.SupportedRemoteCommandProtocols,
+		SupportedPortForwardProtocols:   streaming.DefaultConfig.SupportedPortForwardProtocols,
 	}
 
-	ds, err := dockershim.NewDockerService(dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage, streamingConfig, &pluginSettings, kubeCfg.RuntimeCgroups)
+	var dockerExecHandler dockertools.ExecHandler
+	switch kubeCfg.DockerExecHandlerName {
+	case "native":
+		dockerExecHandler = &dockertools.NativeExecHandler{}
+	case "nsenter":
+		dockerExecHandler = &dockertools.NsenterExecHandler{}
+	default:
+		glog.Warningf("Unknown Docker exec handler %q; defaulting to native", kubeCfg.DockerExecHandlerName)
+		dockerExecHandler = &dockertools.NativeExecHandler{}
+	}
+
+	ds, err := dockershim.NewDockerService(dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage, streamingConfig, &pluginSettings, kubeCfg.RuntimeCgroups, kubeCfg.CgroupDriver, dockerExecHandler)
 	if err != nil {
 		return "", err
 	}

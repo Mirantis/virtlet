@@ -41,10 +41,12 @@ import (
 
 	// FIXME: use client-go
 	// In particular, see https://github.com/kubernetes/client-go/blob/master/examples/in-cluster/main.go
-	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/rest"
+
 	cfg "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
 const (
@@ -113,7 +115,7 @@ type BootstrapConfig struct {
 
 type Bootstrap struct {
 	config     *BootstrapConfig
-	clientset  clientset.Interface
+	clientset  kubernetes.Interface
 	kubeletCfg map[string]interface{}
 }
 
@@ -121,7 +123,7 @@ type Bootstrap struct {
 // bootstrap using the specified BootstrapConfig. cs argument
 // is used to pass a fake Clientset during tests, it should
 // be nil when performing real bootstrap.
-func NewBootstrap(config *BootstrapConfig, cs clientset.Interface) *Bootstrap {
+func NewBootstrap(config *BootstrapConfig, cs kubernetes.Interface) *Bootstrap {
 	return &Bootstrap{config: config, clientset: cs}
 }
 
@@ -169,13 +171,13 @@ func (b *Bootstrap) getNodeNameFromKubelet() (string, error) {
 	return nodeName, nil
 }
 
-func (b *Bootstrap) buildConfigMap(nodeName string) *api.ConfigMap {
+func (b *Bootstrap) buildConfigMap(nodeName string) *v1.ConfigMap {
 	text, err := json.Marshal(b.kubeletCfg)
 	if err != nil {
 		log.Panicf("Couldn't marshal kubelet config: %v", err)
 	}
-	return &api.ConfigMap{
-		ObjectMeta: api.ObjectMeta{
+	return &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "kubelet-" + nodeName,
 			Namespace: "kube-system",
 		},
@@ -185,7 +187,7 @@ func (b *Bootstrap) buildConfigMap(nodeName string) *api.ConfigMap {
 	}
 }
 
-func (b *Bootstrap) putConfigMap(configMap *api.ConfigMap) error {
+func (b *Bootstrap) putConfigMap(configMap *v1.ConfigMap) error {
 	glog.V(1).Infof("Putting ConfigMap %q in namespace %q", configMap.Name, configMap.Namespace)
 	_, err := b.clientset.Core().ConfigMaps("kube-system").Create(configMap)
 	return err
@@ -310,16 +312,16 @@ func (b *Bootstrap) installCriProxyContainer(dockerEndpoint, endpointToPass stri
 
 func (b *Bootstrap) initClientset() error {
 	var err error
-	var config *restclient.Config
+	var config *rest.Config
 	if b.config.ApiServerHost == "" {
-		config, err = restclient.InClusterConfig()
+		config, err = rest.InClusterConfig()
 		if err != nil {
 			return fmt.Errorf("failed to get REST client config: %v", err)
 		}
 	} else {
-		config = &restclient.Config{Host: b.config.ApiServerHost}
+		config = &rest.Config{Host: b.config.ApiServerHost}
 	}
-	b.clientset, err = clientset.NewForConfig(config)
+	b.clientset, err = kubernetes.NewForConfig(config)
 	if err != nil {
 		return fmt.Errorf("failed to create ClientSet: %v", err)
 	}
@@ -345,6 +347,10 @@ func (b *Bootstrap) EnsureCRIProxy() (bool, error) {
 	if err := b.obtainKubeletConfig(); err != nil {
 		return false, err
 	}
+
+	// XXX FIX THIS!!!!
+	// ONLY FOR DIND!!!
+	b.kubeletCfg["enforceNodeAllocatable"] = []string{}
 
 	// Need to have kubelet config saved at this point
 	// so it can be used by the container below.

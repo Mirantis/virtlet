@@ -2,7 +2,7 @@
 
 CRI Proxy makes it possible to run several CRI implementations on the
 same node. It also includes in-process docker-shim which is currently
-imported from k8s 1.5 code. CRI Proxy isn't tied to Virtlet in the
+imported from k8s 1.6 code. CRI Proxy isn't tied to Virtlet in the
 sense that it can be used with other runtimes, too. Docker-shim usage
 is also optional.
 

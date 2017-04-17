@@ -64,7 +64,7 @@ spec:
               "image": "mirantis/virtlet",
               "imagePullPolicy": "IfNotPresent",
               "securityContext": { "privileged": true },
-              "command": ["/bin/sh", "-c", "if [ -f /etc/criproxy/kubelet.conf ]; then exit 0; fi; if [ ! -f /opt/criproxy/bin/criproxy ]; then mkdir -p /opt/criproxy/bin; cp /criproxy /opt/criproxy/bin/criproxy; fi; /opt/criproxy/bin/criproxy -alsologtostderr -v 20 -install >> /hostlog/criproxy-bootstrap.log 2>&1 && sleep Infinity"],
+              "command": ["/bin/sh", "-c", "ln -fs /dind/criproxy /criproxy; if [ -f /etc/criproxy/kubelet.conf ]; then exit 0; fi; if [ ! -f /opt/criproxy/bin/criproxy ]; then mkdir -p /opt/criproxy/bin; cp /criproxy /opt/criproxy/bin/criproxy; fi; /opt/criproxy/bin/criproxy -alsologtostderr -v 20 -install >> /hostlog/criproxy-bootstrap.log 2>&1 && sleep Infinity"],
               "volumeMounts": [
                 {
                   "name": "criproxybin",
@@ -87,8 +87,8 @@ spec:
                   "mountPath": "/hostlog"
                 },
                 {
-                  "name": "criproxy-dev-bin",
-                  "mountPath": "/criproxy"
+                  "name": "dind",
+                  "mountPath": "/dind"
                 }
               ]
             }
@@ -134,12 +134,8 @@ spec:
           name: cnibin
         - mountPath: /var/lib/cni
           name: cnidata
-        - mountPath: /usr/local/bin/virtlet
-          name: virtlet-dev-bin
-        - mountPath: /vmwrapper
-          name: vmwrapper-dev-bin
-        - mountPath: /flexvolume_driver
-          name: flexvolume-libvirt-driver-dev-bin
+        - mountPath: /dind
+          name: dind
         - mountPath: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
           name: k8s-flexvolume-plugins-dir
         - mountPath: /var/lib/kubelet/pods
@@ -198,20 +194,11 @@ spec:
           path: /var/log
         name: log
       - hostPath:
-          path: /dind/virtlet
-        name: virtlet-dev-bin
-      - hostPath:
-          path: /dind/vmwrapper
-        name: vmwrapper-dev-bin
-      - hostPath:
-          path: /dind/criproxy
-        name: criproxy-dev-bin
-      - hostPath:
-          path: /dind/flexvolume_driver
-        name: flexvolume-libvirt-driver-dev-bin
-      - hostPath:
-          path: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
-        name: k8s-flexvolume-plugins-dir
+          path: /dind
+        name: dind
       - hostPath:
           path: /var/lib/kubelet/pods
         name: k8s-pods-dir
+      - hostPath:
+          path: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
+        name: k8s-flexvolume-plugins-dir

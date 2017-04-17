@@ -8,7 +8,7 @@ set -o errtrace
 NONINTERACTIVE="${NONINTERACTIVE:-}"
 NO_VM_CONSOLE="${NO_VM_CONSOLE:-}"
 INJECT_LOCAL_IMAGE="${INJECT_LOCAL_IMAGE:-}"
-dind_script="dind-cluster-v1.5.sh"
+dind_script="dind-cluster-v1.6.sh"
 kubectl="${HOME}/.kubeadm-dind-cluster/kubectl"
 BASE_LOCATION="${BASE_LOCATION:-https://raw.githubusercontent.com/Mirantis/virtlet/master/}"
 # Convenience setting for local testing:
@@ -40,7 +40,7 @@ function demo::get-dind-cluster {
   if [[ -f ${dind_script} ]]; then
     return 0
   fi
-  demo::step "Will download dind-cluster-v1.5.sh into current directory"
+  demo::step "Will download dind-cluster-v1.6.sh into current directory"
   demo::ask-before-continuing
   wget "https://raw.githubusercontent.com/Mirantis/kubeadm-dind-cluster/master/fixed/${dind_script}"
   chmod +x "${dind_script}"
@@ -51,7 +51,7 @@ function demo::start-dind-cluster {
   if [[ ! ${NONINTERACTIVE} ]]; then
     echo "VM console will be attached after Virtlet setup is complete, press Ctrl-] to detach." >&2
   fi
-  echo "To clean up the cluster, use './dind-cluster-v1.5.sh clean'" >&2
+  echo "To clean up the cluster, use './dind-cluster-v1.6.sh clean'" >&2
   demo::ask-before-continuing
   "./${dind_script}" clean
   "./${dind_script}" up
@@ -176,7 +176,7 @@ can be used to detach from it.
 Use 'curl http://nginx.default.svc.cluster.local' from VM console to test
 cluster networking.
 
-To clean up the cluster, use './dind-cluster-v1.5.sh clean'
+To clean up the cluster, use './dind-cluster-v1.6.sh clean'
 [1] https://github.com/Mirantis/virtlet
 [2] https://github.com/Mirantis/kubeadm-dind-cluster
 EOF
