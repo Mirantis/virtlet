@@ -348,9 +348,14 @@ func (b *Bootstrap) EnsureCRIProxy() (bool, error) {
 		return false, err
 	}
 
-	// XXX FIX THIS!!!!
-	// ONLY FOR DIND!!!
-	b.kubeletCfg["enforceNodeAllocatable"] = []string{}
+	// Work around the problem with serialization of enforceNodeAllocatable option.
+	// See https://github.com/kubernetes/kubernetes/pull/44606 for more details.
+	if b.kubeletCfg["enforceNodeAllocatable"] == nil {
+		cgroupsPerQOS, ok := b.kubeletCfg["cgroupsPerQOS"].(bool)
+		if ok && !cgroupsPerQOS {
+			b.kubeletCfg["enforceNodeAllocatable"] = []string{}
+		}
+	}
 
 	// Need to have kubelet config saved at this point
 	// so it can be used by the container below.
