@@ -133,12 +133,12 @@ function demo::kvm-ok {
 }
 
 function demo::start-virtlet {
-  local jq_filter='.items[1].spec.template.spec.containers[0].env|=.+[{"name": "VIRTLET_DOWNLOAD_PROTOCOL","value":"http"}]'
+  local jq_filter='.items[0].spec.template.spec.containers[0].env|=.+[{"name": "VIRTLET_DOWNLOAD_PROTOCOL","value":"http"}]'
   if demo::kvm-ok; then
     demo::step "Deploying Virtlet DaemonSet with KVM support"
   else
     demo::step "Deploying Virtlet DaemonSet *without* KVM support"
-    jq_filter="${jq_filter}"'|.items[1].spec.template.spec.containers[0].env|=.+[{"name": "VIRTLET_DISABLE_KVM","value":"y"}]'
+    jq_filter="${jq_filter}"'|.items[0].spec.template.spec.containers[0].env|=.+[{"name": "VIRTLET_DISABLE_KVM","value":"y"}]'
   fi
   "${kubectl}" convert -f "${BASE_LOCATION}/deploy/virtlet-ds.yaml" --local -o json |
       docker exec -i kube-master jq "${jq_filter}" |
