@@ -10,91 +10,58 @@ spec:
       name: virtlet
       labels:
         runtime: virtlet
-      annotations:
-        scheduler.alpha.kubernetes.io/affinity: >
-          {
-            "nodeAffinity": {
-              "requiredDuringSchedulingIgnoredDuringExecution": {
-                "nodeSelectorTerms": [
-                  {
-                    "matchExpressions": [
-                      {
-                        "key": "extraRuntime",
-                        "operator": "In",
-                        "values": ["virtlet"]
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-          }
-        # The init container "deploy-flexvolume" copies flexvolume libvirt driver
-        # to default kubelet's plugin dir to have it in place on kubelet initialization.
-
-        # The init container "bootstrap" checks if there's already saved kubelet config
-        # and considers that bootstrap is already done if it exists.
-        # If it doesn't, it drops criproxy binary into /opt/criproxy/bin/
-        # if it's not already there and then starts criproxy installation.
-        # The possibility to put criproxy binary in advance into
-        # /opt/criproxy/bin may be helpful for the purpose of
-        # debugging criproxy.
-        pod.beta.kubernetes.io/init-containers: >
-          [
-            {
-              "name": "deploy-flexvolume",
-              "image": "mirantis/virtlet",
-              "imagePullPolicy": "IfNotPresent",
-              "command": ["/bin/sh", "-c", "PLUGIN_DIR=/kubelet-volume-plugins/virtlet~flexvolume_driver; if [ ! -d ${PLUGIN_DIR} ]; then mkdir ${PLUGIN_DIR} && cp /flexvolume_driver ${PLUGIN_DIR}/flexvolume_driver; fi"],
-              "volumeMounts": [
-                {
-                  "name": "k8s-flexvolume-plugins-dir",
-                  "mountPath": "/kubelet-volume-plugins"
-                }
-              ]
-            },
-            {
-              "name": "bootstrap",
-              "image": "mirantis/virtlet",
-              "imagePullPolicy": "IfNotPresent",
-              "securityContext": { "privileged": true },
-              "command": ["/bin/sh", "-c", "ln -fs /dind/criproxy /criproxy; if [ -f /etc/criproxy/kubelet.conf ]; then exit 0; fi; if [ ! -f /opt/criproxy/bin/criproxy ]; then mkdir -p /opt/criproxy/bin; cp /criproxy /opt/criproxy/bin/criproxy; fi; /opt/criproxy/bin/criproxy -alsologtostderr -v 20 -install >> /hostlog/criproxy-bootstrap.log 2>&1 && sleep Infinity"],
-              "volumeMounts": [
-                {
-                  "name": "criproxybin",
-                  "mountPath": "/opt/criproxy/bin"
-                },
-                {
-                  "name": "run",
-                  "mountPath": "/run"
-                },
-                {
-                  "name": "dockersock",
-                  "mountPath": "/var/run/docker.sock"
-                },
-                {
-                  "name": "criproxyconf",
-                  "mountPath": "/etc/criproxy"
-                },
-                {
-                  "name": "log",
-                  "mountPath": "/hostlog"
-                },
-                {
-                  "name": "dind",
-                  "mountPath": "/dind"
-                }
-              ]
-            }
-          ]
     spec:
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       # hostPID is true to (1) enable VMs to survive virtlet container restart
       # (to be checked) and (2) to enable the use of nsenter in init container
       hostPID: true
-      # bootstrap procedure needs admin access to apiserver
+      # bootstrap procedure needs to create a configmap in kube-system namespace
       serviceAccountName: virtlet
+
+      # only run Virtlet pods on the nodes with extraRuntime=virtlet label
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: extraRuntime
+                operator: In
+                values:
+                - virtlet
+
+      initContainers:
+      # The init container first copies virtlet's flexvolume driver
+      # to the default kubelet plugin dir to have it in the proper place by the
+      # time kubelet is restarted by CRI proxy bootstrap procedure.
+      # After that it checks if there's already saved kubelet config
+      # and considers that CRI proxy bootstrap is already done if it exists.
+      # If it doesn't, it drops criproxy binary into /opt/criproxy/bin
+      # if it's not already there and then starts criproxy installation.
+      # The possibility to put criproxy binary in advance into
+      # /opt/criproxy/bin may be helpful for the purpose of
+      # debugging criproxy
+      - name: prepare-node
+        image: mirantis/virtlet
+        imagePullPolicy: IfNotPresent
+        command:
+        - /prepare-node.sh
+        volumeMounts:
+        - name: k8s-flexvolume-plugins-dir
+          mountPath: /kubelet-volume-plugins
+        - name: criproxybin
+          mountPath: /opt/criproxy/bin
+        - name: run
+          mountPath: /run
+        - name: dockersock
+          mountPath: /var/run/docker.sock
+        - name: criproxyconf
+          mountPath: /etc/criproxy
+        - name: log
+          mountPath: /hostlog
+        - name: dind
+          mountPath: /dind
+
       containers:
       - name: virtlet
         image: mirantis/virtlet
