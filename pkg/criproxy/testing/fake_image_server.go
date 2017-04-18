@@ -128,7 +128,7 @@ func (r *FakeImageServer) PullImage(ctx context.Context, in *runtimeapi.PullImag
 		r.Images[imageID] = r.makeFakeImage(image.Image)
 	}
 
-	return &runtimeapi.PullImageResponse{}, nil
+	return &runtimeapi.PullImageResponse{ImageRef: imageID}, nil
 }
 
 func (r *FakeImageServer) RemoveImage(ctx context.Context, in *runtimeapi.RemoveImageRequest) (*runtimeapi.RemoveImageResponse, error) {

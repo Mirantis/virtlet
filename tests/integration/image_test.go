@@ -51,8 +51,10 @@ func (it *imageTester) pullImage() {
 		SandboxConfig: &kubeapi.PodSandboxConfig{},
 	}
 
-	if _, err := it.imageServiceClient.PullImage(context.Background(), in); err != nil {
+	if resp, err := it.imageServiceClient.PullImage(context.Background(), in); err != nil {
 		it.t.Fatalf("PullImage() failed: %v", err)
+	} else if resp.ImageRef != imageSpec.Image {
+		it.t.Fatalf("PullImage(): bad ImageRef in the response: %q instead of %q", resp.ImageRef, imageSpec)
 	}
 }
 
