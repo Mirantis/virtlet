@@ -138,6 +138,10 @@ func TestPatchKubeletConfig(t *testing.T) {
 		t.Fatalf("loadKubeletConfig: %v", err)
 	}
 
+	if b.kubeletReadyAfterPatch() {
+		t.Errorf("kubelet readiness indicated too early")
+	}
+
 	if err := b.patchKubeletConfig(); err != nil {
 		t.Fatalf("patchKubeletConfig(): %v", err)
 	}
@@ -185,6 +189,11 @@ func TestPatchKubeletConfig(t *testing.T) {
 		t.Errorf("needToPatch(): %v", err)
 	} else if needToPatch {
 		t.Errorf("needToPatch() reports the need to patch for the patched config")
+	}
+
+	kubeCfg = newKubeCfg
+	if !b.kubeletReadyAfterPatch() {
+		t.Errorf("kubelet readiness not inidicated")
 	}
 }
 

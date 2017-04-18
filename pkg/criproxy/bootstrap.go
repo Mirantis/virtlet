@@ -52,10 +52,11 @@ import (
 const (
 	BusyboxImageName = "busybox:1.26.2"
 	// TODO: use the same constant/setting in different parts of code
-	proxyRuntimeEndpoint    = "/run/criproxy.sock"
-	proxyStopTimeoutSeconds = 5
-	confFileMode            = 0600
-	confDirMode             = 0700
+	proxyRuntimeEndpoint      = "/run/criproxy.sock"
+	proxyStopTimeoutSeconds   = 5
+	confFileMode              = 0600
+	confDirMode               = 0700
+	kubeletConfigPollInterval = 1 * time.Second
 )
 
 var kubeletSettingsForCriProxy map[string]interface{} = map[string]interface{}{
@@ -103,6 +104,15 @@ func writeJson(data interface{}, file string) error {
 	return nil
 }
 
+func kubeletConfigUpdated(kubeletCfg map[string]interface{}) bool {
+	for k, v := range kubeletSettingsForCriProxy {
+		if kubeletCfg[k] != v {
+			return false
+		}
+	}
+	return true
+}
+
 type BootstrapConfig struct {
 	ApiServerHost   string
 	ConfigzBaseUrl  string
@@ -127,26 +137,36 @@ func NewBootstrap(config *BootstrapConfig, cs kubernetes.Interface) *Bootstrap {
 	return &Bootstrap{config: config, clientset: cs}
 }
 
-func (b *Bootstrap) obtainKubeletConfig() error {
+func (b *Bootstrap) retrieveKubeletConfig() (map[string]interface{}, error) {
 	cfg, err := loadJson(b.config.ConfigzBaseUrl, "/configz")
+	if err != nil {
+		return nil, err
+	}
+	var ok bool
+	var kubeletCfg map[string]interface{}
+	kubeletCfg, ok = cfg["componentconfig"].(map[string]interface{})
+	if !ok {
+		return nil, errors.New("couldn't get componentconfig from /configz")
+	}
+	return kubeletCfg, nil
+}
+
+func (b *Bootstrap) obtainKubeletConfig() error {
+	kubeletCfg, err := b.retrieveKubeletConfig()
 	if err != nil {
 		return err
 	}
-	var ok bool
-	b.kubeletCfg, ok = cfg["componentconfig"].(map[string]interface{})
-	if !ok {
-		return errors.New("couldn't get componentconfig from /configz")
-	}
+	b.kubeletCfg = kubeletCfg
 	return nil
 }
 
-func (b *Bootstrap) kubeletUpdated() bool {
-	for k, v := range kubeletSettingsForCriProxy {
-		if b.kubeletCfg[k] != v {
-			return false
-		}
+func (b *Bootstrap) kubeletReadyAfterPatch() bool {
+	kubeletCfg, err := b.retrieveKubeletConfig()
+	if err != nil {
+		glog.V(2).Infof("can't retrieve kubelet config yet: %v", err)
+		return false
 	}
-	return true
+	return kubeletConfigUpdated(kubeletCfg)
 }
 
 func (b *Bootstrap) updateKubeletConfig() {
@@ -228,7 +248,7 @@ func (b *Bootstrap) deleteSavedKubeletConfig() {
 }
 
 func (b *Bootstrap) patchKubeletConfig() error {
-	if b.kubeletUpdated() {
+	if kubeletConfigUpdated(b.kubeletCfg) {
 		return fmt.Errorf("kubelet already configured for CRI, but no saved config")
 	}
 	b.updateKubeletConfig()
@@ -390,6 +410,13 @@ func (b *Bootstrap) EnsureCRIProxy() (bool, error) {
 	}
 	if err := b.patchKubeletConfig(); err != nil {
 		return false, err
+	}
+
+	for {
+		time.Sleep(kubeletConfigPollInterval)
+		if b.kubeletReadyAfterPatch() {
+			break
+		}
 	}
 
 	glog.V(1).Info("CRI proxy bootstrap complete")

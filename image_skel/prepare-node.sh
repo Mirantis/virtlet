@@ -27,5 +27,4 @@ if [[ ! -f /etc/criproxy/kubelet.conf ]]; then
     fi
   fi
   "${CRIPROXY_DEST}" -alsologtostderr -v 20 -install >> "${BOOTSTRAP_LOG}" 2>&1
-  sleep 10
 fi
