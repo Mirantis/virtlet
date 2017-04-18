@@ -85,6 +85,7 @@ spec:
           ]
     spec:
       hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
       # hostPID is true to (1) enable VMs to survive virtlet container restart
       # (to be checked) and (2) to enable the use of nsenter in init container
       hostPID: true
@@ -93,14 +94,6 @@ spec:
       containers:
       - name: virtlet
         image: mirantis/virtlet
-
-        # Workaround for https://github.com/kubernetes/kubernetes/issues/17406
-        command:
-          - "/bin/bash"
-          - "-c"
-          # TODO: should not be needed in 1.6
-          # See https://github.com/kubernetes/kubernetes/issues/17406
-          - "echo -e \"nameserver ${KUBE_DNS_SERVICE_HOST}\nsearch kube-system.svc.cluster.local svc.cluster.local cluster.local\">/etc/resolv.conf && /start.sh"
         # In case we inject local virtlet image we want to use it not officially available one
         imagePullPolicy: IfNotPresent
         volumeMounts:
