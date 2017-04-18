@@ -973,7 +973,7 @@ func TestCriProxy(t *testing.T) {
 				Auth:          &runtimeapi.AuthConfig{},
 				SandboxConfig: &runtimeapi.PodSandboxConfig{},
 			},
-			resp:    &runtimeapi.PullImageResponse{},
+			resp:    &runtimeapi.PullImageResponse{ImageRef: "image1-3"},
 			journal: []string{"1/image/PullImage"},
 		},
 		{
@@ -984,7 +984,7 @@ func TestCriProxy(t *testing.T) {
 				Auth:          &runtimeapi.AuthConfig{},
 				SandboxConfig: &runtimeapi.PodSandboxConfig{},
 			},
-			resp:    &runtimeapi.PullImageResponse{},
+			resp:    &runtimeapi.PullImageResponse{ImageRef: "alt/image2-3"},
 			journal: []string{"2/image/PullImage"},
 		},
 		{
