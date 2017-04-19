@@ -59,13 +59,13 @@ func startServer(t *testing.T, s ServerWithReadinessFeedback, addr string) {
 	errCh := make(chan error, 1)
 	go func() {
 		if err := s.Serve(addr, readyCh); err != nil {
-			glog.Errorf("error starting server @ %q: %v", addr, err)
+			glog.Errorf("error serving at @ %q: %v", addr, err)
 			errCh <- err
 		}
 	}()
 	select {
 	case err := <-errCh:
-		t.Fatalf("Failed to start fake CRI server: %v", err)
+		t.Fatalf("CRI server stopped with error: %v", err)
 	case <-readyCh:
 	}
 	// TODO: don't use readiness feedback channel, it doesn't help much
