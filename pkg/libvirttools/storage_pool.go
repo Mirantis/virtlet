@@ -41,7 +41,7 @@ type Volume struct {
 type VirtletVolume struct {
 	Name         string `json:"Name"`
 	Format       string `json:"Format"`
-	Capacity     int    `json:"Capacity"`
+	Capacity     int    `json:"Capacity,string"`
 	CapacityUnit string `json:"CapacityUnit"`
 }
 
