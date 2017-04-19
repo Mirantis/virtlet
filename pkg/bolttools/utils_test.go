@@ -150,7 +150,7 @@ func dumpDB(t *testing.T, db *bolt.DB) error {
 	return err
 }
 
-func SetUpBolt(t *testing.T, sandboxConfigs []*kubeapi.PodSandboxConfig, containerConfigs []*criapi.ContainerTestConfigSet) *BoltClient {
+func SetUpBolt(t *testing.T, sandboxConfigs []*kubeapi.PodSandboxConfig, containerConfigs []*criapi.ContainerTestConfig) *BoltClient {
 	b, err := NewFakeBoltClient()
 	if err != nil {
 		t.Fatal(err)

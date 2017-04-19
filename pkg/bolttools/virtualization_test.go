@@ -24,14 +24,8 @@ import (
 )
 
 func TestSetGetContainerInfo(t *testing.T) {
-	sandboxes, err := criapi.GetSandboxes(2)
-	if err != nil {
-		t.Fatalf("Failed to generate array of sandbox configs: %v", err)
-	}
-	containers, err := criapi.GetContainersConfig(sandboxes)
-	if err != nil {
-		t.Fatalf("Failed to generate array of container configs: %v", err)
-	}
+	sandboxes := criapi.GetSandboxes(2)
+	containers := criapi.GetContainersConfig(sandboxes)
 
 	b := SetUpBolt(t, sandboxes, containers)
 
@@ -60,14 +54,8 @@ func TestSetGetContainerInfo(t *testing.T) {
 }
 
 func TestRemoveContainer(t *testing.T) {
-	sandboxes, err := criapi.GetSandboxes(2)
-	if err != nil {
-		t.Fatalf("Failed to generate array of sandbox configs: %v", err)
-	}
-	containers, err := criapi.GetContainersConfig(sandboxes)
-	if err != nil {
-		t.Fatalf("Failed to generate array of container configs: %v", err)
-	}
+	sandboxes := criapi.GetSandboxes(2)
+	containers := criapi.GetContainersConfig(sandboxes)
 
 	b := SetUpBolt(t, sandboxes, containers)
 

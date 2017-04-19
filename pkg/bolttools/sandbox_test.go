@@ -26,11 +26,7 @@ import (
 )
 
 func TestRemovePodSandbox(t *testing.T) {
-	sandboxes, err := criapi.GetSandboxes(1)
-	if err != nil {
-		t.Fatalf("Failed to generate array of sandbox configs: %v", err)
-	}
-
+	sandboxes := criapi.GetSandboxes(1)
 	sandbox := sandboxes[0]
 
 	tests := []struct {
@@ -76,12 +72,9 @@ func TestRemovePodSandbox(t *testing.T) {
 }
 
 func TestSetGetPodSandboxStatus(t *testing.T) {
-	sandboxes, err := criapi.GetSandboxes(2)
-	if err != nil {
-		t.Fatalf("Failed to generate array of sandbox configs: %v", err)
-	}
+	sandboxes := criapi.GetSandboxes(2)
 
-	b := SetUpBolt(t, sandboxes, []*criapi.ContainerTestConfigSet{})
+	b := SetUpBolt(t, sandboxes, []*criapi.ContainerTestConfig{})
 
 	for _, sandbox := range sandboxes {
 		status, err := b.GetPodSandboxStatus(sandbox.GetMetadata().Uid)
@@ -108,10 +101,7 @@ func TestSetGetPodSandboxStatus(t *testing.T) {
 }
 
 func TestListPodSandbox(t *testing.T) {
-	genSandboxes, err := criapi.GetSandboxes(2)
-	if err != nil {
-		t.Fatalf("Failed to generate array of sandbox configs: %v", err)
-	}
+	genSandboxes := criapi.GetSandboxes(2)
 
 	firstSandboxConfig := genSandboxes[0]
 	secondSandboxConfig := genSandboxes[1]
@@ -190,7 +180,7 @@ func TestListPodSandbox(t *testing.T) {
 		},
 	}
 
-	b := SetUpBolt(t, sandboxConfigs, []*criapi.ContainerTestConfigSet{})
+	b := SetUpBolt(t, sandboxConfigs, []*criapi.ContainerTestConfig{})
 
 	for _, tc := range tests {
 		sandboxes, err := b.ListPodSandbox(tc.filter)

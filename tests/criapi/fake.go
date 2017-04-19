@@ -1,12 +1,14 @@
 package criapi
 
 import (
+	"log"
+
 	virtletutils "github.com/Mirantis/virtlet/pkg/utils"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"strconv"
 )
 
-type ContainerTestConfigSet struct {
+type ContainerTestConfig struct {
 	Name                  string
 	SandboxId             string
 	ContainerId           string
@@ -16,15 +18,14 @@ type ContainerTestConfigSet struct {
 	Annotations           map[string]string
 }
 
-func GetSandboxes(sandboxNum int) ([]*kubeapi.PodSandboxConfig, error) {
+func GetSandboxes(sandboxNum int) []*kubeapi.PodSandboxConfig {
 	sandboxes := []*kubeapi.PodSandboxConfig{}
 
 	for i := 0; i < sandboxNum; i++ {
 		name := "testName_" + strconv.Itoa(i)
 		uid, err := virtletutils.NewUuid()
-
 		if err != nil {
-			return nil, err
+			log.Panicf("NewUuid(): %v", err)
 		}
 
 		namespace := "default"
@@ -73,19 +74,18 @@ func GetSandboxes(sandboxNum int) ([]*kubeapi.PodSandboxConfig, error) {
 		sandboxes = append(sandboxes, sandboxConfig)
 	}
 
-	return sandboxes, nil
+	return sandboxes
 }
 
-func GetContainersConfig(sandboxConfigs []*kubeapi.PodSandboxConfig) ([]*ContainerTestConfigSet, error) {
-	containers := []*ContainerTestConfigSet{}
-
+func GetContainersConfig(sandboxConfigs []*kubeapi.PodSandboxConfig) []*ContainerTestConfig {
+	containers := []*ContainerTestConfig{}
 	for _, sandbox := range sandboxConfigs {
 		uid, err := virtletutils.NewUuid()
-
 		if err != nil {
-			return nil, err
+			log.Panicf("NewUuid(): %v", err)
 		}
-		containerConf := &ContainerTestConfigSet{
+
+		containerConf := &ContainerTestConfig{
 			Name:      "container-for-" + sandbox.Metadata.Name,
 			SandboxId: sandbox.Metadata.Uid,
 			Image:     "testImage",
@@ -97,5 +97,5 @@ func GetContainersConfig(sandboxConfigs []*kubeapi.PodSandboxConfig) ([]*Contain
 		containers = append(containers, containerConf)
 	}
 
-	return containers, nil
+	return containers
 }
