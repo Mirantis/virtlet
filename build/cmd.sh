@@ -24,6 +24,23 @@ function ensure_build_image {
     fi
 }
 
+function vsh {
+    ensure_build_image
+    cd "${project_dir}"
+    docker run --rm --privileged -it \
+           -l virtlet_build \
+           -v "virtlet_src:${remote_project_dir}" \
+           -v "virtlet_pkg:/go/pkg" \
+           -v /sys/fs/cgroup:/sys/fs/cgroup \
+           -v /lib/modules:/lib/modules:ro \
+           -v /boot:/boot:ro \
+           -v /var/run/docker.sock:/var/run/docker.sock \
+           -e TRAVIS="${TRAVIS:-}" \
+           -e CRIPROXY_TEST_REMOTE_DOCKER_ENDPOINT="${CRIPROXY_TEST_REMOTE_DOCKER_ENDPOINT:-}" \
+           --name ${container_name} \
+           "${build_image}" env TERM=xterm bash
+}
+
 function vcmd {
     ensure_build_image
     cd "${project_dir}"
@@ -113,6 +130,7 @@ function usage {
     echo >&2 "  $0 copy"
     echo >&2 "  $0 copy-dind"
     echo >&2 "  $0 start-dind"
+    echo >&2 "  $0 vsh"
     echo >&2 "  $0 stop"
     echo >&2 "  $0 clean"
     echo >&2 "  $0 gotest [TEST_ARGS...]"
@@ -142,6 +160,9 @@ case "${cmd}" in
         ;;
     run)
         vcmd "$*"
+        ;;
+    vsh)
+        vsh
         ;;
     stop)
         stop
