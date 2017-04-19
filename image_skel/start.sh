@@ -34,6 +34,14 @@ chown root:root /etc/libvirt/qemu.conf
 chmod 644 /etc/libvirt/libvirtd.conf
 chmod 644 /etc/libvirt/qemu.conf
 
+# Without this hack qemu dies trying to unlink
+# '/var/lib/libvirt/qemu/capabilities.monitor.sock'
+# while libvirt is querying capabilities.
+# Removal of the socket below helps but not always.
+
+mv /var/lib/libvirt/qemu /var/lib/libvirt/qemu.ok
+mv /var/lib/libvirt/qemu.ok /var/lib/libvirt/qemu
+
 # leftover socket prevents libvirt from initializing correctly
 rm -f /var/lib/libvirt/qemu/capabilities.monitor.sock
 
