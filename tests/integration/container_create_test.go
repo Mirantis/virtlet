@@ -48,8 +48,8 @@ func TestContainerCreateStartListRemove(t *testing.T) {
 		t.Fatalf("Failed to generate array of sandbox configs: %v", err)
 	}
 
-	sandboxes[0].Annotations["VirtletVolumes"] = `[{"Name": "vol1"}, {"Name": "vol2"}, {"Name": "vol3"}]`
-	sandboxes[0].Annotations["VirtletVolumes"] = `[{"Name": "vol1"}, {"Name": "vol2"}]`
+	sandboxes[0].Annotations["VirtletVolumes"] = `[{"Name": "vol1"}, {"Name": "vol2", "Format": "qcow2", "Capacity": "2", "CapacityUnit": "MB"}, {"Name": "vol3"}]`
+	sandboxes[1].Annotations["VirtletVolumes"] = `[{"Name": "vol1", "Format": "qcow2", "CapacityUnit": "KB"}, {"Name": "vol2", "Capacity": "2"}]`
 
 	containers, err := criapi.GetContainersConfig(sandboxes)
 	if err != nil {
@@ -192,7 +192,7 @@ func TestContainerCreateStartListRemove(t *testing.T) {
 		t.Logf("Formed CMD to lookup attached volumes: %s\n", cmd)
 		expRes := "0"
 		if _, exists := sandbox.Annotations["VirtletVolumes"]; exists {
-			expRes = fmt.Sprintf("%d", len(strings.Split(sandbox.Annotations["VirtletVolumes"], ",")))
+			expRes = fmt.Sprintf("%d", len(strings.Split(sandbox.Annotations["VirtletVolumes"], "Name"))-1)
 		}
 		out, err := exec.Command("bash", "-c", cmd).Output()
 		if err != nil {
