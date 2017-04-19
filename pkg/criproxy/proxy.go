@@ -326,7 +326,7 @@ func (r *RuntimeProxy) Stop() {
 		client.stop()
 	}
 	// TODO: check if the server is present
-	r.server.Stop()
+	r.server.GracefulStop()
 }
 
 // RuntimeServiceServer methods follow

@@ -58,5 +58,5 @@ func (s *FakeCriServer) Serve(addr string, readyCh chan struct{}) error {
 }
 
 func (s *FakeCriServer) Stop() {
-	s.server.Stop()
+	s.server.GracefulStop()
 }
