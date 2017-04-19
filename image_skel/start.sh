@@ -34,11 +34,17 @@ chown root:root /etc/libvirt/qemu.conf
 chmod 644 /etc/libvirt/libvirtd.conf
 chmod 644 /etc/libvirt/qemu.conf
 
+# leftover socket prevents libvirt from initializing correctly
+rm -f /var/lib/libvirt/qemu/capabilities.monitor.sock
+
 if [[ ${LIBVIRT_CLEANUP:-} ]]; then
   /usr/sbin/libvirtd -d
   /cleanup.py
   kill -9 $(cat /var/run/libvirtd.pid)
 fi
+
+# leftover socket prevents libvirt from initializing correctly
+rm -f /var/lib/libvirt/qemu/capabilities.monitor.sock
 
 if [[ ! ${VIRTLET_DISABLE_KVM:-} ]]; then
   chown root:kvm /dev/kvm

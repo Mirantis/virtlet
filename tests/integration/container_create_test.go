@@ -28,13 +28,6 @@ import (
 )
 
 func TestContainerCreateStartListRemove(t *testing.T) {
-	if inTravis() {
-		// Env vars are not passed to /vmwrapper
-		// QEMU fails with:
-		// Failed to unlink socket /var/lib/libvirt/qemu/capabilities.monitor.sock: Permission denied
-		// Running libvirt in non-build container works though
-		t.Skip("TestContainerCreateStartListRemove fails in Travis due to a libvirt+qemu problem in build container")
-	}
 	manager := NewVirtletManager()
 	if err := manager.Run(); err != nil {
 		t.Fatal(err)
