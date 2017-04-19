@@ -97,7 +97,6 @@ On pod remove expected all volumes and snapshot related to VM should be removed.
 
 ## Persistent Storage
 ### Flexvolume libvirt driver
-**NOTE: Currently, blocked by qemu connectivity issue, see details in #240**
 
 FlexVolume libvirt driver for virtlet supports attaching to VM of Ceph RBD block devices from cluster with cephx auth enabled.
 
