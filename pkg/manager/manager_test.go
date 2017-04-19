@@ -23,10 +23,7 @@ import (
 )
 
 func TestPodSanboxConfigValidation(t *testing.T) {
-	invalidSandboxes, err := criapi.GetSandboxes(4)
-	if err != nil {
-		t.Fatalf("Failed to generate array of sandbox configs: %v", err)
-	}
+	invalidSandboxes := criapi.GetSandboxes(4)
 
 	// Now let's make generated configs to be invalid
 	invalidSandboxes[0].Metadata = nil
