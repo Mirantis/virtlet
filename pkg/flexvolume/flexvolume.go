@@ -243,14 +243,21 @@ func (d *FlexVolumeDriver) doRun(args []string) (map[string]interface{}, error) 
 func (d *FlexVolumeDriver) Run(args []string) string {
 	r := formatResult(d.doRun(args))
 
-	f, err := os.OpenFile("/tmp/flexvolume.log", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
-	if err != nil {
-		panic(err)
-	}
+	// Uncomment the following for debugging.
+	// TODO: make this configurable somehow.
+	// The problem is that kubelet grabs CombinedOutput() from the process
+	// and tries to parse it as JSON (need to recheck this,
+	// maybe submit a PS to fix it)
 
-	defer f.Close()
+	// f, err := os.OpenFile("/tmp/flexvolume.log", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
+	// if err != nil {
+	// 	panic(err)
+	// }
 
-	fmt.Fprintf(f, "flexvolume %s -> %s\n", strings.Join(args, " "), r)
+	// defer f.Close()
+
+	// fmt.Fprintf(f, "flexvolume %s -> %s\n", strings.Join(args, " "), r)
+
 	return r
 }
 
