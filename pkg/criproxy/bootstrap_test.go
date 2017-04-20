@@ -38,7 +38,6 @@ import (
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
 
-	// TODO: use client-go
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/pkg/api/v1"
 	testingcore "k8s.io/client-go/testing"

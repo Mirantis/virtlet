@@ -39,8 +39,6 @@ import (
 	dockercontainer "github.com/docker/engine-api/types/container"
 	dockerfilters "github.com/docker/engine-api/types/filters"
 
-	// FIXME: use client-go
-	// In particular, see https://github.com/kubernetes/client-go/blob/master/examples/in-cluster/main.go
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
