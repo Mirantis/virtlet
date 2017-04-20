@@ -264,6 +264,10 @@ func (v *VirtualizationTool) createBootImageSnapshot(imageName, backingStorePath
 }
 
 func gatherFlexvolumeDriverVolumeDefinitions(podID string, lettersInd int) ([]FlexVolumeInfo, error) {
+	// FIXME: kubelet's --root-dir may be something other than /var/lib/kubelet
+	// Need to remove it from daemonset mounts (both dev and non-dev)
+	// Use 'nsenter -t 1 -m -- tar ...' or something to grab the path
+	// from root namespace
 	var flexInfos []FlexVolumeInfo
 	dir := fmt.Sprintf("/var/lib/kubelet/pods/%s/volumes/virtlet~flexvolume_driver", podID)
 	_, err := os.Stat(dir)
