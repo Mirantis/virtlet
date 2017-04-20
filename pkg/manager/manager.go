@@ -603,7 +603,7 @@ func (v *VirtletManager) PullImage(ctx context.Context, in *kubeapi.PullImageReq
 
 	if existingImageName != "" {
 		// Image has been downloaded already
-		return &kubeapi.PullImageResponse{}, nil
+		return &kubeapi.PullImageResponse{ImageRef: imageName}, nil
 	}
 
 	if err = v.libvirtImageTool.PullImageToVolume(imageName, volumeName); err != nil {
