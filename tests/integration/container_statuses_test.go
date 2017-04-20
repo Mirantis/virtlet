@@ -43,7 +43,7 @@ func TestContainerStatuses(t *testing.T) {
 		t.Errorf("Didn't find expected container id %s in returned containers list %v", container.ContainerId, listResp.Containers)
 	}
 
-	ct.waitForContainerRunning(container.ContainerId)
+	ct.waitForContainerRunning(container.ContainerId, container.Name)
 	ct.stopContainer(container.ContainerId)
 	ct.removeContainer(container.ContainerId)
 	ct.waitForNoContainers(&kubeapi.ContainerFilter{

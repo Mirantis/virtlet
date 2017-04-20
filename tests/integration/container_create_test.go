@@ -65,7 +65,7 @@ func verifyUsingShell(t *testing.T, cmd, what, expected string) {
 	}
 	outStr := strings.TrimSpace(string(out))
 	if outStr != expected {
-		t.Errorf("Verifying %s: expected %q, got %q", expected, outStr)
+		t.Errorf("Verifying %s: expected %q, got %q", what, expected, outStr)
 	}
 }
 
@@ -86,7 +86,7 @@ func TestContainerVolumes(t *testing.T) {
 		createResp := ct.createContainer(sandbox, ct.containers[idx], ct.imageSpecs[idx], mounts)
 		ct.startContainer(createResp.ContainerId)
 
-		vmName := createResp.ContainerId + "-" + sandbox.Metadata.Name
+		vmName := createResp.ContainerId + "-" + ct.containers[idx].Name
 		cmd := fmt.Sprintf("virsh domblklist '%s' | grep '%s-vol.*' | wc -l", vmName, createResp.ContainerId)
 		exp := "0"
 		if _, exists := sandbox.Annotations["VirtletVolumes"]; exists {

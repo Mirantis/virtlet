@@ -17,6 +17,7 @@ limitations under the License.
 package integration
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -95,7 +96,7 @@ func (ct *containerTester) createContainer(sandbox *kubeapi.PodSandboxConfig, co
 		Labels: container.Labels,
 		Mounts: mounts,
 		Metadata: &kubeapi.ContainerMetadata{
-			Name: sandbox.Metadata.Name,
+			Name: container.Name,
 		},
 	}
 	containerIn := &kubeapi.CreateContainerRequest{
@@ -132,7 +133,7 @@ func (ct *containerTester) listContainers(filter *kubeapi.ContainerFilter) *kube
 	return resp
 }
 
-func (ct *containerTester) waitForContainerRunning(containerId string) {
+func (ct *containerTester) waitForContainerRunning(containerId, containerName string) {
 	containerStatusRequest := &kubeapi.ContainerStatusRequest{
 		ContainerId: containerId,
 	}
@@ -140,6 +141,11 @@ func (ct *containerTester) waitForContainerRunning(containerId string) {
 		resp, err := ct.runtimeServiceClient.ContainerStatus(context.Background(), containerStatusRequest)
 		if err != nil {
 			return false, err
+		}
+
+		if containerName != "" && resp.Status.Metadata.Name != containerName {
+			return false, fmt.Errorf("bad container name returned: %q instead of %q",
+				containerName, resp.Status.Metadata.Name)
 		}
 
 		if resp.GetStatus().State == kubeapi.ContainerState_CONTAINER_RUNNING {
