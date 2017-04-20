@@ -64,6 +64,9 @@ var kubeletSettingsForCriProxy map[string]interface{} = map[string]interface{}{
 	"enableCRI":             true,
 	"remoteRuntimeEndpoint": proxyRuntimeEndpoint,
 	"remoteImageEndpoint":   proxyRuntimeEndpoint,
+	// NOTE: this setting is only needed by Virtlet to make flexvolume
+	// handling simpler
+	"enableControllerAttachDetach": false,
 }
 
 func loadJson(baseUrl, suffix string) (map[string]interface{}, error) {

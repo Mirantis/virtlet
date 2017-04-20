@@ -171,10 +171,12 @@ func TestPatchKubeletConfig(t *testing.T) {
 		t.Fatalf("Failed to unmarshal kubelet config: %v", err)
 	}
 
+	enableControllerAttachDetach := false
 	expectedDiff := map[string]interface{}{
-		"ContainerRuntime":      "remote",
-		"RemoteRuntimeEndpoint": "/run/criproxy.sock",
-		"RemoteImageEndpoint":   "/run/criproxy.sock",
+		"ContainerRuntime":             "remote",
+		"RemoteRuntimeEndpoint":        "/run/criproxy.sock",
+		"RemoteImageEndpoint":          "/run/criproxy.sock",
+		"EnableControllerAttachDetach": &enableControllerAttachDetach,
 	}
 	diff := diffStructs(&kubeCfg, &newKubeCfg)
 	if !reflect.DeepEqual(diff, expectedDiff) {
@@ -182,7 +184,11 @@ func TestPatchKubeletConfig(t *testing.T) {
 		if err != nil {
 			t.Fatalf("can't marshal struct diff: %v", err)
 		}
-		t.Errorf("bad kubelet config diff:\n%s", m)
+		mExp, err := json.MarshalIndent(expectedDiff, "", "  ")
+		if err != nil {
+			t.Fatalf("can't marshal struct diff: %v", err)
+		}
+		t.Errorf("bad kubelet config diff:\n%#v\n--vs--\n%#v", m, mExp)
 	}
 
 	if needToPatch, err := b.needToPatch(); err != nil {
