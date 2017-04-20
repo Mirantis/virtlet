@@ -166,7 +166,7 @@ func (b *Bootstrap) obtainKubeletConfig() error {
 func (b *Bootstrap) kubeletReadyAfterPatch() bool {
 	kubeletCfg, err := b.retrieveKubeletConfig()
 	if err != nil {
-		glog.V(2).Infof("can't retrieve kubelet config yet: %v", err)
+		glog.V(2).Infof("Can't retrieve kubelet config yet: %v", err)
 		return false
 	}
 	return kubeletConfigUpdated(kubeletCfg)
