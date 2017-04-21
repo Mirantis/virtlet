@@ -1,12 +1,15 @@
 package criapi
 
 import (
+	"log"
+
 	virtletutils "github.com/Mirantis/virtlet/pkg/utils"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"strconv"
 )
 
-type ContainerTestConfigSet struct {
+type ContainerTestConfig struct {
+	Name                  string
 	SandboxId             string
 	ContainerId           string
 	Image                 string
@@ -15,38 +18,37 @@ type ContainerTestConfigSet struct {
 	Annotations           map[string]string
 }
 
-func GetSandboxes(sandboxNum int) ([]*kubeapi.PodSandboxConfig, error) {
+func GetSandboxes(sandboxNum int) []*kubeapi.PodSandboxConfig {
 	sandboxes := []*kubeapi.PodSandboxConfig{}
 
 	for i := 0; i < sandboxNum; i++ {
 		name := "testName_" + strconv.Itoa(i)
 		uid, err := virtletutils.NewUuid()
-
 		if err != nil {
-			return nil, err
+			log.Panicf("NewUuid(): %v", err)
 		}
 
 		namespace := "default"
 		attempt := uint32(0)
 		metadata := &kubeapi.PodSandboxMetadata{
-			Name:      &name,
-			Uid:       &uid,
-			Namespace: &namespace,
-			Attempt:   &attempt,
+			Name:      name,
+			Uid:       uid,
+			Namespace: namespace,
+			Attempt:   attempt,
 		}
 
 		hostNetwork := false
 		hostPid := false
 		hostIpc := false
 		namespaceOptions := &kubeapi.NamespaceOption{
-			HostNetwork: &hostNetwork,
-			HostPid:     &hostPid,
-			HostIpc:     &hostIpc,
+			HostNetwork: hostNetwork,
+			HostPid:     hostPid,
+			HostIpc:     hostIpc,
 		}
 
 		cgroupParent := ""
 		linuxSandbox := &kubeapi.LinuxPodSandboxConfig{
-			CgroupParent: &cgroupParent,
+			CgroupParent: cgroupParent,
 			SecurityContext: &kubeapi.LinuxSandboxSecurityContext{
 				NamespaceOptions: namespaceOptions,
 			},
@@ -56,8 +58,8 @@ func GetSandboxes(sandboxNum int) ([]*kubeapi.PodSandboxConfig, error) {
 		logDirectory := "/var/log/test_log_directory"
 		sandboxConfig := &kubeapi.PodSandboxConfig{
 			Metadata:     metadata,
-			Hostname:     &hostname,
-			LogDirectory: &logDirectory,
+			Hostname:     hostname,
+			LogDirectory: logDirectory,
 			Labels: map[string]string{
 				"foo":  "bar",
 				"fizz": "buzz",
@@ -72,20 +74,20 @@ func GetSandboxes(sandboxNum int) ([]*kubeapi.PodSandboxConfig, error) {
 		sandboxes = append(sandboxes, sandboxConfig)
 	}
 
-	return sandboxes, nil
+	return sandboxes
 }
 
-func GetContainersConfig(sandboxConfigs []*kubeapi.PodSandboxConfig) ([]*ContainerTestConfigSet, error) {
-	containers := []*ContainerTestConfigSet{}
-
+func GetContainersConfig(sandboxConfigs []*kubeapi.PodSandboxConfig) []*ContainerTestConfig {
+	containers := []*ContainerTestConfig{}
 	for _, sandbox := range sandboxConfigs {
 		uid, err := virtletutils.NewUuid()
-
 		if err != nil {
-			return nil, err
+			log.Panicf("NewUuid(): %v", err)
 		}
-		containerConf := &ContainerTestConfigSet{
-			SandboxId: *sandbox.Metadata.Uid,
+
+		containerConf := &ContainerTestConfig{
+			Name:      "container-for-" + sandbox.Metadata.Name,
+			SandboxId: sandbox.Metadata.Uid,
 			Image:     "testImage",
 			RootImageSnapshotName: "sample_name",
 			ContainerId:           uid,
@@ -95,5 +97,5 @@ func GetContainersConfig(sandboxConfigs []*kubeapi.PodSandboxConfig) ([]*Contain
 		containers = append(containers, containerConf)
 	}
 
-	return containers, nil
+	return containers
 }

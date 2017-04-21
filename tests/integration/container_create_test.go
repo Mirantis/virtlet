@@ -1,5 +1,5 @@
 /*
-Copyright 2016 Mirantis
+Copyright 2017 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,243 +19,185 @@ package integration
 import (
 	"fmt"
 	"os/exec"
+	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/Mirantis/virtlet/tests/criapi"
-	"golang.org/x/net/context"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
-func TestContainerCreateStartListRemove(t *testing.T) {
-	if inTravis() {
-		// Env vars are not passed to /vmwrapper
-		// QEMU fails with:
-		// Failed to unlink socket /var/lib/libvirt/qemu/capabilities.monitor.sock: Permission denied
-		// Running libvirt in non-build container works though
-		t.Skip("TestContainerCreateStartListRemove fails in Travis due to a libvirt+qemu problem in build container")
-	}
-	manager := NewVirtletManager()
-	if err := manager.Run(); err != nil {
-		t.Fatal(err)
-	}
-	defer manager.Close()
+type containerFilterTestCase struct {
+	name               string
+	nilFilter          bool
+	filterByPodSandbox bool
+	filterByContainer  bool
+	labelSelector      map[string]string
+	expectedContainers []int
+}
 
-	runtimeServiceClient := kubeapi.NewRuntimeServiceClient(manager.conn)
+func (c *containerFilterTestCase) containerFilter(ct *containerTester) *kubeapi.ContainerFilter {
+	if c.nilFilter {
+		return nil
+	}
+	filter := &kubeapi.ContainerFilter{LabelSelector: c.labelSelector}
+	if c.filterByPodSandbox {
+		filter.PodSandboxId = ct.containers[0].SandboxId
+	}
+	if c.filterByContainer {
+		filter.Id = ct.containers[0].ContainerId
+	}
+	return filter
+}
 
-	sandboxes, err := criapi.GetSandboxes(2)
+func (c *containerFilterTestCase) expectedIds(ct *containerTester) []string {
+	r := make([]string, len(c.expectedContainers))
+	for n, idx := range c.expectedContainers {
+		r[n] = ct.containers[idx].ContainerId
+	}
+	return r
+}
+
+func verifyUsingShell(t *testing.T, cmd, what, expected string) {
+	t.Logf("Command to verify %s: %s", what, cmd)
+	out, err := exec.Command("bash", "-c", cmd).Output()
 	if err != nil {
-		t.Fatalf("Failed to generate array of sandbox configs: %v", err)
+		t.Fatalf("Failed to execute command %s: %v", cmd, err)
 	}
-
-	sandboxes[0].Annotations["VirtletVolumes"] = `[{"Name": "vol1"}, {"Name": "vol2", "Format": "qcow2", "Capacity": "2", "CapacityUnit": "MB"}, {"Name": "vol3"}]`
-	sandboxes[1].Annotations["VirtletVolumes"] = `[{"Name": "vol1", "Format": "qcow2", "CapacityUnit": "KB"}, {"Name": "vol2", "Capacity": "2"}]`
-
-	containers, err := criapi.GetContainersConfig(sandboxes)
-	if err != nil {
-		t.Fatalf("Failed to generate array of container configs: %v", err)
+	outStr := strings.TrimSpace(string(out))
+	if outStr != expected {
+		t.Errorf("Verifying %s: expected %q, got %q", what, expected, outStr)
 	}
+}
 
-	containers[0].Labels = map[string]string{"unique": "first", "common": "both"}
-	containers[1].Labels = map[string]string{"unique": "second", "common": "both"}
+func TestContainerVolumes(t *testing.T) {
+	ct := newContainerTester(t)
+	defer ct.teardown()
+	ct.sandboxes[0].Annotations["VirtletVolumes"] = `[{"Name": "vol1"}, {"Name": "vol2", "Format": "qcow2", "Capacity": "2", "CapacityUnit": "MB"}, {"Name": "vol3"}]`
+	ct.sandboxes[1].Annotations["VirtletVolumes"] = `[{"Name": "vol1", "Format": "qcow2", "CapacityUnit": "KB"}, {"Name": "vol2", "Capacity": "2"}]`
+	ct.pullAllImages()
 
-	filterTests := []struct {
-		containerFilter *kubeapi.ContainerFilter
-		expectedIds     []*string
-	}{
-		{
-			containerFilter: &kubeapi.ContainerFilter{
-				Id: &containers[0].ContainerId,
-			},
-			expectedIds: []*string{&containers[0].ContainerId},
-		},
-		{
-			containerFilter: &kubeapi.ContainerFilter{
-				PodSandboxId: &containers[0].SandboxId,
-			},
-			expectedIds: []*string{&containers[0].ContainerId},
-		},
-		{
-			containerFilter: &kubeapi.ContainerFilter{
-				PodSandboxId:  &containers[0].SandboxId,
-				LabelSelector: map[string]string{"unique": "first", "common": "both"},
-			},
-			expectedIds: []*string{&containers[0].ContainerId},
-		},
-		{
-			containerFilter: &kubeapi.ContainerFilter{
-				PodSandboxId:  &containers[0].SandboxId,
-				LabelSelector: map[string]string{"unique": "nomatch"},
-			},
-			expectedIds: []*string{},
-		},
-		{
-			containerFilter: &kubeapi.ContainerFilter{
-				Id:           &containers[0].ContainerId,
-				PodSandboxId: &containers[0].SandboxId,
-			},
-			expectedIds: []*string{&containers[0].ContainerId},
-		},
-		{
-			containerFilter: &kubeapi.ContainerFilter{
-				Id:            &containers[0].ContainerId,
-				PodSandboxId:  &containers[0].SandboxId,
-				LabelSelector: map[string]string{"unique": "first", "common": "both"},
-			},
-			expectedIds: []*string{&containers[0].ContainerId},
-		},
-		{
-			containerFilter: &kubeapi.ContainerFilter{
-				Id:            &containers[0].ContainerId,
-				PodSandboxId:  &containers[0].SandboxId,
-				LabelSelector: map[string]string{"unique": "nomatch"},
-			},
-			expectedIds: []*string{},
-		},
-		{
-			containerFilter: &kubeapi.ContainerFilter{
-				LabelSelector: map[string]string{"unique": "first", "common": "both"},
-			},
-			expectedIds: []*string{&containers[0].ContainerId},
-		},
-		{
-			containerFilter: &kubeapi.ContainerFilter{
-				LabelSelector: map[string]string{"common": "both"},
-			},
-			expectedIds: []*string{&containers[0].ContainerId, &containers[1].ContainerId},
-		},
-		{
-			containerFilter: &kubeapi.ContainerFilter{},
-			expectedIds:     []*string{&containers[0].ContainerId, &containers[1].ContainerId},
-		},
-	}
-
-	// Pull Images
-	imageServiceClient := kubeapi.NewImageServiceClient(manager.conn)
-
-	imageSpecs := []*kubeapi.ImageSpec{
-		{Image: &imageCirrosUrl},
-		{Image: &imageCirrosUrl2},
-	}
-
-	for _, ispec := range imageSpecs {
-		in := &kubeapi.PullImageRequest{
-			Image:         ispec,
-			Auth:          &kubeapi.AuthConfig{},
-			SandboxConfig: &kubeapi.PodSandboxConfig{},
-		}
-
-		if _, err := imageServiceClient.PullImage(context.Background(), in); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	for ind, sandbox := range sandboxes {
-		// Sandbox request
-		sandboxOut, err := runtimeServiceClient.RunPodSandbox(context.Background(), &kubeapi.RunPodSandboxRequest{Config: sandbox})
-		if err != nil {
-			t.Fatal(err)
-		}
-		sandboxes[ind].Metadata.Uid = sandboxOut.PodSandboxId
-
-		// Container request
-		hostPath := "/var/lib/virtlet"
-		config := &kubeapi.ContainerConfig{
-			Image:  imageSpecs[ind],
-			Mounts: []*kubeapi.Mount{{HostPath: &hostPath}},
-			Labels: containers[ind].Labels,
-			Metadata: &kubeapi.ContainerMetadata{
-				Name: sandboxes[ind].Metadata.Name,
+	for idx, sandbox := range ct.sandboxes {
+		ct.runPodSandbox(sandbox)
+		mounts := []*kubeapi.Mount{
+			{
+				HostPath: "/var/lib/virtlet",
 			},
 		}
-		containerIn := &kubeapi.CreateContainerRequest{
-			PodSandboxId:  sandboxOut.PodSandboxId,
-			Config:        config,
-			SandboxConfig: sandbox,
-		}
+		createResp := ct.createContainer(sandbox, ct.containers[idx], ct.imageSpecs[idx], mounts)
+		ct.startContainer(createResp.ContainerId)
 
-		createContainerOut, err := runtimeServiceClient.CreateContainer(context.Background(), containerIn)
-		if err != nil {
-			t.Fatalf("Creating container %s failure: %v", *sandboxes[ind].Metadata.Name, err)
-		}
-		t.Logf("Container created Sandbox: %v\n", sandbox)
-		containers[ind].ContainerId = *createContainerOut.ContainerId
-
-		_, err = runtimeServiceClient.StartContainer(context.Background(), &kubeapi.StartContainerRequest{ContainerId: &containers[ind].ContainerId})
-		if err != nil {
-			t.Fatalf("Starting container %s failure: %v", containers[ind].ContainerId, err)
-		}
-
-		// Check attached volumes
-		vmName := *createContainerOut.ContainerId + "-" + *sandboxes[ind].Metadata.Name
-		cmd := "virsh domblklist " + vmName + " | grep " + *createContainerOut.ContainerId + "-vol.* | wc -l"
-		t.Logf("Formed CMD to lookup attached volumes: %s\n", cmd)
-		expRes := "0"
+		vmName := createResp.ContainerId + "-" + ct.containers[idx].Name
+		cmd := fmt.Sprintf("virsh domblklist '%s' | grep '%s-vol.*' | wc -l", vmName, createResp.ContainerId)
+		count := 0
 		if _, exists := sandbox.Annotations["VirtletVolumes"]; exists {
-			expRes = fmt.Sprintf("%d", len(strings.Split(sandbox.Annotations["VirtletVolumes"], "Name"))-1)
+			count = len(strings.Split(sandbox.Annotations["VirtletVolumes"], "Name")) - 1
 		}
-		out, err := exec.Command("bash", "-c", cmd).Output()
-		if err != nil {
-			t.Fatalf("Failed to execute command: %s", cmd)
+		verifyUsingShell(t, cmd, "attached ephemeral volumes", strconv.Itoa(count))
+	}
+
+	if len(ct.listContainers(nil).Containers) != 2 {
+		t.Errorf("expected 2 containers to be listed")
+	}
+
+	for _, container := range ct.containers {
+		ct.stopContainer(container.ContainerId)
+		ct.removeContainer(container.ContainerId)
+		cmd := fmt.Sprintf("virsh vol-list --pool volumes | grep '%s' | wc -l", container.ContainerId)
+		verifyUsingShell(t, cmd, "there's no attached ephemeral volumes", "0")
+	}
+}
+
+func TestContainerCreateStartListRemove(t *testing.T) {
+	ct := newContainerTester(t)
+	defer ct.teardown()
+	ct.containers[0].Labels = map[string]string{"unique": "first", "common": "both"}
+	ct.containers[1].Labels = map[string]string{"unique": "second", "common": "both"}
+	ct.pullAllImages()
+
+	for idx, sandbox := range ct.sandboxes {
+		ct.runPodSandbox(sandbox)
+		createResp := ct.createContainer(sandbox, ct.containers[idx], ct.imageSpecs[idx], nil)
+		ct.startContainer(createResp.ContainerId)
+	}
+
+	for _, tc := range []*containerFilterTestCase{
+		{
+			name:               "by container id",
+			filterByContainer:  true,
+			expectedContainers: []int{0},
+		},
+		{
+			name:               "by sandbox id",
+			filterByPodSandbox: true,
+			expectedContainers: []int{0},
+		},
+		{
+			name:               "by sandbox id and label selector",
+			filterByPodSandbox: true,
+			labelSelector:      map[string]string{"unique": "first", "common": "both"},
+			expectedContainers: []int{0},
+		},
+		{
+			name:               "by sandbox id and non-matching label selector",
+			filterByPodSandbox: true,
+			labelSelector:      map[string]string{"unique": "nomatch"},
+			expectedContainers: []int{},
+		},
+		{
+			name:               "by container id and sandbox id",
+			filterByContainer:  true,
+			filterByPodSandbox: true,
+			expectedContainers: []int{0},
+		},
+		{
+			name:               "by container id, sandbox id and label selector",
+			filterByContainer:  true,
+			filterByPodSandbox: true,
+			labelSelector:      map[string]string{"unique": "first", "common": "both"},
+			expectedContainers: []int{0},
+		},
+		{
+			name:               "by label selector",
+			labelSelector:      map[string]string{"unique": "first", "common": "both"},
+			expectedContainers: []int{0},
+		},
+		{
+			name:               "by label selector matching 2 containers",
+			labelSelector:      map[string]string{"common": "both"},
+			expectedContainers: []int{0, 1},
+		},
+		{
+			name:               "by empty filter",
+			expectedContainers: []int{0, 1},
+		},
+		{
+			name:               "by nil filter",
+			nilFilter:          true,
+			expectedContainers: []int{0, 1},
+		},
+	} {
+		listResp := ct.listContainers(tc.containerFilter(ct))
+		expectedIds := tc.expectedIds(ct)
+		actualIds := make([]string, len(listResp.Containers))
+		for n, container := range listResp.Containers {
+			actualIds[n] = container.Id
 		}
-		outRes := strings.TrimSpace(string(out))
-		if outRes != expRes {
-			t.Errorf("Expected %s attached ephemeral volumes, instead got %s!", expRes, outRes)
+		sort.Strings(expectedIds)
+		sort.Strings(actualIds)
+		expectedIdStr := strings.Join(expectedIds, ",")
+		actualIdStr := strings.Join(actualIds, ",")
+		if expectedIdStr != actualIdStr {
+			t.Errorf("bad container list: %q instead of %q", actualIdStr, expectedIdStr)
 		}
 	}
-	for _, tc := range filterTests {
-		listContainersRequest := &kubeapi.ListContainersRequest{Filter: tc.containerFilter}
 
-		listContainersOut, err := runtimeServiceClient.ListContainers(context.Background(), listContainersRequest)
-		if err != nil {
-			t.Fatalf("Listing containers failure: %v", err)
-		}
-
-		if len(listContainersOut.Containers) != len(tc.expectedIds) {
-			t.Errorf("Expected %d sandboxes, instead got %d", len(tc.expectedIds), len(listContainersOut.Containers))
-		}
-
-		for _, id := range tc.expectedIds {
-			found := false
-			for _, container := range listContainersOut.Containers {
-				if *container.Id == *id {
-					found = true
-					break
-				}
-			}
-			if !found {
-				t.Errorf("Didn't find expected sandbox id %s in returned containers list %v", *id, listContainersOut.Containers)
-			}
-		}
+	for _, container := range ct.containers {
+		ct.stopContainer(container.ContainerId)
+		ct.removeContainer(container.ContainerId)
 	}
-	for _, container := range containers {
-		// Stop container request
-		containerStopIn := &kubeapi.StopContainerRequest{
-			ContainerId: &container.ContainerId,
-		}
-		_, err = runtimeServiceClient.StopContainer(context.Background(), containerStopIn)
-		if err != nil {
-			t.Fatalf("Stopping container %s failure: %v", container.ContainerId, err)
-		}
 
-		// Remove container request
-		containerRemoveIn := &kubeapi.RemoveContainerRequest{
-			ContainerId: &container.ContainerId,
-		}
-		_, err = runtimeServiceClient.RemoveContainer(context.Background(), containerRemoveIn)
-		if err != nil {
-			t.Fatalf("Removing container %s failure: %v", container.ContainerId, err)
-		}
-		// Check all volumes related to VM have been removed
-		cmd := "virsh vol-list --pool volumes | grep " + container.ContainerId + " | wc -l"
-		t.Logf("Formed CMD to lookup volumes: %s\n", cmd)
-		out, err := exec.Command("bash", "-c", cmd).Output()
-		if err != nil {
-			t.Fatalf("Failed to execute command: %s", cmd)
-		}
-		outRes := strings.TrimSpace(string(out))
-		if outRes != "0" {
-			t.Errorf("Expected no ephemeral volumes for %s domain but instead found %s!", container.ContainerId, outRes)
-		}
+	if len(ct.listContainers(nil).Containers) != 0 {
+		t.Errorf("expected no containers to be listed after removing them")
 	}
 }

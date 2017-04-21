@@ -58,7 +58,9 @@ docker exec ${container_name} qemu-img create -f rbd rbd:libvirt-pool/rbd-test-i
 # Add user for virtlet
 docker exec ${container_name} ceph auth get-or-create client.libvirt
 docker exec ceph_cluster ceph auth caps client.libvirt mon "allow *" osd "allow *" msd "allow *"
-SECRET=$(docker exec ${container_name} ceph auth get-key client.libvirt)
+SECRET="$(docker exec ${container_name} ceph auth get-key client.libvirt)"
 
 # Put secret into definition
-IFS='%'; while read line; do eval echo \"$line\"; done < ${SCRIPT_DIR}/../../examples/cirros-vm-rbd-volume.yaml.tmpl > ${SCRIPT_DIR}/substituted-cirros-vm-rbd-volume.yaml
+sed "s^@MON_IP@^${MON_IP}^g;s^@SECRET@^${SECRET}^g" \
+    "${SCRIPT_DIR}/../../examples/cirros-vm-rbd-volume.yaml.tmpl" \
+    > "${SCRIPT_DIR}/cirros-vm-rbd-volume.yaml"

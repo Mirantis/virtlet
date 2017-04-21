@@ -40,8 +40,8 @@ cd "${SCRIPT_DIR}"
 virtlet_pod_name=$(kubectl get pods --namespace=kube-system | grep virtlet | awk '{print $1}')
 
 # Run one-node ceph cluster
-${SCRIPT_DIR}/run_ceph.sh ${SCRIPT_DIR}
-kubectl create -f ${SCRIPT_DIR}/substituted-cirros-vm-rbd-volume.yaml
+"${SCRIPT_DIR}/run_ceph.sh" "${SCRIPT_DIR}"
+kubectl create -f "${SCRIPT_DIR}/cirros-vm-rbd-volume.yaml"
 while ! "${virsh}" list | grep -q cirros-vm-rbd; do
   sleep 1
 done

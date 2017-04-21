@@ -81,8 +81,7 @@ func (r *FakeRuntimeServer) SetFakeSandboxes(sandboxes []*FakePodSandbox) {
 
 	r.Sandboxes = make(map[string]*FakePodSandbox)
 	for _, sandbox := range sandboxes {
-		sandboxID := sandbox.GetId()
-		r.Sandboxes[sandboxID] = sandbox
+		r.Sandboxes[sandbox.Id] = sandbox
 	}
 }
 
@@ -92,8 +91,7 @@ func (r *FakeRuntimeServer) SetFakeContainers(containers []*FakeContainer) {
 
 	r.Containers = make(map[string]*FakeContainer)
 	for _, c := range containers {
-		containerID := c.GetId()
-		r.Containers[containerID] = c
+		r.Containers[c.Id] = c
 	}
 
 }
@@ -108,12 +106,12 @@ func NewFakeRuntimeServer(journal Journal) *FakeRuntimeServer {
 		FakeStatus: &runtimeapi.RuntimeStatus{
 			Conditions: []*runtimeapi.RuntimeCondition{
 				{
-					Type:   &runtimeReadyStr,
-					Status: &ready,
+					Type:   runtimeReadyStr,
+					Status: ready,
 				},
 				{
-					Type:   &networkReadyStr,
-					Status: &ready,
+					Type:   networkReadyStr,
+					Status: ready,
 				},
 			},
 		},
@@ -126,10 +124,10 @@ func (r *FakeRuntimeServer) Version(ctx context.Context, in *runtimeapi.VersionR
 	r.journal.Record("Version")
 
 	return &runtimeapi.VersionResponse{
-		Version:           &version,
-		RuntimeName:       &FakeRuntimeName,
-		RuntimeVersion:    &version,
-		RuntimeApiVersion: &version,
+		Version:           version,
+		RuntimeName:       FakeRuntimeName,
+		RuntimeVersion:    version,
+		RuntimeApiVersion: version,
 	}, nil
 }
 
@@ -148,22 +146,21 @@ func (r *FakeRuntimeServer) RunPodSandbox(ctx context.Context, in *runtimeapi.Ru
 	// fixed name from BuildSandboxName() for easily making fake sandboxes.
 	config := in.GetConfig()
 	podSandboxID := BuildSandboxName(config.Metadata)
-	readyState := runtimeapi.PodSandboxState_SANDBOX_READY
 	r.Sandboxes[podSandboxID] = &FakePodSandbox{
 		PodSandboxStatus: runtimeapi.PodSandboxStatus{
-			Id:        &podSandboxID,
+			Id:        podSandboxID,
 			Metadata:  config.Metadata,
-			State:     &readyState,
-			CreatedAt: &r.CurrentTime,
+			State:     runtimeapi.PodSandboxState_SANDBOX_READY,
+			CreatedAt: r.CurrentTime,
 			Network: &runtimeapi.PodSandboxNetworkStatus{
-				Ip: &FakePodSandboxIP,
+				Ip: FakePodSandboxIP,
 			},
 			Labels:      config.Labels,
 			Annotations: config.Annotations,
 		},
 	}
 
-	return &runtimeapi.RunPodSandboxResponse{PodSandboxId: &podSandboxID}, nil
+	return &runtimeapi.RunPodSandboxResponse{PodSandboxId: podSandboxID}, nil
 }
 
 func (r *FakeRuntimeServer) StopPodSandbox(ctx context.Context, in *runtimeapi.StopPodSandboxRequest) (*runtimeapi.StopPodSandboxResponse, error) {
@@ -172,12 +169,11 @@ func (r *FakeRuntimeServer) StopPodSandbox(ctx context.Context, in *runtimeapi.S
 
 	r.journal.Record("StopPodSandbox")
 
-	podSandboxID := in.GetPodSandboxId()
 	notReadyState := runtimeapi.PodSandboxState_SANDBOX_NOTREADY
-	if s, ok := r.Sandboxes[podSandboxID]; ok {
-		s.State = &notReadyState
+	if s, ok := r.Sandboxes[in.PodSandboxId]; ok {
+		s.State = notReadyState
 	} else {
-		return nil, fmt.Errorf("pod sandbox %s not found", podSandboxID)
+		return nil, fmt.Errorf("pod sandbox %s not found", in.PodSandboxId)
 	}
 
 	return &runtimeapi.StopPodSandboxResponse{}, nil
@@ -190,7 +186,7 @@ func (r *FakeRuntimeServer) RemovePodSandbox(ctx context.Context, in *runtimeapi
 	r.journal.Record("RemovePodSandbox")
 
 	// Remove the pod sandbox
-	delete(r.Sandboxes, in.GetPodSandboxId())
+	delete(r.Sandboxes, in.PodSandboxId)
 
 	return &runtimeapi.RemovePodSandboxResponse{}, nil
 }
@@ -201,10 +197,9 @@ func (r *FakeRuntimeServer) PodSandboxStatus(ctx context.Context, in *runtimeapi
 
 	r.journal.Record("PodSandboxStatus")
 
-	podSandboxID := in.GetPodSandboxId()
-	s, ok := r.Sandboxes[podSandboxID]
+	s, ok := r.Sandboxes[in.PodSandboxId]
 	if !ok {
-		return nil, fmt.Errorf("pod sandbox %q not found", podSandboxID)
+		return nil, fmt.Errorf("pod sandbox %q not found", in.PodSandboxId)
 	}
 
 	return &runtimeapi.PodSandboxStatusResponse{Status: &s.PodSandboxStatus}, nil
@@ -227,10 +222,10 @@ func (r *FakeRuntimeServer) ListPodSandbox(ctx context.Context, in *runtimeapi.L
 	for _, id := range ids {
 		s := r.Sandboxes[id]
 		if filter != nil {
-			if filter.Id != nil && filter.GetId() != id {
+			if filter.Id != "" && filter.Id != id {
 				continue
 			}
-			if filter.State != nil && filter.GetState() != s.GetState() {
+			if filter.State != nil && filter.GetState().State != s.State {
 				continue
 			}
 			if filter.LabelSelector != nil && !filterInLabels(filter.LabelSelector, s.GetLabels()) {
@@ -259,26 +254,23 @@ func (r *FakeRuntimeServer) CreateContainer(ctx context.Context, in *runtimeapi.
 
 	// ContainerID should be randomized for real container runtime, but here just use
 	// fixed BuildContainerName() for easily making fake containers.
-	podSandboxID := in.GetPodSandboxId()
 	config := in.GetConfig()
-	containerID := BuildContainerName(config.Metadata, podSandboxID)
-	createdState := runtimeapi.ContainerState_CONTAINER_CREATED
-	imageRef := config.Image.GetImage()
+	containerID := BuildContainerName(config.Metadata, in.PodSandboxId)
 	r.Containers[containerID] = &FakeContainer{
 		ContainerStatus: runtimeapi.ContainerStatus{
-			Id:          &containerID,
+			Id:          containerID,
 			Metadata:    config.Metadata,
 			Image:       config.Image,
-			ImageRef:    &imageRef,
-			CreatedAt:   &r.CurrentTime,
-			State:       &createdState,
+			ImageRef:    config.Image.Image,
+			CreatedAt:   r.CurrentTime,
+			State:       runtimeapi.ContainerState_CONTAINER_CREATED,
 			Labels:      config.Labels,
 			Annotations: config.Annotations,
 		},
-		SandboxID: podSandboxID,
+		SandboxID: in.PodSandboxId,
 	}
 
-	return &runtimeapi.CreateContainerResponse{ContainerId: &containerID}, nil
+	return &runtimeapi.CreateContainerResponse{ContainerId: containerID}, nil
 }
 
 func (r *FakeRuntimeServer) StartContainer(ctx context.Context, in *runtimeapi.StartContainerRequest) (*runtimeapi.StartContainerResponse, error) {
@@ -287,16 +279,14 @@ func (r *FakeRuntimeServer) StartContainer(ctx context.Context, in *runtimeapi.S
 
 	r.journal.Record("StartContainer")
 
-	containerID := in.GetContainerId()
-	c, ok := r.Containers[containerID]
+	c, ok := r.Containers[in.ContainerId]
 	if !ok {
-		return nil, fmt.Errorf("container %s not found", containerID)
+		return nil, fmt.Errorf("container %s not found", in.ContainerId)
 	}
 
 	// Set container to running.
-	runningState := runtimeapi.ContainerState_CONTAINER_RUNNING
-	c.State = &runningState
-	c.StartedAt = &r.CurrentTime
+	c.State = runtimeapi.ContainerState_CONTAINER_RUNNING
+	c.StartedAt = r.CurrentTime
 
 	return &runtimeapi.StartContainerResponse{}, nil
 }
@@ -307,16 +297,14 @@ func (r *FakeRuntimeServer) StopContainer(ctx context.Context, in *runtimeapi.St
 
 	r.journal.Record("StopContainer")
 
-	containerID := in.GetContainerId()
-	c, ok := r.Containers[containerID]
+	c, ok := r.Containers[in.ContainerId]
 	if !ok {
-		return nil, fmt.Errorf("container %q not found", containerID)
+		return nil, fmt.Errorf("container %q not found", in.ContainerId)
 	}
 
 	// Set container to exited state.
-	exitedState := runtimeapi.ContainerState_CONTAINER_EXITED
-	c.State = &exitedState
-	c.FinishedAt = &r.CurrentTime
+	c.State = runtimeapi.ContainerState_CONTAINER_EXITED
+	c.FinishedAt = r.CurrentTime
 
 	return &runtimeapi.StopContainerResponse{}, nil
 }
@@ -328,7 +316,7 @@ func (r *FakeRuntimeServer) RemoveContainer(ctx context.Context, in *runtimeapi.
 	r.journal.Record("RemoveContainer")
 
 	// Remove the container
-	delete(r.Containers, in.GetContainerId())
+	delete(r.Containers, in.ContainerId)
 
 	return &runtimeapi.RemoveContainerResponse{}, nil
 }
@@ -350,13 +338,13 @@ func (r *FakeRuntimeServer) ListContainers(ctx context.Context, in *runtimeapi.L
 	for _, id := range ids {
 		s := r.Containers[id]
 		if filter != nil {
-			if filter.Id != nil && filter.GetId() != s.GetId() {
+			if filter.Id != "" && filter.Id != s.Id {
 				continue
 			}
-			if filter.PodSandboxId != nil && filter.GetPodSandboxId() != s.SandboxID {
+			if filter.PodSandboxId != "" && filter.PodSandboxId != s.SandboxID {
 				continue
 			}
-			if filter.State != nil && filter.GetState() != s.GetState() {
+			if filter.State != nil && filter.GetState().State != s.State {
 				continue
 			}
 			if filter.LabelSelector != nil && !filterInLabels(filter.LabelSelector, s.GetLabels()) {
@@ -367,7 +355,7 @@ func (r *FakeRuntimeServer) ListContainers(ctx context.Context, in *runtimeapi.L
 		result = append(result, &runtimeapi.Container{
 			Id:           s.Id,
 			CreatedAt:    s.CreatedAt,
-			PodSandboxId: &s.SandboxID,
+			PodSandboxId: s.SandboxID,
 			Metadata:     s.Metadata,
 			State:        s.State,
 			Image:        s.Image,
@@ -386,10 +374,9 @@ func (r *FakeRuntimeServer) ContainerStatus(ctx context.Context, in *runtimeapi.
 
 	r.journal.Record("ContainerStatus")
 
-	containerID := in.GetContainerId()
-	c, ok := r.Containers[containerID]
+	c, ok := r.Containers[in.ContainerId]
 	if !ok {
-		return nil, fmt.Errorf("container %q not found", containerID)
+		return nil, fmt.Errorf("container %q not found", in.ContainerId)
 	}
 
 	return &runtimeapi.ContainerStatusResponse{Status: &c.ContainerStatus}, nil
@@ -397,8 +384,7 @@ func (r *FakeRuntimeServer) ContainerStatus(ctx context.Context, in *runtimeapi.
 
 func (r *FakeRuntimeServer) ExecSync(ctx context.Context, in *runtimeapi.ExecSyncRequest) (*runtimeapi.ExecSyncResponse, error) {
 	r.journal.Record("ExecSync")
-	exitCode := int32(0)
-	return &runtimeapi.ExecSyncResponse{Stdout: nil, Stderr: nil, ExitCode: &exitCode}, nil
+	return &runtimeapi.ExecSyncResponse{Stdout: nil, Stderr: nil, ExitCode: int32(0)}, nil
 }
 
 func (r *FakeRuntimeServer) Exec(ctx context.Context, in *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {

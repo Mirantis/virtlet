@@ -44,20 +44,22 @@ func (it *imageTester) stop() {
 }
 
 func (it *imageTester) pullImage() {
-	imageSpec := &kubeapi.ImageSpec{Image: &imageCirrosUrl}
+	imageSpec := &kubeapi.ImageSpec{Image: imageCirrosUrl}
 	in := &kubeapi.PullImageRequest{
 		Image:         imageSpec,
 		Auth:          &kubeapi.AuthConfig{},
 		SandboxConfig: &kubeapi.PodSandboxConfig{},
 	}
 
-	if _, err := it.imageServiceClient.PullImage(context.Background(), in); err != nil {
+	if resp, err := it.imageServiceClient.PullImage(context.Background(), in); err != nil {
 		it.t.Fatalf("PullImage() failed: %v", err)
+	} else if resp.ImageRef != imageSpec.Image {
+		it.t.Fatalf("PullImage(): bad ImageRef in the response: %q instead of %q", resp.ImageRef, imageSpec)
 	}
 }
 
 func (it *imageTester) queryImage() *kubeapi.Image {
-	imageSpec := &kubeapi.ImageSpec{Image: &imageCirrosUrl}
+	imageSpec := &kubeapi.ImageSpec{Image: imageCirrosUrl}
 	in := &kubeapi.ImageStatusRequest{
 		Image: imageSpec,
 	}
@@ -81,24 +83,24 @@ func (it *imageTester) verifyImage(image *kubeapi.Image) {
 		it.t.Fatal("no image returned by ImageStatus()")
 	}
 
-	if image.GetId() != imageCirrosId {
-		it.t.Fatalf("bad image id: %q instead of %q", image.GetId(), imageCirrosId)
+	if image.Id != imageCirrosId {
+		it.t.Fatalf("bad image id: %q instead of %q", image.Id, imageCirrosId)
 	}
 
-	repoTags := image.GetRepoTags()
+	repoTags := image.RepoTags
 	if len(repoTags) != 1 {
-		it.t.Fatalf("bad number of repo tags for the image (expected just 1 tag): %v", image.GetRepoTags())
+		it.t.Fatalf("bad number of repo tags for the image (expected just 1 tag): %v", image.RepoTags)
 	}
 	if repoTags[0] != imageCirrosUrl {
 		it.t.Fatalf("bad image repo tag: %q instead of %q", repoTags[0], imageCirrosUrl)
 	}
 
-	if image.GetSize_() != uint64(cirrosVolumeSize) {
-		it.t.Fatalf("bad image size in bytes: %d instead of %d", image.GetSize_(), cirrosVolumeSize)
+	if image.Size_ != uint64(cirrosVolumeSize) {
+		it.t.Fatalf("bad image size in bytes: %d instead of %d", image.Size_, cirrosVolumeSize)
 	}
 
-	if image.GetUid() != 0 {
-		it.t.Fatalf("bad image UID: %d instead of 0", image.GetUid())
+	if image.Uid != nil {
+		it.t.Fatalf("bad image UID: %v instead of nil", image.GetUid())
 	}
 }
 
@@ -128,6 +130,8 @@ func TestImagePull(t *testing.T) {
 	it := newImageTester(t)
 	defer it.stop()
 	it.pullImage()
+	// make sure existing image is handled correctly
+	it.pullImage()
 }
 
 func TestImageStatus(t *testing.T) {
@@ -144,7 +148,7 @@ func TestRemoveImage(t *testing.T) {
 	defer it.stop()
 	it.pullImage()
 
-	imageSpec := &kubeapi.ImageSpec{Image: &imageCirrosUrl}
+	imageSpec := &kubeapi.ImageSpec{Image: imageCirrosUrl}
 	in := &kubeapi.RemoveImageRequest{
 		Image: imageSpec,
 	}
@@ -170,6 +174,6 @@ func TestListImagesWithFilter(t *testing.T) {
 	defer it.stop()
 	it.pullImage()
 	noSuchImage := "example.com/no-such-image"
-	it.verifyNoImagesListed(&kubeapi.ImageFilter{Image: &kubeapi.ImageSpec{Image: &noSuchImage}})
-	it.verifySingleImageListed(&kubeapi.ImageFilter{Image: &kubeapi.ImageSpec{Image: &imageCirrosUrl}})
+	it.verifyNoImagesListed(&kubeapi.ImageFilter{Image: &kubeapi.ImageSpec{Image: noSuchImage}})
+	it.verifySingleImageListed(&kubeapi.ImageFilter{Image: &kubeapi.ImageSpec{Image: imageCirrosUrl}})
 }

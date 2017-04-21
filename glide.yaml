@@ -1,28 +1,31 @@
 package: github.com/Mirantis/virtlet
 import:
+- package: github.com/coreos/go-systemd
+  version: 4484981625c1a6a2ecb40a390fcb6a9bcfee76e3
 - package: github.com/golang/glog
 - package: golang.org/x/net
   subpackages:
   - context
 - package: google.golang.org/grpc
-- package: k8s.io/kubernetes
-  version: v1.5.1
-  repo: git://github.com/kubernetes/kubernetes.git
-  vcs: git
-  subpackages:
-  - pkg/kubelet/api/v1alpha1/runtime
-  - api/v1alpha/runtime
 - package: github.com/davecgh/go-spew
-  version: ~1.0.0
+  version: 5215b55f46b2b919f50a1df0eaa5886afe4e3b3d
 - package: go.universe.tf/netboot
   subpackages:
   - dhcp4
 - package: github.com/containernetworking/cni
-  version: ~0.3.0
+  version: 9d5e6e60e79491207834ae8439e80c943db65a69
 - package: github.com/vishvananda/netlink
-  version: a4f22d8ad2327663017dbb309b5e3f8b6f348020
+  version: 9dee363ad4abbc3c9a4a24a9f1e33363e224b111
 - package: github.com/pmezard/go-difflib
   version: ~1.0.0
   subpackages:
   - difflib
 - package: github.com/libvirt/libvirt-go
+- package: k8s.io/kubernetes
+  version: v1.6.1
+- package: k8s.io/apiserver
+  version: fbf5c43dfaa8eb5627bac6058e3bd51db8532cbb
+- package: k8s.io/client-go
+  version: 76153773eaa3a268131d3d993290a194a1370585
+- package: k8s.io/apimachinery
+  version: 75b8dd260ef0469d96d578705a87cffd0e09dab8

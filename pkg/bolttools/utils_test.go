@@ -150,7 +150,7 @@ func dumpDB(t *testing.T, db *bolt.DB) error {
 	return err
 }
 
-func SetUpBolt(t *testing.T, sandboxConfigs []*kubeapi.PodSandboxConfig, containerConfigs []*criapi.ContainerTestConfigSet) *BoltClient {
+func SetUpBolt(t *testing.T, sandboxConfigs []*kubeapi.PodSandboxConfig, containerConfigs []*criapi.ContainerTestConfig) *BoltClient {
 	b, err := NewFakeBoltClient()
 	if err != nil {
 		t.Fatal(err)
@@ -179,7 +179,7 @@ func SetUpBolt(t *testing.T, sandboxConfigs []*kubeapi.PodSandboxConfig, contain
 	}
 
 	for _, container := range containerConfigs {
-		if err := b.SetContainer(container.ContainerId, container.SandboxId, container.Image, container.RootImageSnapshotName, container.Labels, container.Annotations); err != nil {
+		if err := b.SetContainer(container.Name, container.ContainerId, container.SandboxId, container.Image, container.RootImageSnapshotName, container.Labels, container.Annotations); err != nil {
 			t.Fatal(err)
 		}
 	}

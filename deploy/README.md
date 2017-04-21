@@ -4,11 +4,11 @@ The steps described here are performed automatically by
 [demo.sh](demo.sh) script.
 
 1. Start [kubeadm-dind-cluster](https://github.com/Mirants/kubeadm-dind-cluster)
-   with Kubernetes version 1.5 (you're not required to download it to your home directory):
+   with Kubernetes version 1.6 (you're not required to download it to your home directory):
 ```
-$ wget -O ~/dind-cluster-v1.5.sh https://cdn.rawgit.com/Mirantis/kubeadm-dind-cluster/master/fixed/dind-cluster-v1.5.sh
-$ chmod +x ~/dind-cluster-v1.5.sh
-$ ~/dind-cluster-v1.5.sh up
+$ wget -O ~/dind-cluster-v1.6.sh https://cdn.rawgit.com/Mirantis/kubeadm-dind-cluster/master/fixed/dind-cluster-v1.6.sh
+$ chmod +x ~/dind-cluster-v1.6.sh
+$ ~/dind-cluster-v1.6.sh up
 $ export PATH="$HOME/.kubeadm-dind-cluster:$PATH"
 ```
    The cluster script stores appropriate kubectl version in `~/.kubeadm-dind-cluster`.

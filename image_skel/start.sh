@@ -4,6 +4,14 @@ set -o nounset
 set -o pipefail
 set -o errtrace
 
+if [[ -f /dind/virtlet ]]; then
+  ln -fs /dind/virtlet /usr/local/bin/virtlet
+fi
+
+if [[ -f /dind/vmwrapper ]]; then
+  ln -fs /dind/vmwrapper /vmwrapper
+fi
+
 if [[ ! ${VIRTLET_DISABLE_KVM:-} ]]; then
   if ! kvm-ok >&/dev/null; then
     # try to fix the environment by loading appropriate modules
@@ -26,11 +34,25 @@ chown root:root /etc/libvirt/qemu.conf
 chmod 644 /etc/libvirt/libvirtd.conf
 chmod 644 /etc/libvirt/qemu.conf
 
+# Without this hack qemu dies trying to unlink
+# '/var/lib/libvirt/qemu/capabilities.monitor.sock'
+# while libvirt is querying capabilities.
+# Removal of the socket below helps but not always.
+
+mv /var/lib/libvirt/qemu /var/lib/libvirt/qemu.ok
+mv /var/lib/libvirt/qemu.ok /var/lib/libvirt/qemu
+
+# leftover socket prevents libvirt from initializing correctly
+rm -f /var/lib/libvirt/qemu/capabilities.monitor.sock
+
 if [[ ${LIBVIRT_CLEANUP:-} ]]; then
   /usr/sbin/libvirtd -d
   /cleanup.py
   kill -9 $(cat /var/run/libvirtd.pid)
 fi
+
+# leftover socket prevents libvirt from initializing correctly
+rm -f /var/lib/libvirt/qemu/capabilities.monitor.sock
 
 if [[ ! ${VIRTLET_DISABLE_KVM:-} ]]; then
   chown root:kvm /dev/kvm

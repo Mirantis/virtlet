@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
-	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/apimachinery/pkg/fields"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
@@ -38,7 +38,7 @@ func (b *BoltClient) EnsureSandboxSchema() error {
 }
 
 func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConfiguration []byte) error {
-	podId := config.Metadata.GetUid()
+	podId := config.Metadata.Uid
 
 	strLabels, err := json.Marshal(config.GetLabels())
 	if err != nil {
@@ -52,7 +52,13 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConf
 
 	metadata := config.GetMetadata()
 	linuxSandbox := config.GetLinux()
-	namespaceOptions := linuxSandbox.GetSecurityContext().GetNamespaceOptions()
+	if linuxSandbox == nil {
+		linuxSandbox = &kubeapi.LinuxPodSandboxConfig{}
+	}
+	namespaceOptions := &kubeapi.NamespaceOption{}
+	if linuxSandbox.SecurityContext != nil && linuxSandbox.SecurityContext.NamespaceOptions != nil {
+		namespaceOptions = linuxSandbox.SecurityContext.NamespaceOptions
+	}
 
 	return b.db.Batch(func(tx *bolt.Tx) error {
 		parentBucket := tx.Bucket([]byte("sandbox"))
@@ -73,11 +79,11 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConf
 			return err
 		}
 
-		if err := sandboxBucket.Put([]byte("hostname"), []byte(config.GetHostname())); err != nil {
+		if err := sandboxBucket.Put([]byte("hostname"), []byte(config.Hostname)); err != nil {
 			return err
 		}
 
-		if err := sandboxBucket.Put([]byte("logDirectory"), []byte(config.GetLogDirectory())); err != nil {
+		if err := sandboxBucket.Put([]byte("logDirectory"), []byte(config.LogDirectory)); err != nil {
 			return err
 		}
 
@@ -103,19 +109,19 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConf
 			return err
 		}
 
-		if err := metadataBucket.Put([]byte("name"), []byte(metadata.GetName())); err != nil {
+		if err := metadataBucket.Put([]byte("name"), []byte(metadata.Name)); err != nil {
 			return err
 		}
 
-		if err := metadataBucket.Put([]byte("uid"), []byte(metadata.GetUid())); err != nil {
+		if err := metadataBucket.Put([]byte("uid"), []byte(metadata.Uid)); err != nil {
 			return err
 		}
 
-		if err := metadataBucket.Put([]byte("namespace"), []byte(metadata.GetNamespace())); err != nil {
+		if err := metadataBucket.Put([]byte("namespace"), []byte(metadata.Namespace)); err != nil {
 			return err
 		}
 
-		if err := metadataBucket.Put([]byte("attempt"), []byte(strconv.FormatUint(uint64(metadata.GetAttempt()), 10))); err != nil {
+		if err := metadataBucket.Put([]byte("attempt"), []byte(strconv.FormatUint(uint64(metadata.Attempt), 10))); err != nil {
 			return err
 		}
 
@@ -124,7 +130,7 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConf
 			return err
 		}
 
-		if err := linuxSandboxBucket.Put([]byte("cgroupParent"), []byte(linuxSandbox.GetCgroupParent())); err != nil {
+		if err := linuxSandboxBucket.Put([]byte("cgroupParent"), []byte(linuxSandbox.CgroupParent)); err != nil {
 			return err
 		}
 
@@ -133,15 +139,15 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConf
 			return err
 		}
 
-		if err := namespaceOptionsBucket.Put([]byte("hostNetwork"), []byte(strconv.FormatBool(namespaceOptions.GetHostNetwork()))); err != nil {
+		if err := namespaceOptionsBucket.Put([]byte("hostNetwork"), []byte(strconv.FormatBool(namespaceOptions.HostNetwork))); err != nil {
 			return err
 		}
 
-		if err := namespaceOptionsBucket.Put([]byte("hostPid"), []byte(strconv.FormatBool(namespaceOptions.GetHostPid()))); err != nil {
+		if err := namespaceOptionsBucket.Put([]byte("hostPid"), []byte(strconv.FormatBool(namespaceOptions.HostPid))); err != nil {
 			return err
 		}
 
-		if err := namespaceOptionsBucket.Put([]byte("hostIpc"), []byte(strconv.FormatBool(namespaceOptions.GetHostIpc()))); err != nil {
+		if err := namespaceOptionsBucket.Put([]byte("hostIpc"), []byte(strconv.FormatBool(namespaceOptions.HostIpc))); err != nil {
 			return err
 		}
 
@@ -348,18 +354,18 @@ func (b *BoltClient) GetPodSandboxStatus(podId string) (*kubeapi.PodSandboxStatu
 		}
 
 		metadata := &kubeapi.PodSandboxMetadata{
-			Name:      &metadataName,
-			Uid:       &metadataUid,
-			Namespace: &metadataNamespace,
-			Attempt:   &uint32MetadataAttempt,
+			Name:      metadataName,
+			Uid:       metadataUid,
+			Namespace: metadataNamespace,
+			Attempt:   uint32MetadataAttempt,
 		}
 
 		state := kubeapi.PodSandboxState(bytesState[0])
 
 		namespaceOptions := &kubeapi.NamespaceOption{
-			HostNetwork: &hostNetwork,
-			HostPid:     &hostPid,
-			HostIpc:     &hostIpc,
+			HostNetwork: hostNetwork,
+			HostPid:     hostPid,
+			HostIpc:     hostIpc,
 		}
 
 		namespace := &kubeapi.Namespace{
@@ -371,10 +377,10 @@ func (b *BoltClient) GetPodSandboxStatus(podId string) (*kubeapi.PodSandboxStatu
 		}
 
 		podSandboxStatus = &kubeapi.PodSandboxStatus{
-			Id:          &podId,
+			Id:          podId,
 			Metadata:    metadata,
-			State:       &state,
-			CreatedAt:   &createdAt,
+			State:       state,
+			CreatedAt:   createdAt,
 			Linux:       linuxSandbox,
 			Labels:      labels,
 			Annotations: annotations,
@@ -387,11 +393,15 @@ func (b *BoltClient) GetPodSandboxStatus(podId string) (*kubeapi.PodSandboxStatu
 }
 
 func filterPodSandbox(sandbox *kubeapi.PodSandbox, filter *kubeapi.PodSandboxFilter) bool {
-	if filter.GetId() != "" && sandbox.GetId() != filter.GetId() {
+	if filter == nil {
+		return true
+	}
+
+	if filter.Id != "" && sandbox.Id != filter.Id {
 		return false
 	}
 
-	if sandbox.GetState() != filter.GetState() {
+	if filter.State != nil && sandbox.State != filter.GetState().State {
 		return false
 	}
 
@@ -482,19 +492,19 @@ func (b *BoltClient) getPodSandbox(sandboxId []byte, filter *kubeapi.PodSandboxF
 		strSandboxId := string(sandboxId)
 
 		metadata := &kubeapi.PodSandboxMetadata{
-			Name:      &metadataName,
-			Uid:       &metadataUid,
-			Namespace: &metadataNamespace,
-			Attempt:   &uint32MetadataAttempt,
+			Name:      metadataName,
+			Uid:       metadataUid,
+			Namespace: metadataNamespace,
+			Attempt:   uint32MetadataAttempt,
 		}
 
 		state := kubeapi.PodSandboxState(bytesState[0])
 
 		podSandbox = &kubeapi.PodSandbox{
-			Id:        &strSandboxId,
+			Id:        strSandboxId,
 			Metadata:  metadata,
-			State:     &state,
-			CreatedAt: &createdAt,
+			State:     state,
+			CreatedAt: createdAt,
 			Labels:    labels,
 		}
 
