@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -28,12 +27,17 @@ import (
 )
 
 type volumeOpts struct {
+	Type string `json:"type"`
+	// ceph fields
 	Monitor  string `json:"monitor"`
 	Pool     string `json:"pool"`
 	Volume   string `json:"volume"`
 	Secret   string `json:"secret"`
-	User     string `json:user`
-	Protocol string `json:protocol`
+	User     string `json:"user"`
+	Protocol string `json:"protocol"`
+	// nocloud fields
+	MetaData string `json:"metadata"`
+	UserData string `json:"userdata"`
 }
 
 func newUuid() string {
@@ -46,6 +50,16 @@ func newUuid() string {
 
 type UuidGen func() string
 
+type volumeType interface {
+	populateVolumeDir(uuidGen UuidGen, targetDir string, opts volumeOpts) error
+	getVolumeName(opts volumeOpts) (string, error)
+}
+
+var flexVolumeTypes = map[string]volumeType{
+	"ceph":    cephVolumeType{},
+	"nocloud": noCloudVolumeType{},
+}
+
 type FlexVolumeDriver struct {
 	uuidGen UuidGen
 }
@@ -57,47 +71,23 @@ func NewFlexVolumeDriver(uuidGen UuidGen) *FlexVolumeDriver {
 	return &FlexVolumeDriver{uuidGen: uuidGen}
 }
 
-func (d *FlexVolumeDriver) addVolumeDefinitions(target string, opts volumeOpts) error {
-	uuid := d.uuidGen()
+func (d *FlexVolumeDriver) getVolumeType(opts volumeOpts) (volumeType, error) {
+	if opts.Type == "" {
+		return nil, errors.New("virtlet flexvolume type not set")
+	}
+	vt, ok := flexVolumeTypes[opts.Type]
+	if !ok {
+		return nil, fmt.Errorf("unknown volume type %q", opts.Type)
+	}
+	return vt, nil
+}
 
-	secretXML := `
-<secret ephemeral='no' private='no'>
-  <uuid>%s</uuid>
-  <usage type='ceph'>
-    <name>%s</name>
-  </usage>
-</secret>
-`
-	if err := ioutil.WriteFile(target+"/secret.xml", []byte(fmt.Sprintf(secretXML, uuid, opts.User)), 0644); err != nil {
+func (d *FlexVolumeDriver) populateVolumeDir(targetDir string, opts volumeOpts) error {
+	vt, err := d.getVolumeType(opts)
+	if err != nil {
 		return err
 	}
-
-	// Will be removed right after creating appropriate secret in libvirt
-	if err := ioutil.WriteFile(target+"/key", []byte(opts.Secret), 0644); err != nil {
-		return err
-	}
-
-	diskXML := `
-<disk type="network" device="disk">
-  <driver name="qemu" type="raw"/>
-  <auth username="%s">
-    <secret type="ceph" uuid="%s"/>
-  </auth>
-  <source protocol="rbd" name="%s/%s">
-    <host name="%s" port="%s"/>
-  </source>
-  <target dev="%s" bus="virtio"/>
-</disk>
-`
-	pairIPPort := strings.Split(opts.Monitor, ":")
-	if len(pairIPPort) != 2 {
-		return fmt.Errorf("invalid format of ceph monitor setting: %s. Expected in form ip:port", opts.Monitor)
-	}
-	// Note: target dev name wiil be specified later by virtlet diring combining domain xml definition
-	if err := ioutil.WriteFile(target+"/disk.xml", []byte(fmt.Sprintf(diskXML, opts.User, uuid, opts.Pool, opts.Volume, pairIPPort[0], pairIPPort[1], "%s")), 0644); err != nil {
-		return err
-	}
-	return nil
+	return vt.populateVolumeDir(d.uuidGen, targetDir, opts)
 }
 
 // The following functions are not currently needed, but still
@@ -137,7 +127,7 @@ func (d *FlexVolumeDriver) mount(targetMountDir, jsonOptions string) (map[string
 	if err := os.MkdirAll(targetMountDir, 0700); err != nil {
 		return nil, fmt.Errorf("os.MkDirAll(): %v", err)
 	}
-	if err := d.addVolumeDefinitions(targetMountDir, opts); err != nil {
+	if err := d.populateVolumeDir(targetMountDir, opts); err != nil {
 		return nil, err
 	}
 	return nil, nil
@@ -158,17 +148,18 @@ func (d *FlexVolumeDriver) getVolumeName(jsonOptions string) (map[string]interfa
 	if err := json.Unmarshal([]byte(jsonOptions), &opts); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal json options: %v", err)
 	}
-	r := []string{}
-	monStr := strings.Replace(opts.Monitor, ":", "/", -1)
-	for _, s := range []string{monStr, opts.Pool, opts.Volume, opts.User, opts.Protocol} {
-		if s != "" {
-			r = append(r, s)
-		}
+
+	vt, err := d.getVolumeType(opts)
+	if err != nil {
+		return nil, err
 	}
-	if len(r) == 0 {
-		return nil, fmt.Errorf("invalid flexvolume definition")
+
+	volumeName, err := vt.getVolumeName(opts)
+	if err != nil {
+		return nil, err
 	}
-	return map[string]interface{}{"volumeName": strings.Join(r, "/")}, nil
+
+	return map[string]interface{}{"volumeName": volumeName}, nil
 }
 
 type driverOp func(*FlexVolumeDriver, []string) (map[string]interface{}, error)
@@ -249,14 +240,14 @@ func (d *FlexVolumeDriver) Run(args []string) string {
 	// and tries to parse it as JSON (need to recheck this,
 	// maybe submit a PS to fix it)
 
-	// f, err := os.OpenFile("/tmp/flexvolume.log", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
-	// if err != nil {
-	// 	panic(err)
-	// }
+	f, err := os.OpenFile("/tmp/flexvolume.log", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
+	if err != nil {
+		panic(err)
+	}
 
-	// defer f.Close()
+	defer f.Close()
 
-	// fmt.Fprintf(f, "flexvolume %s -> %s\n", strings.Join(args, " "), r)
+	fmt.Fprintf(f, "flexvolume %s -> %s\n", strings.Join(args, " "), r)
 
 	return r
 }

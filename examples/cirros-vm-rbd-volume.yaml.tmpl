@@ -22,6 +22,7 @@ spec:
       flexVolume:
         driver: "virtlet/flexvolume_driver"
         options:
+          Type: ceph
           Monitor: @MON_IP@:6789
           User: libvirt
           Secret: @SECRET@

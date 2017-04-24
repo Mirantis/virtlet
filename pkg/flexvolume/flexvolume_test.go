@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"reflect"
@@ -50,12 +51,55 @@ const (
   </usage>
 </secret>
 `
+	noCloudDiskTestTemplate = `
+<disk type="file" device="disk">
+  <driver name="qemu" type="raw"/>
+  <source file='%s'/>
+  <readonly/>
+  <target dev="%%s" bus="virtio"/>
+</disk>
+`
+	noCloudMetaData = `
+instance-id: some-instance-id
+local-hostname: foobar
+`
+	noCloudUserData = `
+    #cloud-config
+    fqdn: ubuntu-16-vm.mydomain.com
+    users:
+      - name: root
+        ssh-authorized-keys:
+          - ssh-rsa YOUR_KEY_HEWE me@localhost
+    ssh_pwauth: True
+    runcmd:
+    - [ apt-get, update ]
+    - [ apt-get, install, -y, --force-yes, apache2 ]
+`
 )
 
+func isoToMap(isoPath string) (map[string]interface{}, error) {
+	tmpDir, err := ioutil.TempDir("", "iso-out")
+	if err != nil {
+		return nil, fmt.Errorf("ioutil.TempDir(): %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	out, err := exec.Command("7z", "x", "-o"+tmpDir, isoPath).CombinedOutput()
+	if err != nil {
+		outStr := ""
+		if len(out) != 0 {
+			outStr = ". Output:\n" + string(out)
+		}
+		return nil, fmt.Errorf("error unpacking iso: %v%s", err, outStr)
+	}
+	return dirToMap(tmpDir)
+}
+
 // dirToMap converts directory to a map where keys are filenames
-// without full path and values are the contents of the files.  If the
-// directory doesn't exist, dirToMap returns nil
-func dirToMap(dir string) (map[string]string, error) {
+// without full path and values are the contents of the files. Files
+// with '.iso' extensions are unpacked using 7z and then converted to
+// a map using dirToMap. If the directory doesn't exist, dirToMap
+// returns nil
+func dirToMap(dir string) (map[string]interface{}, error) {
 	if fi, err := os.Stat(dir); err != nil && os.IsNotExist(err) {
 		return nil, nil
 	} else if err != nil {
@@ -63,11 +107,11 @@ func dirToMap(dir string) (map[string]string, error) {
 	} else if !fi.IsDir() {
 		return nil, fmt.Errorf("%q expected to be a directory", dir)
 	}
-	paths, err := filepath.Glob(dir + "/*")
+	paths, err := filepath.Glob(filepath.Join(dir, "/*"))
 	if err != nil {
 		return nil, fmt.Errorf("filepath.Glob(): %v", err)
 	}
-	m := map[string]string{}
+	m := map[string]interface{}{}
 	for _, p := range paths {
 		filename := filepath.Base(p)
 		if fi, err := os.Stat(p); err != nil {
@@ -75,16 +119,23 @@ func dirToMap(dir string) (map[string]string, error) {
 		} else if fi.IsDir() {
 			return nil, fmt.Errorf("unexpected directory: %q", filename)
 		}
-		bs, err := ioutil.ReadFile(p)
-		if err != nil {
-			return nil, fmt.Errorf("ioutil.ReadFile(): %v", err)
+		if strings.HasSuffix(filename, ".iso") {
+			m[filename], err = isoToMap(p)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			bs, err := ioutil.ReadFile(p)
+			if err != nil {
+				return nil, fmt.Errorf("ioutil.ReadFile(): %v", err)
+			}
+			m[filename] = string(bs)
 		}
-		m[filename] = string(bs)
 	}
 	return m, nil
 }
 
-func mapToJson(m map[string]string) string {
+func mapToJson(m map[string]interface{}) string {
 	bs, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
 		log.Panicf("error marshalling json: %v", err)
@@ -99,13 +150,20 @@ func TestFlexVolume(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	cephJsonOpts := mapToJson(map[string]string{
+	cephJsonOpts := mapToJson(map[string]interface{}{
+		"type":    "ceph",
 		"monitor": "127.0.0.1:6789",
 		"pool":    "libvirt-pool",
 		"volume":  "rbd-test-image",
 		"secret":  "foobar",
 		"user":    "libvirt",
 	})
+	noCloudJsonOpts := mapToJson(map[string]interface{}{
+		"type":     "nocloud",
+		"metadata": noCloudMetaData,
+		"userdata": noCloudUserData,
+	})
+	noCloudDisk := fmt.Sprintf(noCloudDiskTestTemplate, path.Join(tmpDir, "nocloud/nocloud.iso"))
 	for _, step := range []struct {
 		name    string
 		args    []string
@@ -113,7 +171,7 @@ func TestFlexVolume(t *testing.T) {
 		status  string
 		message string
 		fields  map[string]interface{}
-		files   map[string]string
+		files   map[string]interface{}
 	}{
 		{
 			name:   "init",
@@ -130,14 +188,14 @@ func TestFlexVolume(t *testing.T) {
 			status: "Success",
 		},
 		{
-			name: "getvolumename",
+			name: "getvolumename-ceph",
 			args: []string{
 				"getvolumename",
 				cephJsonOpts,
 			},
 			status: "Success",
 			fields: map[string]interface{}{
-				"volumeName": "127.0.0.1/6789/libvirt-pool/rbd-test-image/libvirt",
+				"volumeName": "ceph/127.0.0.1/6789/libvirt-pool/rbd-test-image/libvirt",
 			},
 		},
 		{
@@ -165,7 +223,7 @@ func TestFlexVolume(t *testing.T) {
 			},
 		},
 		{
-			name: "mount",
+			name: "mount-ceph",
 			args: []string{
 				"mount",
 				path.Join(tmpDir, "ceph"),
@@ -173,14 +231,14 @@ func TestFlexVolume(t *testing.T) {
 			},
 			status: "Success",
 			subdir: "ceph",
-			files: map[string]string{
+			files: map[string]interface{}{
 				"disk.xml":   cephDisk,
 				"key":        "foobar",
 				"secret.xml": cephSecret,
 			},
 		},
 		{
-			name: "unmount",
+			name: "unmount-ceph",
 			args: []string{
 				"unmount",
 				path.Join(tmpDir, "ceph"),
@@ -190,7 +248,7 @@ func TestFlexVolume(t *testing.T) {
 			files:  nil, // dir must be removed
 		},
 		{
-			name: "mount",
+			name: "mount-ceph-1",
 			args: []string{
 				"mount",
 				path.Join(tmpDir, "ceph"),
@@ -198,14 +256,14 @@ func TestFlexVolume(t *testing.T) {
 			},
 			status: "Success",
 			subdir: "ceph",
-			files: map[string]string{
+			files: map[string]interface{}{
 				"disk.xml":   cephDisk,
 				"key":        "foobar",
 				"secret.xml": cephSecret,
 			},
 		},
 		{
-			name: "unmount",
+			name: "unmount-ceph-1",
 			args: []string{
 				"unmount",
 				path.Join(tmpDir, "ceph"),
@@ -243,6 +301,44 @@ func TestFlexVolume(t *testing.T) {
 			args:    []string{},
 			status:  "Failure",
 			message: "no arguments passed",
+		},
+		{
+			name: "getvolumename-nocloud",
+			args: []string{
+				"getvolumename",
+				noCloudJsonOpts,
+			},
+			status: "Success",
+			fields: map[string]interface{}{
+				"volumeName": "nocloud/d310e76be30a09a08316fb5ddb607d9cc6b9183b-822556e837124f608980523088e179808306b8d2",
+			},
+		},
+		{
+			name: "mount-nocloud",
+			args: []string{
+				"mount",
+				path.Join(tmpDir, "nocloud"),
+				noCloudJsonOpts,
+			},
+			status: "Success",
+			subdir: "nocloud",
+			files: map[string]interface{}{
+				"disk.xml": noCloudDisk,
+				"nocloud.iso": map[string]interface{}{
+					"meta-data": noCloudMetaData,
+					"user-data": noCloudUserData,
+				},
+			},
+		},
+		{
+			name: "unmount-nocloud",
+			args: []string{
+				"unmount",
+				path.Join(tmpDir, "nocloud"),
+			},
+			status: "Success",
+			subdir: "nocloud",
+			files:  nil, // dir must be removed
 		},
 	} {
 		t.Run(step.name, func(t *testing.T) {
@@ -293,3 +389,5 @@ func TestFlexVolume(t *testing.T) {
 		})
 	}
 }
+
+// TODO: escape xml in iso path

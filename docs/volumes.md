@@ -116,6 +116,7 @@ Basing on [FlexVolumes](https://github.com/kubernetes/community/blob/master/cont
 
 ```
 - FlexVolume Driver name: kubernetes.io/flexvolume_driver
+- Type: ceph
 - Monitor: <ip:port>
 - User: <user-name>
 - Secret: <user-secret-key>
@@ -192,6 +193,7 @@ spec:
       flexVolume:
         driver: kubernetes.io/flexvolume_driver
         options:
+          Type: ceph
           Monitor: 10.192.0.1:6789
           User: libvirt
           Secret: AQDTwuVY8rA8HxAAthwOKaQPr0hRc7kCmR/9Qg==
