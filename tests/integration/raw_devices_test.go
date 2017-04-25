@@ -82,6 +82,11 @@ func TestRawDevices(t *testing.T) {
 	}
 
 	ct.waitForContainerRunning(container.ContainerId, container.Name)
+
+	// check for loop in container dom
+	cmd := fmt.Sprintf("virsh domblklist %s | grep '/dev/loop' | wc -l", container.ContainerId)
+	verifyUsingShell(t, cmd, "how many there's attached loop devices", "1")
+
 	ct.stopContainer(container.ContainerId)
 	ct.removeContainer(container.ContainerId)
 	ct.waitForNoContainers(&kubeapi.ContainerFilter{
