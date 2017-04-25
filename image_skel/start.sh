@@ -65,6 +65,12 @@ while ! nc -z -v -w1 localhost 16509 >& /dev/null; do
   sleep 0.3
 done
 
+if [[ ${VIRTLET_RAW_DEVICES:-} ]]; then
+  RAW_DEVICES="-raw-devices $VIRTLET_RAW_DEVICES"
+else
+  RAW_DEVICES=""
+fi
+
 PROTOCOL="${VIRTLET_DOWNLOAD_PROTOCOL:-https}"
 
 if [[ ${1:-} != -novirtlet ]]; then
@@ -73,5 +79,5 @@ if [[ ${1:-} != -novirtlet ]]; then
       mkdir ${FLEXVOLUME_DIR}/virtlet~flexvolume_driver
       cp /flexvolume_driver ${FLEXVOLUME_DIR}/virtlet~flexvolume_driver/flexvolume_driver
     fi
-    /usr/local/bin/virtlet -v=${VIRTLET_LOGLEVEL:-2} -logtostderr=true -libvirt-uri=qemu+tcp://localhost/system -image-download-protocol="${PROTOCOL}"
+    /usr/local/bin/virtlet -v=${VIRTLET_LOGLEVEL:-2} -logtostderr=true -libvirt-uri=qemu+tcp://localhost/system -image-download-protocol="${PROTOCOL}" "${RAW_DEVICES}"
 fi
