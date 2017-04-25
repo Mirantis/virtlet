@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cirros-vm
+  annotations:
+    # this assumes that on node prepared for runnig virtlet pods there is some file attached
+    # to /dev/loop0, which can be used by VM as additional disk
+    VirtletVolumes: >
+      [
+        {
+          "Name": "vol1",
+          "Format": "raw",
+          "Path": "/dev/loop0"
+        },
+      ]
+  annotations:
+    kubernetes.io/target-runtime: virtlet
+spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: extraRuntime
+            operator: In
+            values:
+            - virtlet
+  containers:
+    - name: cirros-vm
+      image: virtlet/image-service/cirros
