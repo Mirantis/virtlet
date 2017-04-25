@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/golang/glog"
@@ -186,18 +188,19 @@ func (p *Pool) ListVolumes() ([]*VolumeInfo, error) {
 }
 
 type StorageTool struct {
-	name string
-	tool StorageOperations
-	pool *Pool
+	name       string
+	tool       StorageOperations
+	rawDevices []string
+	pool       *Pool
 }
 
-func NewStorageTool(conn *libvirt.Connect, poolName string) (*StorageTool, error) {
+func NewStorageTool(conn *libvirt.Connect, poolName, rawDevices string) (*StorageTool, error) {
 	tool := NewLibvirtStorageOperations(conn)
 	pool, err := LookupStoragePool(tool, poolName)
 	if err != nil {
 		return nil, err
 	}
-	return &StorageTool{name: poolName, tool: tool, pool: pool}, nil
+	return &StorageTool{name: poolName, tool: tool, pool: pool, rawDevices: strings.Split(rawDevices, ",")}, nil
 }
 
 func (s *StorageTool) GenerateVolumeXML(shortName string, capacity uint64, capacityUnit string, path string) string {
@@ -320,6 +323,9 @@ func (s *StorageTool) PrepareVolumesToBeAttached(virtletVolsDesc string, contain
 			volXML = fmt.Sprintf(volXMLTemplate, path, virtDev)
 
 		case "raw":
+			if err := s.isRawDeviceOnWhitelist(virtletVol.Path); err != nil {
+				return nil, err
+			}
 			if err := verifyRawDeviceAccess(virtletVol.Path); err != nil {
 				return nil, err
 			}
@@ -333,6 +339,21 @@ func (s *StorageTool) PrepareVolumesToBeAttached(virtletVolsDesc string, contain
 	}
 
 	return volumesXMLs, nil
+}
+
+func (s *StorageTool) isRawDeviceOnWhitelist(path string) error {
+	for _, deviceTemplate := range s.rawDevices {
+		devicePaths, err := filepath.Glob("/dev/" + deviceTemplate)
+		if err != nil {
+			return fmt.Errorf("error in raw device whitelist glob pattern '%s': %v", deviceTemplate, err)
+		}
+		for _, devicePath := range devicePaths {
+			if path == devicePath {
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("device '%s' not whitelisted on this virtlet node", path)
 }
 
 func verifyRawDeviceAccess(path string) error {

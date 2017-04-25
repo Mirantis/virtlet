@@ -391,8 +391,8 @@ type VirtualizationTool struct {
 	volumePoolName string
 }
 
-func NewVirtualizationTool(conn *libvirt.Connect, poolName string) (*VirtualizationTool, error) {
-	storageTool, err := NewStorageTool(conn, poolName)
+func NewVirtualizationTool(conn *libvirt.Connect, poolName, rawDevices string) (*VirtualizationTool, error) {
+	storageTool, err := NewStorageTool(conn, poolName, rawDevices)
 	if err != nil {
 		return nil, err
 	}
