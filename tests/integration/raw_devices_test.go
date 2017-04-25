@@ -82,6 +82,11 @@ func TestRawDevices(t *testing.T) {
 	}
 
 	ct.waitForContainerRunning(container.ContainerId, container.Name)
+
+	// check for loop in container dom
+	cmd := fmt.Sprintf("virsh domblklist %s | grep '/dev/loop' | wc -l", container.ContainerId)
+	verifyUsingShell(t, cmd, "the number of loop devices atached", "1")
+
 	ct.stopContainer(container.ContainerId)
 	ct.removeContainer(container.ContainerId)
 	ct.waitForNoContainers(&kubeapi.ContainerFilter{
@@ -103,7 +108,7 @@ func createTemporaryFile() string {
 	zeros := make([]byte, 1024)
 	for counter := 0; counter < tempFileSizeInKB; counter++ {
 		if _, err := file.Write(zeros); err != nil {
-			log.Fatalf("Error during filling temporary file: %v", err)
+			log.Fatalf("Error writing temporary file: %v", err)
 		}
 	}
 
@@ -114,7 +119,7 @@ func fromShell(format string, a ...interface{}) string {
 	command := fmt.Sprintf(format, a...)
 	out, err := exec.Command("bash", "-c", command).Output()
 	if err != nil {
-		log.Fatalf("Error during execution of command '%s': %v", command, err)
+		log.Fatalf("Error executing command '%q': %v", command, err)
 	}
 	return strings.TrimSpace(string(out))
 }
