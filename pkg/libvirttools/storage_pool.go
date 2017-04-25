@@ -18,6 +18,7 @@ package libvirttools
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -57,12 +58,55 @@ func (vol *VirtletVolume) UnmarshalJSON(data []byte) error {
 
 	err := json.Unmarshal(data, volWithDefaults)
 
-	if err == nil && volWithDefaults.Name == "" {
-		return fmt.Errorf("Validation failed for volumes definition within pod's annotations: volume name is mandatory.")
+	if err != nil {
+		return err
+	}
+
+	if volWithDefaults.Format == "qcow2" {
+		if volWithDefaults.Capacity == 0 {
+			volWithDefaults.Capacity = defaultCapacity
+		}
+		if volWithDefaults.CapacityUnit == "" {
+			volWithDefaults.CapacityUnit = defaultCapacityUnit
+		}
 	}
 
 	*vol = VirtletVolume(*volWithDefaults)
-	return err
+	if err := vol.validate(); err != nil {
+		return fmt.Errorf("validation failed for volumes definition within pod's annotations: %s", err)
+	}
+
+	return nil
+}
+
+func (vol *VirtletVolume) validate() error {
+	if vol.Name == "" {
+		return errors.New("volume name is mandatory")
+	}
+
+	switch vol.Format {
+	case "qcow2":
+		if vol.Path != "" {
+			return fmt.Errorf("qcow2 volume should not have Path but it has it set to: %s", vol.Path)
+		}
+	case "raw":
+		if vol.Capacity != 0 {
+			return fmt.Errorf("raw volume should not have Capacity, but it has it equal to: %d", vol.Capacity)
+		}
+		if vol.CapacityUnit != "" {
+			return fmt.Errorf("raw volume should not have CapacityUnit, but it has it set to: %s", vol.CapacityUnit)
+		}
+		if !strings.HasPrefix(vol.Path, "/dev/") {
+			return fmt.Errorf("raw volume Path needs to be prefixed by '/dev/', but it's whole value is: ", vol.Path)
+		}
+		if err := verifyRawDeviceAccess(vol.Path); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("unsupported volume format: %s", vol.Format)
+	}
+
+	return nil
 }
 
 func (v *Volume) Remove() error {
@@ -267,15 +311,14 @@ func (s *StorageTool) CleanAttachedVolumes(virtletVolsDesc string, containerId s
 	}
 
 	for _, virtletVol := range vols {
-		switch virtletVol.Format {
-		case "qcow2":
+		if err := virtletVol.validate(); err != nil {
+			return err
+		}
+		if virtletVol.Format == "qcow2" {
 			volName := containerId + "-" + virtletVol.Name
 			if err := s.RemoveVolume(volName); err != nil {
 				return fmt.Errorf("error during removal of volume '%s' for container %s: %v", volName, containerId, err)
 			}
-		case "raw":
-		default:
-			return fmt.Errorf("unsupported volume format '%s' in volume '%s' definition", virtletVol.Format, virtletVol.Name)
 		}
 	}
 
@@ -296,6 +339,9 @@ func (s *StorageTool) PrepareVolumesToBeAttached(virtletVolsDesc string, contain
 	}
 
 	for i, virtletVol := range virtletVols {
+		if err := virtletVol.validate(); err != nil {
+			return nil, fmt.Errorf("volume '%s' have an error in definition: %s", virtletVol.Name, err)
+		}
 		if letterInd+i == len(diskLetters) {
 			return nil, fmt.Errorf("too much volumes, limit %d of them exceeded on volume '%s'", len(diskLetters), virtletVol.Name)
 		}
@@ -305,9 +351,9 @@ func (s *StorageTool) PrepareVolumesToBeAttached(virtletVolsDesc string, contain
 		var volXML string
 		switch virtletVol.Format {
 		case "qcow2":
-			vol, err := s.CreateVolume(volName, defaultCapacity, defaultCapacityUnit)
+			vol, err := s.CreateVolume(volName, uint64(virtletVol.Capacity), virtletVol.CapacityUnit)
 			if err != nil {
-				return nil, fmt.Errorf("Error during creation of volume '%s' with virtlet description %s: %v", volName, virtletVol.Name, err)
+				return nil, fmt.Errorf("error during creation of volume '%s' with virtlet description %s: %v", volName, virtletVol.Name, err)
 			}
 
 			path, err := vol.GetPath()
@@ -326,13 +372,7 @@ func (s *StorageTool) PrepareVolumesToBeAttached(virtletVolsDesc string, contain
 			if err := s.isRawDeviceOnWhitelist(virtletVol.Path); err != nil {
 				return nil, err
 			}
-			if err := verifyRawDeviceAccess(virtletVol.Path); err != nil {
-				return nil, err
-			}
 			volXML = generateRawDeviceXML(virtletVol.Path, virtDev)
-
-		default:
-			return nil, fmt.Errorf("unsupported volume format '%s' in volume '%s' definition", virtletVol.Format, virtletVol.Name)
 		}
 
 		volumesXMLs = append(volumesXMLs, volXML)
