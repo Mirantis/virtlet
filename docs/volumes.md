@@ -3,9 +3,8 @@
 ## Caveats and Limitations
 
 1. Virtlet uses virtio block device driver.
-2. The overal allowed number of volumes can be attached to single VM is up to 20 regardless of ephemeral or/and persistent.
-3. Virtlet sets name for disks in a form ```vd + <disk-letter>```, where disk letter for disk is set in alphabet order from 'b' to 'u' (20 in overall) while forms domain's xml definition.
-   The first one 'vda' is used for boot image.
+1. The overal allowed number of volumes can be attached to single VM is up to 20 regardless of ephemeral, persistent and/or raw devices.
+1. Virtlet sets name for disks in a form ```vd + <disk-letter>```, where disk letter for disk is set in alphabet order from 'b' to 'u' (20 in overall) while forms domain's xml definition. The first one - 'vda' - is used for boot image.
 
 ```
 <domain type='qemu' id='2' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'>
@@ -83,19 +82,39 @@ metadata:
           "Name": "vol2"
         }
       ]
+    kubernetes.io/target-runtime: virtlet
+    scheduler.alpha.kubernetes.io/affinity: >
+      {
+        "nodeAffinity": {
+          "requiredDuringSchedulingIgnoredDuringExecution": {
+            "nodeSelectorTerms": [
+              {
+                "matchExpressions": [
+                  {
+                    "key": "extraRuntime",
+                    "operator": "In",
+                    "values": ["virtlet"]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
 spec:
   containers:
     - name: test-vm
       image: download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img
 ```
 
-According to this definition will be created VM-POD with VM with 2 equal volumes, attached,  which can be found in "volumes" pool under `<domain-uuid>-vol1` and `<domain-uuid>-vol2`
+According to this definition will be created VM-POD with VM with 2 equal volumes, attached, which can be found in "volumes" pool under `<domain-uuid>-vol1` and `<domain-uuid>-vol2`
 Boot image is exposed to the guest OS under **vda** device.
 Additional volume disks are exposed in the alphabet order starting from b, so vol1 will be vdb and vol2 - vdc
 
 On pod remove expected all volumes and snapshot related to VM should be removed.
 
 ## Persistent Storage
+
 ### Flexvolume libvirt driver
 
 FlexVolume libvirt driver for virtlet supports attaching to VM of Ceph RBD block devices from cluster with cephx auth enabled.
@@ -105,7 +124,7 @@ Basing on [FlexVolumes](https://github.com/kubernetes/community/blob/master/cont
 #### RBD Volume definition supported features:
 
 ```
-- FlexVolume Driver name:  kubernetes.io/flexvolume_driver
+- FlexVolume Driver name: kubernetes.io/flexvolume_driver
 - Monitor: <ip:port>
 - User: <user-name>
 - Secret: <user-secret-key>
@@ -209,3 +228,73 @@ vda        /var/lib/virtlet/snapshot_de0ae972-4154-4f8f-70ff-48335987b5ce
 vdb        libvirt-pool/rbd-test-image
 ```
 
+### Raw devices
+
+Volume settings for locally accessible raw devices are passed via pod's metadata Annotations, like for [ephemeral volumes](## Ephemeral Local Storage).
+
+See the following example:
+
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-vm-pod
+  annotations:
+    VirtletVolumes: >
+      [
+        {
+          "Name": "vol1",
+          "Format": "raw",
+          "Path": "/dev/loop0"
+        },
+      ]
+    kubernetes.io/target-runtime: virtlet
+    scheduler.alpha.kubernetes.io/affinity: >
+      {
+        "nodeAffinity": {
+          "requiredDuringSchedulingIgnoredDuringExecution": {
+            "nodeSelectorTerms": [
+              {
+                "matchExpressions": [
+                  {
+                    "key": "extraRuntime",
+                    "operator": "In",
+                    "values": ["virtlet"]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+spec:
+  containers:
+    - name: test-vm
+      image: download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img
+```
+
+As always, boot image is exposed to the guest OS under **vda** device.
+According to this definition here will be exposed to VM single raw device `/dev/loop0`.
+As devices/volumes are exposed in the alphabet order starting from `b`, `vol1` will be visible on VM as `vdb`.
+
+#### Raw Devices whitelist
+
+Virtlet allows to expose to VM only whitelisted raw devices. This list is controlled by `-raw-devices` parameter for `virtlet` binary. It's value is passed to `virtlet` daemonset using `VIRTLET_RAW_DEVICES` environment variable.
+This `-raw-devices` parameter should contain comma separated patterns of paths relative to `/dev` directory, which are used to [glob](https://en.wikipedia.org/wiki/Glob_(programming)) paths of devices, allowed to use by virtual machines.
+When not set, it defaults to `loop*`.
+
+Easiest method to pass this parameter to `virtlet` is to use [configmap](https://kubernetes.io/docs/tasks/configure-pod-container/configmap) to contain a key/value pair (e.x. `devices.raw=loop*,mapper/vm_pool-*`), which then can be used in `deploy/virtlet_ds.yaml` after setting:
+```
+spec:
+  ...
+  containers:
+  - name: virtlet
+    ...
+    env:
+      ...
+      - name: VIRTLET_RAW_DEVICES
+        valueFrom:
+	  configMapKeyRef:
+	    name: name-of-configmap-for-this-node
+	    key: devices.raw
+```
