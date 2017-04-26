@@ -20,7 +20,7 @@ SUBDIRS = pkg/bolttools pkg/libvirttools pkg/manager pkg/nettools pkg/criproxy t
 
 # FIXME: add back dockerfilelint.test
 # (as of now, it requires Docker)
-check_SCRIPTS = cpplint.test gofmt.test
+check_SCRIPTS = gofmt.test
 TESTS = $(check_SCRIPTS)
 
 .PHONY: all vendor

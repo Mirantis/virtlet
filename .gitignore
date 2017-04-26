@@ -66,14 +66,12 @@ vendor
 # Tests
 *.log
 *.test
-!cpplint.test
 !dockerfilelint.test
 !gofmt.test
 !go.test
 *.trs
 .deps
 .dirstamp
-cpplint.py
 test-driver
 
 # build output
