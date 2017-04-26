@@ -77,6 +77,7 @@ type SourceHost struct {
 }
 
 type Source struct {
+	Device   string       `xml:"dev,attr,omitempty"`
 	SrcFile  string       `xml:"file,attr,omitempty"`
 	Protocol string       `xml:"protocol,attr,omitempty"`
 	Name     string       `xml:"name,attr,omitempty"`
@@ -246,13 +247,6 @@ func generateDomXML(useKvm bool, name string, memory int64, memoryUnit string, u
 	return fmt.Sprintf(domXML, domainType, uuid, name, uuid, memoryUnit, memory, cpuNum, cpuShare, cpuPeriod, cpuQuota, imageFilepath, emulator, netNSPath, cniConfigEscaped)
 }
 
-var volXMLTemplate string = `
-<disk type='file' device='disk'>
-    <driver name='qemu' type='raw'/>
-    <source file='%s'/>
-    <target dev='%s' bus='virtio'/>
-</disk>`
-
 func (v *VirtualizationTool) createBootImageSnapshot(imageName, backingStorePath string, size uint64) (string, error) {
 	vol, err := v.volumeStorage.CreateSnapshot(imageName, size, "B", backingStorePath)
 
@@ -370,11 +364,7 @@ func (v *VirtualizationTool) addAttachedVolumesXML(podID string, uuid string, vi
 		}
 	}
 
-	if len(flexVolumeInfos) == len(diskLetters) {
-		return marshalToXML(domain)
-	}
-
-	volumesXML, err := v.volumeStorage.CreateVolumesToBeAttached(virtletVolsDesc, uuid, len(flexVolumeInfos))
+	volumesXML, err := v.volumeStorage.PrepareVolumesToBeAttached(virtletVolsDesc, uuid, len(flexVolumeInfos))
 	if err != nil {
 		return "", err
 	}
@@ -394,8 +384,8 @@ type VirtualizationTool struct {
 	volumePoolName string
 }
 
-func NewVirtualizationTool(conn *libvirt.Connect, poolName string) (*VirtualizationTool, error) {
-	storageTool, err := NewStorageTool(conn, poolName)
+func NewVirtualizationTool(conn *libvirt.Connect, poolName, rawDevices string) (*VirtualizationTool, error) {
+	storageTool, err := NewStorageTool(conn, poolName, rawDevices)
 	if err != nil {
 		return nil, err
 	}

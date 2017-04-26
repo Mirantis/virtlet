@@ -49,7 +49,7 @@ type ImageTool struct {
 }
 
 func NewImageTool(conn *libvirt.Connect, poolName, protocol string) (*ImageTool, error) {
-	storageTool, err := NewStorageTool(conn, poolName)
+	storageTool, err := NewStorageTool(conn, poolName, "")
 	if err != nil {
 		return nil, err
 	}

@@ -44,6 +44,8 @@ var (
 		"Location of CNI configurations (first file name in lexicographic order will be chosen)")
 	imageDownloadProtocol = flag.String("image-download-protocol", "https",
 		"Image download protocol. Can be https (default) or http.")
+	rawDevices = flag.String("raw-devices", "loop*",
+		"Comma separated list of raw device glob patterns to which VM can have an access (with skipped /dev/ prefix)")
 )
 
 func main() {
@@ -51,7 +53,7 @@ func main() {
 
 	rand.Seed(time.Now().UnixNano())
 
-	server, err := manager.NewVirtletManager(*libvirtUri, *pool, *imageDownloadProtocol, *storageBackend, *boltPath, *cniPluginsDir, *cniConfigsDir)
+	server, err := manager.NewVirtletManager(*libvirtUri, *pool, *imageDownloadProtocol, *storageBackend, *boltPath, *cniPluginsDir, *cniConfigsDir, *rawDevices)
 	if err != nil {
 		glog.Errorf("Initializing server failed: %v", err)
 		os.Exit(1)

@@ -18,8 +18,11 @@ package libvirttools
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/golang/glog"
@@ -30,6 +33,12 @@ const (
 	defaultCapacity     = 1024
 	defaultCapacityUnit = "MB"
 	poolTypeDir         = "dir"
+	diskXMLTemplate     = `
+<disk type='file' device='disk'>
+    <driver name='qemu' type='raw'/>
+    <source file='%s'/>
+    <target dev='%s' bus='virtio'/>
+</disk>`
 )
 
 type Volume struct {
@@ -41,27 +50,69 @@ type Volume struct {
 type VirtletVolume struct {
 	Name         string `json:"Name"`
 	Format       string `json:"Format"`
-	Capacity     int    `json:"Capacity,string"`
-	CapacityUnit string `json:"CapacityUnit"`
+	Capacity     int    `json:"Capacity,string,omitempty"`
+	CapacityUnit string `json:"CapacityUnit,omitempty"`
+	Path         string `json:"Path,omitempty"`
 }
 
 func (vol *VirtletVolume) UnmarshalJSON(data []byte) error {
 	// volAlias is needed to prevent recursive calls to UnmarshalJSON
 	type volAlias VirtletVolume
 	volWithDefaults := &volAlias{
-		Format:       "qcow2",
-		Capacity:     defaultCapacity,
-		CapacityUnit: defaultCapacityUnit,
+		Format: "qcow2",
 	}
 
 	err := json.Unmarshal(data, volWithDefaults)
 
-	if err == nil && volWithDefaults.Name == "" {
-		return fmt.Errorf("Validation failed for volumes definition within pod's annotations: volume name is mandatory.")
+	if err != nil {
+		return err
+	}
+
+	if volWithDefaults.Format == "qcow2" {
+		if volWithDefaults.Capacity == 0 {
+			volWithDefaults.Capacity = defaultCapacity
+		}
+		if volWithDefaults.CapacityUnit == "" {
+			volWithDefaults.CapacityUnit = defaultCapacityUnit
+		}
 	}
 
 	*vol = VirtletVolume(*volWithDefaults)
-	return err
+	if err := vol.validate(); err != nil {
+		return fmt.Errorf("validation failed for volumes definition within pod's annotations: %s", err)
+	}
+
+	return nil
+}
+
+func (vol *VirtletVolume) validate() error {
+	if vol.Name == "" {
+		return errors.New("volume name is mandatory")
+	}
+
+	switch vol.Format {
+	case "qcow2":
+		if vol.Path != "" {
+			return fmt.Errorf("qcow2 volume should not have Path but it has it set to: %s", vol.Path)
+		}
+	case "rawDevice":
+		if vol.Capacity != 0 {
+			return fmt.Errorf("raw volume should not have Capacity, but it has it equal to: %d", vol.Capacity)
+		}
+		if vol.CapacityUnit != "" {
+			return fmt.Errorf("raw volume should not have CapacityUnit, but it has it set to: %s", vol.CapacityUnit)
+		}
+		if !strings.HasPrefix(vol.Path, "/dev/") {
+			return fmt.Errorf("raw volume Path needs to be prefixed by '/dev/', but it's whole value is: ", vol.Path)
+		}
+		if err := verifyRawDeviceAccess(vol.Path); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("unsupported volume format: %s", vol.Format)
+	}
+
+	return nil
 }
 
 func (v *Volume) Remove() error {
@@ -187,18 +238,19 @@ func (p *Pool) ListVolumes() ([]*VolumeInfo, error) {
 }
 
 type StorageTool struct {
-	name string
-	tool StorageOperations
-	pool *Pool
+	name       string
+	tool       StorageOperations
+	rawDevices []string
+	pool       *Pool
 }
 
-func NewStorageTool(conn *libvirt.Connect, poolName string) (*StorageTool, error) {
+func NewStorageTool(conn *libvirt.Connect, poolName, rawDevices string) (*StorageTool, error) {
 	tool := NewLibvirtStorageOperations(conn)
 	pool, err := LookupStoragePool(tool, poolName)
 	if err != nil {
 		return nil, err
 	}
-	return &StorageTool{name: poolName, tool: tool, pool: pool}, nil
+	return &StorageTool{name: poolName, tool: tool, pool: pool, rawDevices: strings.Split(rawDevices, ",")}, nil
 }
 
 func (s *StorageTool) GenerateVolumeXML(shortName string, capacity uint64, capacityUnit string, path string) string {
@@ -214,7 +266,7 @@ func (s *StorageTool) GenerateVolumeXML(shortName string, capacity uint64, capac
 	return fmt.Sprintf(volXML, shortName, capacityUnit, capacity, path)
 }
 
-func (s *StorageTool) CreateVolume(name string, capacity uint64, capacityUnit string) (*Volume, error) {
+func (s *StorageTool) CreateQCOW2Volume(name string, capacity uint64, capacityUnit string) (*Volume, error) {
 	volumeXML := `
 <volume>
     <name>%s</name>
@@ -257,7 +309,7 @@ func (s *StorageTool) ListVolumes() ([]*VolumeInfo, error) {
 	return s.pool.ListVolumes()
 }
 
-func (s *StorageTool) CleanAttachedVolumes(virtletVolsDesc string, containerId string) error {
+func (s *StorageTool) CleanAttachedQCOW2Volumes(virtletVolsDesc string, containerId string) error {
 
 	var vols []VirtletVolume
 	if err := json.Unmarshal([]byte(virtletVolsDesc), &vols); err != nil {
@@ -265,44 +317,49 @@ func (s *StorageTool) CleanAttachedVolumes(virtletVolsDesc string, containerId s
 	}
 
 	for _, virtletVol := range vols {
-		switch virtletVol.Format {
-		case "qcow2":
+		if err := virtletVol.validate(); err != nil {
+			return err
+		}
+		if virtletVol.Format == "qcow2" {
 			volName := containerId + "-" + virtletVol.Name
 			if err := s.RemoveVolume(volName); err != nil {
 				return fmt.Errorf("error during removal of volume '%s' for container %s: %v", volName, containerId, err)
 			}
-		default:
-			return fmt.Errorf("unsupported volume format '%s' in volume '%s' definition", virtletVol.Format, virtletVol.Name)
 		}
 	}
 
 	return nil
 }
 
-func (s *StorageTool) CreateVolumesToBeAttached(virtletVolsDesc string, containerId string, letterInd int) ([]string, error) {
+// PrepareVolumesToBeAttached returns a list of xml definitions for dom xml of created or raw disks
+// letterInd contains the number of drive letters already used by flexvolumes
+func (s *StorageTool) PrepareVolumesToBeAttached(virtletVolsDesc string, containerId string, letterInd int) ([]string, error) {
 	if virtletVolsDesc == "" {
 		return nil, nil
 	}
 
-	var volumesXMLs []string
+	var disksXMLs []string
 	var virtletVols []VirtletVolume
 	if err := json.Unmarshal([]byte(virtletVolsDesc), &virtletVols); err != nil {
 		return nil, fmt.Errorf("error when unmarshalling json string with volumes description '%s' for container %s: %v", virtletVolsDesc, containerId, err)
 	}
 
 	for i, virtletVol := range virtletVols {
+		if err := virtletVol.validate(); err != nil {
+			return nil, fmt.Errorf("volume '%s' have an error in definition: %s", virtletVol.Name, err)
+		}
 		if letterInd+i == len(diskLetters) {
 			return nil, fmt.Errorf("too much volumes, limit %d of them exceeded on volume '%s'", len(diskLetters), virtletVol.Name)
 		}
 
 		volName := containerId + "-" + virtletVol.Name
 		virtDev := "vd" + diskLetters[letterInd+i]
-		var volXML string
+		var diskXML string
 		switch virtletVol.Format {
 		case "qcow2":
-			vol, err := s.CreateVolume(volName, defaultCapacity, defaultCapacityUnit)
+			vol, err := s.CreateQCOW2Volume(volName, uint64(virtletVol.Capacity), virtletVol.CapacityUnit)
 			if err != nil {
-				return nil, fmt.Errorf("Error during creation of volume '%s' with virtlet description %s: %v", volName, virtletVol.Name, err)
+				return nil, fmt.Errorf("error during creation of volume '%s' with virtlet description %s: %v", volName, virtletVol.Name, err)
 			}
 
 			path, err := vol.GetPath()
@@ -315,16 +372,62 @@ func (s *StorageTool) CreateVolumesToBeAttached(virtletVolsDesc string, containe
 				return nil, err
 			}
 
-			volXML = fmt.Sprintf(volXMLTemplate, path, virtDev)
+			diskXML = fmt.Sprintf(diskXMLTemplate, path, virtDev)
 
-		default:
-			return nil, fmt.Errorf("unsupported volume format '%s' in volume '%s' definition", virtletVol.Format, virtletVol.Name)
+		case "rawDevice":
+			if err := s.isRawDeviceOnWhitelist(virtletVol.Path); err != nil {
+				return nil, err
+			}
+			diskXML = generateRawDeviceXML(virtletVol.Path, virtDev)
 		}
 
-		volumesXMLs = append(volumesXMLs, volXML)
+		disksXMLs = append(disksXMLs, diskXML)
 	}
 
-	return volumesXMLs, nil
+	return disksXMLs, nil
+}
+
+func (s *StorageTool) isRawDeviceOnWhitelist(path string) error {
+	for _, deviceTemplate := range s.rawDevices {
+		devicePaths, err := filepath.Glob("/dev/" + deviceTemplate)
+		if err != nil {
+			return fmt.Errorf("error in raw device whitelist glob pattern '%s': %v", deviceTemplate, err)
+		}
+		for _, devicePath := range devicePaths {
+			if path == devicePath {
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("device '%s' not whitelisted on this virtlet node", path)
+}
+
+func verifyRawDeviceAccess(path string) error {
+	// TODO: verify access rights for qemu process to this path
+	pathInfo, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+
+	// is this device and not char device?
+	if pathInfo.Mode()&os.ModeDevice != 0 && pathInfo.Mode()&os.ModeCharDevice == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("path '%s' points to something other than block device", path)
+}
+
+const (
+	rawDeviceTemplateXML = `<disk type='block' device='disk'>
+  <driver name='qemu' type='raw'/>
+  <source dev='%s'/>
+  <target dev='%s' bus='virtio'/>
+</disk>
+`
+)
+
+func generateRawDeviceXML(path, device string) string {
+	return fmt.Sprintf(rawDeviceTemplateXML, path, device)
 }
 
 func (s *StorageTool) PullImageToVolume(path, volumeName string) error {

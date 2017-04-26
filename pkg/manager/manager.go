@@ -53,7 +53,7 @@ type VirtletManager struct {
 	cniClient *cni.Client
 }
 
-func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, metadataPath, cniPluginsDir, cniConfigsDir string) (*VirtletManager, error) {
+func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, metadataPath, cniPluginsDir, cniConfigsDir, rawDevices string) (*VirtletManager, error) {
 	libvirtConnTool, err := libvirttools.NewConnectionTool(libvirtUri)
 	if err != nil {
 		return nil, err
@@ -65,7 +65,7 @@ func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, m
 	}
 
 	// TODO: pool name should be passed like for imageTool
-	libvirtVirtualizationTool, err := libvirttools.NewVirtualizationTool(libvirtConnTool.Connection(), "volumes")
+	libvirtVirtualizationTool, err := libvirttools.NewVirtualizationTool(libvirtConnTool.Connection(), "volumes", rawDevices)
 	if err != nil {
 		return nil, err
 	}
@@ -401,7 +401,7 @@ func (v *VirtletManager) RemoveContainer(ctx context.Context, in *kubeapi.Remove
 
 	storagePool := v.libvirtVirtualizationTool.GetStoragePool()
 	if virtletVolsDesc, exists := containerInfo.SandBoxAnnotations[libvirttools.VirtletVolumesAnnotationKeyName]; exists {
-		if err := storagePool.CleanAttachedVolumes(virtletVolsDesc, in.ContainerId); err != nil {
+		if err := storagePool.CleanAttachedQCOW2Volumes(virtletVolsDesc, in.ContainerId); err != nil {
 			return nil, err
 		}
 	}
