@@ -288,18 +288,31 @@ func gatherFlexvolumeDriverVolumeDefinitions(podID string, lettersInd int) ([]Fl
 				glog.Errorf("Had to omit attaching of one ore more flex volumes. Limit on number is: %d", lettersInd)
 				return flexInfos, nil
 			}
-			volInfos, err := ioutil.ReadDir(path.Join(dir, vol.Name()))
-			glog.V(2).Infof("Found FlexVolume definition parts in nested dir %s:\n %v", vol.Name(), volInfos)
+			fileInfos, err := ioutil.ReadDir(path.Join(dir, vol.Name()))
+			glog.V(2).Infof("Found FlexVolume definition parts in nested dir %s:\n %v", vol.Name(), fileInfos)
 			if err != nil {
 				return nil, err
 			}
 			var flexvol FlexVolumeInfo
-			for _, volInfo := range volInfos {
-				content, err := ioutil.ReadFile(path.Join(dir, vol.Name(), volInfo.Name()))
+			for _, fileInfo := range fileInfos {
+				curPath := path.Join(dir, vol.Name(), fileInfo.Name())
+				if fileInfo.IsDir() {
+					isoName := fileInfo.Name()
+					if !strings.HasSuffix(isoName, ".cd") {
+						return nil, fmt.Errorf("unexpected directory %q: must have .cd suffix", curPath)
+					}
+					volId := isoName[:len(isoName)-3]
+					isoPath := path.Join(dir, vol.Name(), volId+".iso")
+					if err := utils.GenIsoImage(isoPath, volId, curPath); err != nil {
+						return nil, fmt.Errorf("error generating iso image: %v", err)
+					}
+					continue
+				}
+				content, err := ioutil.ReadFile(curPath)
 				if err != nil {
 					return nil, err
 				}
-				switch volInfo.Name() {
+				switch fileInfo.Name() {
 				case "disk.xml":
 					flexvol.DiskXML = string(content)
 				case "secret.xml":
