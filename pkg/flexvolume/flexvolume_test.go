@@ -22,12 +22,12 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"os/exec"
 	"path"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+
+	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 )
 
 const (
@@ -77,64 +77,6 @@ local-hostname: foobar
 `
 )
 
-func isoToMap(isoPath string) (map[string]interface{}, error) {
-	tmpDir, err := ioutil.TempDir("", "iso-out")
-	if err != nil {
-		return nil, fmt.Errorf("ioutil.TempDir(): %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-	out, err := exec.Command("7z", "x", "-o"+tmpDir, isoPath).CombinedOutput()
-	if err != nil {
-		outStr := ""
-		if len(out) != 0 {
-			outStr = ". Output:\n" + string(out)
-		}
-		return nil, fmt.Errorf("error unpacking iso: %v%s", err, outStr)
-	}
-	return dirToMap(tmpDir)
-}
-
-// dirToMap converts directory to a map where keys are filenames
-// without full path and values are the contents of the files. Files
-// with '.iso' extensions are unpacked using 7z and then converted to
-// a map using dirToMap. If the directory doesn't exist, dirToMap
-// returns nil
-func dirToMap(dir string) (map[string]interface{}, error) {
-	if fi, err := os.Stat(dir); err != nil && os.IsNotExist(err) {
-		return nil, nil
-	} else if err != nil {
-		return nil, fmt.Errorf("os.Stat(): %v", err)
-	} else if !fi.IsDir() {
-		return nil, fmt.Errorf("%q expected to be a directory", dir)
-	}
-	paths, err := filepath.Glob(filepath.Join(dir, "/*"))
-	if err != nil {
-		return nil, fmt.Errorf("filepath.Glob(): %v", err)
-	}
-	m := map[string]interface{}{}
-	for _, p := range paths {
-		filename := filepath.Base(p)
-		if fi, err := os.Stat(p); err != nil {
-			return nil, fmt.Errorf("os.Stat(): %v", err)
-		} else if fi.IsDir() {
-			return nil, fmt.Errorf("unexpected directory: %q", filename)
-		}
-		if strings.HasSuffix(filename, ".iso") {
-			m[filename], err = isoToMap(p)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			bs, err := ioutil.ReadFile(p)
-			if err != nil {
-				return nil, fmt.Errorf("ioutil.ReadFile(): %v", err)
-			}
-			m[filename] = string(bs)
-		}
-	}
-	return m, nil
-}
-
 func mapToJson(m map[string]interface{}) string {
 	bs, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
@@ -163,7 +105,7 @@ func TestFlexVolume(t *testing.T) {
 		"metadata": noCloudMetaData,
 		"userdata": noCloudUserData,
 	})
-	noCloudDisk := fmt.Sprintf(noCloudDiskTestTemplate, path.Join(tmpDir, "nocloud/nocloud.iso"))
+	noCloudDisk := fmt.Sprintf(noCloudDiskTestTemplate, path.Join(tmpDir, "nocloud/cidata.iso"))
 	for _, step := range []struct {
 		name    string
 		args    []string
@@ -186,17 +128,6 @@ func TestFlexVolume(t *testing.T) {
 				"node1",
 			},
 			status: "Success",
-		},
-		{
-			name: "getvolumename-ceph",
-			args: []string{
-				"getvolumename",
-				cephJsonOpts,
-			},
-			status: "Success",
-			fields: map[string]interface{}{
-				"volumeName": "ceph/127.0.0.1/6789/libvirt-pool/rbd-test-image/libvirt",
-			},
 		},
 		{
 			name: "isattached",
@@ -303,17 +234,6 @@ func TestFlexVolume(t *testing.T) {
 			message: "no arguments passed",
 		},
 		{
-			name: "getvolumename-nocloud",
-			args: []string{
-				"getvolumename",
-				noCloudJsonOpts,
-			},
-			status: "Success",
-			fields: map[string]interface{}{
-				"volumeName": "nocloud/d310e76be30a09a08316fb5ddb607d9cc6b9183b-822556e837124f608980523088e179808306b8d2",
-			},
-		},
-		{
 			name: "mount-nocloud",
 			args: []string{
 				"mount",
@@ -324,7 +244,7 @@ func TestFlexVolume(t *testing.T) {
 			subdir: "nocloud",
 			files: map[string]interface{}{
 				"disk.xml": noCloudDisk,
-				"nocloud.iso": map[string]interface{}{
+				"cidata.cd": map[string]interface{}{
 					"meta-data": noCloudMetaData,
 					"user-data": noCloudUserData,
 				},
@@ -378,7 +298,7 @@ func TestFlexVolume(t *testing.T) {
 				}
 			}
 			if step.subdir != "" {
-				files, err := dirToMap(path.Join(tmpDir, step.subdir))
+				files, err := testutils.DirToMap(path.Join(tmpDir, step.subdir))
 				if err != nil {
 					t.Fatalf("dirToMap() on %q: %v", subdir, err)
 				}

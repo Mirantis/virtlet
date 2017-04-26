@@ -24,6 +24,8 @@ import (
 	"strings"
 
 	uuid "github.com/nu7hatch/gouuid"
+
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 type volumeOpts struct {
@@ -50,14 +52,11 @@ func newUuid() string {
 
 type UuidGen func() string
 
-type volumeType interface {
-	populateVolumeDir(uuidGen UuidGen, targetDir string, opts volumeOpts) error
-	getVolumeName(opts volumeOpts) (string, error)
-}
+type volumeHandler func(uuidGen UuidGen, targetDir string, opts volumeOpts) (map[string][]byte, error)
 
-var flexVolumeTypes = map[string]volumeType{
-	"ceph":    cephVolumeType{},
-	"nocloud": noCloudVolumeType{},
+var volumeHandlers = map[string]volumeHandler{
+	"ceph":    cephVolumeHandler,
+	"nocloud": noCloudVolumeHandler,
 }
 
 type FlexVolumeDriver struct {
@@ -71,11 +70,11 @@ func NewFlexVolumeDriver(uuidGen UuidGen) *FlexVolumeDriver {
 	return &FlexVolumeDriver{uuidGen: uuidGen}
 }
 
-func (d *FlexVolumeDriver) getVolumeType(opts volumeOpts) (volumeType, error) {
+func (d *FlexVolumeDriver) getVolumeHandler(opts volumeOpts) (volumeHandler, error) {
 	if opts.Type == "" {
 		return nil, errors.New("virtlet flexvolume type not set")
 	}
-	vt, ok := flexVolumeTypes[opts.Type]
+	vt, ok := volumeHandlers[opts.Type]
 	if !ok {
 		return nil, fmt.Errorf("unknown volume type %q", opts.Type)
 	}
@@ -83,11 +82,18 @@ func (d *FlexVolumeDriver) getVolumeType(opts volumeOpts) (volumeType, error) {
 }
 
 func (d *FlexVolumeDriver) populateVolumeDir(targetDir string, opts volumeOpts) error {
-	vt, err := d.getVolumeType(opts)
+	handler, err := d.getVolumeHandler(opts)
 	if err != nil {
 		return err
 	}
-	return vt.populateVolumeDir(d.uuidGen, targetDir, opts)
+	files, err := handler(d.uuidGen, targetDir, opts)
+	if err != nil {
+		return err
+	}
+	if err := utils.WriteFiles(targetDir, files); err != nil {
+		return err
+	}
+	return nil
 }
 
 // The following functions are not currently needed, but still
@@ -142,26 +148,6 @@ func (d *FlexVolumeDriver) unmount(targetMountDir string) (map[string]interface{
 	return nil, nil
 }
 
-// Invocation: <driver executable> getvolumename <json options>
-func (d *FlexVolumeDriver) getVolumeName(jsonOptions string) (map[string]interface{}, error) {
-	var opts volumeOpts
-	if err := json.Unmarshal([]byte(jsonOptions), &opts); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal json options: %v", err)
-	}
-
-	vt, err := d.getVolumeType(opts)
-	if err != nil {
-		return nil, err
-	}
-
-	volumeName, err := vt.getVolumeName(opts)
-	if err != nil {
-		return nil, err
-	}
-
-	return map[string]interface{}{"volumeName": volumeName}, nil
-}
-
 type driverOp func(*FlexVolumeDriver, []string) (map[string]interface{}, error)
 
 type cmdInfo struct {
@@ -193,11 +179,6 @@ var commands = map[string]cmdInfo{
 	"isattached": cmdInfo{
 		2, func(d *FlexVolumeDriver, args []string) (map[string]interface{}, error) {
 			return d.isAttached(args[0], args[1])
-		},
-	},
-	"getvolumename": cmdInfo{
-		1, func(d *FlexVolumeDriver, args []string) (map[string]interface{}, error) {
-			return d.getVolumeName(args[0])
 		},
 	},
 	"mount": cmdInfo{
