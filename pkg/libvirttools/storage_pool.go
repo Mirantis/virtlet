@@ -33,6 +33,12 @@ const (
 	defaultCapacity     = 1024
 	defaultCapacityUnit = "MB"
 	poolTypeDir         = "dir"
+	diskXMLTemplate     = `
+<disk type='file' device='disk'>
+    <driver name='qemu' type='raw'/>
+    <source file='%s'/>
+    <target dev='%s' bus='virtio'/>
+</disk>`
 )
 
 type Volume struct {
@@ -89,7 +95,7 @@ func (vol *VirtletVolume) validate() error {
 		if vol.Path != "" {
 			return fmt.Errorf("qcow2 volume should not have Path but it has it set to: %s", vol.Path)
 		}
-	case "raw":
+	case "rawDevice":
 		if vol.Capacity != 0 {
 			return fmt.Errorf("raw volume should not have Capacity, but it has it equal to: %d", vol.Capacity)
 		}
@@ -260,7 +266,7 @@ func (s *StorageTool) GenerateVolumeXML(shortName string, capacity uint64, capac
 	return fmt.Sprintf(volXML, shortName, capacityUnit, capacity, path)
 }
 
-func (s *StorageTool) CreateVolume(name string, capacity uint64, capacityUnit string) (*Volume, error) {
+func (s *StorageTool) CreateQCOW2Volume(name string, capacity uint64, capacityUnit string) (*Volume, error) {
 	volumeXML := `
 <volume>
     <name>%s</name>
@@ -303,7 +309,7 @@ func (s *StorageTool) ListVolumes() ([]*VolumeInfo, error) {
 	return s.pool.ListVolumes()
 }
 
-func (s *StorageTool) CleanAttachedVolumes(virtletVolsDesc string, containerId string) error {
+func (s *StorageTool) CleanAttachedQCOW2Volumes(virtletVolsDesc string, containerId string) error {
 
 	var vols []VirtletVolume
 	if err := json.Unmarshal([]byte(virtletVolsDesc), &vols); err != nil {
@@ -325,14 +331,14 @@ func (s *StorageTool) CleanAttachedVolumes(virtletVolsDesc string, containerId s
 	return nil
 }
 
-// PrepareVolumesToBeAttached returns a list of xml definitions for dom xml of created or raw volumes
+// PrepareVolumesToBeAttached returns a list of xml definitions for dom xml of created or raw disks
 // letterInd contains the number of drive letters already used by flexvolumes
 func (s *StorageTool) PrepareVolumesToBeAttached(virtletVolsDesc string, containerId string, letterInd int) ([]string, error) {
 	if virtletVolsDesc == "" {
 		return nil, nil
 	}
 
-	var volumesXMLs []string
+	var disksXMLs []string
 	var virtletVols []VirtletVolume
 	if err := json.Unmarshal([]byte(virtletVolsDesc), &virtletVols); err != nil {
 		return nil, fmt.Errorf("error when unmarshalling json string with volumes description '%s' for container %s: %v", virtletVolsDesc, containerId, err)
@@ -348,10 +354,10 @@ func (s *StorageTool) PrepareVolumesToBeAttached(virtletVolsDesc string, contain
 
 		volName := containerId + "-" + virtletVol.Name
 		virtDev := "vd" + diskLetters[letterInd+i]
-		var volXML string
+		var diskXML string
 		switch virtletVol.Format {
 		case "qcow2":
-			vol, err := s.CreateVolume(volName, uint64(virtletVol.Capacity), virtletVol.CapacityUnit)
+			vol, err := s.CreateQCOW2Volume(volName, uint64(virtletVol.Capacity), virtletVol.CapacityUnit)
 			if err != nil {
 				return nil, fmt.Errorf("error during creation of volume '%s' with virtlet description %s: %v", volName, virtletVol.Name, err)
 			}
@@ -366,19 +372,19 @@ func (s *StorageTool) PrepareVolumesToBeAttached(virtletVolsDesc string, contain
 				return nil, err
 			}
 
-			volXML = fmt.Sprintf(volXMLTemplate, path, virtDev)
+			diskXML = fmt.Sprintf(diskXMLTemplate, path, virtDev)
 
-		case "raw":
+		case "rawDevice":
 			if err := s.isRawDeviceOnWhitelist(virtletVol.Path); err != nil {
 				return nil, err
 			}
-			volXML = generateRawDeviceXML(virtletVol.Path, virtDev)
+			diskXML = generateRawDeviceXML(virtletVol.Path, virtDev)
 		}
 
-		volumesXMLs = append(volumesXMLs, volXML)
+		disksXMLs = append(disksXMLs, diskXML)
 	}
 
-	return volumesXMLs, nil
+	return disksXMLs, nil
 }
 
 func (s *StorageTool) isRawDeviceOnWhitelist(path string) error {

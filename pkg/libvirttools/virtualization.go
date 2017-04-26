@@ -247,13 +247,6 @@ func generateDomXML(useKvm bool, name string, memory int64, memoryUnit string, u
 	return fmt.Sprintf(domXML, domainType, uuid, name, uuid, memoryUnit, memory, cpuNum, cpuShare, cpuPeriod, cpuQuota, imageFilepath, emulator, netNSPath, cniConfigEscaped)
 }
 
-var volXMLTemplate string = `
-<disk type='file' device='disk'>
-    <driver name='qemu' type='raw'/>
-    <source file='%s'/>
-    <target dev='%s' bus='virtio'/>
-</disk>`
-
 func (v *VirtualizationTool) createBootImageSnapshot(imageName, backingStorePath string, size uint64) (string, error) {
 	vol, err := v.volumeStorage.CreateSnapshot(imageName, size, "B", backingStorePath)
 

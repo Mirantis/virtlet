@@ -224,7 +224,7 @@ metadata:
       [
         {
           "Name": "vol1",
-          "Format": "raw",
+          "Format": "rawDevice",
           "Path": "/dev/loop0"
         },
       ]

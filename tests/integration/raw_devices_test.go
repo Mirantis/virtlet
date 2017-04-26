@@ -64,7 +64,7 @@ func TestRawDevices(t *testing.T) {
 	sandbox := ct.sandboxes[0]
 	container := ct.containers[0]
 
-	sandbox.Annotations["VirtletVolumes"] = fmt.Sprintf(`[{"Name": "vol", "Format": "raw", "Path": "%s"}]`, l.devPath)
+	sandbox.Annotations["VirtletVolumes"] = fmt.Sprintf(`[{"Name": "vol", "Format": "rawDevice", "Path": "%s"}]`, l.devPath)
 
 	ct.pullImage(imageSpec)
 	ct.runPodSandbox(sandbox)
