@@ -28,3 +28,6 @@ if [[ ! -f /etc/criproxy/kubelet.conf ]]; then
   fi
   "${CRIPROXY_DEST}" -alsologtostderr -v 20 -install >> "${BOOTSTRAP_LOG}" 2>&1
 fi
+
+# Ensure that /var/lib/libvirt/images exists on node
+mkdir -p /host-var-lib/libvirt/images
