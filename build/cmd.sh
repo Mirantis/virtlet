@@ -123,6 +123,19 @@ function clean {
     done
 }
 
+function gotest {
+    start_libvirt=""
+    subdir="$(virtlet_subdir)"
+    if [[ ${subdir} =~ /integration$ ]]; then
+        start_libvirt="VIRTLET_DISABLE_KVM=1 /start.sh -novirtlet && "
+    fi
+    vcmd "${start_libvirt}cd '${subdir}' && CGO_CFLAGS='-g -O2 -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include' CGO_LDFLAGS='-lglib-2.0 -lvirt' go test $*"
+}
+
+function gobuild {
+    vcmd "cd '$(virtlet_subdir)' && CGO_CFLAGS='-g -O2 -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include' CGO_LDFLAGS='-lglib-2.0 -lvirt' go build $*"
+}
+
 function usage {
     echo >&2 "Usage:"
     echo >&2 "  $0 build"
@@ -147,10 +160,10 @@ shift
 
 case "${cmd}" in
     gotest)
-        ( vcmd "cd '$(virtlet_subdir)' && CGO_CFLAGS='-g -O2 -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include' CGO_LDFLAGS='-lglib-2.0 -lvirt' go test $*" )
+        gotest
         ;;
     gobuild)
-        ( vcmd "cd '$(virtlet_subdir)' && CGO_CFLAGS='-g -O2 -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include' CGO_LDFLAGS='-lglib-2.0 -lvirt' go build $*" )
+        gobuild
         ;;
     build)
         ( vcmd "./autogen.sh && ./configure && make" )
