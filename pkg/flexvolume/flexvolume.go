@@ -42,6 +42,23 @@ type volumeOpts struct {
 	UserData string `json:"userdata"`
 }
 
+// flexVolumeDebug indicates whether flexvolume debugging should be enabled
+var flexVolumeDebug = false
+
+func init() {
+	// XXX: invent a better wat to decide whether debugging should
+	// be used for flexvolume driver. For now we only enable it if
+	// Docker-in-Docker env is used
+	if fi, err := os.Stat("/dind/flexvolume_driver"); err == nil && !fi.IsDir() {
+		flexVolumeDebug = true
+	}
+}
+
+type Mounter interface {
+	Mount(source string, target string, fstype string) error
+	Unmount(target string) error
+}
+
 func newUuid() string {
 	u, err := uuid.NewV4()
 	if err != nil {
@@ -215,20 +232,17 @@ func (d *FlexVolumeDriver) doRun(args []string) (map[string]interface{}, error) 
 func (d *FlexVolumeDriver) Run(args []string) string {
 	r := formatResult(d.doRun(args))
 
-	// Uncomment the following for debugging.
-	// TODO: make this configurable somehow.
-	// The problem is that kubelet grabs CombinedOutput() from the process
-	// and tries to parse it as JSON (need to recheck this,
-	// maybe submit a PS to fix it)
-
-	f, err := os.OpenFile("/tmp/flexvolume.log", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
-	if err != nil {
-		panic(err)
+	if flexVolumeDebug {
+		// This is for debugging purposes only.
+		// The problem is that kubelet grabs CombinedOutput() from the process
+		// and tries to parse it as JSON (need to recheck this,
+		// maybe submit a PS to fix it)
+		f, err := os.OpenFile("/tmp/flexvolume.log", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
+		if err == nil {
+			defer f.Close()
+			fmt.Fprintf(f, "flexvolume %s -> %s\n", strings.Join(args, " "), r)
+		}
 	}
-
-	defer f.Close()
-
-	fmt.Fprintf(f, "flexvolume %s -> %s\n", strings.Join(args, " "), r)
 
 	return r
 }
