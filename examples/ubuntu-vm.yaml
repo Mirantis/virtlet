@@ -16,8 +16,6 @@ spec:
             - virtlet
   containers:
     - name: ubuntu-vm
-      # image: virtlet/github.com/eprasad/virt-cirros/raw/master/virt-cirros-0.3.4-x86_64-disk.img
-      # image: virtlet/download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img
       image: virtlet/cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img
   volumes:
     - name: test
