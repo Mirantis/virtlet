@@ -14,15 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package flexvolume
 
-import (
-	"os"
+import "syscall"
 
-	"github.com/Mirantis/virtlet/pkg/flexvolume"
-)
+type LinuxMounter struct{}
 
-func main() {
-	driver := flexvolume.NewFlexVolumeDriver(flexvolume.NewUuid, flexvolume.NewLinuxMounter())
-	os.Stdout.WriteString(driver.Run(os.Args[1:]))
+var _ Mounter = &LinuxMounter{}
+
+func NewLinuxMounter() *LinuxMounter {
+	return &LinuxMounter{}
+}
+
+func (mounter *LinuxMounter) Mount(source string, target string, fstype string) error {
+	return syscall.Mount(source, target, fstype, 0, "")
+}
+
+func (mounter *LinuxMounter) Unmount(target string) error {
+	return syscall.Unmount(target, 0)
 }

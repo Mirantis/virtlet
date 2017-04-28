@@ -59,7 +59,7 @@ type Mounter interface {
 	Unmount(target string) error
 }
 
-func newUuid() string {
+func NewUuid() string {
 	u, err := uuid.NewV4()
 	if err != nil {
 		panic("can't generate UUID")
@@ -78,13 +78,11 @@ var volumeHandlers = map[string]volumeHandler{
 
 type FlexVolumeDriver struct {
 	uuidGen UuidGen
+	mounter Mounter
 }
 
-func NewFlexVolumeDriver(uuidGen UuidGen) *FlexVolumeDriver {
-	if uuidGen == nil {
-		uuidGen = newUuid
-	}
-	return &FlexVolumeDriver{uuidGen: uuidGen}
+func NewFlexVolumeDriver(uuidGen UuidGen, mounter Mounter) *FlexVolumeDriver {
+	return &FlexVolumeDriver{uuidGen: uuidGen, mounter: mounter}
 }
 
 func (d *FlexVolumeDriver) getVolumeHandler(opts volumeOpts) (volumeHandler, error) {
@@ -150,14 +148,48 @@ func (d *FlexVolumeDriver) mount(targetMountDir, jsonOptions string) (map[string
 	if err := os.MkdirAll(targetMountDir, 0700); err != nil {
 		return nil, fmt.Errorf("os.MkDirAll(): %v", err)
 	}
+
+	// Here we populate the volume directory twice.
+	// That's because we need to do tmpfs mount to make kubelet happy -
+	// it will not try to unmount the volume if it doesn't detect mount
+	// point on the flexvolume dir, and using 'mount --bind' is not enough
+	// because kubelet's mount point detection doesn't see bind mounts.
+	// The problem is that hostPaths are mounted as private (no mount
+	// propagation) and so tmpfs content is not visible inside Virtlet
+	// pod. So, in order to avoid unneeded confusion down the road,
+	// we place flexvolume contents to the volume dir twice,
+	// both directly and onto the freshly mounted tmpfs.
+
 	if err := d.populateVolumeDir(targetMountDir, opts); err != nil {
 		return nil, err
 	}
+
+	if err := d.mounter.Mount("tmpfs", targetMountDir, "tmpfs"); err != nil {
+		return nil, fmt.Errorf("error mounting tmpfs at %q: %v", targetMountDir, err)
+	}
+
+	done := false
+	defer func() {
+		// try to unmount upon error or panic
+		if !done {
+			d.mounter.Unmount(targetMountDir)
+		}
+	}()
+
+	if err := d.populateVolumeDir(targetMountDir, opts); err != nil {
+		return nil, err
+	}
+
+	done = true
 	return nil, nil
 }
 
 // Invocation: <driver executable> unmount <mount dir>
 func (d *FlexVolumeDriver) unmount(targetMountDir string) (map[string]interface{}, error) {
+	if err := d.mounter.Unmount(targetMountDir); err != nil {
+		return nil, fmt.Errorf("unmount %q: %v", err.Error())
+	}
+
 	if err := os.RemoveAll(targetMountDir); err != nil {
 		return nil, fmt.Errorf("os.RemoveAll(): %v", err.Error())
 	}

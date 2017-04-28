@@ -38,7 +38,7 @@ func DirToMap(dir string) (map[string]interface{}, error) {
 	} else if !fi.IsDir() {
 		return nil, fmt.Errorf("%q expected to be a directory", dir)
 	}
-	paths, err := filepath.Glob(filepath.Join(dir, "/*"))
+	paths, err := filepath.Glob(filepath.Join(dir, "*"))
 	if err != nil {
 		return nil, fmt.Errorf("filepath.Glob(): %v", err)
 	}
