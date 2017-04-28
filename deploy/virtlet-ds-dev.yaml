@@ -41,6 +41,7 @@ spec:
       # The possibility to put criproxy binary in advance into
       # /opt/criproxy/bin may be helpful for the purpose of
       # debugging criproxy
+      # At the end it ensures that /var/lib/libvirt/images exists on node.
       - name: prepare-node
         image: mirantis/virtlet
         imagePullPolicy: IfNotPresent
@@ -61,6 +62,9 @@ spec:
           mountPath: /hostlog
         - name: dind
           mountPath: /dind
+        # for ensuring that /var/lib/libvirt/images exists on node
+        - name: var-lib
+          mountPath: /host-var-lib
 
       containers:
       - name: virtlet
@@ -80,9 +84,8 @@ spec:
           name: run
         - mountPath: /var/lib/virtlet
           name: virtlet
-        # FIXME: E0102 08:26:02.959687      32 virtlet.go:50] Initializing server failed: cannot open path '/var/lib/libvirt/images': No such file or directory
-        # - mountPath: /var/lib/libvirt
-        #   name: libvirt
+        - mountPath: /var/lib/libvirt
+          name: libvirt
         - mountPath: /etc/cni
           name: cniconf
         - mountPath: /opt/cni/bin
@@ -157,6 +160,9 @@ spec:
       - hostPath:
           path: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
         name: k8s-flexvolume-plugins-dir
+      - hostPath:
+          path: /var/lib
+        name: var-lib
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding

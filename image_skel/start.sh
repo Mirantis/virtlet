@@ -39,8 +39,10 @@ chmod 644 /etc/libvirt/qemu.conf
 # while libvirt is querying capabilities.
 # Removal of the socket below helps but not always.
 
-mv /var/lib/libvirt/qemu /var/lib/libvirt/qemu.ok
-mv /var/lib/libvirt/qemu.ok /var/lib/libvirt/qemu
+if [[ -e /var/lib/libvirt/qemu ]]; then
+  mv /var/lib/libvirt/qemu /var/lib/libvirt/qemu.ok
+  mv /var/lib/libvirt/qemu.ok /var/lib/libvirt/qemu
+fi
 
 # leftover socket prevents libvirt from initializing correctly
 rm -f /var/lib/libvirt/qemu/capabilities.monitor.sock
