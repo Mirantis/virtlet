@@ -160,10 +160,10 @@ shift
 
 case "${cmd}" in
     gotest)
-        gotest
+        gotest "$@"
         ;;
     gobuild)
-        gobuild
+        gobuild "$@"
         ;;
     build)
         ( vcmd "./autogen.sh && ./configure && make" )
