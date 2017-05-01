@@ -24,10 +24,7 @@ MON_IP=$(docker exec kube-master route | grep default | awk '{print $2}')
 CEPH_PUBLIC_NETWORK=${MON_IP}/16
 container_name="ceph_cluster"
 
-if docker ps | grep -q ${container_name}; then
-  docker stop ${container_name}
-  docker rm -f -v ${container_name}
-fi
+docker rm -fv ${container_name} >&/dev/null || true
 
 docker run -d --net=host -e MON_IP=${MON_IP} -e CEPH_PUBLIC_NETWORK=${CEPH_PUBLIC_NETWORK} --name ${container_name} ceph/demo
 

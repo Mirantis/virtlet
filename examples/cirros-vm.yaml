@@ -19,7 +19,7 @@ spec:
     # image: virtlet/image-service/cirros
     image: virtlet/download.cirros-cloud.net/0.3.5/cirros-0.3.5-x86_64-disk.img
   volumes:
-  - name: test
+  - name: nocloud
     flexVolume:
       driver: "virtlet/flexvolume_driver"
       options:
