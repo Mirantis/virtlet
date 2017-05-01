@@ -58,13 +58,18 @@ func (c *containerFilterTestCase) expectedIds(ct *containerTester) []string {
 	return r
 }
 
+func runShellCommand(t *testing.T, format string, args ...interface{}) string {
+	command := fmt.Sprintf(format, args...)
+	out, err := exec.Command("bash", "-c", command).Output()
+	if err != nil {
+		t.Fatalf("Error executing command '%q': %v", command, err)
+	}
+	return strings.TrimSpace(string(out))
+}
+
 func verifyUsingShell(t *testing.T, cmd, what, expected string) {
 	t.Logf("Command to verify %s: %s", what, cmd)
-	out, err := exec.Command("bash", "-c", cmd).Output()
-	if err != nil {
-		t.Fatalf("Failed to execute command %s: %v", cmd, err)
-	}
-	outStr := strings.TrimSpace(string(out))
+	outStr := runShellCommand(t, "%s", cmd)
 	if outStr != expected {
 		t.Errorf("Verifying %s: expected %q, got %q", what, expected, outStr)
 	}

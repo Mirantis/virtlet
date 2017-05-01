@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -28,6 +27,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Mirantis/virtlet/pkg/utils"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 )
 
@@ -77,14 +77,6 @@ local-hostname: foobar
     - [ apt-get, install, -y, --force-yes, apache2 ]
 `
 )
-
-func mapToJson(m map[string]interface{}) string {
-	bs, err := json.MarshalIndent(m, "", "  ")
-	if err != nil {
-		log.Panicf("error marshalling json: %v", err)
-	}
-	return string(bs)
-}
 
 type fakeMounter struct {
 	t       *testing.T
@@ -162,7 +154,7 @@ func TestFlexVolume(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	cephJsonOpts := mapToJson(map[string]interface{}{
+	cephJsonOpts := utils.MapToJson(map[string]interface{}{
 		"type":    "ceph",
 		"monitor": "127.0.0.1:6789",
 		"pool":    "libvirt-pool",
@@ -170,7 +162,7 @@ func TestFlexVolume(t *testing.T) {
 		"secret":  "foobar",
 		"user":    "libvirt",
 	})
-	noCloudJsonOpts := mapToJson(map[string]interface{}{
+	noCloudJsonOpts := utils.MapToJson(map[string]interface{}{
 		"type":     "nocloud",
 		"metadata": noCloudMetaData,
 		"userdata": noCloudUserData,
@@ -388,7 +380,7 @@ func TestFlexVolume(t *testing.T) {
 					t.Fatalf("dirToMap() on %q: %v", subdir, err)
 				}
 				if !reflect.DeepEqual(files, step.files) {
-					t.Errorf("bad file content.\n%s\n-- instead of --\n%s", mapToJson(files), mapToJson(step.files))
+					t.Errorf("bad file content.\n%s\n-- instead of --\n%s", utils.MapToJson(files), utils.MapToJson(step.files))
 				}
 			}
 			if !reflect.DeepEqual(mounter.journal, step.mountJournal) {

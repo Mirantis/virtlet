@@ -178,19 +178,8 @@ func (ct *containerTester) removeContainer(containerId string) {
 	}
 }
 
-func (ct *containerTester) waitForNoContainers(filter *kubeapi.ContainerFilter) {
-	// Wait up to 20 seconds for container removal
-	err := utils.WaitLoop(func() (bool, error) {
-		out, err := ct.runtimeServiceClient.ListContainers(context.Background(), &kubeapi.ListContainersRequest{
-			Filter: filter,
-		})
-		if err != nil {
-			return false, err
-		}
-
-		return len(out.Containers) == 0, nil
-	}, time.Second, 20*time.Second)
-	if err != nil {
-		ct.t.Fatalf("Container not removed in expected time: %v", err)
+func (ct *containerTester) verifyNoContainers(filter *kubeapi.ContainerFilter) {
+	if len(ct.listContainers(filter).Containers) != 0 {
+		ct.t.Errorf("expected no containers to be listed")
 	}
 }

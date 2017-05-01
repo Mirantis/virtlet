@@ -21,11 +21,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"os/exec"
-	"strings"
 	"testing"
-
-	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
 const (
@@ -33,12 +29,14 @@ const (
 )
 
 type loopbackHandler struct {
+	t        *testing.T
 	filePath string
 	devPath  string
 }
 
-func prepareLoopbackDevice() *loopbackHandler {
+func prepareLoopbackDevice(t *testing.T) *loopbackHandler {
 	lh := loopbackHandler{
+		t:        t,
 		filePath: createTemporaryFile(),
 	}
 	lh.Attach()
@@ -55,7 +53,7 @@ func (lh *loopbackHandler) Cleanup() {
 }
 
 func TestRawDevices(t *testing.T) {
-	l := prepareLoopbackDevice()
+	l := prepareLoopbackDevice(t)
 	defer l.Cleanup()
 
 	ct := newContainerTester(t)
@@ -71,16 +69,6 @@ func TestRawDevices(t *testing.T) {
 	ct.createContainer(sandbox, container, imageSpec, nil)
 	ct.startContainer(container.ContainerId)
 
-	listResp := ct.listContainers(&kubeapi.ContainerFilter{
-		Id: container.ContainerId,
-	})
-	if len(listResp.Containers) != 1 {
-		t.Errorf("Expected single container, instead got: %d", len(listResp.Containers))
-	}
-	if listResp.Containers[0].Id != container.ContainerId {
-		t.Errorf("Didn't find expected container id %s in returned containers list %v", container.ContainerId, listResp.Containers)
-	}
-
 	ct.waitForContainerRunning(container.ContainerId, container.Name)
 
 	// check for loop in container dom
@@ -89,9 +77,7 @@ func TestRawDevices(t *testing.T) {
 
 	ct.stopContainer(container.ContainerId)
 	ct.removeContainer(container.ContainerId)
-	ct.waitForNoContainers(&kubeapi.ContainerFilter{
-		Id: container.ContainerId,
-	})
+	ct.verifyNoContainers(nil)
 }
 
 func createTemporaryFile() string {
@@ -115,19 +101,10 @@ func createTemporaryFile() string {
 	return file.Name()
 }
 
-func fromShell(format string, a ...interface{}) string {
-	command := fmt.Sprintf(format, a...)
-	out, err := exec.Command("bash", "-c", command).Output()
-	if err != nil {
-		log.Fatalf("Error executing command '%q': %v", command, err)
-	}
-	return strings.TrimSpace(string(out))
-}
-
 func (lh *loopbackHandler) Attach() {
-	lh.devPath = fromShell("losetup -f %s --show", lh.filePath)
+	lh.devPath = runShellCommand(lh.t, "losetup -f %s --show", lh.filePath)
 }
 
 func (lh *loopbackHandler) Detach() {
-	_ = fromShell("losetup -d %s", lh.devPath)
+	runShellCommand(lh.t, "losetup -d %s", lh.devPath)
 }
