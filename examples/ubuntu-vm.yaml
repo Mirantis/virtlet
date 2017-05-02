@@ -24,11 +24,10 @@ spec:
       options:
         type: nocloud
         metadata: |
-          { "uuid": "ubuntu-vm.example.com" }
-
+          instance-id: ubuntu-vm-001
+          local-hostname: ubuntu-vm
         userdata: |
           #cloud-config
-          fqdn: ubuntu-vm.example.com
           users:
           - name: root
             ssh-authorized-keys:
