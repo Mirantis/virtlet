@@ -46,7 +46,7 @@ type volumeOpts struct {
 var flexVolumeDebug = false
 
 func init() {
-	// XXX: invent a better wat to decide whether debugging should
+	// XXX: invent a better way to decide whether debugging should
 	// be used for flexvolume driver. For now we only enable it if
 	// Docker-in-Docker env is used
 	if fi, err := os.Stat("/dind/flexvolume_driver"); err == nil && !fi.IsDir() {

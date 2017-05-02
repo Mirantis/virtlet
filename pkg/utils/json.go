@@ -1,5 +1,5 @@
 /*
-Copyright 2016 Mirantis
+Copyright 2017 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,8 @@ import (
 	"log"
 )
 
+// MapToJson converts the specified map object to JSON.
+// It panics in case if the map connot be converted.
 func MapToJson(m map[string]interface{}) string {
 	bs, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
