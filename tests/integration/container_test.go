@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"golang.org/x/net/context"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
@@ -180,6 +181,6 @@ func (ct *containerTester) removeContainer(containerId string) {
 
 func (ct *containerTester) verifyNoContainers(filter *kubeapi.ContainerFilter) {
 	if len(ct.listContainers(filter).Containers) != 0 {
-		ct.t.Errorf("expected no containers to be listed")
+		ct.t.Errorf("expected no containers to be listed, filter: %s", spew.Sdump(filter))
 	}
 }
