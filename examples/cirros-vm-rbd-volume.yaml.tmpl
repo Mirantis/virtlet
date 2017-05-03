@@ -15,15 +15,27 @@ spec:
             values:
             - virtlet
   containers:
-    - name: cirros-vm-rbd
-      image: virtlet/image-service.kube-system/cirros
+  - name: cirros-vm-rbd
+    image: virtlet/image-service.kube-system/cirros
   volumes:
-    - name: test
-      flexVolume:
-        driver: "virtlet/flexvolume_driver"
-        options:
-          Monitor: @MON_IP@:6789
-          User: libvirt
-          Secret: @SECRET@
-          Volume: rbd-test-image
-          Pool: libvirt-pool
+  - name: test
+    flexVolume:
+      driver: "virtlet/flexvolume_driver"
+      options:
+        type: ceph
+        monitor: @MON_IP@:6789
+        user: libvirt
+        secret: @SECRET@
+        volume: rbd-test-image
+        pool: libvirt-pool
+  - name: nocloud
+    flexVolume:
+      driver: "virtlet/flexvolume_driver"
+      options:
+        type: nocloud
+        metadata: |
+          {
+            "instance-id": "cirros-vm-002",
+            "local-hostname": "my-cirros-vm-rbd",
+            "public-keys": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCaJEcFDXEK2ZbX0ZLS1EIYFZRbDAcRfuVjpstSc0De8+sV1aiu+dePxdkuDRwqFtCyk6dEZkssjOkBXtri00MECLkir6FcH3kKOJtbJ6vy3uaJc9w1ERo+wyl6SkAh/+JTJkp7QRXj8oylW5E20LsbnA/dIwWzAF51PPwF7A7FtNg9DnwPqMkxFo1Th/buOMKbP5ZA1mmNNtmzbMpMfJATvVyiv3ccsSJKOiyQr6UG+j7sc/7jMVz5Xk34Vd0l8GwcB0334MchHckmqDB142h/NCWTr8oLakDNvkfC1YneAfAO41hDkUbxPtVBG5M/o7P4fxoqiHEX+ZLfRxDtHB53 me@localhost"
+          }

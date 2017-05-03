@@ -24,7 +24,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Mirantis/virtlet/pkg/utils"
+	"github.com/Mirantis/virtlet/pkg/diskimage"
 	"github.com/golang/glog"
 	libvirt "github.com/libvirt/libvirt-go"
 )
@@ -367,7 +367,7 @@ func (s *StorageTool) PrepareVolumesToBeAttached(virtletVolsDesc string, contain
 				return nil, err
 			}
 
-			err = utils.FormatDisk(path)
+			err = diskimage.FormatDisk(path)
 			if err != nil {
 				return nil, err
 			}

@@ -46,7 +46,5 @@ func TestContainerStatuses(t *testing.T) {
 	ct.waitForContainerRunning(container.ContainerId, container.Name)
 	ct.stopContainer(container.ContainerId)
 	ct.removeContainer(container.ContainerId)
-	ct.waitForNoContainers(&kubeapi.ContainerFilter{
-		Id: container.ContainerId,
-	})
+	ct.verifyNoContainers(nil)
 }

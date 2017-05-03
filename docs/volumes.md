@@ -1,4 +1,4 @@
-# Volumes Handling
+# Volume Handling
 
 ## Caveats and Limitations
 
@@ -54,10 +54,10 @@ From [Libvirt spec](http://libvirt.org/formatdomain.html#elementsDisks):
           "CapacityUnit": "MB"
 ```
 
-Downloaded qcow2 images are stored at local storage libvirt pool "**default**" at path `/var/lib/libvirt/images`
+Downloaded qcow2 images are stored at local storage libvirt pool "**default**" under `/var/lib/libvirt/images`.
 
 All ephemeral volumes created by request as well as snapshot for boot image are stored
-at local storage libvirt pool "**volumes**" at path /var/lib/virtlet/volumes
+at local storage libvirt pool "**volumes**" under `/var/lib/virtlet/volumes`.
 
 
 Volume settings for ephemeral local storage volumes are passed via pod's metadata Annotations.
@@ -106,29 +106,60 @@ On pod remove expected all volumes and snapshot related to VM should be removed.
 
 ## Persistent Storage
 
-### Flexvolume libvirt driver
+### Flexvolume driver
 
-FlexVolume libvirt driver for virtlet supports attaching to VM of Ceph RBD block devices from cluster with cephx auth enabled.
+FlexVolume virtlet driver supports attaching Ceph RBDs (RADOS Block Devices) and [NoCloud](http://cloudinit.readthedocs.io/en/latest/topics/datasources/nocloud.html) [cloud-init](https://cloudinit.readthedocs.io/en/latest/) data sources VMs.
+Cephx authentication can be enabled for the Ceph clusters that are used with this driver.
 
-Basing on [FlexVolumes](https://github.com/kubernetes/community/blob/master/contributors/devel/flexvolume.md) for k8s implements defined api to have virtlet be alinged with a way of definition of remote persistent volumes for pods inside pods(https://kubernetes.io/docs/concepts/storage/volumes/#flexvolume) as well as using [PV&PVC](https://kubernetes.io/docs/concepts/storage/persistent-volumes/)
+Virtlet uses [FlexVolume](https://github.com/kubernetes/community/blob/master/contributors/devel/flexvolume.md) mechanism for the volumes to make volume definitions more consistent with volume definitions of non-VM pods and to make it possible to use [PVs and PVCs](https://kubernetes.io/docs/concepts/storage/persistent-volumes/).
 
-#### RBD Volume definition supported features:
+As of now, there's no need to mount volumes inside the container, it's enough to define them for the pod, but this may change in future.
+
+#### Using NoCloud Cloud-init data source mechanism
+
+Virtlet currently supports passing static [cloud-init](https://cloudinit.readthedocs.io/en/latest/) data using [NoCloud](http://cloudinit.readthedocs.io/en/latest/topics/datasources/nocloud.html) data sources VMs. In order to do so, you need to define a `flexVolume` based volume for your pod, with `options` containing `type: nocloud`, `metadata` and optional `userdata` fields. The contents of `metadata` and `userdata` fields will be passed as `user-data` and `meta-data` correspondingly to the VM's cloud-init handler. Note that in some cases there can be VM-dependent restrictions, e.g. the image used by [CirrOS example](../examples/cirros-vm.yaml) supplied with Virtlet only supports JSON data in `metadata` field and a script beginning with `#!` in `userdata` field. Below is the relevant fragment of pod definition:
+
+```yaml
+  volumes:
+  - name: nocloud
+    flexVolume:
+      driver: "virtlet/flexvolume_driver"
+      options:
+        type: nocloud
+        metadata: |
+          {
+            "instance-id": "cirros-vm-001",
+            "local-hostname": "my-cirros-vm",
+            "public-keys": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCaJEcFDXEK2ZbX0ZLS1EIYFZRbDAcRfuVjpstSc0De8+sV1aiu+dePxdkuDRwqFtCyk6dEZkssjOkBXtri00MECLkir6FcH3kKOJtbJ6vy3uaJc9w1ERo+wyl6SkAh/+JTJkp7QRXj8oylW5E20LsbnA/dIwWzAF51PPwF7A7FtNg9DnwPqMkxFo1Th/buOMKbP5ZA1mmNNtmzbMpMfJATvVyiv3ccsSJKOiyQr6UG+j7sc/7jMVz5Xk34Vd0l8GwcB0334MchHckmqDB142h/NCWTr8oLakDNvkfC1YneAfAO41hDkUbxPtVBG5M/o7P4fxoqiHEX+ZLfRxDtHB53 me@localhost"
+          }
+
+        userdata: |
+          #!/bin/sh
+          echo "Hi there"
+```
+
+Here we set hostname for the VM, inject an ssh public key and provide a script that executed by cloud-init. There's helper script named [examples/vmssh.sh](../examples/vmssh.sh) that can be used to access VMs over ssh after providing ssh keys for them (it defaults to using a sample key from examples/ directory).
+
+Virtlet's cloud-init mechanism is not finalized yet and will change in future so as to support dynamic metadata generation and passing metadata via the metadata server along with `NoCloud` datasource.
+
+#### Supported features of RBD Volume definition
 
 ```
 - FlexVolume Driver name: kubernetes.io/flexvolume_driver
-- Monitor: <ip:port>
-- User: <user-name>
-- Secret: <user-secret-key>
-- Volume: <rbd-image-name>
-- Pool: <pool-name>
+- type: ceph
+- monitor: <ip:port>
+- user: <user-name>
+- secret: <user-secret-key>
+- volume: <rbd-image-name>
+- pool: <pool-name>
 ```
 
-#### Driver Implemetation details
-1. It's expected driver's binary resides at `/usr/libexec/kubernetes/kubelet-plugins/volume/exec/virtlet~flexvolume_driver/flexvolume_driver` before kubelet is started. Note: If you're using Daemonset for virtlet deployment, you don't need to bother about that.
-1. Kubelet calls libvirt driver and passes volume info to it
-1. Libvirt driver uses standart kubelet's dir `/var/lib/kubelet/pods/<pod-id>/volumes/virtlet~flexvolume_driver/<volume-name>` to store formed xml definitions to be used by virtlet. It's expected to have three files for each volume: disk.xml, secret.xml and key in case of you have cephx auth, ohterwise only disk.xml will be generated.
+#### Driver implemetation details
+1. It's expected that the driver's binary resides at `/usr/libexec/kubernetes/kubelet-plugins/volume/exec/virtlet~flexvolume_driver/flexvolume_driver` before kubelet is started. Note that if you're using DaemonSet for virtlet deployment, you don't need to bother about that because in that case it's done automatically.
+1. Kubelet calls the virtlet flexvolume driver and passes volume info to it
+1. Virtlet flexvolume driver uses standard kubelet's dir `/var/lib/kubelet/pods/<pod-id>/volumes/virtlet~flexvolume_driver/<volume-name>` to store the xml definitions to be used by virtlet. Virtlet looks for  `disk.xml`, `secret.xml` and `key` files (`secret.xml` and `key` files are used only if you have cephx auth). For `NoCloud` volumes, there's also a `cidata.cd` directory that's used to generate `cidata.iso` image.
 
-See below example with details:
+See below an example with some details:
 ```
 # ls -l /var/lib/kubelet/pods/d46318cc-1a80-11e7-ac74-02420ac00002/volumes/virtlet~flexvolume_driver/test/
 total 12
@@ -164,7 +195,7 @@ total 12
 # cat key
 AQDTwuVY8rA8HxAAthwOKaQPr0hRc7kCmR/9Qg==
 ```
-4. Virtlet checks whether there are dirs with volume info under `/var/lib/kubelet/pods/<pod-id>/volumes/virtlet~flexvolume_driver`. If yes, virtlet integrates disk.xml inside domain's definition and creates secret entity in libvirt for cephx auth basing on provided secret.xml and key.
+4. Virtlet checks whether there are dirs with volume info under `/var/lib/kubelet/pods/<pod-id>/volumes/virtlet~flexvolume_driver`. If yes, virtlet includes `disk.xml` content inside domain definition and creates a secret entity in libvirt for cephx auth based on provided `secret.xml` and `key` files.
 
 #### Example of VM-pod definition with specidied rbd device to attach:
 ```yaml
@@ -192,6 +223,7 @@ spec:
       flexVolume:
         driver: kubernetes.io/flexvolume_driver
         options:
+          Type: ceph
           Monitor: 10.192.0.1:6789
           User: libvirt
           Secret: AQDTwuVY8rA8HxAAthwOKaQPr0hRc7kCmR/9Qg==
@@ -248,7 +280,7 @@ As always, boot image is exposed to the guest OS under **vda** device.
 This pod definition exposes a single raw device to the VM (/dev/loop0).
 As devices/volumes are exposed in the alphabet order starting from `b`, `vol1` will be visible on typical linux VM as `vdb`, but please reffer to third caveats of listed at the top of this document.
 
-#### Raw Devices whitelist
+#### Raw device whitelist
 
 Virtlet allows to expose to VM only whitelisted raw devices. This list is controlled by `-raw-devices` parameter for `virtlet` binary. It's value is passed to `virtlet` daemonset using `VIRTLET_RAW_DEVICES` environment variable.
 This `-raw-devices` parameter should contain comma separated patterns of paths relative to `/dev` directory, which are used to [glob](https://en.wikipedia.org/wiki/Glob_(programming)) paths of devices, allowed to use by virtual machines.

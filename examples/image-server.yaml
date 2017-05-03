@@ -16,7 +16,7 @@ spec:
               "name": "dl-image",
               "image": "alpine:3.5",
               "imagePullPolicy": "IfNotPresent",
-              "command": ["/bin/sh", "-c", "apk update && apk add ca-certificates wget && wget -O /images/cirros https://github.com/eprasad/virt-cirros/raw/master/virt-cirros-0.3.4-x86_64-disk.img && touch /images/ready"],
+              "command": ["/bin/sh", "-c", "apk update && apk add ca-certificates wget && wget -O /images/cirros https://download.cirros-cloud.net/0.3.5/cirros-0.3.5-x86_64-disk.img && touch /images/ready"],
               "volumeMounts": [
                 {
                   "name": "images",

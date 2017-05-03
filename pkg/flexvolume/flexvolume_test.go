@@ -20,13 +20,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/Mirantis/virtlet/pkg/utils"
+	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 )
 
 const (
@@ -50,46 +52,99 @@ const (
   </usage>
 </secret>
 `
+	noCloudDiskTestTemplate = `
+<disk type="file" device="disk">
+  <driver name="qemu" type="raw"/>
+  <source file='%s'/>
+  <readonly/>
+  <target dev="%%s" bus="virtio"/>
+</disk>
+`
+	noCloudMetaData = `
+instance-id: some-instance-id
+local-hostname: foobar
+`
+	noCloudUserData = `
+    #cloud-config
+    fqdn: ubuntu-16-vm.mydomain.com
+    users:
+      - name: root
+        ssh-authorized-keys:
+          - ssh-rsa YOUR_KEY_HEWE me@localhost
+    ssh_pwauth: True
+    runcmd:
+    - [ apt-get, update ]
+    - [ apt-get, install, -y, --force-yes, apache2 ]
+`
 )
 
-// dirToMap converts directory to a map where keys are filenames
-// without full path and values are the contents of the files.  If the
-// directory doesn't exist, dirToMap returns nil
-func dirToMap(dir string) (map[string]string, error) {
-	if fi, err := os.Stat(dir); err != nil && os.IsNotExist(err) {
-		return nil, nil
-	} else if err != nil {
-		return nil, fmt.Errorf("os.Stat(): %v", err)
-	} else if !fi.IsDir() {
-		return nil, fmt.Errorf("%q expected to be a directory", dir)
-	}
-	paths, err := filepath.Glob(dir + "/*")
-	if err != nil {
-		return nil, fmt.Errorf("filepath.Glob(): %v", err)
-	}
-	m := map[string]string{}
-	for _, p := range paths {
-		filename := filepath.Base(p)
-		if fi, err := os.Stat(p); err != nil {
-			return nil, fmt.Errorf("os.Stat(): %v", err)
-		} else if fi.IsDir() {
-			return nil, fmt.Errorf("unexpected directory: %q", filename)
-		}
-		bs, err := ioutil.ReadFile(p)
-		if err != nil {
-			return nil, fmt.Errorf("ioutil.ReadFile(): %v", err)
-		}
-		m[filename] = string(bs)
-	}
-	return m, nil
+type fakeMounter struct {
+	t       *testing.T
+	tmpDir  string
+	journal []string
 }
 
-func mapToJson(m map[string]string) string {
-	bs, err := json.MarshalIndent(m, "", "  ")
-	if err != nil {
-		log.Panicf("error marshalling json: %v", err)
+var _ Mounter = &fakeMounter{}
+
+func newFakeMounter(t *testing.T, tmpDir string) *fakeMounter {
+	return &fakeMounter{t: t, tmpDir: tmpDir}
+}
+
+func (mounter *fakeMounter) validatePath(target string) {
+	if filepath.Dir(target) != filepath.Clean(mounter.tmpDir) {
+		mounter.t.Fatalf("bad path encountered by the mounter: %q (tmpDir %q)", target, mounter.tmpDir)
 	}
-	return string(bs)
+}
+
+func (mounter *fakeMounter) Mount(source string, target string, fstype string) error {
+	mounter.validatePath(target)
+	mounter.journal = append(mounter.journal, fmt.Sprintf("mount: %s %s %s", source, target, fstype))
+
+	// We want to check directory contents both before & after mount,
+	// see comment in FlexVolumeDriver.mount() in flexvolume.go.
+	// So we move the original contents to .shadowed subdir.
+	shadowedPath := filepath.Join(target, ".shadowed")
+	if err := os.Mkdir(shadowedPath, 0755); err != nil {
+		mounter.t.Fatalf("os.Mkdir(): %v", err)
+	}
+
+	pathsToShadow, err := filepath.Glob(filepath.Join(target, "*"))
+	if err != nil {
+		mounter.t.Fatalf("filepath.Glob(): %v", err)
+	}
+	for _, pathToShadow := range pathsToShadow {
+		filename := filepath.Base(pathToShadow)
+		if filename == ".shadowed" {
+			continue
+		}
+		if err := os.Rename(pathToShadow, filepath.Join(shadowedPath, filename)); err != nil {
+			mounter.t.Fatalf("os.Rename(): %v", err)
+		}
+	}
+	return nil
+}
+
+func (mounter *fakeMounter) Unmount(target string) error {
+	// we make sure that path is under our tmpdir before wiping it
+	mounter.validatePath(target)
+	mounter.journal = append(mounter.journal, fmt.Sprintf("unmount: %s", target))
+
+	paths, err := filepath.Glob(filepath.Join(target, "*"))
+	if err != nil {
+		mounter.t.Fatalf("filepath.Glob(): %v", err)
+	}
+	for _, path := range paths {
+		if filepath.Base(path) != ".shadowed" {
+			continue
+		}
+		if err := os.RemoveAll(path); err != nil {
+			mounter.t.Fatalf("os.RemoveAll(): %v", err)
+		}
+	}
+
+	// We don't clean up '.shadowed' dir here because flexvolume driver
+	// recursively removes the whole dir tree anyway.
+	return nil
 }
 
 func TestFlexVolume(t *testing.T) {
@@ -99,21 +154,31 @@ func TestFlexVolume(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	cephJsonOpts := mapToJson(map[string]string{
+	cephJsonOpts := utils.MapToJson(map[string]interface{}{
+		"type":    "ceph",
 		"monitor": "127.0.0.1:6789",
 		"pool":    "libvirt-pool",
 		"volume":  "rbd-test-image",
 		"secret":  "foobar",
 		"user":    "libvirt",
 	})
+	noCloudJsonOpts := utils.MapToJson(map[string]interface{}{
+		"type":     "nocloud",
+		"metadata": noCloudMetaData,
+		"userdata": noCloudUserData,
+	})
+	noCloudDisk := fmt.Sprintf(noCloudDiskTestTemplate, path.Join(tmpDir, "nocloud/cidata.iso"))
+	cephDir := path.Join(tmpDir, "ceph")
+	noCloudDir := path.Join(tmpDir, "nocloud")
 	for _, step := range []struct {
-		name    string
-		args    []string
-		subdir  string
-		status  string
-		message string
-		fields  map[string]interface{}
-		files   map[string]string
+		name         string
+		args         []string
+		subdir       string
+		status       string
+		message      string
+		fields       map[string]interface{}
+		files        map[string]interface{}
+		mountJournal []string
 	}{
 		{
 			name:   "init",
@@ -124,21 +189,10 @@ func TestFlexVolume(t *testing.T) {
 			name: "attach",
 			args: []string{
 				"attach",
-				"{}",
+				"{}", // not actually used by our impl
 				"node1",
 			},
 			status: "Success",
-		},
-		{
-			name: "getvolumename",
-			args: []string{
-				"getvolumename",
-				cephJsonOpts,
-			},
-			status: "Success",
-			fields: map[string]interface{}{
-				"volumeName": "127.0.0.1/6789/libvirt-pool/rbd-test-image/libvirt",
-			},
 		},
 		{
 			name: "isattached",
@@ -165,54 +219,60 @@ func TestFlexVolume(t *testing.T) {
 			},
 		},
 		{
-			name: "mount",
-			args: []string{
-				"mount",
-				path.Join(tmpDir, "ceph"),
-				cephJsonOpts,
-			},
+			name:   "mount-ceph",
+			args:   []string{"mount", cephDir, cephJsonOpts},
 			status: "Success",
 			subdir: "ceph",
-			files: map[string]string{
+			files: map[string]interface{}{
 				"disk.xml":   cephDisk,
 				"key":        "foobar",
 				"secret.xml": cephSecret,
+				".shadowed": map[string]interface{}{
+					"disk.xml":   cephDisk,
+					"key":        "foobar",
+					"secret.xml": cephSecret,
+				},
+			},
+			mountJournal: []string{
+				fmt.Sprintf("mount: tmpfs %s tmpfs", cephDir),
 			},
 		},
 		{
-			name: "unmount",
-			args: []string{
-				"unmount",
-				path.Join(tmpDir, "ceph"),
-			},
+			name:   "unmount-ceph",
+			args:   []string{"unmount", cephDir},
 			status: "Success",
 			subdir: "ceph",
-			files:  nil, // dir must be removed
+			mountJournal: []string{
+				fmt.Sprintf("unmount: %s", cephDir),
+			},
 		},
 		{
-			name: "mount",
-			args: []string{
-				"mount",
-				path.Join(tmpDir, "ceph"),
-				cephJsonOpts,
-			},
+			name:   "mount-ceph-1",
+			args:   []string{"mount", cephDir, cephJsonOpts},
 			status: "Success",
 			subdir: "ceph",
-			files: map[string]string{
+			files: map[string]interface{}{
 				"disk.xml":   cephDisk,
 				"key":        "foobar",
 				"secret.xml": cephSecret,
+				".shadowed": map[string]interface{}{
+					"disk.xml":   cephDisk,
+					"key":        "foobar",
+					"secret.xml": cephSecret,
+				},
+			},
+			mountJournal: []string{
+				fmt.Sprintf("mount: tmpfs %s tmpfs", cephDir),
 			},
 		},
 		{
-			name: "unmount",
-			args: []string{
-				"unmount",
-				path.Join(tmpDir, "ceph"),
-			},
+			name:   "unmount-ceph-1",
+			args:   []string{"unmount", cephDir},
 			status: "Success",
 			subdir: "ceph",
-			files:  nil, // dir must be removed
+			mountJournal: []string{
+				fmt.Sprintf("unmount: %s", cephDir),
+			},
 		},
 		{
 			name: "detach",
@@ -244,13 +304,46 @@ func TestFlexVolume(t *testing.T) {
 			status:  "Failure",
 			message: "no arguments passed",
 		},
+		{
+			name:   "mount-nocloud",
+			args:   []string{"mount", noCloudDir, noCloudJsonOpts},
+			status: "Success",
+			subdir: "nocloud",
+			files: map[string]interface{}{
+				"disk.xml": noCloudDisk,
+				"cidata.cd": map[string]interface{}{
+					"meta-data": noCloudMetaData,
+					"user-data": noCloudUserData,
+				},
+				".shadowed": map[string]interface{}{
+					"disk.xml": noCloudDisk,
+					"cidata.cd": map[string]interface{}{
+						"meta-data": noCloudMetaData,
+						"user-data": noCloudUserData,
+					},
+				},
+			},
+			mountJournal: []string{
+				fmt.Sprintf("mount: tmpfs %s tmpfs", noCloudDir),
+			},
+		},
+		{
+			name:   "unmount-nocloud",
+			args:   []string{"unmount", noCloudDir},
+			status: "Success",
+			subdir: "nocloud",
+			mountJournal: []string{
+				fmt.Sprintf("unmount: %s", noCloudDir),
+			},
+		},
 	} {
 		t.Run(step.name, func(t *testing.T) {
 			var subdir string
 			args := step.args
+			mounter := newFakeMounter(t, tmpDir)
 			d := NewFlexVolumeDriver(func() string {
 				return "abb67e3c-71b3-4ddd-5505-8c4215d5c4eb"
-			})
+			}, mounter)
 			result := d.Run(args)
 			var m map[string]interface{}
 			if err := json.Unmarshal([]byte(result), &m); err != nil {
@@ -282,14 +375,19 @@ func TestFlexVolume(t *testing.T) {
 				}
 			}
 			if step.subdir != "" {
-				files, err := dirToMap(path.Join(tmpDir, step.subdir))
+				files, err := testutils.DirToMap(path.Join(tmpDir, step.subdir))
 				if err != nil {
 					t.Fatalf("dirToMap() on %q: %v", subdir, err)
 				}
 				if !reflect.DeepEqual(files, step.files) {
-					t.Errorf("bad file content.\n%s\n-- instead of --\n%s", mapToJson(files), mapToJson(step.files))
+					t.Errorf("bad file content.\n%s\n-- instead of --\n%s", utils.MapToJson(files), utils.MapToJson(step.files))
 				}
+			}
+			if !reflect.DeepEqual(mounter.journal, step.mountJournal) {
+				t.Errorf("unexpected mount journal: %#v instead of %#v", mounter.journal, step.mountJournal)
 			}
 		})
 	}
 }
+
+// TODO: escape xml in iso path

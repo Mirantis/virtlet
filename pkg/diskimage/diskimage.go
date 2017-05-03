@@ -14,11 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+package diskimage
 
 import (
 	"errors"
-	"github.com/Mirantis/virtlet/pkg/utils/guestfs"
+
+	"github.com/Mirantis/virtlet/pkg/diskimage/guestfs"
 )
 
 func InitLibForImage(path string) (*guestfs.Guestfs, error) {

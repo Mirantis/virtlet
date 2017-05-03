@@ -26,6 +26,7 @@ fi
 
 SCRIPT_DIR="$(cd $(dirname "$(readlinkf "${BASH_SOURCE}")"); pwd)"
 virsh="${SCRIPT_DIR}/../../examples/virsh.sh"
+vmssh="${SCRIPT_DIR}/../../examples/vmssh.sh"
 
 # provide path for kubectl
 export PATH="${HOME}/.kubeadm-dind-cluster:${PATH}"
@@ -35,12 +36,20 @@ while ! "${virsh}" list | grep -q cirros-vm; do
 done
 
 cd "${SCRIPT_DIR}"
-"${SCRIPT_DIR}/vmchat.exp" $("${virsh}" list --name)
+"${SCRIPT_DIR}/vmchat.exp" 1
+
+vm_hostname="$("${vmssh}" cirros@cirros-vm cat /etc/hostname)"
+expected_hostname=my-cirros-vm
+if [[ "${vm_hostname}" != "${expected_hostname}" ]]; then
+  echo "Unexpected vm hostname: ${vm_hostname} instead ${expected_hostname}" >&2
+  exit 1
+fi
 
 virtlet_pod_name=$(kubectl get pods --namespace=kube-system | grep virtlet | awk '{print $1}')
 
 # Run one-node ceph cluster
 "${SCRIPT_DIR}/run_ceph.sh" "${SCRIPT_DIR}"
+
 kubectl create -f "${SCRIPT_DIR}/cirros-vm-rbd-volume.yaml"
 while ! "${virsh}" list | grep -q cirros-vm-rbd; do
   sleep 1
@@ -51,6 +60,11 @@ fi
 if ! kubectl exec "${virtlet_pod_name}" --namespace=kube-system -- /bin/sh -c "virsh list | grep cirros-vm-rbd.*running"; then
   exit 1
 fi
+
+# wait for login prompt to appear
+"${SCRIPT_DIR}/vmchat-short.exp" 2
+
+"${vmssh}" cirros@cirros-vm-rbd 'sudo /usr/sbin/mkfs.ext2 /dev/vdb && sudo mount /dev/vdb /mnt && ls -l /mnt | grep lost+found'
 
 # check vnc consoles are available for both domains
 if ! kubectl exec "${virtlet_pod_name}" --namespace=kube-system -- /bin/sh -c "apt-get install -y vncsnapshot"; then

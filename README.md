@@ -26,7 +26,10 @@ chmod +x demo.sh
 ./demo.sh
 ```
 
-The demo will start a test cluster, deploy Virtlet on it and then boot a [CirrOS](https://launchpad.net/cirros) VM there. You may access sample nginx server via `curl http://nginx.default.svc.cluster.local` from inside the VM. To detach from VM console, press `Ctrl-]`. After you detach from the VM you can remove the test cluster with `./dind-cluster-v1.6.sh clean`.
+The demo will start a test cluster, deploy Virtlet on it and then boot a [CirrOS](https://launchpad.net/cirros) VM there. You may access sample nginx server via `curl http://nginx.default.svc.cluster.local` from inside the VM. To detach from VM console, press `Ctrl-]`. After the VM has booted, you can also use a helper script to connect to its SSH server:
+```
+examples/vmssh.sh cirros@cirros-vm [command...]
+```
 
 By default, CNI bridge plugin is used for cluster networking. Another option is using [flannel](https://github.com/coreos/flannel). To do so, run demo script like this:
 ```
@@ -36,6 +39,8 @@ CNI_PLUGIN=flannel ./demo.sh
 The demo script will check for KVM support on the host and will make Virtlet use KVM if it's available on Docker host. If KVM is not available, plain QEMU will be used.
 
 The demo is based on [kubeadm-dind-cluster](https://github.com/Mirantis/kubeadm-dind-cluster) project. **Docker btrfs storage driver is currently unsupported.** Please refer to `kubeadm-dind-cluster` documentation for more info.
+
+You can remove the test cluster with `./dind-cluster-v1.6.sh clean` when you no longer need it.
 
 ## Need any help with Virtlet?
 

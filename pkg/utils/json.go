@@ -14,15 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package utils
 
 import (
-	"os"
-
-	"github.com/Mirantis/virtlet/pkg/flexvolume"
+	"encoding/json"
+	"log"
 )
 
-func main() {
-	driver := flexvolume.NewFlexVolumeDriver(flexvolume.NewUuid, flexvolume.NewLinuxMounter())
-	os.Stdout.WriteString(driver.Run(os.Args[1:]))
+// MapToJson converts the specified map object to JSON.
+// It panics in case if the map connot be converted.
+func MapToJson(m map[string]interface{}) string {
+	bs, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		log.Panicf("error marshalling json: %v", err)
+	}
+	return string(bs)
 }

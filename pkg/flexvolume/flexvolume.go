@@ -20,23 +20,46 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 
 	uuid "github.com/nu7hatch/gouuid"
+
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 type volumeOpts struct {
+	Type string `json:"type"`
+	// ceph fields
 	Monitor  string `json:"monitor"`
 	Pool     string `json:"pool"`
 	Volume   string `json:"volume"`
 	Secret   string `json:"secret"`
-	User     string `json:user`
-	Protocol string `json:protocol`
+	User     string `json:"user"`
+	Protocol string `json:"protocol"`
+	// nocloud fields
+	MetaData string `json:"metadata"`
+	UserData string `json:"userdata"`
 }
 
-func newUuid() string {
+// flexVolumeDebug indicates whether flexvolume debugging should be enabled
+var flexVolumeDebug = false
+
+func init() {
+	// XXX: invent a better way to decide whether debugging should
+	// be used for flexvolume driver. For now we only enable it if
+	// Docker-in-Docker env is used
+	if fi, err := os.Stat("/dind/flexvolume_driver"); err == nil && !fi.IsDir() {
+		flexVolumeDebug = true
+	}
+}
+
+type Mounter interface {
+	Mount(source string, target string, fstype string) error
+	Unmount(target string) error
+}
+
+func NewUuid() string {
 	u, err := uuid.NewV4()
 	if err != nil {
 		panic("can't generate UUID")
@@ -46,55 +69,43 @@ func newUuid() string {
 
 type UuidGen func() string
 
+type volumeHandler func(uuidGen UuidGen, targetDir string, opts volumeOpts) (map[string][]byte, error)
+
+var volumeHandlers = map[string]volumeHandler{
+	"ceph":    cephVolumeHandler,
+	"nocloud": noCloudVolumeHandler,
+}
+
 type FlexVolumeDriver struct {
 	uuidGen UuidGen
+	mounter Mounter
 }
 
-func NewFlexVolumeDriver(uuidGen UuidGen) *FlexVolumeDriver {
-	if uuidGen == nil {
-		uuidGen = newUuid
-	}
-	return &FlexVolumeDriver{uuidGen: uuidGen}
+func NewFlexVolumeDriver(uuidGen UuidGen, mounter Mounter) *FlexVolumeDriver {
+	return &FlexVolumeDriver{uuidGen: uuidGen, mounter: mounter}
 }
 
-func (d *FlexVolumeDriver) addVolumeDefinitions(target string, opts volumeOpts) error {
-	uuid := d.uuidGen()
+func (d *FlexVolumeDriver) getVolumeHandler(opts volumeOpts) (volumeHandler, error) {
+	if opts.Type == "" {
+		return nil, errors.New("virtlet flexvolume type not set")
+	}
+	vt, ok := volumeHandlers[opts.Type]
+	if !ok {
+		return nil, fmt.Errorf("unknown volume type %q", opts.Type)
+	}
+	return vt, nil
+}
 
-	secretXML := `
-<secret ephemeral='no' private='no'>
-  <uuid>%s</uuid>
-  <usage type='ceph'>
-    <name>%s</name>
-  </usage>
-</secret>
-`
-	if err := ioutil.WriteFile(target+"/secret.xml", []byte(fmt.Sprintf(secretXML, uuid, opts.User)), 0644); err != nil {
+func (d *FlexVolumeDriver) populateVolumeDir(targetDir string, opts volumeOpts) error {
+	handler, err := d.getVolumeHandler(opts)
+	if err != nil {
 		return err
 	}
-
-	// Will be removed right after creating appropriate secret in libvirt
-	if err := ioutil.WriteFile(target+"/key", []byte(opts.Secret), 0644); err != nil {
+	files, err := handler(d.uuidGen, targetDir, opts)
+	if err != nil {
 		return err
 	}
-
-	diskXML := `
-<disk type="network" device="disk">
-  <driver name="qemu" type="raw"/>
-  <auth username="%s">
-    <secret type="ceph" uuid="%s"/>
-  </auth>
-  <source protocol="rbd" name="%s/%s">
-    <host name="%s" port="%s"/>
-  </source>
-  <target dev="%s" bus="virtio"/>
-</disk>
-`
-	pairIPPort := strings.Split(opts.Monitor, ":")
-	if len(pairIPPort) != 2 {
-		return fmt.Errorf("invalid format of ceph monitor setting: %s. Expected in form ip:port", opts.Monitor)
-	}
-	// Note: target dev name wiil be specified later by virtlet diring combining domain xml definition
-	if err := ioutil.WriteFile(target+"/disk.xml", []byte(fmt.Sprintf(diskXML, opts.User, uuid, opts.Pool, opts.Volume, pairIPPort[0], pairIPPort[1], "%s")), 0644); err != nil {
+	if err := utils.WriteFiles(targetDir, files); err != nil {
 		return err
 	}
 	return nil
@@ -137,38 +148,53 @@ func (d *FlexVolumeDriver) mount(targetMountDir, jsonOptions string) (map[string
 	if err := os.MkdirAll(targetMountDir, 0700); err != nil {
 		return nil, fmt.Errorf("os.MkDirAll(): %v", err)
 	}
-	if err := d.addVolumeDefinitions(targetMountDir, opts); err != nil {
+
+	// Here we populate the volume directory twice.
+	// That's because we need to do tmpfs mount to make kubelet happy -
+	// it will not try to unmount the volume if it doesn't detect mount
+	// point on the flexvolume dir, and using 'mount --bind' is not enough
+	// because kubelet's mount point detection doesn't see bind mounts.
+	// The problem is that hostPaths are mounted as private (no mount
+	// propagation) and so tmpfs content is not visible inside Virtlet
+	// pod. So, in order to avoid unneeded confusion down the road,
+	// we place flexvolume contents to the volume dir twice,
+	// both directly and onto the freshly mounted tmpfs.
+
+	if err := d.populateVolumeDir(targetMountDir, opts); err != nil {
 		return nil, err
 	}
+
+	if err := d.mounter.Mount("tmpfs", targetMountDir, "tmpfs"); err != nil {
+		return nil, fmt.Errorf("error mounting tmpfs at %q: %v", targetMountDir, err)
+	}
+
+	done := false
+	defer func() {
+		// try to unmount upon error or panic
+		if !done {
+			d.mounter.Unmount(targetMountDir)
+		}
+	}()
+
+	if err := d.populateVolumeDir(targetMountDir, opts); err != nil {
+		return nil, err
+	}
+
+	done = true
 	return nil, nil
 }
 
 // Invocation: <driver executable> unmount <mount dir>
 func (d *FlexVolumeDriver) unmount(targetMountDir string) (map[string]interface{}, error) {
+	if err := d.mounter.Unmount(targetMountDir); err != nil {
+		return nil, fmt.Errorf("unmount %q: %v", err.Error())
+	}
+
 	if err := os.RemoveAll(targetMountDir); err != nil {
 		return nil, fmt.Errorf("os.RemoveAll(): %v", err.Error())
 	}
 
 	return nil, nil
-}
-
-// Invocation: <driver executable> getvolumename <json options>
-func (d *FlexVolumeDriver) getVolumeName(jsonOptions string) (map[string]interface{}, error) {
-	var opts volumeOpts
-	if err := json.Unmarshal([]byte(jsonOptions), &opts); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal json options: %v", err)
-	}
-	r := []string{}
-	monStr := strings.Replace(opts.Monitor, ":", "/", -1)
-	for _, s := range []string{monStr, opts.Pool, opts.Volume, opts.User, opts.Protocol} {
-		if s != "" {
-			r = append(r, s)
-		}
-	}
-	if len(r) == 0 {
-		return nil, fmt.Errorf("invalid flexvolume definition")
-	}
-	return map[string]interface{}{"volumeName": strings.Join(r, "/")}, nil
 }
 
 type driverOp func(*FlexVolumeDriver, []string) (map[string]interface{}, error)
@@ -202,11 +228,6 @@ var commands = map[string]cmdInfo{
 	"isattached": cmdInfo{
 		2, func(d *FlexVolumeDriver, args []string) (map[string]interface{}, error) {
 			return d.isAttached(args[0], args[1])
-		},
-	},
-	"getvolumename": cmdInfo{
-		1, func(d *FlexVolumeDriver, args []string) (map[string]interface{}, error) {
-			return d.getVolumeName(args[0])
 		},
 	},
 	"mount": cmdInfo{
@@ -243,20 +264,17 @@ func (d *FlexVolumeDriver) doRun(args []string) (map[string]interface{}, error) 
 func (d *FlexVolumeDriver) Run(args []string) string {
 	r := formatResult(d.doRun(args))
 
-	// Uncomment the following for debugging.
-	// TODO: make this configurable somehow.
-	// The problem is that kubelet grabs CombinedOutput() from the process
-	// and tries to parse it as JSON (need to recheck this,
-	// maybe submit a PS to fix it)
-
-	// f, err := os.OpenFile("/tmp/flexvolume.log", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	// defer f.Close()
-
-	// fmt.Fprintf(f, "flexvolume %s -> %s\n", strings.Join(args, " "), r)
+	if flexVolumeDebug {
+		// This is for debugging purposes only.
+		// The problem is that kubelet grabs CombinedOutput() from the process
+		// and tries to parse it as JSON (need to recheck this,
+		// maybe submit a PS to fix it)
+		f, err := os.OpenFile("/tmp/flexvolume.log", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
+		if err == nil {
+			defer f.Close()
+			fmt.Fprintf(f, "flexvolume %s -> %s\n", strings.Join(args, " "), r)
+		}
+	}
 
 	return r
 }

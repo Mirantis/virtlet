@@ -28,3 +28,12 @@ kubectl get pods -w
 ```
 ./virsh.sh console $(./virsh.sh list --name)
 ```
+7. As soon as the VM has booted, you can use the `vmssh.sh` script to access it using ssh:
+```
+./vmssh.sh cirros@cirros-vm [command...]
+```
+
+Besides [cirros-vm.yaml](cirros-vm.yaml), there's also [ubuntu-vm.yaml](ubuntu-vm.yaml) that can be used to start an Ubuntu Xenial VM. It can also be accessed using `vmssh.sh` after it boots:
+```
+./vmssh.sh root@ubuntu-vm [command...]
+```

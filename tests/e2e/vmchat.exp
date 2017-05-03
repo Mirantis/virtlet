@@ -36,7 +36,7 @@ expect {
     "Password: "
 }
 sleep 3
-send "letmein\r"
+send "cubswin:)\r"
 
 # display network config for the purpose of diagnostics
 expect {
