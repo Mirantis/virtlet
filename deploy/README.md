@@ -1,4 +1,10 @@
-# Deploying virtlet as a DaemonSet
+# Deploying Virtlet
+
+## Deploying Virtlet on a real cluster
+
+See [this document](real-cluster.md) for instructions.
+
+## Deploying Virtlet as a DaemonSet on kubeadm-dind-cluster
 
 The steps described here are performed automatically by
 [demo.sh](demo.sh) script.
@@ -16,7 +22,7 @@ $ export PATH="$HOME/.kubeadm-dind-cluster:$PATH"
 ```
 kubectl label node kube-node-1 extraRuntime=virtlet
 ```
-3. Deploy Virtlet DaemonSet:
+3. Deploy Virtlet DaemonSet (assuming that you have [virtlet-ds.yaml](virtlet-ds.yaml) in the current directory):
 ```
 kubectl create -f virtlet-ds.yaml
 ```
