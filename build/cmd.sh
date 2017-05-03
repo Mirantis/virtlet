@@ -129,11 +129,11 @@ function gotest {
     if [[ ${subdir} =~ /integration$ ]]; then
       start_libvirt="VIRTLET_DISABLE_KVM=${VIRTLET_DISABLE_KVM:-} /start.sh -novirtlet && "
     fi
-    vcmd "${start_libvirt}cd '${subdir}' && CGO_CFLAGS='-g -O2 -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include' CGO_LDFLAGS='-lglib-2.0 -lvirt' go test $*"
+    vcmd "${start_libvirt}cd '${subdir}' && go test $*"
 }
 
 function gobuild {
-    vcmd "cd '$(virtlet_subdir)' && CGO_CFLAGS='-g -O2 -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include' CGO_LDFLAGS='-lglib-2.0 -lvirt' go build $*"
+    vcmd "cd '$(virtlet_subdir)' && go build $*"
 }
 
 function usage {
