@@ -54,8 +54,6 @@ From [Libvirt spec](http://libvirt.org/formatdomain.html#elementsDisks):
           "CapacityUnit": "MB"
 ```
 
-Downloaded qcow2 images are stored at local storage libvirt pool "**default**" under `/var/lib/libvirt/images`.
-
 All ephemeral volumes created by request as well as snapshot for boot image are stored
 at local storage libvirt pool "**volumes**" under `/var/lib/virtlet/volumes`.
 
