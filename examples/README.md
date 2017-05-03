@@ -35,5 +35,5 @@ kubectl get pods -w
 
 Besides [cirros-vm.yaml](cirros-vm.yaml), there's also [ubuntu-vm.yaml](ubuntu-vm.yaml) that can be used to start an Ubuntu Xenial VM. It can also be accessed using `vmssh.sh` after it boots:
 ```
-./vmssh.sh root@ubuntu-vm
+./vmssh.sh root@ubuntu-vm [command...]
 ```

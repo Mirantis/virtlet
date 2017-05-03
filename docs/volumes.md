@@ -140,7 +140,7 @@ Virtlet currently supports passing static [cloud-init](https://cloudinit.readthe
 
 Here we set hostname for the VM, inject an ssh public key and provide a script that executed by cloud-init. There's helper script named [examples/vmssh.sh](../examples/vmssh.sh) that can be used to access VMs over ssh after providing ssh keys for them (it defaults to using a sample key from examples/ directory).
 
-Virtlet's cloud-init mechanism is not finalized yet and will change in future so as to support dynamic metadata generation and passing metadata via the metadata server instead of `NoCloud`.
+Virtlet's cloud-init mechanism is not finalized yet and will change in future so as to support dynamic metadata generation and passing metadata via the metadata server along with `NoCloud` datasource.
 
 #### Supported features of RBD Volume definition
 
