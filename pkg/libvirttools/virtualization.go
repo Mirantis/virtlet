@@ -52,6 +52,8 @@ const (
 	domainDestroyCheckInterval      = 500 * time.Millisecond
 	domainDestroyTimeout            = 5 * time.Second
 	diskLetterStr                   = "bcdefghijklmnopqrstu"
+
+	podNameString = "@podname@"
 )
 
 var diskLetters = strings.Split(diskLetterStr, "")
@@ -257,7 +259,7 @@ func (v *VirtualizationTool) createBootImageSnapshot(imageName, backingStorePath
 	return vol.GetPath()
 }
 
-func gatherFlexvolumeDriverVolumeDefinitions(podID string, lettersInd int) ([]FlexVolumeInfo, error) {
+func gatherFlexvolumeDriverVolumeDefinitions(podID, podName string, lettersInd int) ([]FlexVolumeInfo, error) {
 	// FIXME: kubelet's --root-dir may be something other than /var/lib/kubelet
 	// Need to remove it from daemonset mounts (both dev and non-dev)
 	// Use 'nsenter -t 1 -m -- tar ...' or something to grab the path
@@ -303,6 +305,9 @@ func gatherFlexvolumeDriverVolumeDefinitions(podID string, lettersInd int) ([]Fl
 					}
 					volId := isoName[:len(isoName)-3]
 					isoPath := path.Join(dir, vol.Name(), volId+".iso")
+					if err := maybeInjectPodName(path.Join(curPath, "meta-data"), podName); err != nil {
+						return nil, fmt.Errorf("error injecting the pod name: %v", err)
+					}
 					if err := utils.GenIsoImage(isoPath, volId, curPath); err != nil {
 						return nil, fmt.Errorf("error generating iso image: %v", err)
 					}
@@ -346,7 +351,7 @@ func marshalToXML(domain *Domain) (string, error) {
 	return string(outArr[:]), nil
 }
 
-func (v *VirtualizationTool) addAttachedVolumesXML(podID string, uuid string, virtletVolsDesc string, domXML string) (string, error) {
+func (v *VirtualizationTool) addAttachedVolumesXML(podID, podName, uuid, virtletVolsDesc, domXML string) (string, error) {
 	glog.V(3).Infof("INPUT domain:\n%s\n\n", domXML)
 	domain := &Domain{}
 	err := xml.Unmarshal([]byte(domXML), domain)
@@ -354,7 +359,7 @@ func (v *VirtualizationTool) addAttachedVolumesXML(podID string, uuid string, vi
 		return "", err
 	}
 
-	flexVolumeInfos, err := gatherFlexvolumeDriverVolumeDefinitions(podID, 0)
+	flexVolumeInfos, err := gatherFlexvolumeDriverVolumeDefinitions(podID, podName, 0)
 	if err != nil {
 		return "", err
 	}
@@ -412,8 +417,12 @@ func (v *VirtualizationTool) CreateContainer(metadataStore metadata.MetadataStor
 		return "", err
 	}
 
-	config := in.GetConfig()
-	name := config.GetMetadata().Name
+	if in.Config == nil || in.Config.Metadata == nil || in.Config.Image == nil || in.SandboxConfig == nil || in.SandboxConfig.Metadata == nil {
+		return "", errors.New("invalid input data")
+	}
+
+	config := in.Config
+	name := config.Metadata.Name
 	sandBoxAnnotations, err := metadataStore.GetPodSandboxAnnotations(in.PodSandboxId)
 	if err != nil {
 		return "", err
@@ -442,7 +451,7 @@ func (v *VirtualizationTool) CreateContainer(metadataStore metadata.MetadataStor
 		return "", err
 	}
 
-	metadataStore.SetContainer(name, uuid, in.PodSandboxId, config.GetImage().Image, snapshotName, config.Labels, config.Annotations)
+	metadataStore.SetContainer(name, uuid, in.PodSandboxId, config.Image.Image, snapshotName, config.Labels, config.Annotations)
 
 	var memory, cpuShares, cpuPeriod, cpuQuota int64
 	if config.Linux != nil && config.Linux.Resources != nil {
@@ -465,7 +474,7 @@ func (v *VirtualizationTool) CreateContainer(metadataStore metadata.MetadataStor
 	domXML := generateDomXML(canUseKvm(), name, memory, memoryUnit, uuid, cpuNum, cpuShares, cpuPeriod, cpuQuota, snapshotImage, netNSPath, cniConfig)
 
 	virtletVolsDesc, _ := sandBoxAnnotations[VirtletVolumesAnnotationKeyName]
-	domXML, err = v.addAttachedVolumesXML(in.PodSandboxId, uuid, virtletVolsDesc, domXML)
+	domXML, err = v.addAttachedVolumesXML(in.PodSandboxId, in.SandboxConfig.Metadata.Name, uuid, virtletVolsDesc, domXML)
 	if err != nil {
 		return "", err
 	}
@@ -811,4 +820,23 @@ func (v *VirtualizationTool) RemoveVolume(name string) error {
 
 func (v *VirtualizationTool) GetStoragePool() *StorageTool {
 	return v.volumeStorage
+}
+
+func maybeInjectPodName(targetFile, podName string) error {
+	content, err := ioutil.ReadFile(targetFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("reading %q: %v", targetFile, err)
+	}
+	toFind := []byte(podNameString)
+	if !bytes.Contains(content, toFind) {
+		return nil
+	}
+	content = bytes.Replace(content, toFind, []byte(podName), -1)
+	if err := ioutil.WriteFile(targetFile, content, 0644); err != nil {
+		return fmt.Errorf("writing %q: %v", targetFile, err)
+	}
+	return nil
 }

@@ -32,7 +32,11 @@ import (
 const (
 	noCloudMetaData = `
 instance-id: some-instance-id
-local-hostname: foobar.example.com
+local-hostname: @podname@
+`
+	noCloudMetaDataUpdated = `
+instance-id: some-instance-id
+local-hostname: testName_0
 `
 	noCloudUserData = `
     #cloud-config
@@ -103,7 +107,7 @@ func TestCloudInitNoCloud(t *testing.T) {
 		t.Fatalf("isoToMap() on %q: %v", isoPath, err)
 	}
 	expectedFiles := map[string]interface{}{
-		"meta-data": noCloudMetaData,
+		"meta-data": noCloudMetaDataUpdated,
 		"user-data": noCloudUserData,
 	}
 	if !reflect.DeepEqual(files, expectedFiles) {
