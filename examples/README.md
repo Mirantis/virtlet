@@ -37,3 +37,38 @@ Besides [cirros-vm.yaml](cirros-vm.yaml), there's also [ubuntu-vm.yaml](ubuntu-v
 ```
 ./vmssh.sh root@ubuntu-vm [command...]
 ```
+
+# Kubernetes on VM-based StatefulSet
+
+[Another example](k8s.yaml) involves starting several VMs using `StatefulSet` and deploying
+Kubernetes using `kubeadm` on it.
+
+You can create the cluster like this:
+```
+kubectl create -f k8s.yaml
+```
+
+Watch progress of the cluster setup via the VM console:
+```
+./virsh.sh list
+./virsh.sh FIRST_DOMAIN_NAME_OR_INDEX
+```
+
+After it's complete you can log into the master node:
+
+```
+./vmssh.sh k8s-0
+```
+
+There you can wait a bit for k8s nodes and pods to become ready.
+You can list them using the following commands inside the VM:
+
+```
+kubectl get nodes -w
+kubectl get pods --all-namespaces -o wide -w
+```
+
+After that you can follow
+[the instructions](../deploy/real-cluster.md) to install Virtlet on
+the cluster, but note that you'll have to disable KVM because nested
+virtualization is not yet supported by Virtlet.
