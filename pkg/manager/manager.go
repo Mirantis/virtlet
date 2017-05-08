@@ -571,24 +571,7 @@ func (v *VirtletManager) PullImage(ctx context.Context, in *kubeapi.PullImageReq
 		return nil, err
 	}
 
-	// PullPolicy is not accessible directly within remote runtime
-	// But PullImage request can be called in 2 cases:
-	// 1. PullAlways
-	// 2. PullIfNotPresent
-	// So need to check whether the image with such URL was already downloaded
-
-	existingImageName, err := v.metadataStore.GetImageName(volumeName)
-	if err != nil {
-		glog.Errorf("PullImage: error when checking for existing image %q: %v", imageName, err)
-		return nil, err
-	}
-
-	if existingImageName != "" {
-		// Image has been downloaded already
-		return &kubeapi.PullImageResponse{ImageRef: imageName}, nil
-	}
-
-	if err = v.libvirtImageTool.PullImageToVolume(imageName, volumeName); err != nil {
+	if err = v.libvirtImageTool.PullRemoteImageToVolume(imageName, volumeName); err != nil {
 		glog.Errorf("Error when pulling image %q: %v", imageName, err)
 		return nil, err
 	}
