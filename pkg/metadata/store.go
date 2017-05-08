@@ -22,16 +22,16 @@ import (
 
 // ContainerInfo contains metadata informations about container instance
 type ContainerInfo struct {
-	Name                  string
-	CreatedAt             int64
-	StartedAt             int64
-	SandboxId             string
-	Image                 string
-	RootImageSnapshotName string
-	Labels                map[string]string
-	Annotations           map[string]string
-	SandBoxAnnotations    map[string]string
-	State                 kubeapi.ContainerState
+	Name                string
+	CreatedAt           int64
+	StartedAt           int64
+	SandboxId           string
+	Image               string
+	RootImageVolumeName string
+	Labels              map[string]string
+	Annotations         map[string]string
+	SandBoxAnnotations  map[string]string
+	State               kubeapi.ContainerState
 }
 
 // ImageMetadataStore contains methods to operate on VM images
@@ -55,7 +55,7 @@ type SandboxMetadataStore interface {
 
 // ContainerMetadataStore contains methods to operate on containers (VMs)
 type ContainerMetadataStore interface {
-	SetContainer(name, containerId, sandboxId, image, rootImageSnapshotName string, labels, annotations map[string]string) error
+	SetContainer(name, containerId, sandboxId, image, rootImageVolumeName string, labels, annotations map[string]string) error
 	UpdateStartedAt(containerId string, startedAt string) error
 	UpdateState(containerId string, state byte) error
 	GetContainerInfo(containerId string) (*ContainerInfo, error)

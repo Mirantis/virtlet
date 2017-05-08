@@ -65,7 +65,7 @@ func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, m
 	}
 
 	// TODO: pool name should be passed like for imageTool
-	libvirtVirtualizationTool, err := libvirttools.NewVirtualizationTool(libvirtConnTool.Connection(), "volumes", rawDevices)
+	libvirtVirtualizationTool, err := libvirttools.NewVirtualizationTool(libvirtConnTool.Connection(), "volumes", libvirtImageTool.GetStorageTool(), rawDevices)
 	if err != nil {
 		return nil, err
 	}
@@ -301,24 +301,6 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 	glog.V(3).Infof("CreateContainer: %s", spew.Sdump(in))
 	glog.V(3).Infof("CreateContainer config: %s", spew.Sdump(config))
 
-	volumeName, err := libvirttools.ImageNameToVolumeName(imageName)
-	if err != nil {
-		glog.Errorf("CreateContainer: error getting volume name for image %q: %v", imageName, err)
-		return nil, err
-	}
-
-	imageFilePath, err := v.libvirtImageTool.ImageFilePath(volumeName)
-	if err != nil {
-		glog.Errorf("Error when getting file path for image %q (volume %q): %v", imageName, volumeName, err)
-		return nil, err
-	}
-
-	volumeInfo, err := v.libvirtImageTool.ImageAsVolumeInfo(volumeName)
-	if err != nil {
-		glog.Errorf("Error when getting volume info for image %q (volume %q): %v", imageName, volumeName, err)
-		return nil, err
-	}
-
 	// TODO: get it as string
 	netAsBytes, err := v.metadataStore.GetPodNetworkConfigurationAsBytes(podSandboxId)
 	if err != nil {
@@ -333,12 +315,12 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 	}
 
 	netNSPath := cni.PodNetNSPath(podSandboxId)
-	glog.V(2).Infof("CreateContainer: imageName %s, imageFilepath %s, ip %s, network namespace %s", imageName, imageFilePath, netResult.IP4.IP.IP.String(), netNSPath)
+	glog.V(2).Infof("CreateContainer: imageName %s, ip %s, network namespace %s", imageName, netResult.IP4.IP.IP.String(), netNSPath)
 
 	// TODO: we should not pass whole "in" to CreateContainer - we should pass there only needed info for CreateContainer
 	// without whole data container
 	// TODO: use network configuration by CreateContainer
-	uuid, err := v.libvirtVirtualizationTool.CreateContainer(v.metadataStore, in, imageFilePath, volumeInfo.Size, netNSPath, string(netAsBytes))
+	uuid, err := v.libvirtVirtualizationTool.CreateContainer(v.metadataStore, in, imageName, netNSPath, string(netAsBytes))
 	if err != nil {
 		glog.Errorf("Error when creating container %s: %v", name, err)
 		return nil, err
@@ -394,8 +376,8 @@ func (v *VirtletManager) RemoveContainer(ctx context.Context, in *kubeapi.Remove
 		return nil, err
 	}
 
-	if err := v.libvirtVirtualizationTool.RemoveVolume(containerInfo.RootImageSnapshotName); err != nil {
-		glog.Errorf("Error when removing image snapshot with name '%s': %v", containerInfo.RootImageSnapshotName, err)
+	if err := v.libvirtVirtualizationTool.RemoveVolume(containerInfo.RootImageVolumeName); err != nil {
+		glog.Errorf("Error when removing root volume with name '%s': %v", containerInfo.RootImageVolumeName, err)
 		return nil, err
 	}
 

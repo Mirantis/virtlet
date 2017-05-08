@@ -63,14 +63,6 @@ func (i *ImageTool) ListImagesAsVolumeInfos() ([]*VolumeInfo, error) {
 	return i.tool.ListVolumes()
 }
 
-func (i *ImageTool) ImageFilePath(volumeName string) (string, error) {
-	vol, err := i.tool.LookupVolume(volumeName)
-	if err != nil {
-		return "", err
-	}
-	return vol.GetPath()
-}
-
 func (i *ImageTool) ImageAsVolumeInfo(volumeName string) (*VolumeInfo, error) {
 	vol, err := i.tool.LookupVolume(volumeName)
 	if err != nil {
@@ -91,4 +83,8 @@ func (i *ImageTool) PullImageToVolume(imageName, volumeName string) error {
 
 func (i *ImageTool) RemoveImage(volumeName string) error {
 	return i.tool.RemoveVolume(volumeName)
+}
+
+func (i *ImageTool) GetStorageTool() *StorageTool {
+	return i.tool
 }

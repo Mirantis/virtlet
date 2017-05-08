@@ -9,13 +9,13 @@ import (
 )
 
 type ContainerTestConfig struct {
-	Name                  string
-	SandboxId             string
-	ContainerId           string
-	Image                 string
-	RootImageSnapshotName string
-	Labels                map[string]string
-	Annotations           map[string]string
+	Name                string
+	SandboxId           string
+	ContainerId         string
+	Image               string
+	RootImageVolumeName string
+	Labels              map[string]string
+	Annotations         map[string]string
 }
 
 func GetSandboxes(sandboxNum int) []*kubeapi.PodSandboxConfig {
@@ -86,13 +86,13 @@ func GetContainersConfig(sandboxConfigs []*kubeapi.PodSandboxConfig) []*Containe
 		}
 
 		containerConf := &ContainerTestConfig{
-			Name:      "container-for-" + sandbox.Metadata.Name,
-			SandboxId: sandbox.Metadata.Uid,
-			Image:     "testImage",
-			RootImageSnapshotName: "sample_name",
-			ContainerId:           uid,
-			Labels:                map[string]string{"foo": "bar", "fizz": "buzz"},
-			Annotations:           map[string]string{"hello": "world", "virt": "let"},
+			Name:                "container-for-" + sandbox.Metadata.Name,
+			SandboxId:           sandbox.Metadata.Uid,
+			Image:               "testImage",
+			RootImageVolumeName: "sample_name",
+			ContainerId:         uid,
+			Labels:              map[string]string{"foo": "bar", "fizz": "buzz"},
+			Annotations:         map[string]string{"hello": "world", "virt": "let"},
 		}
 		containers = append(containers, containerConf)
 	}

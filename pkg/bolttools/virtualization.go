@@ -40,7 +40,7 @@ func (b *BoltClient) EnsureVirtualizationSchema() error {
 	return err
 }
 
-func (b *BoltClient) SetContainer(name, containerId, sandboxId, image, rootImageSnapshotName string, labels, annotations map[string]string) error {
+func (b *BoltClient) SetContainer(name, containerId, sandboxId, image, rootImageVolumeName string, labels, annotations map[string]string) error {
 	strLabels, err := json.Marshal(labels)
 	if err != nil {
 		return err
@@ -93,7 +93,7 @@ func (b *BoltClient) SetContainer(name, containerId, sandboxId, image, rootImage
 			return err
 		}
 
-		if err := bucket.Put([]byte("rootImageSnapshotName"), []byte(rootImageSnapshotName)); err != nil {
+		if err := bucket.Put([]byte("rootImageVolumeName"), []byte(rootImageVolumeName)); err != nil {
 			return err
 		}
 
@@ -223,7 +223,7 @@ func (b *BoltClient) GetContainerInfo(containerId string) (*metadata.ContainerIn
 			return err
 		}
 
-		rootImageSnapshotName, err := getString(bucket, "rootImageSnapshotName")
+		rootImageVolumeName, err := getString(bucket, "rootImageVolumeName")
 		if err != nil {
 			return err
 		}
@@ -264,16 +264,16 @@ func (b *BoltClient) GetContainerInfo(containerId string) (*metadata.ContainerIn
 		}
 
 		containerInfo = &metadata.ContainerInfo{
-			Name:      name,
-			CreatedAt: createdAt,
-			StartedAt: startedAt,
-			SandboxId: sandboxId,
-			Image:     image,
-			RootImageSnapshotName: rootImageSnapshotName,
-			Labels:                labels,
-			SandBoxAnnotations:    sandBoxAnnotations,
-			Annotations:           annotations,
-			State:                 kubeapi.ContainerState(byteState[0]),
+			Name:                name,
+			CreatedAt:           createdAt,
+			StartedAt:           startedAt,
+			SandboxId:           sandboxId,
+			Image:               image,
+			RootImageVolumeName: rootImageVolumeName,
+			Labels:              labels,
+			SandBoxAnnotations:  sandBoxAnnotations,
+			Annotations:         annotations,
+			State:               kubeapi.ContainerState(byteState[0]),
 		}
 
 		return nil
