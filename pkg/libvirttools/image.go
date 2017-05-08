@@ -18,6 +18,7 @@ package libvirttools
 
 import (
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/Mirantis/virtlet/pkg/utils"
@@ -77,6 +78,9 @@ func (i *ImageTool) PullRemoteImageToVolume(imageName, volumeName string) error 
 	if err != nil {
 		return err
 	}
+	defer func() {
+		os.Remove(path)
+	}()
 
 	return i.tool.PullFileToVolume(path, volumeName)
 }
