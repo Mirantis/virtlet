@@ -432,7 +432,7 @@ func generateRawDeviceXML(path, device string) string {
 	return fmt.Sprintf(rawDeviceTemplateXML, path, device)
 }
 
-func (s *StorageTool) PullImageToVolume(path, volumeName string) error {
+func (s *StorageTool) PullFileToVolume(path, volumeName string) error {
 	imageSize, err := getFileSize(path)
 	if err != nil {
 		return err

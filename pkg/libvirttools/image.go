@@ -73,12 +73,12 @@ func (i *ImageTool) ImageAsVolumeInfo(volumeName string) (*VolumeInfo, error) {
 
 func (i *ImageTool) PullRemoteImageToVolume(imageName, volumeName string) error {
 	// TODO(nhlfr): Handle AuthConfig from PullImageRequest.
-	path, err := utils.DownloadFile(i.protocol, stripTagFromImageName(imageName), volumeName)
+	path, err := utils.DownloadFile(i.protocol, stripTagFromImageName(imageName))
 	if err != nil {
 		return err
 	}
 
-	return i.tool.PullImageToVolume(path, volumeName)
+	return i.tool.PullFileToVolume(path, volumeName)
 }
 
 func (i *ImageTool) RemoveImage(volumeName string) error {
