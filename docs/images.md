@@ -21,8 +21,10 @@ Virtlet supports QCOW2 format for VM images.
 1. Kubelet sends `PullImage` gRPC request to Virtlet.
 (Note, that `PullImage` request can be skipped by kubelet unless the pod has `imagePullPolicy: PullAlways` or `imagePullPolicy: PullIfNotPreset` and the image is not pulled yet.)
 1. Virtlet uses image url fragment after last slash as internal image name that it looks up in the list of existent images on the host.
-1. In case if there's no image with such name in the list, the image will be downloaded using specified url prepended with `scheme://`. After that Virtlet creates libvirt volume in "**default**" libvirt pool under `/var/lib/libvirt/images` and copies the image content to it.
-1. In case if there's an entry with such name in list, `PullImage` call just return success.
+1. The image will be downloaded using specified url prepended with `scheme://`. After that Virtlet creates libvirt volume in "**default**" libvirt pool under `/var/lib/libvirt/images` and copies the image content to it. As there is no versioning of QCOW2 images Virtlet downloads the image each time, using the image name with `scheme://` prefix added.
 
-**Note:** In order to safe disk space and to be able to reuse existing guest OS volumes Virtlet creates separate volume which uses the original one as backing store.
-All snapshot volumes are stored in "**volumes**" libvirt pool under `/var/lib/virtlet/volumes`.
+**Note:** Virtual machines are started from volumes which are clones of boot images.
+Original images are stored in libvirt `default` pool (`/var/lib/libvirt/images` on filesystem).
+Clones used as boot images are stored in "**volumes**" libvirt pool under `/var/lib/virtlet/volumes`
+during the VM execution time and are automatically garbage collected by Virtlet
+after stopping VM pod environment (sandbox).
