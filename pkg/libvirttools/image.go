@@ -68,7 +68,7 @@ func NewImageTool(conn *libvirt.Connect, poolName, protocol string) (*ImageTool,
 	return &ImageTool{tool: storageTool, protocol: protocol}, nil
 }
 
-func (i *ImageTool) ListImagesAsVolumeInfos() ([]*VolumeInfo, error) {
+func (i *ImageTool) ListLibvirtVolumesAsVolumeInfos() ([]*VolumeInfo, error) {
 	return i.tool.ListVolumes()
 }
 
@@ -99,4 +99,9 @@ func (i *ImageTool) RemoveImage(volumeName string) error {
 
 func (i *ImageTool) GetStorageTool() *StorageTool {
 	return i.tool
+}
+
+func ImageNameFromLibvirtVolumeName(volumeName string) string {
+	parts := strings.SplitN(volumeName, "_", 2)
+	return parts[1]
 }
