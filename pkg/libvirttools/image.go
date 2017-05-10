@@ -17,6 +17,9 @@ limitations under the License.
 package libvirttools
 
 import (
+	"crypto/sha1"
+	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"strings"
@@ -38,8 +41,13 @@ func ImageNameToVolumeName(imageName string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	h := sha1.New()
+	io.WriteString(h, u.Path)
+
 	segments := strings.Split(u.Path, "/")
-	volumeName := segments[len(segments)-1]
+
+	volumeName := fmt.Sprintf("%x_%s", h.Sum(nil), segments[len(segments)-1])
 
 	return volumeName, nil
 }
