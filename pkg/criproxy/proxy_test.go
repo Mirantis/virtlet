@@ -1140,7 +1140,7 @@ func inTravis() bool {
 	return os.Getenv("TRAVIS") == "true"
 }
 
-func TestCriProxyNoStartupRace(t *testing.T) {
+func TestCriProxyInactiveServers(t *testing.T) {
 	if inTravis() {
 		t.Skip("apparently there's still a startup race in CRI proxy, but it only manifests itself on slower machines")
 	}
@@ -1197,7 +1197,7 @@ func TestCriProxyNoStartupRace(t *testing.T) {
 		if i == 100 {
 			t.Fatalf("2nd client didn't activate")
 		}
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 		var resp runtimeapi.ListImagesResponse
 		if err := tester.invoke("/runtime.ImageService/ListImages", &runtimeapi.ListImagesRequest{}, &resp); err != nil {
 			t.Fatalf("ListImages() failed while waiting for 2nd client to connect: %v", err)
@@ -1238,6 +1238,68 @@ func TestCriProxyNoStartupRace(t *testing.T) {
 		},
 	}, "")
 	tester.verifyJournal(t, []string{"1/image/ListImages", "2/image/ListImages"})
+
+	tester.servers[1].Stop()
+	for i := 0; ; i++ {
+		if i == 100 {
+			t.Fatalf("2nd client didn't deactivate")
+		}
+		time.Sleep(500 * time.Millisecond)
+		var resp runtimeapi.ListImagesResponse
+		if err := tester.invoke("/runtime.ImageService/ListImages", &runtimeapi.ListImagesRequest{}, &resp); err != nil {
+			t.Fatalf("ListImages() failed while waiting for 2nd client to disconnect: %v", err)
+		}
+		if len(resp.GetImages()) == 4 {
+			tester.verifyJournal(t, []string{"1/image/ListImages", "2/image/ListImages"})
+		} else {
+			tester.verifyJournal(t, []string{"1/image/ListImages"})
+			break
+		}
+	}
+
+	tester.verifyCall(t, "/runtime.ImageService/ListImages", &runtimeapi.ListImagesRequest{}, &runtimeapi.ListImagesResponse{
+		Images: []*runtimeapi.Image{
+			{
+				Id:       "image1-1",
+				RepoTags: []string{"image1-1"},
+				Size_:    fakeImageSize1,
+			},
+			{
+				Id:       "image1-2",
+				RepoTags: []string{"image1-2"},
+				Size_:    fakeImageSize1,
+			},
+		},
+	}, "")
+	tester.verifyJournal(t, []string{"1/image/ListImages"})
+
+	// no runtimes are called here because the runtime for alt/ prefix is offline
+	tester.verifyCall(t, "/runtime.ImageService/ImageStatus",
+		&runtimeapi.ImageStatusRequest{
+			Image: &runtimeapi.ImageSpec{Image: "alt/image2-1"},
+		},
+		&runtimeapi.ImageStatusResponse{}, "")
+	tester.verifyJournal(t, nil)
+
+	// no runtimes are called here because the runtime for alt/ prefix is offline
+	tester.verifyCall(t, "/runtime.ImageService/ListImages",
+		&runtimeapi.ListImagesRequest{
+			Filter: &runtimeapi.ImageFilter{
+				Image: &runtimeapi.ImageSpec{Image: "alt/image2-1"},
+			},
+		},
+		&runtimeapi.ListImagesResponse{}, "")
+	tester.verifyJournal(t, nil)
+
+	tester.verifyCall(t, "/runtime.RuntimeService/ListPodSandbox",
+		&runtimeapi.ListPodSandboxRequest{},
+		&runtimeapi.ListPodSandboxResponse{}, "")
+	tester.verifyJournal(t, []string{"1/runtime/ListPodSandbox"})
+
+	tester.verifyCall(t, "/runtime.RuntimeService/ListContainers",
+		&runtimeapi.ListContainersRequest{},
+		&runtimeapi.ListContainersResponse{}, "")
+	tester.verifyJournal(t, []string{"1/runtime/ListContainers"})
 }
 
 func init() {
@@ -1246,6 +1308,4 @@ func init() {
 	flag.Set("v", "5")
 }
 
-// TODO: never wait for the client to connect, just err
-// TODO: proper status handling (contact both runtimes, etc.)
-// TODO: make sure patching requests/responses is ok & if it is, don't use copying for them
+// TODO: test reconnecting after restart of a runtime
