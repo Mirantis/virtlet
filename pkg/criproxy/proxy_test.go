@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -49,6 +48,7 @@ const (
 	podSandboxId2             = "alt__pod-2-1_default_" + podUid2 + "_0"
 	containerId1              = podSandboxId1 + "_container1_0"
 	containerId2              = podSandboxId2 + "_container2_0"
+	numGrpcConnectAttempts    = 600
 )
 
 type ServerWithReadinessFeedback interface {
@@ -68,10 +68,6 @@ func startServer(t *testing.T, s ServerWithReadinessFeedback, addr string) {
 	case err := <-errCh:
 		t.Fatalf("CRI server stopped with error: %v", err)
 	case <-readyCh:
-	}
-	// TODO: don't use readiness feedback channel, it doesn't help much
-	if err := waitForSocket(addr); err != nil {
-		t.Fatalf("Waiting for socket %q failed: %v", addr, err)
 	}
 }
 
@@ -167,8 +163,14 @@ func (tester *proxyTester) stop() {
 	tester.proxy.Stop()
 }
 
-func (tester *proxyTester) verifyJournal(t *testing.T, expectedJournal []string) {
-	if err := tester.journal.Verify(expectedJournal); err != nil {
+func (tester *proxyTester) verifyJournal(t *testing.T, expectedItems []string) {
+	if err := tester.journal.Verify(expectedItems); err != nil {
+		t.Error(err)
+	}
+}
+
+func (tester *proxyTester) verifyJournalUnordered(t *testing.T, expectedItems []string) {
+	if err := tester.journal.VerifyUnordered(expectedItems); err != nil {
 		t.Error(err)
 	}
 }
@@ -235,7 +237,9 @@ func TestCriProxy(t *testing.T) {
 				RuntimeVersion:    "0.1.0",
 				RuntimeApiVersion: "0.1.0",
 			},
-			journal: []string{"1/runtime/Version"},
+			// the first Version request is done by CRI proxy itself
+			// to verify the connection
+			journal: []string{"1/runtime/Version", "1/runtime/Version"},
 		},
 		{
 			name:   "status",
@@ -298,7 +302,9 @@ func TestCriProxy(t *testing.T) {
 			resp: &runtimeapi.RunPodSandboxResponse{
 				PodSandboxId: podSandboxId2,
 			},
-			journal: []string{"2/runtime/RunPodSandbox"},
+			// the first Version request is done by CRI proxy itself
+			// to verify the connection
+			journal: []string{"2/runtime/Version", "2/runtime/RunPodSandbox"},
 		},
 		{
 			name:   "run pod sandbox with bad runtime id",
@@ -1135,16 +1141,7 @@ func TestCriProxy(t *testing.T) {
 	}
 }
 
-func inTravis() bool {
-	// https://docs.travis-ci.com/user/environment-variables/#Default-Environment-Variables
-	return os.Getenv("TRAVIS") == "true"
-}
-
-func TestCriProxyNoStartupRace(t *testing.T) {
-	if inTravis() {
-		t.Skip("apparently there's still a startup race in CRI proxy, but it only manifests itself on slower machines")
-	}
-
+func TestCriProxyInactiveServers(t *testing.T) {
 	tester := newProxyTester(t)
 	defer tester.stop()
 	tester.startServers(t, 0)
@@ -1169,7 +1166,9 @@ func TestCriProxyNoStartupRace(t *testing.T) {
 			},
 		},
 	}, "")
-	tester.verifyJournal(t, []string{"1/image/ListImages"})
+	// the first Version request is done by CRI proxy itself
+	// to verify the connection
+	tester.verifyJournal(t, []string{"1/runtime/Version", "1/image/ListImages"})
 
 	// this one skips 2nd client because it's not connected yet
 	tester.verifyCall(t, "/runtime.ImageService/ListImages", &runtimeapi.ListImagesRequest{}, &runtimeapi.ListImagesResponse{
@@ -1197,13 +1196,17 @@ func TestCriProxyNoStartupRace(t *testing.T) {
 		if i == 100 {
 			t.Fatalf("2nd client didn't activate")
 		}
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 		var resp runtimeapi.ListImagesResponse
 		if err := tester.invoke("/runtime.ImageService/ListImages", &runtimeapi.ListImagesRequest{}, &resp); err != nil {
 			t.Fatalf("ListImages() failed while waiting for 2nd client to connect: %v", err)
 		}
 		if len(resp.GetImages()) == 4 {
-			tester.verifyJournal(t, []string{"1/image/ListImages", "2/image/ListImages"})
+			// the Version request is done by CRI proxy itself
+			// to verify the connection. The order here is undefined
+			// beause "2/runtime/Version" may come either before
+			// or after "1/image/ListImages"
+			tester.verifyJournalUnordered(t, []string{"1/image/ListImages", "2/runtime/Version", "2/image/ListImages"})
 			break
 		} else {
 			tester.verifyJournal(t, []string{"1/image/ListImages"})
@@ -1238,6 +1241,68 @@ func TestCriProxyNoStartupRace(t *testing.T) {
 		},
 	}, "")
 	tester.verifyJournal(t, []string{"1/image/ListImages", "2/image/ListImages"})
+
+	tester.servers[1].Stop()
+	for i := 0; ; i++ {
+		if i == 100 {
+			t.Fatalf("2nd client didn't deactivate")
+		}
+		time.Sleep(500 * time.Millisecond)
+		var resp runtimeapi.ListImagesResponse
+		if err := tester.invoke("/runtime.ImageService/ListImages", &runtimeapi.ListImagesRequest{}, &resp); err != nil {
+			t.Fatalf("ListImages() failed while waiting for 2nd client to disconnect: %v", err)
+		}
+		if len(resp.GetImages()) == 4 {
+			tester.verifyJournal(t, []string{"1/image/ListImages", "2/image/ListImages"})
+		} else {
+			tester.verifyJournal(t, []string{"1/image/ListImages"})
+			break
+		}
+	}
+
+	tester.verifyCall(t, "/runtime.ImageService/ListImages", &runtimeapi.ListImagesRequest{}, &runtimeapi.ListImagesResponse{
+		Images: []*runtimeapi.Image{
+			{
+				Id:       "image1-1",
+				RepoTags: []string{"image1-1"},
+				Size_:    fakeImageSize1,
+			},
+			{
+				Id:       "image1-2",
+				RepoTags: []string{"image1-2"},
+				Size_:    fakeImageSize1,
+			},
+		},
+	}, "")
+	tester.verifyJournal(t, []string{"1/image/ListImages"})
+
+	// no runtimes are called here because the runtime for alt/ prefix is offline
+	tester.verifyCall(t, "/runtime.ImageService/ImageStatus",
+		&runtimeapi.ImageStatusRequest{
+			Image: &runtimeapi.ImageSpec{Image: "alt/image2-1"},
+		},
+		&runtimeapi.ImageStatusResponse{}, "")
+	tester.verifyJournal(t, nil)
+
+	// no runtimes are called here because the runtime for alt/ prefix is offline
+	tester.verifyCall(t, "/runtime.ImageService/ListImages",
+		&runtimeapi.ListImagesRequest{
+			Filter: &runtimeapi.ImageFilter{
+				Image: &runtimeapi.ImageSpec{Image: "alt/image2-1"},
+			},
+		},
+		&runtimeapi.ListImagesResponse{}, "")
+	tester.verifyJournal(t, nil)
+
+	tester.verifyCall(t, "/runtime.RuntimeService/ListPodSandbox",
+		&runtimeapi.ListPodSandboxRequest{},
+		&runtimeapi.ListPodSandboxResponse{}, "")
+	tester.verifyJournal(t, []string{"1/runtime/ListPodSandbox"})
+
+	tester.verifyCall(t, "/runtime.RuntimeService/ListContainers",
+		&runtimeapi.ListContainersRequest{},
+		&runtimeapi.ListContainersResponse{}, "")
+	tester.verifyJournal(t, []string{"1/runtime/ListContainers"})
 }
 
 func init() {
@@ -1246,6 +1311,4 @@ func init() {
 	flag.Set("v", "5")
 }
 
-// TODO: never wait for the client to connect, just err
-// TODO: proper status handling (contact both runtimes, etc.)
-// TODO: make sure patching requests/responses is ok & if it is, don't use copying for them
+// TODO: test reconnecting after restart of a runtime

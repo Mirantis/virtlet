@@ -36,9 +36,16 @@ package testing
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"sync"
+	"time"
 
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+)
+
+const (
+	journalWaitInterval = 1000 * time.Millisecond
+	journalWaitCount    = 1500
 )
 
 func BuildContainerName(metadata *runtimeapi.ContainerMetadata, sandboxID string) string {
@@ -64,17 +71,24 @@ func filterInLabels(filter, labels map[string]string) bool {
 	return true
 }
 
+// Journal records a series of events (items) represented as strings in a
+// thread-safe way
 type Journal interface {
+	// Record saves the specified item in the journal
 	Record(item string)
 }
 
+// SimpleJournal is an implementation of Journal that has methods
+// for waiting for particular events and verifying journal contents
 type SimpleJournal struct {
 	sync.Mutex
 	Items []string
 }
 
+// NewSimpleJournal creates an instance of SimpleJournal
 func NewSimpleJournal() *SimpleJournal { return &SimpleJournal{} }
 
+// Record implements Record method of Journal interface
 func (j *SimpleJournal) Record(item string) {
 	j.Lock()
 	defer j.Unlock()
@@ -82,6 +96,8 @@ func (j *SimpleJournal) Record(item string) {
 	j.Items = append(j.Items, item)
 }
 
+// Verify verifies that the current contents of the journal is expectedItems,
+// returns nil if so or an error otherwise
 func (j *SimpleJournal) Verify(expectedItems []string) error {
 	j.Lock()
 	defer j.Unlock()
@@ -94,15 +110,39 @@ func (j *SimpleJournal) Verify(expectedItems []string) error {
 	return nil
 }
 
+// VerifyUnordered verifies that the current contents of the journal
+// contains the same items as expectedItems slice but in any order.
+// It returns nil if so or an error otherwise
+func (j *SimpleJournal) VerifyUnordered(expectedItems []string) error {
+	j.Lock()
+	defer j.Unlock()
+
+	actualItems := j.Items
+	expectedItems = expectedItems[:]
+	sort.Strings(actualItems)
+	sort.Strings(expectedItems)
+	j.Items = nil
+	if !reflect.DeepEqual(actualItems, expectedItems) {
+		return fmt.Errorf("bad journal items. Expected %v, got %v", expectedItems, actualItems)
+	}
+	return nil
+}
+
+// PrefixJournal is an implementation of Journal interface that prefixes
+// every item passed to it with the specified prefix before passing it on
+// to the underlying Journal
 type PrefixJournal struct {
 	journal Journal
 	prefix  string
 }
 
+// NewPrefixJournal creates an instance of PrefixJournal with the
+// specified underlying journal and prefix
 func NewPrefixJournal(journal Journal, prefix string) *PrefixJournal {
 	return &PrefixJournal{journal, prefix}
 }
 
+// Record implements Record method of Journal interface
 func (j *PrefixJournal) Record(item string) {
 	j.journal.Record(j.prefix + item)
 }

@@ -50,11 +50,12 @@ import (
 const (
 	BusyboxImageName = "busybox:1.26.2"
 	// TODO: use the same constant/setting in different parts of code
-	proxyRuntimeEndpoint      = "/run/criproxy.sock"
-	proxyStopTimeoutSeconds   = 5
-	confFileMode              = 0600
-	confDirMode               = 0700
-	kubeletConfigPollInterval = 1 * time.Second
+	proxyRuntimeEndpoint             = "/run/criproxy.sock"
+	proxyStopTimeoutSeconds          = 5
+	confFileMode                     = 0600
+	confDirMode                      = 0700
+	kubeletConfigPollInterval        = 1 * time.Second
+	waitForCriProxySocketNumAttempts = 600
 )
 
 var kubeletSettingsForCriProxy map[string]interface{} = map[string]interface{}{
@@ -399,7 +400,7 @@ func (b *Bootstrap) EnsureCRIProxy() (bool, error) {
 		return false, err
 	}
 
-	if err = waitForSocket(b.config.ProxySocketPath); err != nil {
+	if err = waitForSocket(b.config.ProxySocketPath, waitForCriProxySocketNumAttempts, nil); err != nil {
 		return false, err
 	}
 
