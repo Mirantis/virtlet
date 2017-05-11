@@ -39,15 +39,23 @@ func dial(addr string, timeout time.Duration) (net.Conn, error) {
 	return net.DialTimeout("unix", addr, timeout)
 }
 
-func waitForSocket(path string) error {
+func waitForSocket(path string, maxAttempts int, extraCheck func() error) error {
 	var err error
-	for {
+	var conn net.Conn
+	for n := 0; maxAttempts < 0 || n < maxAttempts; n++ {
 		if _, err = os.Stat(path); err != nil {
-			glog.V(1).Infof("%q is not here yet: %s", path, err)
-		} else if conn, err := dial(path, connectWaitTimeout); err != nil {
-			glog.V(1).Infof("can't connect to %q yet: %s", path, err)
+			glog.V(1).Infof("attempt %d: %q is not here yet: %v", n, path, err)
+		} else if conn, err = dial(path, connectWaitTimeout); err != nil {
+			glog.V(1).Infof("attempt %d: can't connect to %q yet: %v", n, path, err)
 		} else {
 			conn.Close()
+			if extraCheck != nil {
+				err = extraCheck()
+				if err != nil {
+					glog.V(1).Infof("attempt %d: extra check failed for %q: %v", n, path, err)
+					continue
+				}
+			}
 			break
 		}
 		time.Sleep(connectAttemptInterval)

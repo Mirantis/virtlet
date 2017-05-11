@@ -112,24 +112,29 @@ func (c *apiClient) connectNonLocked() chan error {
 	c.state = clientStateConnecting
 	go func() {
 		glog.V(1).Infof("Connecting to runtime service %s", c.addr)
-		if err := waitForSocket(c.addr); err != nil {
+		if err := waitForSocket(c.addr, -1, func() error {
+			var err error
+			c.conn, err = grpc.Dial(c.addr, grpc.WithInsecure(), grpc.WithTimeout(c.connectionTimeout), grpc.WithDialer(dial))
+			if err == nil {
+				ctx, _ := context.WithTimeout(context.Background(), c.connectionTimeout)
+				_, err := runtimeapi.NewRuntimeServiceClient(c.conn).Version(ctx, &runtimeapi.VersionRequest{})
+				if err != nil {
+					c.conn.Close()
+					c.conn = nil
+				}
+			}
+			return err
+		}); err != nil {
 			glog.Errorf("Failed to find the socket: %v", err)
 			errCh <- fmt.Errorf("failed to find the socket: %v", err)
-			return
-		}
-
-		conn, err := grpc.Dial(c.addr, grpc.WithInsecure(), grpc.WithTimeout(c.connectionTimeout), grpc.WithDialer(dial))
-		if err != nil {
-			errCh <- err
 			return
 		}
 
 		c.Lock()
 		defer c.Unlock()
 		glog.V(1).Infof("Connected to runtime service %s", c.addr)
-		c.conn = conn
-		c.RuntimeServiceClient = runtimeapi.NewRuntimeServiceClient(conn)
-		c.ImageServiceClient = runtimeapi.NewImageServiceClient(conn)
+		c.RuntimeServiceClient = runtimeapi.NewRuntimeServiceClient(c.conn)
+		c.ImageServiceClient = runtimeapi.NewImageServiceClient(c.conn)
 		c.state = clientStateConnected
 
 		errCh <- nil

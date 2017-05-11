@@ -48,6 +48,7 @@ const (
 	podSandboxId2             = "alt__pod-2-1_default_" + podUid2 + "_0"
 	containerId1              = podSandboxId1 + "_container1_0"
 	containerId2              = podSandboxId2 + "_container2_0"
+	numGrpcConnectAttempts    = 600
 )
 
 type ServerWithReadinessFeedback interface {
@@ -67,10 +68,6 @@ func startServer(t *testing.T, s ServerWithReadinessFeedback, addr string) {
 	case err := <-errCh:
 		t.Fatalf("CRI server stopped with error: %v", err)
 	case <-readyCh:
-	}
-	// TODO: don't use readiness feedback channel, it doesn't help much
-	if err := waitForSocket(addr); err != nil {
-		t.Fatalf("Waiting for socket %q failed: %v", addr, err)
 	}
 }
 
@@ -166,8 +163,14 @@ func (tester *proxyTester) stop() {
 	tester.proxy.Stop()
 }
 
-func (tester *proxyTester) verifyJournal(t *testing.T, expectedJournal []string) {
-	if err := tester.journal.Verify(expectedJournal); err != nil {
+func (tester *proxyTester) verifyJournal(t *testing.T, expectedItems []string) {
+	if err := tester.journal.Verify(expectedItems); err != nil {
+		t.Error(err)
+	}
+}
+
+func (tester *proxyTester) verifyJournalUnordered(t *testing.T, expectedItems []string) {
+	if err := tester.journal.VerifyUnordered(expectedItems); err != nil {
 		t.Error(err)
 	}
 }
@@ -234,7 +237,9 @@ func TestCriProxy(t *testing.T) {
 				RuntimeVersion:    "0.1.0",
 				RuntimeApiVersion: "0.1.0",
 			},
-			journal: []string{"1/runtime/Version"},
+			// the first Version request is done by CRI proxy itself
+			// to verify the connection
+			journal: []string{"1/runtime/Version", "1/runtime/Version"},
 		},
 		{
 			name:   "status",
@@ -297,7 +302,9 @@ func TestCriProxy(t *testing.T) {
 			resp: &runtimeapi.RunPodSandboxResponse{
 				PodSandboxId: podSandboxId2,
 			},
-			journal: []string{"2/runtime/RunPodSandbox"},
+			// the first Version request is done by CRI proxy itself
+			// to verify the connection
+			journal: []string{"2/runtime/Version", "2/runtime/RunPodSandbox"},
 		},
 		{
 			name:   "run pod sandbox with bad runtime id",
@@ -1159,7 +1166,9 @@ func TestCriProxyInactiveServers(t *testing.T) {
 			},
 		},
 	}, "")
-	tester.verifyJournal(t, []string{"1/image/ListImages"})
+	// the first Version request is done by CRI proxy itself
+	// to verify the connection
+	tester.verifyJournal(t, []string{"1/runtime/Version", "1/image/ListImages"})
 
 	// this one skips 2nd client because it's not connected yet
 	tester.verifyCall(t, "/runtime.ImageService/ListImages", &runtimeapi.ListImagesRequest{}, &runtimeapi.ListImagesResponse{
@@ -1193,7 +1202,11 @@ func TestCriProxyInactiveServers(t *testing.T) {
 			t.Fatalf("ListImages() failed while waiting for 2nd client to connect: %v", err)
 		}
 		if len(resp.GetImages()) == 4 {
-			tester.verifyJournal(t, []string{"1/image/ListImages", "2/image/ListImages"})
+			// the Version request is done by CRI proxy itself
+			// to verify the connection. The order here is undefined
+			// beause "2/runtime/Version" may come either before
+			// or after "1/image/ListImages"
+			tester.verifyJournalUnordered(t, []string{"1/image/ListImages", "2/runtime/Version", "2/image/ListImages"})
 			break
 		} else {
 			tester.verifyJournal(t, []string{"1/image/ListImages"})
