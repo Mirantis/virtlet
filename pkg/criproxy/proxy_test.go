@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -1135,16 +1134,7 @@ func TestCriProxy(t *testing.T) {
 	}
 }
 
-func inTravis() bool {
-	// https://docs.travis-ci.com/user/environment-variables/#Default-Environment-Variables
-	return os.Getenv("TRAVIS") == "true"
-}
-
 func TestCriProxyInactiveServers(t *testing.T) {
-	if inTravis() {
-		t.Skip("apparently there's still a startup race in CRI proxy, but it only manifests itself on slower machines")
-	}
-
 	tester := newProxyTester(t)
 	defer tester.stop()
 	tester.startServers(t, 0)
