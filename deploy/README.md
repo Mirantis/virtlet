@@ -31,3 +31,27 @@ kubectl create -f virtlet-ds.yaml
 kubectl get pods -w -n kube-system
 ```
 5. Go to `examples/` directory and follow [the instructions](../examples/README.md) from there.
+
+## Removing Virtlet
+
+In order to remove Virtlet, first you need to delete all the VM pods.
+
+You can remove Virtlet DaemonSet with the following command:
+```bash
+kubectl delete daemonset -R -n kube-system virtlet
+```
+
+To undo the changes made by CRI proxy bootstrap, first remove the
+configmaps for the nodes that run Virtlet, e.g. for node named
+`kube-node-1` this is done using the following command:
+```
+kubectl delete configmap -n kube-system kubelet-kube-node-1
+```
+
+Then restart kubelet on the nodes, remove criproxy containers and the
+saved kubelet config:
+```
+systemctl restart kubelet
+docker rm -fv $(docker ps -qf label=criproxy=true)
+rm /etc/criproxy/kubelet.conf
+```

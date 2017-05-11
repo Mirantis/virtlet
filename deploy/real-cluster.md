@@ -200,3 +200,20 @@ You can also ssh into the VM:
 ```
 ./vmssh.sh cirros@cirros-vm
 ```
+
+## Removing Virtlet
+
+In order to remove Virtlet, first you need to delete all the VM pods.
+
+You can remove Virtlet DaemonSet with the following command:
+```bash
+kubectl delete daemonset -R -n kube-system virtlet
+```
+
+After doing this, remove CRI proxy from each node by reverting the
+changes in Kubelet flags, e.g. by removing
+`/etc/systemd/system/kubelet.service.d/20-virtlet.conf` in case of
+kubeadm scenario described above. After this you need to restart
+kubelet and remove the CRI Proxy binary (`/usr/local/bin/criproxy`)
+and its saved kubelet configuration file
+(`/etc/criproxy/kubelet.conf`).
