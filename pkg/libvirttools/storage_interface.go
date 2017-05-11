@@ -88,9 +88,9 @@ func (l LibvirtStorageOperations) VolumeGetPath(volume *libvirt.StorageVol) (str
 
 func (l LibvirtStorageOperations) PullImageToVolume(pool *libvirt.StoragePool, shortName, filepath, volXML string) error {
 	// if we have such image already in store - remove it
-	existing_vol, _ := l.LookupVolumeByName(pool, shortName)
-	if existing_vol != nil {
-		if err := l.RemoveVolume(existing_vol); err != nil {
+	existingVol, _ := l.LookupVolumeByName(pool, shortName)
+	if existingVol != nil {
+		if err := l.RemoveVolume(existingVol); err != nil {
 			return err
 		}
 	}

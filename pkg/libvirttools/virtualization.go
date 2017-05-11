@@ -260,7 +260,7 @@ func (v *VirtualizationTool) createBootImageClone(cloneName, imageName string) (
 		return "", err
 	}
 
-	vol, err := v.volumeStorage.CreateVolumeClone(cloneName, imageVolume)
+	vol, err := v.volumeStorage.CloneVolume(cloneName, imageVolume)
 	if err != nil {
 		return "", err
 	}

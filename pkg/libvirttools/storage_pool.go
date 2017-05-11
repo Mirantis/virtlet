@@ -286,7 +286,7 @@ func (s *StorageTool) CreateQCOW2Volume(name string, capacity uint64, capacityUn
 	return s.pool.CreateVolume(name, volumeXML)
 }
 
-func (s *StorageTool) CreateVolumeClone(name string, from *Volume) (*Volume, error) {
+func (s *StorageTool) CloneVolume(name string, from *Volume) (*Volume, error) {
 	cloneXMLtemplate := `
 <volume type='file'>
     <name>%s</name>
