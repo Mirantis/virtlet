@@ -469,26 +469,26 @@ func (v *VirtletManager) Status(context.Context, *kubeapi.StatusRequest) (*kubea
 //
 
 func (v *VirtletManager) imageFromVolumeInfo(volumeInfo *libvirttools.VolumeInfo) (*kubeapi.Image, error) {
-	imageName, err := v.metadataStore.GetImageName(volumeInfo.Name)
+	libvirtVolumeName, err := v.metadataStore.GetImageName(volumeInfo.Name)
 	if err != nil {
 		glog.Errorf("Error when checking for existing image with volume %q: %v", volumeInfo.Name, err)
 		return nil, err
 	}
 
-	if imageName == "" {
+	if libvirtVolumeName == "" {
 		// the image doesn't exist
 		return nil, nil
 	}
 
 	return &kubeapi.Image{
-		Id:       volumeInfo.Name,
-		RepoTags: []string{imageName},
+		Id:       libvirttools.ImageNameFromLibvirtVolumeName(volumeInfo.Name),
+		RepoTags: []string{libvirtVolumeName},
 		Size_:    volumeInfo.Size,
 	}, nil
 }
 
 func (v *VirtletManager) ListImages(ctx context.Context, in *kubeapi.ListImagesRequest) (*kubeapi.ListImagesResponse, error) {
-	volumeInfos, err := v.libvirtImageTool.ListImagesAsVolumeInfos()
+	volumeInfos, err := v.libvirtImageTool.ListLibvirtVolumesAsVolumeInfos()
 	if err != nil {
 		glog.Errorf("Error when listing images: %v", err)
 		return nil, err

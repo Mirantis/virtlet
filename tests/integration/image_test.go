@@ -182,7 +182,11 @@ func TestListImagesWithFilter(t *testing.T) {
 }
 
 func getImageFileModificationTime() (time.Time, error) {
-	fileInfo, err := os.Stat(path.Join("/var/lib/libvirt/images", imageCirrosId))
+	// Hardcoded file name for image:
+	// "download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img"
+	// used by it.pullImage
+	imageFileName := "cdb29fccb47c1a69b1931685596258cfb760cb87_cirros-0.3.4-x86_64-disk.img"
+	fileInfo, err := os.Stat(path.Join("/var/lib/libvirt/images", imageFileName))
 	if err != nil {
 		return time.Time{}, err
 	}
