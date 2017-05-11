@@ -54,9 +54,8 @@ From [Libvirt spec](http://libvirt.org/formatdomain.html#elementsDisks):
           "CapacityUnit": "MB"
 ```
 
-All ephemeral volumes created by request as well as snapshot for boot image are stored
+All ephemeral volumes created by request as well as clones of boot images are stored
 at local storage libvirt pool "**volumes**" under `/var/lib/virtlet/volumes`.
-
 
 Volume settings for ephemeral local storage volumes are passed via pod's metadata Annotations.
 
@@ -97,10 +96,10 @@ spec:
 ```
 
 According to this definition will be created VM-POD with VM with 2 equal volumes, attached, which can be found in "volumes" pool under `<domain-uuid>-vol1` and `<domain-uuid>-vol2`
-Boot image is exposed to the guest OS under **vda** device.
+A clone of boot image is exposed as **vda** device to the guest OS.
 On a typical linux system the additional volume disks are assigned to /dev/vdX devices in an alphabetical order, so vol1 will be /dev/vdb and vol2 will be /dev/vdc, but please refer to caveat #3 at the beginning of this document.
 
-On pod remove expected all volumes and snapshot related to VM should be removed.
+When a pod is removed, all the volumes related to it are removed too. This includes the root disk (a clone of the boot image) and any additional volumes.
 
 ## Persistent Storage
 
@@ -235,7 +234,7 @@ spec:
 # virsh domblklist 2
 Target     Source
 ------------------------------------------------
-vda        /var/lib/virtlet/snapshot_de0ae972-4154-4f8f-70ff-48335987b5ce
+vda        /var/lib/virtlet/root_de0ae972-4154-4f8f-70ff-48335987b5ce
 vdb        libvirt-pool/rbd-test-image
 ```
 

@@ -17,7 +17,10 @@ limitations under the License.
 package integration
 
 import (
+	"os"
+	"path"
 	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"golang.org/x/net/context"
@@ -176,4 +179,35 @@ func TestListImagesWithFilter(t *testing.T) {
 	noSuchImage := "example.com/no-such-image"
 	it.verifyNoImagesListed(&kubeapi.ImageFilter{Image: &kubeapi.ImageSpec{Image: noSuchImage}})
 	it.verifySingleImageListed(&kubeapi.ImageFilter{Image: &kubeapi.ImageSpec{Image: imageCirrosUrl}})
+}
+
+func getImageFileModificationTime() (time.Time, error) {
+	fileInfo, err := os.Stat(path.Join("/var/lib/libvirt/images", imageCirrosId))
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return fileInfo.ModTime(), nil
+}
+
+func TestImageRedownload(t *testing.T) {
+	it := newImageTester(t)
+	defer it.stop()
+
+	it.pullImage()
+	firstTime, err := getImageFileModificationTime()
+	if err != nil {
+		t.Fatal("Can't stat cirros image in libvirt store:", err)
+	}
+
+	it.pullImage()
+
+	secondTime, err := getImageFileModificationTime()
+	if err != nil {
+		t.Fatal("Can't stat cirros image in libvirt store:", err)
+	}
+
+	if firstTime.Equal(secondTime) {
+		t.Fatal("Image in libvirt store was not modified by second call to PullImage")
+	}
 }

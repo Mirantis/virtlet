@@ -18,6 +18,7 @@ package libvirttools
 
 import (
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/Mirantis/virtlet/pkg/utils"
@@ -63,14 +64,6 @@ func (i *ImageTool) ListImagesAsVolumeInfos() ([]*VolumeInfo, error) {
 	return i.tool.ListVolumes()
 }
 
-func (i *ImageTool) ImageFilePath(volumeName string) (string, error) {
-	vol, err := i.tool.LookupVolume(volumeName)
-	if err != nil {
-		return "", err
-	}
-	return vol.GetPath()
-}
-
 func (i *ImageTool) ImageAsVolumeInfo(volumeName string) (*VolumeInfo, error) {
 	vol, err := i.tool.LookupVolume(volumeName)
 	if err != nil {
@@ -79,16 +72,23 @@ func (i *ImageTool) ImageAsVolumeInfo(volumeName string) (*VolumeInfo, error) {
 	return vol.Info()
 }
 
-func (i *ImageTool) PullImageToVolume(imageName, volumeName string) error {
+func (i *ImageTool) PullRemoteImageToVolume(imageName, volumeName string) error {
 	// TODO(nhlfr): Handle AuthConfig from PullImageRequest.
-	path, err := utils.DownloadFile(i.protocol, stripTagFromImageName(imageName), volumeName)
+	path, err := utils.DownloadFile(i.protocol, stripTagFromImageName(imageName))
 	if err != nil {
 		return err
 	}
+	defer func() {
+		os.Remove(path)
+	}()
 
-	return i.tool.PullImageToVolume(path, volumeName)
+	return i.tool.PullFileToVolume(path, volumeName)
 }
 
 func (i *ImageTool) RemoveImage(volumeName string) error {
 	return i.tool.RemoveVolume(volumeName)
+}
+
+func (i *ImageTool) GetStorageTool() *StorageTool {
+	return i.tool
 }

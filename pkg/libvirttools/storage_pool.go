@@ -216,6 +216,14 @@ func (p *Pool) LookupVolume(name string) (*Volume, error) {
 	return &Volume{tool: p.tool, Name: name, volume: vol}, nil
 }
 
+func (p *Pool) CloneVolume(name, volXML string, from *Volume) (*Volume, error) {
+	vol, err := p.tool.CreateVolCloneFromXML(p.pool, volXML, from.volume)
+	if err != nil {
+		return nil, err
+	}
+	return &Volume{tool: p.tool, Name: name, volume: vol}, nil
+}
+
 func (p *Pool) ListVolumes() ([]*VolumeInfo, error) {
 	volumes, err := p.tool.ListAllVolumes(p.pool)
 	if err != nil {
@@ -278,23 +286,17 @@ func (s *StorageTool) CreateQCOW2Volume(name string, capacity uint64, capacityUn
 	return s.pool.CreateVolume(name, volumeXML)
 }
 
-func (s *StorageTool) CreateSnapshot(name string, capacity uint64, capacityUnit string, backingStorePath string) (*Volume, error) {
-	snapshotXML := `
+func (s *StorageTool) CloneVolume(name string, from *Volume) (*Volume, error) {
+	cloneXMLtemplate := `
 <volume type='file'>
     <name>%s</name>
-    <allocation>0</allocation>
-    <capacity unit="%s">%d</capacity>
     <target>
          <format type='qcow2'/>
     </target>
-    <backingStore>
-         <path>%s</path>
-         <format type='qcow2'/>
-     </backingStore>
 </volume>`
-	snapshotXML = fmt.Sprintf(snapshotXML, name, capacityUnit, capacity, backingStorePath)
-	glog.V(2).Infof("Create volume using XML description: %s", snapshotXML)
-	return s.pool.CreateVolume(name, snapshotXML)
+	cloneXML := fmt.Sprintf(cloneXMLtemplate, name)
+	glog.V(2).Infof("Creating volume clone with name '%s' from volume '%s'.", name, from.Name)
+	return s.pool.CloneVolume(name, cloneXML, from)
 }
 
 func (s *StorageTool) LookupVolume(name string) (*Volume, error) {
@@ -430,7 +432,7 @@ func generateRawDeviceXML(path, device string) string {
 	return fmt.Sprintf(rawDeviceTemplateXML, path, device)
 }
 
-func (s *StorageTool) PullImageToVolume(path, volumeName string) error {
+func (s *StorageTool) PullFileToVolume(path, volumeName string) error {
 	imageSize, err := getFileSize(path)
 	if err != nil {
 		return err

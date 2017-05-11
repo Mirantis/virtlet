@@ -19,23 +19,23 @@ package utils
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
-	"os"
 
 	"github.com/golang/glog"
 )
 
 // DownloadFile downloads a file via an URL constructed as 'protocol://location'
-// and saves it under the specified fileName in /tmp
-func DownloadFile(protocol, location, fileName string) (string, error) {
+// and saves it in temporary file in default system directory for temporary files.
+// Returns path to this temporary file.
+func DownloadFile(protocol, location string) (string, error) {
 	url := fmt.Sprintf("%s://%s", protocol, location)
 
-	path := "/tmp/" + fileName
-	fp, err := os.Create(path)
+	tempFile, err := ioutil.TempFile("", "virtlet_")
 	if err != nil {
 		return "", err
 	}
-	defer fp.Close()
+	defer tempFile.Close()
 
 	glog.V(2).Infof("Start downloading %s", url)
 
@@ -45,10 +45,10 @@ func DownloadFile(protocol, location, fileName string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	_, err = io.Copy(fp, resp.Body)
+	_, err = io.Copy(tempFile, resp.Body)
 	if err != nil {
 		return "", err
 	}
-	glog.V(2).Infof("Data from url %s saved in %s", url, path)
-	return path, nil
+	glog.V(2).Infof("Data from url %s saved in %s", url, tempFile.Name())
+	return tempFile.Name(), nil
 }

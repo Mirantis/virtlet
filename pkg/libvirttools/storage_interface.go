@@ -26,6 +26,7 @@ import (
 type StorageOperations interface {
 	CreateFromXML(xmlConfig string) (*libvirt.StoragePool, error)
 	CreateVolFromXML(pool *libvirt.StoragePool, xmlConfig string) (*libvirt.StorageVol, error)
+	CreateVolCloneFromXML(pool *libvirt.StoragePool, xmlConfig string, from *libvirt.StorageVol) (*libvirt.StorageVol, error)
 	ListAllVolumes(pool *libvirt.StoragePool) ([]libvirt.StorageVol, error)
 	LookupByName(name string) (*libvirt.StoragePool, error)
 	LookupVolumeByName(pool *libvirt.StoragePool, name string) (*libvirt.StorageVol, error)
@@ -51,6 +52,10 @@ func (l LibvirtStorageOperations) CreateFromXML(xmlConfig string) (*libvirt.Stor
 
 func (l LibvirtStorageOperations) CreateVolFromXML(pool *libvirt.StoragePool, xmlConfig string) (*libvirt.StorageVol, error) {
 	return pool.StorageVolCreateXML(xmlConfig, 0)
+}
+
+func (l LibvirtStorageOperations) CreateVolCloneFromXML(pool *libvirt.StoragePool, xmlConfig string, from *libvirt.StorageVol) (*libvirt.StorageVol, error) {
+	return pool.StorageVolCreateXMLFrom(xmlConfig, from, 0)
 }
 
 func (l LibvirtStorageOperations) ListAllVolumes(pool *libvirt.StoragePool) ([]libvirt.StorageVol, error) {
@@ -82,10 +87,12 @@ func (l LibvirtStorageOperations) VolumeGetPath(volume *libvirt.StorageVol) (str
 }
 
 func (l LibvirtStorageOperations) PullImageToVolume(pool *libvirt.StoragePool, shortName, filepath, volXML string) error {
-	// if we have such image already in store - just ignore request
-	existing_vol, _ := l.LookupVolumeByName(pool, shortName)
-	if existing_vol != nil {
-		return nil
+	// if we have such image already in store - remove it
+	existingVol, _ := l.LookupVolumeByName(pool, shortName)
+	if existingVol != nil {
+		if err := l.RemoveVolume(existingVol); err != nil {
+			return err
+		}
 	}
 
 	f, err := os.Open(filepath)

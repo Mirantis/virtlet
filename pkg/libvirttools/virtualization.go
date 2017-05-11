@@ -187,7 +187,7 @@ func canUseKvm() bool {
 	return true
 }
 
-func generateDomXML(useKvm bool, name string, memory int64, memoryUnit string, uuid string, cpuNum int, cpuShare int64, cpuPeriod int64, cpuQuota int64, imageFilepath, netNSPath, cniConfig string) string {
+func generateDomXML(useKvm bool, name string, memory int64, memoryUnit string, uuid string, cpuNum int, cpuShare int64, cpuPeriod int64, cpuQuota int64, rootDiskFilepath, netNSPath, cniConfig string) string {
 	domainType := defaultDomainType
 	emulator := defaultEmulator
 	if !useKvm {
@@ -246,12 +246,21 @@ func generateDomXML(useKvm bool, name string, memory int64, memoryUnit string, u
       <env name='VIRTLET_CNI_CONFIG' value='%s'/>
     </commandline>
 </domain>`
-	return fmt.Sprintf(domXML, domainType, uuid, name, uuid, memoryUnit, memory, cpuNum, cpuShare, cpuPeriod, cpuQuota, imageFilepath, emulator, netNSPath, cniConfigEscaped)
+	return fmt.Sprintf(domXML, domainType, uuid, name, uuid, memoryUnit, memory, cpuNum, cpuShare, cpuPeriod, cpuQuota, rootDiskFilepath, emulator, netNSPath, cniConfigEscaped)
 }
 
-func (v *VirtualizationTool) createBootImageSnapshot(imageName, backingStorePath string, size uint64) (string, error) {
-	vol, err := v.volumeStorage.CreateSnapshot(imageName, size, "B", backingStorePath)
+func (v *VirtualizationTool) createBootImageClone(cloneName, imageName string) (string, error) {
+	imageVolumeName, err := ImageNameToVolumeName(imageName)
+	if err != nil {
+		return "", err
+	}
 
+	imageVolume, err := v.imagesStorage.LookupVolume(imageVolumeName)
+	if err != nil {
+		return "", err
+	}
+
+	vol, err := v.volumeStorage.CloneVolume(cloneName, imageVolume)
 	if err != nil {
 		return "", err
 	}
@@ -399,19 +408,20 @@ func (v *VirtualizationTool) addAttachedVolumesXML(podID, podName, uuid, virtlet
 type VirtualizationTool struct {
 	tool           DomainOperations
 	volumeStorage  *StorageTool
+	imagesStorage  *StorageTool
 	volumePoolName string
 }
 
-func NewVirtualizationTool(conn *libvirt.Connect, poolName, rawDevices string) (*VirtualizationTool, error) {
-	storageTool, err := NewStorageTool(conn, poolName, rawDevices)
+func NewVirtualizationTool(conn *libvirt.Connect, volumesPoolName string, imagesStorage *StorageTool, rawDevices string) (*VirtualizationTool, error) {
+	storageTool, err := NewStorageTool(conn, volumesPoolName, rawDevices)
 	if err != nil {
 		return nil, err
 	}
 	tool := NewLibvirtDomainOperations(conn)
-	return &VirtualizationTool{tool: tool, volumeStorage: storageTool}, nil
+	return &VirtualizationTool{tool: tool, volumeStorage: storageTool, imagesStorage: imagesStorage}, nil
 }
 
-func (v *VirtualizationTool) CreateContainer(metadataStore metadata.MetadataStore, in *kubeapi.CreateContainerRequest, imageFilepath string, imageSize uint64, netNSPath, cniConfig string) (string, error) {
+func (v *VirtualizationTool) CreateContainer(metadataStore metadata.MetadataStore, in *kubeapi.CreateContainerRequest, imageName string, netNSPath, cniConfig string) (string, error) {
 	uuid, err := utils.NewUuid()
 	if err != nil {
 		return "", err
@@ -445,13 +455,13 @@ func (v *VirtualizationTool) CreateContainer(metadataStore metadata.MetadataStor
 		}
 	}
 
-	snapshotName := "snapshot_" + uuid
-	snapshotImage, err := v.createBootImageSnapshot(snapshotName, imageFilepath, imageSize)
+	cloneName := "root_" + uuid
+	cloneImage, err := v.createBootImageClone(cloneName, imageName)
 	if err != nil {
 		return "", err
 	}
 
-	metadataStore.SetContainer(name, uuid, in.PodSandboxId, config.Image.Image, snapshotName, config.Labels, config.Annotations)
+	metadataStore.SetContainer(name, uuid, in.PodSandboxId, config.Image.Image, cloneName, config.Labels, config.Annotations)
 
 	var memory, cpuShares, cpuPeriod, cpuQuota int64
 	if config.Linux != nil && config.Linux.Resources != nil {
@@ -471,7 +481,7 @@ func (v *VirtualizationTool) CreateContainer(metadataStore metadata.MetadataStor
 		return "", err
 	}
 
-	domXML := generateDomXML(canUseKvm(), name, memory, memoryUnit, uuid, cpuNum, cpuShares, cpuPeriod, cpuQuota, snapshotImage, netNSPath, cniConfig)
+	domXML := generateDomXML(canUseKvm(), name, memory, memoryUnit, uuid, cpuNum, cpuShares, cpuPeriod, cpuQuota, cloneImage, netNSPath, cniConfig)
 
 	virtletVolsDesc, _ := sandBoxAnnotations[VirtletVolumesAnnotationKeyName]
 	domXML, err = v.addAttachedVolumesXML(in.PodSandboxId, in.SandboxConfig.Metadata.Name, uuid, virtletVolsDesc, domXML)
