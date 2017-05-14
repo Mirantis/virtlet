@@ -31,13 +31,14 @@ vmssh="${SCRIPT_DIR}/../../examples/vmssh.sh"
 # provide path for kubectl
 export PATH="${HOME}/.kubeadm-dind-cluster:${PATH}"
 
-while ! "${virsh}" list | grep -q cirros-vm; do
+while ! "${virsh}" list --name | grep -q 'cirros-vm$'; do
   sleep 1
 done
 
 cd "${SCRIPT_DIR}"
 "${SCRIPT_DIR}/vmchat.exp" 1
 
+# test ceph RBD
 vm_hostname="$("${vmssh}" cirros@cirros-vm cat /etc/hostname)"
 expected_hostname=my-cirros-vm
 if [[ "${vm_hostname}" != "${expected_hostname}" ]]; then
@@ -68,16 +69,62 @@ fi
 
 # check vnc consoles are available for both domains
 if ! kubectl exec "${virtlet_pod_name}" --namespace=kube-system -- /bin/sh -c "apt-get install -y vncsnapshot"; then
-  echo "Failed to install vncsnapshot inside virtlet container"
+  echo "Failed to install vncsnapshot inside virtlet container" >&2
   exit 1
 fi
 
+# grab screenshots
+
 if ! kubectl exec "${virtlet_pod_name}" --namespace=kube-system -- /bin/sh -c "vncsnapshot :0 /domain_1.jpeg"; then
-  echo "Failed to addtach and get screenshot for vnc console for domain with 1 id"
+  echo "Failed to addtach and get screenshot for vnc console for domain with 1 id" >&2
   exit 1
 fi
 
 if ! kubectl exec "${virtlet_pod_name}" --namespace=kube-system -- /bin/sh -c "vncsnapshot :1 /domain_2.jpeg"; then
-  echo "Failed to addtach and get screenshot for vnc console for domain with 2 id"
+  echo "Failed to addtach and get screenshot for vnc console for domain with 2 id" >&2
   exit 1
 fi
+
+# check cpu count
+
+function verify-cpu-count {
+  local expected_count="${1}"
+  cirros_cpu_count="$("${SCRIPT_DIR}/../../examples/vmssh.sh" cirros@cirros-vm grep '^processor' /proc/cpuinfo|wc -l)"
+  if [[ ${cirros_cpu_count} != ${expected_count} ]]; then
+    echo "bad cpu count for cirros-vm: ${cirros_cpu_count} instead of ${expected_count}" >&2
+    exit 1
+  fi
+}
+
+verify-cpu-count 1
+
+# test pod removal
+
+kubectl delete pod cirros-vm
+n=180
+while kubectl get pod cirros-vm >&/dev/null; do
+  if ((--n == 0)); then
+    echo "Timed out waiting for pod removal" >&2
+  fi
+  sleep 1
+  echo -n "." >&2
+done
+echo
+
+if "${virsh}" list --name|grep -- '-cirros-vm$'; then
+  echo "cirros-vm domain still listed after deletion" >&2
+  exit 1
+fi
+
+# test changing vcpu count
+
+kubectl convert -f "${SCRIPT_DIR}/../../examples/cirros-vm.yaml" --local -o json | docker exec -i kube-master jq '.metadata.annotations.VirtletVCPUCount = "2"' | kubectl create -f -
+
+while ! "${virsh}" list --name | grep -q 'cirros-vm$'; do
+  sleep 1
+done
+
+# wait for login prompt to appear
+"${SCRIPT_DIR}/vmchat-short.exp" 3
+
+verify-cpu-count 2
