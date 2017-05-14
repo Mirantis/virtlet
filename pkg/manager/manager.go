@@ -64,13 +64,13 @@ func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, m
 		return nil, err
 	}
 
-	// TODO: pool name should be passed like for imageTool
-	libvirtVirtualizationTool, err := libvirttools.NewVirtualizationTool(libvirtConnTool.Connection(), "volumes", rawDevices)
+	boltClient, err := bolttools.NewBoltClient(metadataPath)
 	if err != nil {
 		return nil, err
 	}
 
-	boltClient, err := bolttools.NewBoltClient(metadataPath)
+	// TODO: pool name should be passed like for imageTool
+	libvirtVirtualizationTool, err := libvirttools.NewVirtualizationTool(libvirtConnTool.Connection(), "volumes", rawDevices, boltClient)
 	if err != nil {
 		return nil, err
 	}
@@ -338,7 +338,7 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 	// TODO: we should not pass whole "in" to CreateContainer - we should pass there only needed info for CreateContainer
 	// without whole data container
 	// TODO: use network configuration by CreateContainer
-	uuid, err := v.libvirtVirtualizationTool.CreateContainer(v.metadataStore, in, imageFilePath, volumeInfo.Size, netNSPath, string(netAsBytes))
+	uuid, err := v.libvirtVirtualizationTool.CreateContainer(in, imageFilePath, volumeInfo.Size, netNSPath, string(netAsBytes))
 	if err != nil {
 		glog.Errorf("Error when creating container %s: %v", name, err)
 		return nil, err
@@ -383,29 +383,6 @@ func (v *VirtletManager) RemoveContainer(ctx context.Context, in *kubeapi.Remove
 		return nil, err
 	}
 
-	containerInfo, err := v.metadataStore.GetContainerInfo(in.ContainerId)
-	if err != nil {
-		glog.Errorf("Error when retrieving container '%s' info from metadata store: %v", in.ContainerId, err)
-		return nil, err
-	}
-
-	if err := v.metadataStore.RemoveContainer(in.ContainerId); err != nil {
-		glog.Errorf("Error when removing container '%s' from metadata store: %v", in.ContainerId, err)
-		return nil, err
-	}
-
-	if err := v.libvirtVirtualizationTool.RemoveVolume(containerInfo.RootImageSnapshotName); err != nil {
-		glog.Errorf("Error when removing image snapshot with name '%s': %v", containerInfo.RootImageSnapshotName, err)
-		return nil, err
-	}
-
-	storagePool := v.libvirtVirtualizationTool.GetStoragePool()
-	if virtletVolsDesc, exists := containerInfo.SandBoxAnnotations[libvirttools.VirtletVolumesAnnotationKeyName]; exists {
-		if err := storagePool.CleanAttachedQCOW2Volumes(virtletVolsDesc, in.ContainerId); err != nil {
-			return nil, err
-		}
-	}
-
 	response := &kubeapi.RemoveContainerResponse{}
 	return response, nil
 }
@@ -414,7 +391,7 @@ func (v *VirtletManager) ListContainers(ctx context.Context, in *kubeapi.ListCon
 	filter := in.GetFilter()
 	glog.V(3).Infof("Listing containers with filter: %s", spew.Sdump(filter))
 	glog.V(3).Infof("ListContainers: %s", spew.Sdump(in))
-	containers, err := v.libvirtVirtualizationTool.ListContainers(v.metadataStore, filter)
+	containers, err := v.libvirtVirtualizationTool.ListContainers(filter)
 	if err != nil {
 		glog.Errorf("Error when listing containers with filter %s: %v", spew.Sdump(filter), err)
 		return nil, err
@@ -426,7 +403,7 @@ func (v *VirtletManager) ListContainers(ctx context.Context, in *kubeapi.ListCon
 
 func (v *VirtletManager) ContainerStatus(ctx context.Context, in *kubeapi.ContainerStatusRequest) (*kubeapi.ContainerStatusResponse, error) {
 	glog.V(3).Infof("ContainerStatus: %s", spew.Sdump(in))
-	status, err := v.libvirtVirtualizationTool.ContainerStatus(v.metadataStore, in.ContainerId)
+	status, err := v.libvirtVirtualizationTool.ContainerStatus(in.ContainerId)
 	if err != nil {
 		glog.Errorf("Error when getting container '%s' status: %v", in.ContainerId, err)
 		return nil, err
