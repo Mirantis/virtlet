@@ -289,6 +289,9 @@ func (s *StorageTool) PrepareVolumesToBeAttached(volumes []*VirtletVolume, conta
 			if err := s.isRawDeviceOnWhitelist(virtletVol.Path); err != nil {
 				return nil, err
 			}
+			if err := verifyRawDeviceAccess(virtletVol.Path); err != nil {
+				return nil, err
+			}
 			diskXML = generateRawDeviceXML(virtletVol.Path, virtDev)
 		}
 

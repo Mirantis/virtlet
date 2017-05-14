@@ -137,9 +137,6 @@ func (vol *VirtletVolume) validate() error {
 		if !strings.HasPrefix(vol.Path, "/dev/") {
 			return fmt.Errorf("raw volume Path needs to be prefixed by '/dev/', but it's whole value is: ", vol.Path)
 		}
-		if err := verifyRawDeviceAccess(vol.Path); err != nil {
-			return err
-		}
 	default:
 		return fmt.Errorf("unsupported volume format: %s", vol.Format)
 	}
