@@ -97,7 +97,7 @@ func (va *VirtletAnnotations) validate() error {
 		}
 	}
 	if errs != nil {
-		return fmt.Errorf("Bad virtlet annotations. Errors:\n%s", strings.Join(errs, "\n"))
+		return fmt.Errorf("bad virtlet annotations. Errors:\n%s", strings.Join(errs, "\n"))
 	}
 
 	return nil
