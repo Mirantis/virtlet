@@ -31,14 +31,30 @@ vmssh="${SCRIPT_DIR}/../../examples/vmssh.sh"
 # provide path for kubectl
 export PATH="${HOME}/.kubeadm-dind-cluster:${PATH}"
 
-while ! "${virsh}" list --name | grep -q 'cirros-vm$'; do
-  sleep 1
-done
+function wait-for-pod {
+  local pod="${1}"
+  local n=180
+  while true; do
+    local phase="$(kubectl get pod "${1}" -o jsonpath='{.status.phase}')"
+    if [[ ${phase} == Running ]]; then
+      break
+    fi
+    if ((--n == 0)); then
+      echo "Timed out waiting for pod ${pod}" >&2
+    fi
+    sleep 1
+    echo -n "." >&2
+  done
+  echo >&2
+}
+
+wait-for-pod cirros-vm
 
 cd "${SCRIPT_DIR}"
-"${SCRIPT_DIR}/vmchat.exp" 1
+"${SCRIPT_DIR}/vmchat.exp" @cirros-vm
 
 # test ceph RBD
+
 vm_hostname="$("${vmssh}" cirros@cirros-vm cat /etc/hostname)"
 expected_hostname=my-cirros-vm
 if [[ "${vm_hostname}" != "${expected_hostname}" ]]; then
@@ -52,18 +68,14 @@ virtlet_pod_name=$(kubectl get pods --namespace=kube-system | grep virtlet | awk
 "${SCRIPT_DIR}/run_ceph.sh" "${SCRIPT_DIR}"
 
 kubectl create -f "${SCRIPT_DIR}/cirros-vm-rbd-volume.yaml"
-while ! "${virsh}" list | grep -q cirros-vm-rbd; do
-  sleep 1
-done
-if [ "$(${virsh} domblklist 2 | grep rbd-test-image | wc -l)" != "1" ]; then
-  exit 1
-fi
-if ! kubectl exec "${virtlet_pod_name}" --namespace=kube-system -- /bin/sh -c "virsh list | grep cirros-vm-rbd.*running"; then
+wait-for-pod cirros-vm-rbd
+if [ "$(${virsh} domblklist @cirros-vm-rbd | grep rbd-test-image | wc -l)" != "1" ]; then
+  echo "ceph: failed to find rbd-test-image in domblklist" >&2
   exit 1
 fi
 
 # wait for login prompt to appear
-"${SCRIPT_DIR}/vmchat-short.exp" 2
+"${SCRIPT_DIR}/vmchat-short.exp" @cirros-vm-rbd
 
 "${vmssh}" cirros@cirros-vm-rbd 'sudo /usr/sbin/mkfs.ext2 /dev/vdb && sudo mount /dev/vdb /mnt && ls -l /mnt | grep lost+found'
 
@@ -89,7 +101,7 @@ fi
 
 function verify-cpu-count {
   local expected_count="${1}"
-  cirros_cpu_count="$("${SCRIPT_DIR}/../../examples/vmssh.sh" cirros@cirros-vm grep '^processor' /proc/cpuinfo|wc -l)"
+  cirros_cpu_count="$("${vmssh}" cirros@cirros-vm grep '^processor' /proc/cpuinfo|wc -l)"
   if [[ ${cirros_cpu_count} != ${expected_count} ]]; then
     echo "bad cpu count for cirros-vm: ${cirros_cpu_count} instead of ${expected_count}" >&2
     exit 1
@@ -109,7 +121,7 @@ while kubectl get pod cirros-vm >&/dev/null; do
   sleep 1
   echo -n "." >&2
 done
-echo
+echo >&2
 
 if "${virsh}" list --name|grep -- '-cirros-vm$'; then
   echo "cirros-vm domain still listed after deletion" >&2
@@ -120,11 +132,49 @@ fi
 
 kubectl convert -f "${SCRIPT_DIR}/../../examples/cirros-vm.yaml" --local -o json | docker exec -i kube-master jq '.metadata.annotations.VirtletVCPUCount = "2"' | kubectl create -f -
 
-while ! "${virsh}" list --name | grep -q 'cirros-vm$'; do
-  sleep 1
-done
+wait-for-pod cirros-vm
 
 # wait for login prompt to appear
-"${SCRIPT_DIR}/vmchat-short.exp" 3
+"${SCRIPT_DIR}/vmchat-short.exp" @cirros-vm
 
 verify-cpu-count 2
+
+# verify domain memory size settings
+
+function domain_xpath {
+  local domain="${1}"
+  local xpath="${2}"
+  kubectl exec -n kube-system "${virtlet_pod_name}" -- \
+          /bin/sh -c "virsh dumpxml '${domain}' | xmllint --xpath '${xpath}' -"
+}
+
+pod_domain="$("${virsh}" poddomain @cirros-vm)"
+
+# <memory unit='KiB'>131072</memory>
+dom_mem_size_k="$(domain_xpath "${pod_domain}" 'string(/domain/memory[@unit="KiB"])')"
+expected_dom_mem_size_k="131072"
+if [[ ${dom_mem_size_k} != ${expected_dom_mem_size_k} ]]; then
+  echo "Bad memory size in the domain definition. Expected ${dom_mem_size_k}, but got ${expected_mem_size_k}" >&2
+  exit 1
+fi
+
+# verify <memoryBacking><locked/></memoryBacking> in the domain definition
+# (so the VM memory doesn't get swapped out)
+
+if [[ $(domain_xpath "${pod_domain}" 'count(/domain/memoryBacking/locked)') != 1 ]]; then
+  echo "Didn't find memoryBacking/locked in the domain definition" >&2
+  exit 1
+fi
+
+# verify memory size as reported by Linux kernel inside VM
+
+# The boot message is:
+# [    0.000000] Memory: 109112k/130944k available (6576k kernel code, 452k absent, 21380k reserved, 6620k data, 928k init)
+
+mem_size_k="$("${vmssh}" cirros@cirros-vm dmesg|grep 'Memory:'|sed 's@.*/\|k .*@@g')"
+expected_mem_size_k=130944
+
+if [[ ${mem_size_k} != ${expected_mem_size_k} ]]; then
+  echo "Bad memory size (inside VM). Expected ${expected_mem_size_k}, but got ${mem_size_k}" >&2
+  exit 1
+fi
