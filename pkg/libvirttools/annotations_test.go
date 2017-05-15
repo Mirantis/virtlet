@@ -145,6 +145,18 @@ func TestVirtletAnnotations(t *testing.T) {
 				"VirtletVolumes": `[{"Name": "rawVol", "Format": "rawDevice", "Path": "/tmp/foobar"}]`,
 			},
 		},
+		{
+			name: "bad volume - bad capacity units",
+			annotations: map[string]string{
+				"VirtletVolumes": `[{"Name": "badvol", "CapacityUnit": "cm"}]`,
+			},
+		},
+		{
+			name: "bad volume - negative capacity",
+			annotations: map[string]string{
+				"VirtletVolumes": `[{"Name": "badvol", "Capacity": "-1024"}]`,
+			},
+		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			va, err := LoadAnnotations(testCase.annotations)

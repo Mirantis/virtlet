@@ -32,6 +32,12 @@ const (
 	VirtletVolumesAnnotationKeyName   = "VirtletVolumes"
 )
 
+var capacityUnits []string = []string{
+	// https://libvirt.org/formatstorage.html#StorageVolFirst
+	"B", "bytes", "KB", "K", "KiB", "MB", "M", "MiB", "GB", "G",
+	"GiB", "TB", "T", "TiB", "PB", "P", "PiB", "EB", "E", "EiB",
+}
+
 type VirtletAnnotations struct {
 	VCPUCount int
 	Volumes   []*VirtletVolume
@@ -127,6 +133,12 @@ func (vol *VirtletVolume) validate() error {
 		if vol.Path != "" {
 			return fmt.Errorf("qcow2 volume should not have Path but it has it set to: %s", vol.Path)
 		}
+		if vol.Capacity < 0 {
+			return fmt.Errorf("qcow2 volume has negative capacity %d", vol.Capacity)
+		}
+		if !validCapacityUnit(vol.CapacityUnit) {
+			return fmt.Errorf("qcow2 has invalid capacity units %q", vol.CapacityUnit)
+		}
 	case "rawDevice":
 		if vol.Capacity != 0 {
 			return fmt.Errorf("raw volume should not have Capacity, but it has it equal to: %d", vol.Capacity)
@@ -142,4 +154,13 @@ func (vol *VirtletVolume) validate() error {
 	}
 
 	return nil
+}
+
+func validCapacityUnit(unit string) bool {
+	for _, item := range capacityUnits {
+		if item == unit {
+			return true
+		}
+	}
+	return false
 }
