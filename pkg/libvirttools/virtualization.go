@@ -31,6 +31,7 @@ import (
 
 	"github.com/golang/glog"
 	libvirt "github.com/libvirt/libvirt-go"
+	libvirtxml "github.com/libvirt/libvirt-go-xml"
 	"k8s.io/apimachinery/pkg/fields"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
@@ -56,121 +57,6 @@ const (
 )
 
 var diskLetters = strings.Split(diskLetterStr, "")
-
-type Driver struct {
-	DriverName string `xml:"name,attr,omitempty"`
-	DriverType string `xml:"type,attr,omitempty"`
-}
-
-type Secret struct {
-	Type string `xml:"type,attr,omitempty"`
-	UUID string `xml:"uuid,attr,omitempty"`
-}
-
-type Auth struct {
-	Username string `xml:"username,attr,omitempty"`
-	Secret   Secret `xml:"secret"`
-}
-
-type SourceHost struct {
-	Name string `xml:"name,attr,omitempty"`
-	Port string `xml:"port,attr,omitempty"`
-}
-
-type Source struct {
-	Device   string       `xml:"dev,attr,omitempty"`
-	SrcFile  string       `xml:"file,attr,omitempty"`
-	Protocol string       `xml:"protocol,attr,omitempty"`
-	Name     string       `xml:"name,attr,omitempty"`
-	Hosts    []SourceHost `xml:"host,omitempty"`
-}
-
-type Target struct {
-	TargetDev string `xml:"dev,attr"`
-	TargetBus string `xml:"bus,attr"`
-}
-
-type Disk struct {
-	DiskType   string `xml:"type,attr"`
-	DiskDevice string `xml:"device,attr"`
-	Driver     Driver `xml:"driver"`
-	Src        Source `xml:"source"`
-	Auth       *Auth  `xml:"auth"`
-	Target     Target `xml:"target"`
-}
-
-type Devices struct {
-	DiskList []Disk   `xml:"disk"`
-	Inpt     Input    `xml:"input"`
-	Graph    Graphics `xml:"graphics"`
-	Serial   Serial   `xml:"serial"`
-	Consl    Console  `xml:"console"`
-	Snd      Sound    `xml:"sound"`
-	Items    []Tag    `xml:",any"`
-}
-
-type Tag struct {
-	XMLName xml.Name
-	Content string `xml:",innerxml"`
-}
-
-type Memory struct {
-	Memory string `xml:",chardata"`
-	Unit   string `xml:"unit,attr"`
-}
-
-type Domain struct {
-	XMLName xml.Name `xml:"domain"`
-	DomType string   `xml:"type,attr"`
-	Memory  Memory   `xml:"memory"`
-	Devs    Devices  `xml:"devices"`
-	Items   []Tag    `xml:",any"`
-}
-
-type CommandLine struct {
-	XMLName xml.Name     `xml:"http://libvirt.org/schemas/domain/qemu/1.0 commandline"`
-	Args    []string     `xml:"http://libvirt.org/schemas/domain/qemu/1.0 arg"`
-	Env     []CommandEnv `xml:"http://libvirt.org/schemas/domain/qemu/1.0 env"`
-}
-
-type CommandEnv struct {
-	XMLName xml.Name `xml:"http://libvirt.org/schemas/domain/qemu/1.0 env"`
-	Name    string   `xml:"name,attr"`
-	Value   string   `xml:"value,attr"`
-}
-
-type Input struct {
-	Type string `xml:"type,attr"`
-	Bus  string `xml:"bus,attr"`
-}
-
-type Graphics struct {
-	Type string `xml:"type,attr"`
-	Port string `xml:"port,attr"`
-}
-
-type Console struct {
-	Type   string        `xml:"type,attr"`
-	Target TargetConsole `xml:"target"`
-}
-
-type TargetConsole struct {
-	Type string `xml:"type,attr"`
-	Port string `xml:"port,attr"`
-}
-
-type Serial struct {
-	Type   string       `xml:"type,attr"`
-	Target TargetSerial `xml:"target"`
-}
-
-type TargetSerial struct {
-	Port string `xml:"port,attr"`
-}
-
-type Sound struct {
-	Model string `xml:"model,attr"`
-}
 
 type FlexVolumeInfo struct {
 	DiskXML   string
@@ -345,16 +231,16 @@ func gatherFlexvolumeDriverVolumeDefinitions(podID, podName string, lettersInd i
 	return flexInfos, nil
 }
 
-func addDiskToDomainDefinition(domain *Domain, volXML string) error {
-	disk := Disk{}
+func addDiskToDomainDefinition(domain *libvirtxml.Domain, volXML string) error {
+	disk := libvirtxml.DomainDisk{}
 	if err := xml.Unmarshal([]byte(volXML), &disk); err != nil {
 		return err
 	}
-	domain.Devs.DiskList = append(domain.Devs.DiskList, disk)
+	domain.Devices.Disks = append(domain.Devices.Disks, disk)
 	return nil
 }
 
-func marshalToXML(domain *Domain) (string, error) {
+func marshalToXML(domain *libvirtxml.Domain) (string, error) {
 	outArr, err := xml.MarshalIndent(domain, " ", "  ")
 	if err != nil {
 		return "", err
@@ -364,7 +250,7 @@ func marshalToXML(domain *Domain) (string, error) {
 
 func (v *VirtualizationTool) addAttachedVolumesXML(podID, podName, uuid, domXML string, volumes []*VirtletVolume) (string, error) {
 	glog.V(3).Infof("INPUT domain:\n%s\n\n", domXML)
-	domain := &Domain{}
+	domain := &libvirtxml.Domain{}
 	err := xml.Unmarshal([]byte(domXML), domain)
 	if err != nil {
 		return "", err
