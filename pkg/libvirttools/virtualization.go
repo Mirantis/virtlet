@@ -46,12 +46,11 @@ const (
 	noKvmDomainType   = "qemu"
 	noKvmEmulator     = "/usr/bin/qemu-system-x86_64"
 
-	VirtletVolumesAnnotationKeyName = "VirtletVolumes"
-	domainShutdownRetryInterval     = 10 * time.Second
-	domainShutdownTimeout           = 60 * time.Second
-	domainDestroyCheckInterval      = 500 * time.Millisecond
-	domainDestroyTimeout            = 5 * time.Second
-	diskLetterStr                   = "bcdefghijklmnopqrstu"
+	domainShutdownRetryInterval = 10 * time.Second
+	domainShutdownTimeout       = 60 * time.Second
+	domainDestroyCheckInterval  = 500 * time.Millisecond
+	domainDestroyTimeout        = 5 * time.Second
+	diskLetterStr               = "bcdefghijklmnopqrstu"
 
 	podNameString = "@podname@"
 )
@@ -360,7 +359,7 @@ func marshalToXML(domain *Domain) (string, error) {
 	return string(outArr[:]), nil
 }
 
-func (v *VirtualizationTool) addAttachedVolumesXML(podID, podName, uuid, virtletVolsDesc, domXML string) (string, error) {
+func (v *VirtualizationTool) addAttachedVolumesXML(podID, podName, uuid, domXML string, volumes []*VirtletVolume) (string, error) {
 	glog.V(3).Infof("INPUT domain:\n%s\n\n", domXML)
 	domain := &Domain{}
 	err := xml.Unmarshal([]byte(domXML), domain)
@@ -391,7 +390,7 @@ func (v *VirtualizationTool) addAttachedVolumesXML(podID, podName, uuid, virtlet
 		}
 	}
 
-	volumesXML, err := v.volumeStorage.PrepareVolumesToBeAttached(virtletVolsDesc, uuid, len(flexVolumeInfos))
+	volumesXML, err := v.volumeStorage.PrepareVolumesToBeAttached(volumes, uuid, len(flexVolumeInfos))
 	if err != nil {
 		return "", err
 	}
@@ -410,18 +409,24 @@ type VirtualizationTool struct {
 	volumeStorage  *StorageTool
 	imagesStorage  *StorageTool
 	volumePoolName string
+	metadataStore  metadata.MetadataStore
 }
 
-func NewVirtualizationTool(conn *libvirt.Connect, volumesPoolName string, imagesStorage *StorageTool, rawDevices string) (*VirtualizationTool, error) {
+func NewVirtualizationTool(conn *libvirt.Connect, volumesPoolName string, imagesStorage *StorageTool, rawDevices string, metadataStore metadata.MetadataStore) (*VirtualizationTool, error) {
 	storageTool, err := NewStorageTool(conn, volumesPoolName, rawDevices)
 	if err != nil {
 		return nil, err
 	}
 	tool := NewLibvirtDomainOperations(conn)
-	return &VirtualizationTool{tool: tool, volumeStorage: storageTool, imagesStorage: imagesStorage}, nil
+	return &VirtualizationTool{
+		tool:          tool,
+		volumeStorage: storageTool,
+		imagesStorage: imagesStorage,
+		metadataStore: metadataStore,
+	}, nil
 }
 
-func (v *VirtualizationTool) CreateContainer(metadataStore metadata.MetadataStore, in *kubeapi.CreateContainerRequest, imageName string, netNSPath, cniConfig string) (string, error) {
+func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest, imageName string, netNSPath, cniConfig string) (string, error) {
 	uuid, err := utils.NewUuid()
 	if err != nil {
 		return "", err
@@ -433,7 +438,7 @@ func (v *VirtualizationTool) CreateContainer(metadataStore metadata.MetadataStor
 
 	config := in.Config
 	name := config.Metadata.Name
-	sandBoxAnnotations, err := metadataStore.GetPodSandboxAnnotations(in.PodSandboxId)
+	sandboxAnnotations, err := v.metadataStore.GetPodSandboxAnnotations(in.PodSandboxId)
 	if err != nil {
 		return "", err
 	}
@@ -461,7 +466,7 @@ func (v *VirtualizationTool) CreateContainer(metadataStore metadata.MetadataStor
 		return "", err
 	}
 
-	metadataStore.SetContainer(name, uuid, in.PodSandboxId, config.Image.Image, cloneName, config.Labels, config.Annotations)
+	v.metadataStore.SetContainer(name, uuid, in.PodSandboxId, config.Image.Image, cloneName, config.Labels, config.Annotations)
 
 	var memory, cpuShares, cpuPeriod, cpuQuota int64
 	if config.Linux != nil && config.Linux.Resources != nil {
@@ -476,15 +481,13 @@ func (v *VirtualizationTool) CreateContainer(metadataStore metadata.MetadataStor
 		memoryUnit = defaultMemoryUnit
 	}
 
-	cpuNum, err := utils.GetvCPUsNum()
+	annotations, err := LoadAnnotations(sandboxAnnotations)
 	if err != nil {
 		return "", err
 	}
 
-	domXML := generateDomXML(canUseKvm(), name, memory, memoryUnit, uuid, cpuNum, cpuShares, cpuPeriod, cpuQuota, cloneImage, netNSPath, cniConfig)
-
-	virtletVolsDesc, _ := sandBoxAnnotations[VirtletVolumesAnnotationKeyName]
-	domXML, err = v.addAttachedVolumesXML(in.PodSandboxId, in.SandboxConfig.Metadata.Name, uuid, virtletVolsDesc, domXML)
+	domXML := generateDomXML(canUseKvm(), name, memory, memoryUnit, uuid, annotations.VCPUCount, cpuShares, cpuPeriod, cpuQuota, cloneImage, netNSPath, cniConfig)
+	domXML, err = v.addAttachedVolumesXML(in.PodSandboxId, in.SandboxConfig.Metadata.Name, uuid, domXML, annotations.Volumes)
 	if err != nil {
 		return "", err
 	}
@@ -544,9 +547,14 @@ func (v *VirtualizationTool) StopContainer(containerId string) error {
 // even if it's still running
 // it waits up to 5 sec for doing the job by libvirt
 func (v *VirtualizationTool) RemoveContainer(containerId string) error {
+	containerInfo, err := v.metadataStore.GetContainerInfo(containerId)
+	if err != nil {
+		glog.Errorf("Error when retrieving container '%s' info from metadata store: %v", containerId, err)
+		return err
+	}
+
 	// Give a chance to gracefully stop domain
 	// TODO: handle errors - there could be e.x. connection errori
-
 	domain, err := v.tool.LookupByUUIDString(containerId)
 	if err != nil {
 		return err
@@ -563,7 +571,7 @@ func (v *VirtualizationTool) RemoveContainer(containerId string) error {
 	}
 
 	// Wait until domain is really removed or timeout after 5 sec.
-	return utils.WaitLoop(func() (bool, error) {
+	if err := utils.WaitLoop(func() (bool, error) {
 		domain, err := v.tool.LookupByUUIDString(containerId)
 		if domain != nil && err != nil {
 			return false, nil
@@ -584,7 +592,31 @@ func (v *VirtualizationTool) RemoveContainer(containerId string) error {
 
 		// Other error occured
 		return false, err
-	}, domainDestroyCheckInterval, domainDestroyTimeout)
+	}, domainDestroyCheckInterval, domainDestroyTimeout); err != nil {
+		return err
+	}
+
+	if err := v.metadataStore.RemoveContainer(containerId); err != nil {
+		glog.Errorf("Error when removing container '%s' from metadata store: %v", containerId, err)
+		return err
+	}
+
+	if err := v.RemoveVolume(containerInfo.RootImageVolumeName); err != nil {
+		glog.Errorf("Error when removing image snapshot with name '%s': %v", containerInfo.RootImageVolumeName, err)
+		return err
+	}
+
+	annotations, err := LoadAnnotations(containerInfo.SandBoxAnnotations)
+	if err != nil {
+		return err
+	}
+	if len(annotations.Volumes) > 0 {
+		if err := v.volumeStorage.CleanAttachedQCOW2Volumes(annotations.Volumes, containerId); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func libvirtToKubeState(domainState libvirt.DomainState, lastState kubeapi.ContainerState) kubeapi.ContainerState {
@@ -618,8 +650,8 @@ func libvirtToKubeState(domainState libvirt.DomainState, lastState kubeapi.Conta
 	return containerState
 }
 
-func (v *VirtualizationTool) getContainerInfo(metadataStore metadata.MetadataStore, domain *libvirt.Domain, containerId string) (*metadata.ContainerInfo, error) {
-	containerInfo, err := metadataStore.GetContainerInfo(containerId)
+func (v *VirtualizationTool) getContainerInfo(domain *libvirt.Domain, containerId string) (*metadata.ContainerInfo, error) {
+	containerInfo, err := v.metadataStore.GetContainerInfo(containerId)
 	if err != nil {
 		return nil, err
 	}
@@ -634,13 +666,13 @@ func (v *VirtualizationTool) getContainerInfo(metadataStore metadata.MetadataSto
 
 	containerState := libvirtToKubeState(domainInfo.State, containerInfo.State)
 	if containerInfo.State != containerState {
-		if err := metadataStore.UpdateState(containerId, byte(containerState)); err != nil {
+		if err := v.metadataStore.UpdateState(containerId, byte(containerState)); err != nil {
 			return nil, err
 		}
 		startedAt := time.Now().UnixNano()
 		if containerState == kubeapi.ContainerState_CONTAINER_RUNNING {
 			strStartedAt := strconv.FormatInt(startedAt, 10)
-			if err := metadataStore.UpdateStartedAt(containerId, strStartedAt); err != nil {
+			if err := v.metadataStore.UpdateStartedAt(containerId, strStartedAt); err != nil {
 				return nil, err
 			}
 		}
@@ -674,13 +706,13 @@ func filterContainer(container *kubeapi.Container, filter *kubeapi.ContainerFilt
 	return true
 }
 
-func (v *VirtualizationTool) getContainer(metadataStore metadata.MetadataStore, domain *libvirt.Domain) (*kubeapi.Container, error) {
+func (v *VirtualizationTool) getContainer(domain *libvirt.Domain) (*kubeapi.Container, error) {
 	containerId, err := v.tool.GetUUIDString(domain)
 	if err != nil {
 		return nil, err
 	}
 
-	containerInfo, err := v.getContainerInfo(metadataStore, domain, containerId)
+	containerInfo, err := v.getContainerInfo(domain, containerId)
 	if err != nil {
 		return nil, err
 	}
@@ -707,13 +739,13 @@ func (v *VirtualizationTool) getContainer(metadataStore metadata.MetadataStore, 
 	return container, nil
 }
 
-func (v *VirtualizationTool) ListContainers(metadataStore metadata.MetadataStore, filter *kubeapi.ContainerFilter) ([]*kubeapi.Container, error) {
+func (v *VirtualizationTool) ListContainers(filter *kubeapi.ContainerFilter) ([]*kubeapi.Container, error) {
 	containers := make([]*kubeapi.Container, 0)
 
 	if filter != nil {
 		if filter.Id != "" {
 			// Verify if there is container metadata
-			containerInfo, err := metadataStore.GetContainerInfo(filter.Id)
+			containerInfo, err := v.metadataStore.GetContainerInfo(filter.Id)
 			if err != nil {
 				return nil, err
 			}
@@ -729,7 +761,7 @@ func (v *VirtualizationTool) ListContainers(metadataStore metadata.MetadataStore
 				// There's no such domain - looks like it's already removed, so return an empty list
 				return containers, nil
 			}
-			container, err := v.getContainer(metadataStore, domain)
+			container, err := v.getContainer(domain)
 			if err != nil {
 				return nil, err
 			}
@@ -742,13 +774,13 @@ func (v *VirtualizationTool) ListContainers(metadataStore metadata.MetadataStore
 			}
 			return containers, nil
 		} else if filter.PodSandboxId != "" {
-			domainID, err := metadataStore.GetPodSandboxContainerID(filter.PodSandboxId)
+			domainID, err := v.metadataStore.GetPodSandboxContainerID(filter.PodSandboxId)
 			if err != nil {
 				// There's no such sandbox - looks like it's already removed, so return an empty list
 				return containers, nil
 			}
 			// Verify if there is container metadata
-			containerInfo, err := metadataStore.GetContainerInfo(domainID)
+			containerInfo, err := v.metadataStore.GetContainerInfo(domainID)
 			if err != nil {
 				return nil, err
 			}
@@ -763,7 +795,7 @@ func (v *VirtualizationTool) ListContainers(metadataStore metadata.MetadataStore
 				// There's no such domain - looks like it's already removed, so return an empty list
 				return containers, nil
 			}
-			container, err := v.getContainer(metadataStore, domain)
+			container, err := v.getContainer(domain)
 			if err != nil {
 				return nil, err
 			}
@@ -780,7 +812,7 @@ func (v *VirtualizationTool) ListContainers(metadataStore metadata.MetadataStore
 		return nil, err
 	}
 	for _, domain := range domains {
-		container, err := v.getContainer(metadataStore, &domain)
+		container, err := v.getContainer(&domain)
 		if err != nil {
 			return nil, err
 		}
@@ -793,13 +825,13 @@ func (v *VirtualizationTool) ListContainers(metadataStore metadata.MetadataStore
 	return containers, nil
 }
 
-func (v *VirtualizationTool) ContainerStatus(metadataStore metadata.MetadataStore, containerId string) (*kubeapi.ContainerStatus, error) {
+func (v *VirtualizationTool) ContainerStatus(containerId string) (*kubeapi.ContainerStatus, error) {
 	domain, err := v.tool.LookupByUUIDString(containerId)
 	if err != nil {
 		return nil, err
 	}
 
-	containerInfo, err := v.getContainerInfo(metadataStore, domain, containerId)
+	containerInfo, err := v.getContainerInfo(domain, containerId)
 	if err != nil {
 		return nil, err
 	}

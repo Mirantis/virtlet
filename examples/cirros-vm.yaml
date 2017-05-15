@@ -3,8 +3,18 @@ kind: Pod
 metadata:
   name: cirros-vm
   annotations:
+    # This tells CRI Proxy that this pod belongs to Virtlet runtime
     kubernetes.io/target-runtime: virtlet
+    # An optional annotation specifying the count of virtual CPUs.
+    # Note that annotation values must always be strings,
+    # thus numeric values need to be quoted.
+    # Defaults to "1".
+    VirtletVCPUCount: "1"
 spec:
+  # This nodeAffinity specification tells Kubernetes to run this
+  # pod only on the nodes that have extraRuntime=virtlet label.
+  # This label is used by Virtlet DaemonSet to select nodes
+  # that must have Virtlet runtime
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
@@ -16,14 +26,19 @@ spec:
             - virtlet
   containers:
   - name: cirros-vm
-    # image: virtlet/image-service/cirros
+    # This specifies the image to use.
+    # virtlet/ prefix is used by CRI proxy, the remaining part
+    # of the image name is prepended with https:// and used to download the image
     image: virtlet/download.cirros-cloud.net/0.3.5/cirros-0.3.5-x86_64-disk.img
   volumes:
   - name: nocloud
+    # here we define a nocloud flexVolume. This notation is temporary
+    # and will likely change in future.
     flexVolume:
       driver: "virtlet/flexvolume_driver"
       options:
         type: nocloud
+        # specify host name and inject a public key
         metadata: |
           {
             "instance-id": "cirros-vm-001",
@@ -31,6 +46,7 @@ spec:
             "public-keys": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCaJEcFDXEK2ZbX0ZLS1EIYFZRbDAcRfuVjpstSc0De8+sV1aiu+dePxdkuDRwqFtCyk6dEZkssjOkBXtri00MECLkir6FcH3kKOJtbJ6vy3uaJc9w1ERo+wyl6SkAh/+JTJkp7QRXj8oylW5E20LsbnA/dIwWzAF51PPwF7A7FtNg9DnwPqMkxFo1Th/buOMKbP5ZA1mmNNtmzbMpMfJATvVyiv3ccsSJKOiyQr6UG+j7sc/7jMVz5Xk34Vd0l8GwcB0334MchHckmqDB142h/NCWTr8oLakDNvkfC1YneAfAO41hDkUbxPtVBG5M/o7P4fxoqiHEX+ZLfRxDtHB53 me@localhost"
           }
 
+        # cloud-init userdata
         userdata: |
           #!/bin/sh
           echo "Hi there"
