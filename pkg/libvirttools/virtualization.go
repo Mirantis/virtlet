@@ -203,6 +203,9 @@ func generateDomXML(useKvm bool, name string, memory int64, memoryUnit string, u
     <name>%s-%s</name>
     <uuid>%s</uuid>
     <memory unit='%s'>%d</memory>
+    <memoryBacking>
+      <locked/>
+    </memoryBacking>
     <vcpu>%d</vcpu>
     <cputune>
         <shares>%d</shares>
