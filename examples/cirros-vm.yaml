@@ -3,7 +3,7 @@ kind: Pod
 metadata:
   name: cirros-vm
   annotations:
-    # This tells CRI Proxy that this Pod belongs to Virtlet runtime
+    # This tells CRI Proxy that this pod belongs to Virtlet runtime
     kubernetes.io/target-runtime: virtlet
     # An optional annotation specifying the count of virtual CPUs.
     # Note that annotation values must always be strings,
