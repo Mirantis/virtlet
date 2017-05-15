@@ -26,7 +26,7 @@ kubectl get pods -w
 ```
 6. Connect to the VM console:
 ```
-./virsh.sh console $(./virsh.sh list --name)
+./virsh.sh console @cirros-vm
 ```
 7. As soon as the VM has booted, you can use the `vmssh.sh` script to access it using ssh:
 ```
@@ -51,7 +51,7 @@ kubectl create -f k8s.yaml
 Watch progress of the cluster setup via the VM console:
 ```
 ./virsh.sh list
-./virsh.sh FIRST_DOMAIN_NAME_OR_INDEX
+./virsh.sh console @k8s-0
 ```
 
 After it's complete you can log into the master node:
