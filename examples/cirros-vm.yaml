@@ -30,6 +30,10 @@ spec:
     # virtlet/ prefix is used by CRI proxy, the remaining part
     # of the image name is prepended with https:// and used to download the image
     image: virtlet/download.cirros-cloud.net/0.3.5/cirros-0.3.5-x86_64-disk.img
+    resources:
+      limits:
+        # This memory limit is applied to the libvirt domain definition
+        memory: 128Mi
   volumes:
   - name: nocloud
     # here we define a nocloud flexVolume. This notation is temporary

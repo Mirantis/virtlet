@@ -169,7 +169,11 @@ chmod 600 vmkey
 Both utilities need `kubectl` to be configured to access your cluster.
 
 `virsh.sh` can be used to access a VM console. `virsh.sh` currently assumes
-single Virtlet node per cluster, which will be fixed soon.
+single Virtlet node per cluster, which will be fixed soon. It supports
+convenience notation `@podname[:namespace]` that can be used to refer
+to libvirt domain that corresponds to the pod. It also supports additional
+command `./virsh.sh poddomain @podname[:namespace]` that displays libvirt
+domain id for a pod.
 `vmssh.sh` provides ssh access to VM pods.
 
 To test your Virtlet installation, start a sample VM:
@@ -185,7 +189,7 @@ You can list libvirt domains with `virsh.sh`:
 
 And then connect to console:
 ```
-$ ./virsh.sh console 1
+$ ./virsh.sh console @cirros-vm
 Connected to domain 411c70b0-1df3-46be-4838-c85474a1b44a-cirros-vm
 Escape character is ^]
 
