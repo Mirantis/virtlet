@@ -1,0 +1,59 @@
+--- ./domain_ref.go	2017-05-15 22:08:28.735308800 +0000
++++ ./domain.go	2017-05-15 22:22:50.304352700 +0000
+@@ -184,9 +184,8 @@
+ }
+ 
+ type DomainChardevTarget struct {
+-	Type  string `xml:"type,attr"`
+-	Name  string `xml:"name,attr"`
+-	State string `xml:"state,attr,omitempty"` // is guest agent connected?
++	Type string `xml:"type,attr,omitempty"`
++	Port string `xml:"name,attr,omitempty"`
+ }
+ 
+ type DomainAlias struct {
+@@ -202,6 +201,7 @@
+ 
+ type DomainChardev struct {
+ 	Type    string               `xml:"type,attr"`
++	TTY     string               `xml:"tty,attr,omitempty"`
+ 	Source  *DomainChardevSource `xml:"source"`
+ 	Target  *DomainChardevTarget `xml:"target"`
+ 	Alias   *DomainAlias         `xml:"alias"`
+@@ -251,6 +251,7 @@
+ }
+ 
+ type DomainDeviceList struct {
++	Emulator    string             `xml:"emulator,omitempty"`
+ 	Controllers []DomainController `xml:"controller"`
+ 	Disks       []DomainDisk       `xml:"disk"`
+ 	Filesystems []DomainFilesystem `xml:"filesystem"`
+@@ -431,6 +432,20 @@
+ 	SMM        *DomainFeatureState  `xml:"smm"`
+ }
+ 
++type QemuArg struct {
++	Value string `xml:"value,attr"`
++}
++
++type QemuEnv struct {
++	Name  string `xml:"name,attr"`
++	Value string `xml:"value,attr,omitempty"`
++}
++
++type DomainCMDLine struct {
++	Args []QemuArg `xml:"arg"`
++	Envs []QemuEnv `xml:"env"`
++}
++
+ type Domain struct {
+ 	XMLName       xml.Name           `xml:"domain"`
+ 	Type          string             `xml:"type,attr,omitempty"`
+@@ -449,6 +464,7 @@
+ 	OnReboot      string             `xml:"on_reboot,omitempty"`
+ 	OnCrash       string             `xml:"on_crash,omitempty"`
+ 	Features      *DomainFeatureList `xml:"features"`
++	CMDLine       *DomainCMDLine     `xml:"http://libvirt.org/schemas/domain/qemu/1.0 commandline"`
+ }
+ 
+ func (d *Domain) Unmarshal(doc string) error {

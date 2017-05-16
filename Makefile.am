@@ -26,7 +26,11 @@ TESTS = $(check_SCRIPTS)
 .PHONY: all vendor
 
 all:
-	if [ ! -d vendor ]; then $(MAKE) install-vendor; fi
+	if [ ! -d vendor ]; then \
+		$(MAKE) install-vendor; \
+		cp ./vendor/github.com/libvirt/libvirt-go-xml/domain.go ./vendor/github.com/libvirt/libvirt-go-xml/domain.orig; \
+	fi
+	patch ./vendor/github.com/libvirt/libvirt-go-xml/domain.orig -i ./libvirt-xml-go.patch -o ./vendor/github.com/libvirt/libvirt-go-xml/domain.go
 	mkdir -p $(builddir)/_output $(builddir)/contrib/images/libvirt/_output
 	go build -o $(builddir)/_output/virtlet ./cmd/virtlet
 	go build -o $(builddir)/_output/vmwrapper ./cmd/vmwrapper
