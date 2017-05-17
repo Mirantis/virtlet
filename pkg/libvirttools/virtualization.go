@@ -95,12 +95,6 @@ func (ds *VirtletDomainSettings) createDomain() *libvirtxml.Domain {
 		emulator = noKvmEmulator
 	}
 
-	var buf bytes.Buffer
-	if err := xml.EscapeText(&buf, []byte(ds.cniConfig)); err != nil {
-		glog.Errorf("EscapeText() failed: %v", err)
-	}
-	cniConfigEscaped := buf.String()
-
 	domain := &libvirtxml.Domain{
 
 		Devices: &libvirtxml.DomainDeviceList{
@@ -147,7 +141,7 @@ func (ds *VirtletDomainSettings) createDomain() *libvirtxml.Domain {
 			Envs: []libvirtxml.QemuEnv{
 				libvirtxml.QemuEnv{Name: "VIRTLET_EMULATOR", Value: emulator},
 				libvirtxml.QemuEnv{Name: "VIRTLET_NS", Value: ds.netNSPath},
-				libvirtxml.QemuEnv{Name: "VIRTLET_CNI_CONFIG", Value: cniConfigEscaped},
+				libvirtxml.QemuEnv{Name: "VIRTLET_CNI_CONFIG", Value: ds.cniConfig},
 			},
 		},
 	}
