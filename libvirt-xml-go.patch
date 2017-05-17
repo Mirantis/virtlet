@@ -1,5 +1,5 @@
---- ./domain_ref.go	2017-05-15 22:08:28.735308800 +0000
-+++ ./domain.go	2017-05-15 22:22:50.304352700 +0000
+--- domain_ref.go	2017-05-16 01:08:28.735308800 +0300
++++ domain.go	2017-05-17 13:49:21.167776600 +0300
 @@ -184,9 +184,8 @@
  }
  
@@ -28,7 +28,7 @@
  	Controllers []DomainController `xml:"controller"`
  	Disks       []DomainDisk       `xml:"disk"`
  	Filesystems []DomainFilesystem `xml:"filesystem"`
-@@ -431,6 +432,20 @@
+@@ -431,24 +432,55 @@
  	SMM        *DomainFeatureState  `xml:"smm"`
  }
  
@@ -46,14 +46,58 @@
 +	Envs []QemuEnv `xml:"env"`
 +}
 +
++type DomainCPUTune struct {
++	Shares uint    `xml:"shares,omitempty"`
++	Period uint64  `xml:"period,omitempty"`
++	Quota  int64   `xml:"quota,omitempty"`
++}
++
++type DomainMemoryBackingLocked struct {
++	//empty
++}
++
++type DomainMemoryBacking struct {
++	Locked    *DomainMemoryBackingLocked `xml:locked`
++}
++
  type Domain struct {
- 	XMLName       xml.Name           `xml:"domain"`
- 	Type          string             `xml:"type,attr,omitempty"`
-@@ -449,6 +464,7 @@
- 	OnReboot      string             `xml:"on_reboot,omitempty"`
- 	OnCrash       string             `xml:"on_crash,omitempty"`
- 	Features      *DomainFeatureList `xml:"features"`
-+	CMDLine       *DomainCMDLine     `xml:"http://libvirt.org/schemas/domain/qemu/1.0 commandline"`
+-	XMLName       xml.Name           `xml:"domain"`
+-	Type          string             `xml:"type,attr,omitempty"`
+-	Name          string             `xml:"name"`
+-	UUID          string             `xml:"uuid,omitempty"`
+-	Memory        *DomainMemory      `xml:"memory"`
+-	CurrentMemory *DomainMemory      `xml:"currentMemory"`
+-	MaximumMemory *DomainMaxMemory   `xml:"maxMemory"`
+-	VCPU          *DomainVCPU        `xml:"vcpu"`
+-	CPU           *DomainCPU         `xml:"cpu"`
+-	Resource      *DomainResource    `xml:"resource"`
+-	Devices       *DomainDeviceList  `xml:"devices"`
+-	OS            *DomainOS          `xml:"os"`
+-	SysInfo       *DomainSysInfo     `xml:"sysinfo"`
+-	OnPoweroff    string             `xml:"on_poweroff,omitempty"`
+-	OnReboot      string             `xml:"on_reboot,omitempty"`
+-	OnCrash       string             `xml:"on_crash,omitempty"`
+-	Features      *DomainFeatureList `xml:"features"`
++	XMLName       xml.Name              `xml:"domain"`
++	Type          string                `xml:"type,attr,omitempty"`
++	Name          string                `xml:"name"`
++	UUID          string                `xml:"uuid,omitempty"`
++	Memory        *DomainMemory         `xml:"memory"`
++	CurrentMemory *DomainMemory         `xml:"currentMemory"`
++	MaximumMemory *DomainMaxMemory      `xml:"maxMemory"`
++	MemoryBacking *DomainMemoryBacking  `xml:"memoryBacking"`
++	VCPU          *DomainVCPU           `xml:"vcpu"`
++	CPU           *DomainCPU            `xml:"cpu"`
++	CPUTune       *DomainCPUTune        `xml:"cputune"`
++	Resource      *DomainResource       `xml:"resource"`
++	Devices       *DomainDeviceList     `xml:"devices"`
++	OS            *DomainOS             `xml:"os"`
++	SysInfo       *DomainSysInfo        `xml:"sysinfo"`
++	OnPoweroff    string                `xml:"on_poweroff,omitempty"`
++	OnReboot      string                `xml:"on_reboot,omitempty"`
++	OnCrash       string                `xml:"on_crash,omitempty"`
++	Features      *DomainFeatureList    `xml:"features"`
++	CMDLine       *DomainCMDLine        `xml:"http://libvirt.org/schemas/domain/qemu/1.0 commandline"`
  }
  
  func (d *Domain) Unmarshal(doc string) error {
