@@ -87,7 +87,7 @@ func canUseKvm() bool {
 	return true
 }
 
-func getDomain() *libvirtxml.Domain {
+func (ds *VirtletDomainSettings) createDomain() *libvirtxml.Domain {
 	var dom libvirtxml.Domain
 
 	dom.Devices = &libvirtxml.DomainDeviceList{Emulator: "/vmwrapper"}
@@ -108,16 +108,15 @@ func getDomain() *libvirtxml.Domain {
 	dom.OnReboot = "restart"
 	dom.OnCrash = "restart"
 
-	return &dom
-}
-
-func (ds *VirtletDomainSettings) createDomain() *libvirtxml.Domain {
-	dom := getDomain()
 	dom.Name = ds.domainUUID + "-" + ds.domainName
 	dom.UUID = ds.domainUUID
 	dom.Memory = &libvirtxml.DomainMemory{Value: ds.memory, Unit: ds.memoryUnit}
 	dom.VCPU = &libvirtxml.DomainVCPU{Value: ds.vcpuNum}
-	dom.CPUTune = &libvirtxml.DomainCPUTune{Shares: ds.cpuShares, Period: ds.cpuPeriod, Quota: ds.cpuQuota}
+	dom.CPUTune = &libvirtxml.DomainCPUTune{
+		Shares: &libvirtxml.DomainCPUTuneShares{Value: ds.cpuShares},
+		Period: &libvirtxml.DomainCPUTunePeriod{Value: ds.cpuPeriod},
+		Quota:  &libvirtxml.DomainCPUTuneQuota{Value: ds.cpuQuota},
+	}
 	dom.MemoryBacking = &libvirtxml.DomainMemoryBacking{Locked: &libvirtxml.DomainMemoryBackingLocked{}}
 
 	dom.Devices.Disks = []libvirtxml.DomainDisk{libvirtxml.DomainDisk{
@@ -148,7 +147,7 @@ func (ds *VirtletDomainSettings) createDomain() *libvirtxml.Domain {
 		libvirtxml.QemuEnv{Name: "VIRTLET_CNI_CONFIG", Value: cniConfigEscaped},
 	}}
 
-	return dom
+	return &dom
 }
 
 func (v *VirtualizationTool) createBootImageClone(cloneName, imageName string) (string, error) {
@@ -391,7 +390,7 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 		return "", err
 	}
 
-	return domSettings.domainName, nil
+	return domSettings.domainUUID, nil
 }
 
 func (v *VirtualizationTool) StartContainer(containerId string) error {
