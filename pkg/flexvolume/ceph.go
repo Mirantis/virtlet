@@ -17,31 +17,11 @@ limitations under the License.
 package flexvolume
 
 import (
+	"encoding/xml"
 	"fmt"
 	"strings"
-)
 
-const (
-	secretTemplate = `
-<secret ephemeral='no' private='no'>
-  <uuid>%s</uuid>
-  <usage type='ceph'>
-    <name>%s</name>
-  </usage>
-</secret>
-`
-	cephDiskTemplate = `
-<disk type="network" device="disk">
-  <driver name="qemu" type="raw"/>
-  <auth username="%s">
-    <secret type="ceph" uuid="%s"/>
-  </auth>
-  <source protocol="rbd" name="%s/%s">
-    <host name="%s" port="%s"/>
-  </source>
-  <target dev="%%s" bus="virtio"/>
-</disk>
-`
+	libvirtxml "github.com/libvirt/libvirt-go-xml"
 )
 
 func cephVolumeHandler(uuidGen UuidGen, targetDir string, opts volumeOpts) (map[string][]byte, error) {
@@ -50,10 +30,50 @@ func cephVolumeHandler(uuidGen UuidGen, targetDir string, opts volumeOpts) (map[
 	if len(pairIPPort) != 2 {
 		return nil, fmt.Errorf("invalid format of ceph monitor setting: %s. Expected in form ip:port", opts.Monitor)
 	}
+
+	disk := libvirtxml.DomainDisk{
+		Type:   "network",
+		Device: "disk",
+		Driver: &libvirtxml.DomainDiskDriver{Name: "qemu", Type: "raw"},
+		Auth: &libvirtxml.DomainDiskAuth{
+			Username: opts.User,
+			Secret: &libvirtxml.DomainDiskSecret{
+				Type: "ceph",
+				UUID: uuid,
+			},
+		},
+		Source: &libvirtxml.DomainDiskSource{
+			Protocol: "rbd",
+			Name:     opts.Pool + "/" + opts.Volume,
+			Hosts: []libvirtxml.DomainDiskSourceHost{
+				libvirtxml.DomainDiskSourceHost{
+					Name: pairIPPort[0],
+					Port: pairIPPort[1],
+				},
+			},
+		},
+		Target: &libvirtxml.DomainDiskTarget{Bus: "virtio"},
+	}
+	diskXML, err := xml.MarshalIndent(&disk, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+
+	secret := libvirtxml.Secret{
+		Ephemeral: "no",
+		Private:   "no",
+		UUID:      uuid,
+		Usage:     &libvirtxml.SecretUsage{Name: opts.User},
+	}
+	secretXML, err := secret.Marshal()
+	if err != nil {
+		return nil, err
+	}
+
 	return map[string][]byte{
 		// Note: target dev name will be specified by virtlet later when building full domain xml definition
-		"disk.xml":   []byte(fmt.Sprintf(cephDiskTemplate, opts.User, uuid, opts.Pool, opts.Volume, pairIPPort[0], pairIPPort[1])),
-		"secret.xml": []byte(fmt.Sprintf(secretTemplate, uuid, opts.User)),
+		"disk.xml":   diskXML,
+		"secret.xml": []byte(secretXML),
 		// Will be removed right after creating appropriate secret in libvirt
 		"key": []byte(opts.Secret),
 	}, nil

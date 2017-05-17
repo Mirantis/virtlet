@@ -59,7 +59,7 @@ const (
 var diskLetters = strings.Split(diskLetterStr, "")
 
 type FlexVolumeInfo struct {
-	DiskXML   string
+	Disk      *libvirtxml.DomainDisk
 	SecretXML string
 	Key       string
 }
@@ -230,14 +230,18 @@ func gatherFlexvolumeDriverVolumeDefinitions(podID, podName string, lettersInd i
 				}
 				switch fileInfo.Name() {
 				case "disk.xml":
-					flexvol.DiskXML = string(content)
+					disk := libvirtxml.DomainDisk{}
+					if err := xml.Unmarshal(content, &disk); err != nil {
+						return nil, err
+					}
+					flexvol.Disk = &disk
 				case "secret.xml":
 					flexvol.SecretXML = string(content)
 				case "key":
 					flexvol.Key = string(content)
 				}
 			}
-			flexvol.DiskXML = fmt.Sprintf(flexvol.DiskXML, "vd"+diskLetters[lettersInd])
+			flexvol.Disk.Target.Dev = "vd" + diskLetters[lettersInd]
 			lettersInd++
 			flexInfos = append(flexInfos, flexvol)
 		}
@@ -245,25 +249,7 @@ func gatherFlexvolumeDriverVolumeDefinitions(podID, podName string, lettersInd i
 	return flexInfos, nil
 }
 
-func addDiskToDomainDefinition(domain *libvirtxml.Domain, volXML string) error {
-	disk := libvirtxml.DomainDisk{}
-	if err := xml.Unmarshal([]byte(volXML), &disk); err != nil {
-		return err
-	}
-	domain.Devices.Disks = append(domain.Devices.Disks, disk)
-	return nil
-}
-
-func marshalToXML(domain *libvirtxml.Domain) (string, error) {
-	outArr, err := xml.MarshalIndent(domain, " ", "  ")
-	if err != nil {
-		return "", err
-	}
-	domXML := strings.Replace(string(outArr[:]), "\"", "'", -1)
-	return domXML, nil
-}
-
-func (v *VirtualizationTool) addVolumesToDomain(podID, podName string, domain *libvirtxml.Domain, volumes []*VirtletVolume) error {
+func (v *VirtualizationTool) addVolumesToDomain(podID, podName string, domain *libvirtxml.Domain, virtletVols []*VirtletVolume) error {
 	flexVolumeInfos, err := gatherFlexvolumeDriverVolumeDefinitions(podID, podName, 0)
 	if err != nil {
 		return err
@@ -282,22 +268,15 @@ func (v *VirtualizationTool) addVolumesToDomain(podID, podName string, domain *l
 			}
 			secret.SetValue(key, 0)
 		}
-		if err = addDiskToDomainDefinition(domain, flexVolumeInfo.DiskXML); err != nil {
-			return err
-		}
+		domain.Devices.Disks = append(domain.Devices.Disks, *flexVolumeInfo.Disk)
 	}
 
-	volumesXML, err := v.volumeStorage.PrepareVolumesToBeAttached(volumes, domain.UUID, len(flexVolumeInfos))
+	volumes, err := v.volumeStorage.PrepareVolumesToBeAttached(virtletVols, domain.UUID, len(flexVolumeInfos))
 	if err != nil {
 		return err
 	}
 
-	for _, volXML := range volumesXML {
-		if err = addDiskToDomainDefinition(domain, volXML); err != nil {
-			return err
-		}
-	}
-
+	domain.Devices.Disks = append(domain.Devices.Disks, volumes...)
 	return nil
 }
 
@@ -385,7 +364,7 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 	if err != nil {
 		return "", err
 	}
-
+	domSettings.vcpuNum = annotations.VCPUCount
 	domSettings.useKvm = canUseKvm()
 	dom := domSettings.createDomain()
 
@@ -393,7 +372,7 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 		return "", err
 	}
 
-	domXML, err := marshalToXML(dom)
+	domXML, err := dom.Marshal()
 	if err != nil {
 		return "", err
 	}
