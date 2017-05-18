@@ -63,7 +63,7 @@ func cephVolumeHandler(uuidGen UuidGen, targetDir string, opts volumeOpts) (map[
 		Ephemeral: "no",
 		Private:   "no",
 		UUID:      uuid,
-		Usage:     &libvirtxml.SecretUsage{Name: opts.User},
+		Usage:     &libvirtxml.SecretUsage{Name: opts.User, Type: "ceph"},
 	}
 	secretXML, err := secret.Marshal()
 	if err != nil {
