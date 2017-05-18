@@ -286,6 +286,7 @@ func (s *StorageTool) PrepareVolumesToBeAttached(volumes []*VirtletVolume, conta
 				return nil, err
 			}
 			disk.Type = "block"
+			disk.Driver.Type = "raw"
 			disk.Source.Device = virtletVol.Path
 		}
 
