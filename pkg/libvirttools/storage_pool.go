@@ -187,6 +187,7 @@ func (s *StorageTool) CreateQCOW2Volume(name string, capacity uint64, capacityUn
 		Name:       name,
 		Allocation: &libvirtxml.StorageVolumeSize{Value: 0},
 		Capacity:   &libvirtxml.StorageVolumeSize{Unit: capacityUnit, Value: capacity},
+		Target:     &libvirtxml.StorageVolumeTarget{Format: &libvirtxml.StorageVolumeTargetFormat{Type: "qcow2"}},
 	}
 	volumeXML, err := volume.Marshal()
 	if err != nil {
@@ -286,6 +287,7 @@ func (s *StorageTool) PrepareVolumesToBeAttached(volumes []*VirtletVolume, conta
 				return nil, err
 			}
 			disk.Type = "block"
+			disk.Driver.Type = "raw"
 			disk.Source.Device = virtletVol.Path
 		}
 
