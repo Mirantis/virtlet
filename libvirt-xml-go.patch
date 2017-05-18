@@ -1,6 +1,33 @@
 --- domain_ref.go	2017-05-15 22:08:28.735308800 +0000
-+++ domain.go	2017-05-17 20:25:02.298415800 +0000
-@@ -184,9 +184,8 @@
++++ domain.go	2017-05-18 19:18:59.300460500 +0000
+@@ -73,14 +73,19 @@
+ 	Bus string `xml:"bus,attr,omitempty"`
+ }
+ 
++type DomainDiskReadOnly struct {
++	//empty
++}
++
+ type DomainDisk struct {
+-	Type     string            `xml:"type,attr"`
+-	Device   string            `xml:"device,attr"`
+-	Snapshot string            `xml:"snapshot,attr,omitempty"`
+-	Driver   *DomainDiskDriver `xml:"driver"`
+-	Auth     *DomainDiskAuth   `xml:"auth"`
+-	Source   *DomainDiskSource `xml:"source"`
+-	Target   *DomainDiskTarget `xml:"target"`
++	Type     string              `xml:"type,attr"`
++	Device   string              `xml:"device,attr"`
++	Snapshot string              `xml:"snapshot,attr,omitempty"`
++	Driver   *DomainDiskDriver   `xml:"driver"`
++	Auth     *DomainDiskAuth     `xml:"auth"`
++	Source   *DomainDiskSource   `xml:"source"`
++	Target   *DomainDiskTarget   `xml:"target"`
++	ReadOnly *DomainDiskReadOnly `xml:"readonly"`
+ }
+ 
+ type DomainFilesystemDriver struct {
+@@ -184,9 +189,8 @@
  }
  
  type DomainChardevTarget struct {
@@ -12,7 +39,7 @@
  }
  
  type DomainAlias struct {
-@@ -202,6 +201,7 @@
+@@ -202,6 +206,7 @@
  
  type DomainChardev struct {
  	Type    string               `xml:"type,attr"`
@@ -20,7 +47,7 @@
  	Source  *DomainChardevSource `xml:"source"`
  	Target  *DomainChardevTarget `xml:"target"`
  	Alias   *DomainAlias         `xml:"alias"`
-@@ -251,6 +251,7 @@
+@@ -251,6 +256,7 @@
  }
  
  type DomainDeviceList struct {
@@ -28,7 +55,7 @@
  	Controllers []DomainController `xml:"controller"`
  	Disks       []DomainDisk       `xml:"disk"`
  	Filesystems []DomainFilesystem `xml:"filesystem"`
-@@ -431,24 +432,67 @@
+@@ -431,24 +437,67 @@
  	SMM        *DomainFeatureState  `xml:"smm"`
  }
  
