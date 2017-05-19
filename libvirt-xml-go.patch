@@ -96,7 +96,7 @@
 +}
 +
 +type DomainMemoryBacking struct {
-+	Locked *DomainMemoryBackingLocked `xml:locked`
++	Locked *DomainMemoryBackingLocked `xml:"locked"`
 +}
 +
  type Domain struct {
