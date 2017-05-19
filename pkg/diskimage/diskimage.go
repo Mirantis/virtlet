@@ -44,7 +44,7 @@ func FormatDisk(path string) error {
 	/* Attach the disk image to libguestfs. */
 	optargs := guestfs.OptargsAdd_drive{
 		Format_is_set:   true,
-		Format:          "raw",
+		Format:          "qcow2",
 		Readonly_is_set: true,
 		Readonly:        false,
 	}

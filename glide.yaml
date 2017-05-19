@@ -21,6 +21,7 @@ import:
   subpackages:
   - difflib
 - package: github.com/libvirt/libvirt-go
+- package: github.com/libvirt/libvirt-go-xml
 - package: k8s.io/kubernetes
   version: v1.6.1
 - package: k8s.io/apiserver

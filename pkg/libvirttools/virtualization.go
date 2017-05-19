@@ -31,6 +31,7 @@ import (
 
 	"github.com/golang/glog"
 	libvirt "github.com/libvirt/libvirt-go"
+	libvirtxml "github.com/libvirt/libvirt-go-xml"
 	"k8s.io/apimachinery/pkg/fields"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
@@ -57,125 +58,25 @@ const (
 
 var diskLetters = strings.Split(diskLetterStr, "")
 
-type Driver struct {
-	DriverName string `xml:"name,attr,omitempty"`
-	DriverType string `xml:"type,attr,omitempty"`
-}
-
-type Secret struct {
-	Type string `xml:"type,attr,omitempty"`
-	UUID string `xml:"uuid,attr,omitempty"`
-}
-
-type Auth struct {
-	Username string `xml:"username,attr,omitempty"`
-	Secret   Secret `xml:"secret"`
-}
-
-type SourceHost struct {
-	Name string `xml:"name,attr,omitempty"`
-	Port string `xml:"port,attr,omitempty"`
-}
-
-type Source struct {
-	Device   string       `xml:"dev,attr,omitempty"`
-	SrcFile  string       `xml:"file,attr,omitempty"`
-	Protocol string       `xml:"protocol,attr,omitempty"`
-	Name     string       `xml:"name,attr,omitempty"`
-	Hosts    []SourceHost `xml:"host,omitempty"`
-}
-
-type Target struct {
-	TargetDev string `xml:"dev,attr"`
-	TargetBus string `xml:"bus,attr"`
-}
-
-type Disk struct {
-	DiskType   string `xml:"type,attr"`
-	DiskDevice string `xml:"device,attr"`
-	Driver     Driver `xml:"driver"`
-	Src        Source `xml:"source"`
-	Auth       *Auth  `xml:"auth"`
-	Target     Target `xml:"target"`
-}
-
-type Devices struct {
-	DiskList []Disk   `xml:"disk"`
-	Inpt     Input    `xml:"input"`
-	Graph    Graphics `xml:"graphics"`
-	Serial   Serial   `xml:"serial"`
-	Consl    Console  `xml:"console"`
-	Snd      Sound    `xml:"sound"`
-	Items    []Tag    `xml:",any"`
-}
-
-type Tag struct {
-	XMLName xml.Name
-	Content string `xml:",innerxml"`
-}
-
-type Memory struct {
-	Memory string `xml:",chardata"`
-	Unit   string `xml:"unit,attr"`
-}
-
-type Domain struct {
-	XMLName xml.Name `xml:"domain"`
-	DomType string   `xml:"type,attr"`
-	Memory  Memory   `xml:"memory"`
-	Devs    Devices  `xml:"devices"`
-	Items   []Tag    `xml:",any"`
-}
-
-type CommandLine struct {
-	XMLName xml.Name     `xml:"http://libvirt.org/schemas/domain/qemu/1.0 commandline"`
-	Args    []string     `xml:"http://libvirt.org/schemas/domain/qemu/1.0 arg"`
-	Env     []CommandEnv `xml:"http://libvirt.org/schemas/domain/qemu/1.0 env"`
-}
-
-type CommandEnv struct {
-	XMLName xml.Name `xml:"http://libvirt.org/schemas/domain/qemu/1.0 env"`
-	Name    string   `xml:"name,attr"`
-	Value   string   `xml:"value,attr"`
-}
-
-type Input struct {
-	Type string `xml:"type,attr"`
-	Bus  string `xml:"bus,attr"`
-}
-
-type Graphics struct {
-	Type string `xml:"type,attr"`
-	Port string `xml:"port,attr"`
-}
-
-type Console struct {
-	Type   string        `xml:"type,attr"`
-	Target TargetConsole `xml:"target"`
-}
-
-type TargetConsole struct {
-	Type string `xml:"type,attr"`
-	Port string `xml:"port,attr"`
-}
-
-type Serial struct {
-	Type   string       `xml:"type,attr"`
-	Target TargetSerial `xml:"target"`
-}
-
-type TargetSerial struct {
-	Port string `xml:"port,attr"`
-}
-
-type Sound struct {
-	Model string `xml:"model,attr"`
-}
-
 type FlexVolumeInfo struct {
-	DiskXML   string
+	Disk      *libvirtxml.DomainDisk
 	SecretXML string
 	Key       string
+}
+
+type VirtletDomainSettings struct {
+	useKvm           bool
+	domainName       string
+	domainUUID       string
+	memory           int
+	memoryUnit       string
+	vcpuNum          int
+	cpuShares        uint
+	cpuPeriod        uint64
+	cpuQuota         int64
+	rootDiskFilepath string
+	netNSPath        string
+	cniConfig        string
 }
 
 func canUseKvm() bool {
@@ -186,69 +87,65 @@ func canUseKvm() bool {
 	return true
 }
 
-func generateDomXML(useKvm bool, name string, memory int64, memoryUnit string, uuid string, cpuNum int, cpuShare int64, cpuPeriod int64, cpuQuota int64, rootDiskFilepath, netNSPath, cniConfig string) string {
+func (ds *VirtletDomainSettings) createDomain() *libvirtxml.Domain {
 	domainType := defaultDomainType
 	emulator := defaultEmulator
-	if !useKvm {
+	if !ds.useKvm {
 		domainType = noKvmDomainType
 		emulator = noKvmEmulator
 	}
-	var buf bytes.Buffer
-	if err := xml.EscapeText(&buf, []byte(cniConfig)); err != nil {
-		glog.Errorf("EscapeText() failed: %v", err)
+
+	domain := &libvirtxml.Domain{
+
+		Devices: &libvirtxml.DomainDeviceList{
+			Emulator: "/vmwrapper",
+			Inputs:   []libvirtxml.DomainInput{libvirtxml.DomainInput{Type: "tablet", Bus: "usb"}},
+			Graphics: []libvirtxml.DomainGraphic{libvirtxml.DomainGraphic{Type: "vnc", Port: -1}},
+			Serials:  []libvirtxml.DomainChardev{libvirtxml.DomainChardev{Type: "pty", Target: &libvirtxml.DomainChardevTarget{Port: "0"}}},
+			Consoles: []libvirtxml.DomainChardev{libvirtxml.DomainChardev{Type: "pty", Target: &libvirtxml.DomainChardevTarget{Type: "serial", Port: "0"}}},
+			Videos:   []libvirtxml.DomainVideo{libvirtxml.DomainVideo{Model: libvirtxml.DomainVideoModel{Type: "cirrus"}}},
+			Disks: []libvirtxml.DomainDisk{libvirtxml.DomainDisk{
+				Type:   "file",
+				Device: "disk",
+				Driver: &libvirtxml.DomainDiskDriver{Name: "qemu", Type: "qcow2"},
+				Source: &libvirtxml.DomainDiskSource{File: ds.rootDiskFilepath},
+				Target: &libvirtxml.DomainDiskTarget{Dev: "vda", Bus: "virtio"},
+			}},
+		},
+
+		OS: &libvirtxml.DomainOS{
+			Type:        &libvirtxml.DomainOSType{Type: "hvm"},
+			BootDevices: []libvirtxml.DomainBootDevice{libvirtxml.DomainBootDevice{Dev: "hd"}},
+		},
+
+		Features: &libvirtxml.DomainFeatureList{ACPI: &libvirtxml.DomainFeature{}},
+
+		OnPoweroff: "destroy",
+		OnReboot:   "restart",
+		OnCrash:    "restart",
+
+		Type: domainType,
+
+		Name:   ds.domainUUID + "-" + ds.domainName,
+		UUID:   ds.domainUUID,
+		Memory: &libvirtxml.DomainMemory{Value: ds.memory, Unit: ds.memoryUnit},
+		VCPU:   &libvirtxml.DomainVCPU{Value: ds.vcpuNum},
+		CPUTune: &libvirtxml.DomainCPUTune{
+			Shares: &libvirtxml.DomainCPUTuneShares{Value: ds.cpuShares},
+			Period: &libvirtxml.DomainCPUTunePeriod{Value: ds.cpuPeriod},
+			Quota:  &libvirtxml.DomainCPUTuneQuota{Value: ds.cpuQuota},
+		},
+		MemoryBacking: &libvirtxml.DomainMemoryBacking{Locked: &libvirtxml.DomainMemoryBackingLocked{}},
+
+		CMDLine: &libvirtxml.DomainCMDLine{
+			Envs: []libvirtxml.QemuEnv{
+				libvirtxml.QemuEnv{Name: "VIRTLET_EMULATOR", Value: emulator},
+				libvirtxml.QemuEnv{Name: "VIRTLET_NS", Value: ds.netNSPath},
+				libvirtxml.QemuEnv{Name: "VIRTLET_CNI_CONFIG", Value: ds.cniConfig},
+			},
+		},
 	}
-	cniConfigEscaped := buf.String()
-	domXML := `
-<domain type='%s'>
-    <name>%s-%s</name>
-    <uuid>%s</uuid>
-    <memory unit='%s'>%d</memory>
-    <memoryBacking>
-      <locked/>
-    </memoryBacking>
-    <vcpu>%d</vcpu>
-    <cputune>
-        <shares>%d</shares>
-        <period>%d</period>
-        <quota>%d</quota>
-    </cputune>
-    <os>
-        <type>hvm</type>
-        <boot dev='hd'/>
-    </os>
-    <features>
-        <acpi/><apic/>
-    </features>
-    <on_poweroff>destroy</on_poweroff>
-    <on_reboot>restart</on_reboot>
-    <on_crash>restart</on_crash>
-    <devices>
-        <emulator>/vmwrapper</emulator>
-        <disk type='file' device='disk'>
-            <driver name='qemu' type='qcow2'/>
-            <source file='%s'/>
-            <target dev='vda' bus='virtio'/>
-        </disk>
-        <input type='tablet' bus='usb'/>
-        <graphics type='vnc' port='-1'/>
-        <serial type='pty'>
-            <target port='0'/>
-        </serial>
-        <console type='pty'>
-            <target type='serial' port='0'/>
-        </console>
-        <sound model='ac97'/>
-        <video>
-            <model type='cirrus'/>
-        </video>
-    </devices>
-    <commandline xmlns='http://libvirt.org/schemas/domain/qemu/1.0'>
-      <env name='VIRTLET_EMULATOR' value='%s'/>
-      <env name='VIRTLET_NS' value='%s'/>
-      <env name='VIRTLET_CNI_CONFIG' value='%s'/>
-    </commandline>
-</domain>`
-	return fmt.Sprintf(domXML, domainType, uuid, name, uuid, memoryUnit, memory, cpuNum, cpuShare, cpuPeriod, cpuQuota, rootDiskFilepath, emulator, netNSPath, cniConfigEscaped)
+	return domain
 }
 
 func (v *VirtualizationTool) createBootImageClone(cloneName, imageName string) (string, error) {
@@ -330,14 +227,18 @@ func gatherFlexvolumeDriverVolumeDefinitions(podID, podName string, lettersInd i
 				}
 				switch fileInfo.Name() {
 				case "disk.xml":
-					flexvol.DiskXML = string(content)
+					disk := libvirtxml.DomainDisk{}
+					if err := xml.Unmarshal(content, &disk); err != nil {
+						return nil, err
+					}
+					flexvol.Disk = &disk
 				case "secret.xml":
 					flexvol.SecretXML = string(content)
 				case "key":
 					flexvol.Key = string(content)
 				}
 			}
-			flexvol.DiskXML = fmt.Sprintf(flexvol.DiskXML, "vd"+diskLetters[lettersInd])
+			flexvol.Disk.Target.Dev = "vd" + diskLetters[lettersInd]
 			lettersInd++
 			flexInfos = append(flexInfos, flexvol)
 		}
@@ -345,34 +246,10 @@ func gatherFlexvolumeDriverVolumeDefinitions(podID, podName string, lettersInd i
 	return flexInfos, nil
 }
 
-func addDiskToDomainDefinition(domain *Domain, volXML string) error {
-	disk := Disk{}
-	if err := xml.Unmarshal([]byte(volXML), &disk); err != nil {
-		return err
-	}
-	domain.Devs.DiskList = append(domain.Devs.DiskList, disk)
-	return nil
-}
-
-func marshalToXML(domain *Domain) (string, error) {
-	outArr, err := xml.MarshalIndent(domain, " ", "  ")
-	if err != nil {
-		return "", err
-	}
-	return string(outArr[:]), nil
-}
-
-func (v *VirtualizationTool) addAttachedVolumesXML(podID, podName, uuid, domXML string, volumes []*VirtletVolume) (string, error) {
-	glog.V(3).Infof("INPUT domain:\n%s\n\n", domXML)
-	domain := &Domain{}
-	err := xml.Unmarshal([]byte(domXML), domain)
-	if err != nil {
-		return "", err
-	}
-
+func (v *VirtualizationTool) addVolumesToDomain(podID, podName string, domain *libvirtxml.Domain, virtletVols []*VirtletVolume) error {
 	flexVolumeInfos, err := gatherFlexvolumeDriverVolumeDefinitions(podID, podName, 0)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	glog.V(2).Infof("FlexVolumes set to process: %v", flexVolumeInfos)
@@ -380,31 +257,24 @@ func (v *VirtualizationTool) addAttachedVolumesXML(podID, podName, uuid, domXML 
 		if flexVolumeInfo.SecretXML != "" {
 			secret, err := v.tool.DefineSecretFromXML(flexVolumeInfo.SecretXML)
 			if err != nil {
-				return "", err
+				return err
 			}
 			key, err := base64.StdEncoding.DecodeString(flexVolumeInfo.Key)
 			if err != nil {
-				return "", err
+				return err
 			}
 			secret.SetValue(key, 0)
 		}
-		if err = addDiskToDomainDefinition(domain, flexVolumeInfo.DiskXML); err != nil {
-			return "", err
-		}
+		domain.Devices.Disks = append(domain.Devices.Disks, *flexVolumeInfo.Disk)
 	}
 
-	volumesXML, err := v.volumeStorage.PrepareVolumesToBeAttached(volumes, uuid, len(flexVolumeInfos))
+	volumes, err := v.volumeStorage.PrepareVolumesToBeAttached(virtletVols, domain.UUID, len(flexVolumeInfos))
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	for _, volXML := range volumesXML {
-		if err = addDiskToDomainDefinition(domain, volXML); err != nil {
-			return "", err
-		}
-	}
-
-	return marshalToXML(domain)
+	domain.Devices.Disks = append(domain.Devices.Disks, volumes...)
+	return nil
 }
 
 type VirtualizationTool struct {
@@ -435,22 +305,28 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 		return "", err
 	}
 
+	settings := VirtletDomainSettings{
+		domainUUID: uuid,
+		netNSPath:  netNSPath,
+		cniConfig:  cniConfig,
+	}
+
 	if in.Config == nil || in.Config.Metadata == nil || in.Config.Image == nil || in.SandboxConfig == nil || in.SandboxConfig.Metadata == nil {
 		return "", errors.New("invalid input data")
 	}
 
 	config := in.Config
-	name := config.Metadata.Name
+	settings.domainName = config.Metadata.Name
 	sandboxAnnotations, err := v.metadataStore.GetPodSandboxAnnotations(in.PodSandboxId)
 	if err != nil {
 		return "", err
 	}
 
-	if name == "" {
-		name = uuid
+	if settings.domainName == "" {
+		settings.domainName = settings.domainUUID
 	} else {
 		// check whether the domain with such name already exists, if so - return it's uuid
-		domainName := in.PodSandboxId + "-" + name
+		domainName := in.PodSandboxId + "-" + settings.domainName
 		domain, _ := v.tool.LookupByName(domainName)
 		if domain != nil {
 			if domainID, err := v.tool.GetUUIDString(domain); err == nil {
@@ -463,54 +339,58 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 		}
 	}
 
-	cloneName := "root_" + uuid
-	cloneImage, err := v.createBootImageClone(cloneName, imageName)
+	cloneName := "root_" + settings.domainUUID
+	settings.rootDiskFilepath, err = v.createBootImageClone(cloneName, imageName)
 	if err != nil {
 		return "", err
 	}
 
-	v.metadataStore.SetContainer(name, uuid, in.PodSandboxId, config.Image.Image, cloneName, config.Labels, config.Annotations)
+	v.metadataStore.SetContainer(settings.domainName, settings.domainUUID, in.PodSandboxId, config.Image.Image, cloneName, config.Labels, config.Annotations)
 
-	var memory, cpuShares, cpuPeriod, cpuQuota int64
 	if config.Linux != nil && config.Linux.Resources != nil {
-		memory = config.Linux.Resources.MemoryLimitInBytes
-		cpuShares = config.Linux.Resources.CpuShares
-		cpuPeriod = config.Linux.Resources.CpuPeriod
-		cpuQuota = config.Linux.Resources.CpuQuota
+		settings.memory = int(config.Linux.Resources.MemoryLimitInBytes)
+		settings.cpuShares = uint(config.Linux.Resources.CpuShares)
+		settings.cpuPeriod = uint64(config.Linux.Resources.CpuPeriod)
+		settings.cpuQuota = config.Linux.Resources.CpuQuota
 	}
-	memoryUnit := "b"
-	if memory == 0 {
-		memory = defaultMemory
-		memoryUnit = defaultMemoryUnit
+	settings.memoryUnit = "b"
+	if settings.memory == 0 {
+		settings.memory = defaultMemory
+		settings.memoryUnit = defaultMemoryUnit
 	}
 
 	annotations, err := LoadAnnotations(sandboxAnnotations)
 	if err != nil {
 		return "", err
 	}
+	settings.vcpuNum = annotations.VCPUCount
+	settings.useKvm = canUseKvm()
+	domain := settings.createDomain()
 
-	domXML := generateDomXML(canUseKvm(), name, memory, memoryUnit, uuid, annotations.VCPUCount, cpuShares, cpuPeriod, cpuQuota, cloneImage, netNSPath, cniConfig)
-	domXML, err = v.addAttachedVolumesXML(in.PodSandboxId, in.SandboxConfig.Metadata.Name, uuid, domXML, annotations.Volumes)
+	if err = v.addVolumesToDomain(in.PodSandboxId, in.SandboxConfig.Metadata.Name, domain, annotations.Volumes); err != nil {
+		return "", err
+	}
+
+	domainXML, err := domain.Marshal()
 	if err != nil {
 		return "", err
 	}
 
-	domXML = strings.Replace(domXML, "\"", "'", -1)
-	glog.V(2).Infof("Creating domain:\n%s", domXML)
-	if _, err := v.tool.DefineFromXML(domXML); err != nil {
+	glog.V(2).Infof("Creating domain:\n%s", domainXML)
+	if _, err := v.tool.DefineFromXML(domainXML); err != nil {
 		return "", err
 	}
 
-	domain, err := v.tool.LookupByUUIDString(uuid)
+	domainPtr, err := v.tool.LookupByUUIDString(settings.domainUUID)
 	if err != nil {
 		return "", err
 	}
 
-	if _, err := v.tool.GetDomainInfo(domain); err != nil {
+	if _, err := v.tool.GetDomainInfo(domainPtr); err != nil {
 		return "", err
 	}
 
-	return uuid, nil
+	return settings.domainUUID, nil
 }
 
 func (v *VirtualizationTool) StartContainer(containerId string) error {

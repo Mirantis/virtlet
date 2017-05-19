@@ -17,25 +17,31 @@ limitations under the License.
 package flexvolume
 
 import (
-	"fmt"
+	"encoding/xml"
 	"path/filepath"
-)
 
-const (
-	noCloudDiskTemplate = `
-<disk type="file" device="disk">
-  <driver name="qemu" type="raw"/>
-  <source file='%s'/>
-  <readonly/>
-  <target dev="%%s" bus="virtio"/>
-</disk>
-`
+	libvirtxml "github.com/libvirt/libvirt-go-xml"
 )
 
 func noCloudVolumeHandler(uuidGen UuidGen, targetDir string, opts volumeOpts) (map[string][]byte, error) {
 	isoPath := filepath.Join(targetDir, "cidata.iso")
+
+	disk := libvirtxml.DomainDisk{
+		Type:     "file",
+		Device:   "disk",
+		Driver:   &libvirtxml.DomainDiskDriver{Name: "qemu", Type: "raw"},
+		Source:   &libvirtxml.DomainDiskSource{File: isoPath},
+		Target:   &libvirtxml.DomainDiskTarget{Bus: "virtio"},
+		ReadOnly: &libvirtxml.DomainDiskReadOnly{},
+	}
+
+	diskXML, err := xml.MarshalIndent(&disk, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+
 	return map[string][]byte{
-		"disk.xml":            []byte(fmt.Sprintf(noCloudDiskTemplate, isoPath)),
+		"disk.xml":            diskXML,
 		"cidata.cd/meta-data": []byte(opts.MetaData),
 		"cidata.cd/user-data": []byte(opts.UserData),
 	}, nil

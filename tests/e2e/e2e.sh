@@ -78,7 +78,7 @@ fi
 # wait for login prompt to appear
 "${SCRIPT_DIR}/vmchat-short.exp" @cirros-vm-rbd
 
-"${vmssh}" cirros@cirros-vm-rbd 'sudo /usr/sbin/mkfs.ext2 /dev/vdb && sudo mount /dev/vdb /mnt && ls -l /mnt | grep lost+found'
+"${vmssh}" cirros@cirros-vm-rbd 'sudo /usr/sbin/mkfs.ext2 /dev/vdc && sudo mount /dev/vdc /mnt && ls -l /mnt | grep lost+found'
 
 # check vnc consoles are available for both domains
 if ! kubectl exec "${virtlet_pod_name}" --namespace=kube-system -- /bin/sh -c "apt-get install -y vncsnapshot"; then

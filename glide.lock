@@ -1,5 +1,5 @@
-hash: caa8317655422f51d63f54f4696fd4fa8e0d65ce684e99a12ff4dd54967ab80d
-updated: 2017-04-17T19:16:44.449399415+03:00
+hash: 9f5c3fc2a95e67236dfaa31d352b76f9d762d6c5871b61092b863bc83ed10b56
+updated: 2017-05-15T19:39:56.7455294Z
 imports:
 - name: bitbucket.org/ww/goautoneg
   version: 75cd24fc2f2c2a2088577d12123ddee5f54e0675
@@ -58,7 +58,7 @@ imports:
 - name: github.com/blang/semver
   version: 31b736133b98f26d5e078ec9eb591666edfd091f
 - name: github.com/boltdb/bolt
-  version: dfb21201d9270c1082d5fb0f07f500311ff72f18
+  version: e9cf4fae01b5a8ff89d0ec6b32f0d9c9f79aefdd
 - name: github.com/containernetworking/cni
   version: 9d5e6e60e79491207834ae8439e80c943db65a69
   subpackages:
@@ -226,7 +226,9 @@ imports:
 - name: github.com/kr/pty
   version: f7ee69f31298ecbe5d2b349c711e2547a617d398
 - name: github.com/libvirt/libvirt-go
-  version: ea3aa1162f01b9a41d4ab1c183f3a4dc59f57273
+  version: c3209e4ba8b8dda65c85ca0ac04302e55895caf7
+- name: github.com/libvirt/libvirt-go-xml
+  version: e515652baed5eb4eb96b99a6dcc9acfcd4fc300f
 - name: github.com/mailru/easyjson
   version: d5b7844b561a7bc640052f1b935f7b800330d7e0
   subpackages:
@@ -310,7 +312,7 @@ imports:
 - name: github.com/vishvananda/netns
   version: 8ba1072b58e0c2a240eb5f6120165c7776c3e7b8
 - name: go.universe.tf/netboot
-  version: 7e671a0899a237c12a78d95cc849584ff31bd683
+  version: 9253ccdf97149d96019a62122555b37047168c1f
   subpackages:
   - dhcp4
 - name: golang.org/x/exp

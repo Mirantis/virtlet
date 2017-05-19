@@ -1,0 +1,142 @@
+--- domain_ref.go	2017-05-15 22:08:28.735308800 +0000
++++ domain.go	2017-05-18 19:18:59.300460500 +0000
+@@ -73,14 +73,19 @@
+ 	Bus string `xml:"bus,attr,omitempty"`
+ }
+ 
++type DomainDiskReadOnly struct {
++	//empty
++}
++
+ type DomainDisk struct {
+-	Type     string            `xml:"type,attr"`
+-	Device   string            `xml:"device,attr"`
+-	Snapshot string            `xml:"snapshot,attr,omitempty"`
+-	Driver   *DomainDiskDriver `xml:"driver"`
+-	Auth     *DomainDiskAuth   `xml:"auth"`
+-	Source   *DomainDiskSource `xml:"source"`
+-	Target   *DomainDiskTarget `xml:"target"`
++	Type     string              `xml:"type,attr"`
++	Device   string              `xml:"device,attr"`
++	Snapshot string              `xml:"snapshot,attr,omitempty"`
++	Driver   *DomainDiskDriver   `xml:"driver"`
++	Auth     *DomainDiskAuth     `xml:"auth"`
++	Source   *DomainDiskSource   `xml:"source"`
++	Target   *DomainDiskTarget   `xml:"target"`
++	ReadOnly *DomainDiskReadOnly `xml:"readonly"`
+ }
+ 
+ type DomainFilesystemDriver struct {
+@@ -184,9 +189,8 @@
+ }
+ 
+ type DomainChardevTarget struct {
+-	Type  string `xml:"type,attr"`
+-	Name  string `xml:"name,attr"`
+-	State string `xml:"state,attr,omitempty"` // is guest agent connected?
++	Type string `xml:"type,attr,omitempty"`
++	Port string `xml:"name,attr,omitempty"`
+ }
+ 
+ type DomainAlias struct {
+@@ -202,6 +206,7 @@
+ 
+ type DomainChardev struct {
+ 	Type    string               `xml:"type,attr"`
++	TTY     string               `xml:"tty,attr,omitempty"`
+ 	Source  *DomainChardevSource `xml:"source"`
+ 	Target  *DomainChardevTarget `xml:"target"`
+ 	Alias   *DomainAlias         `xml:"alias"`
+@@ -251,6 +256,7 @@
+ }
+ 
+ type DomainDeviceList struct {
++	Emulator    string             `xml:"emulator,omitempty"`
+ 	Controllers []DomainController `xml:"controller"`
+ 	Disks       []DomainDisk       `xml:"disk"`
+ 	Filesystems []DomainFilesystem `xml:"filesystem"`
+@@ -431,24 +437,67 @@
+ 	SMM        *DomainFeatureState  `xml:"smm"`
+ }
+ 
++type QemuArg struct {
++	Value string `xml:"value,attr"`
++}
++
++type QemuEnv struct {
++	Name  string `xml:"name,attr"`
++	Value string `xml:"value,attr,omitempty"`
++}
++
++type DomainCMDLine struct {
++	Args []QemuArg `xml:"arg"`
++	Envs []QemuEnv `xml:"env"`
++}
++
++type DomainCPUTuneShares struct {
++	Value uint `xml:",chardata"`
++}
++
++type DomainCPUTunePeriod struct {
++	Value uint64 `xml:",chardata"`
++}
++
++type DomainCPUTuneQuota struct {
++	Value int64 `xml:",chardata"`
++}
++
++type DomainCPUTune struct {
++	Shares *DomainCPUTuneShares `xml:"shares"`
++	Period *DomainCPUTunePeriod `xml:"period"`
++	Quota  *DomainCPUTuneQuota  `xml:"quota"`
++}
++
++type DomainMemoryBackingLocked struct {
++	//empty
++}
++
++type DomainMemoryBacking struct {
++	Locked *DomainMemoryBackingLocked `xml:"locked"`
++}
++
+ type Domain struct {
+-	XMLName       xml.Name           `xml:"domain"`
+-	Type          string             `xml:"type,attr,omitempty"`
+-	Name          string             `xml:"name"`
+-	UUID          string             `xml:"uuid,omitempty"`
+-	Memory        *DomainMemory      `xml:"memory"`
+-	CurrentMemory *DomainMemory      `xml:"currentMemory"`
+-	MaximumMemory *DomainMaxMemory   `xml:"maxMemory"`
+-	VCPU          *DomainVCPU        `xml:"vcpu"`
+-	CPU           *DomainCPU         `xml:"cpu"`
+-	Resource      *DomainResource    `xml:"resource"`
+-	Devices       *DomainDeviceList  `xml:"devices"`
+-	OS            *DomainOS          `xml:"os"`
+-	SysInfo       *DomainSysInfo     `xml:"sysinfo"`
+-	OnPoweroff    string             `xml:"on_poweroff,omitempty"`
+-	OnReboot      string             `xml:"on_reboot,omitempty"`
+-	OnCrash       string             `xml:"on_crash,omitempty"`
+-	Features      *DomainFeatureList `xml:"features"`
++	XMLName       xml.Name             `xml:"domain"`
++	Type          string               `xml:"type,attr,omitempty"`
++	Name          string               `xml:"name"`
++	UUID          string               `xml:"uuid,omitempty"`
++	Memory        *DomainMemory        `xml:"memory"`
++	CurrentMemory *DomainMemory        `xml:"currentMemory"`
++	MaximumMemory *DomainMaxMemory     `xml:"maxMemory"`
++	MemoryBacking *DomainMemoryBacking `xml:"memoryBacking"`
++	VCPU          *DomainVCPU          `xml:"vcpu"`
++	CPU           *DomainCPU           `xml:"cpu"`
++	CPUTune       *DomainCPUTune       `xml:"cputune"`
++	Resource      *DomainResource      `xml:"resource"`
++	Devices       *DomainDeviceList    `xml:"devices"`
++	OS            *DomainOS            `xml:"os"`
++	SysInfo       *DomainSysInfo       `xml:"sysinfo"`
++	OnPoweroff    string               `xml:"on_poweroff,omitempty"`
++	OnReboot      string               `xml:"on_reboot,omitempty"`
++	OnCrash       string               `xml:"on_crash,omitempty"`
++	Features      *DomainFeatureList   `xml:"features"`
++	CMDLine       *DomainCMDLine       `xml:"http://libvirt.org/schemas/domain/qemu/1.0 commandline"`
+ }
+ 
+ func (d *Domain) Unmarshal(doc string) error {
