@@ -390,23 +390,6 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 
 	if settings.domainName == "" {
 		settings.domainName = settings.domainUUID
-	} else {
-		// check whether the domain with such name already exists, and if so, return it's uuid
-		domainName := in.PodSandboxId + "-" + settings.domainName
-		domain, err := v.domainConn.LookupDomainByName(domainName)
-		if err != nil && err != virt.ErrDomainNotFound {
-			return "", fmt.Errorf("failed to look up domain %q: %v", domainName, err)
-		}
-		if err == nil {
-			if domainID, err := domain.UUIDString(); err == nil {
-				// FIXME: this is a temp workaround for an existing domain being returned on create container call
-				// (this causing SyncPod issues)
-				return domainID, nil
-			} else {
-				glog.Errorf("Failed to get UUID for domain with name: %s due to %v", domainName, err)
-				return "", fmt.Errorf("Failure in communication with libvirt: %v", err)
-			}
-		}
 	}
 
 	cloneName := "root_" + settings.domainUUID
