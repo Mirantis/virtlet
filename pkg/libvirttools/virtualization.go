@@ -487,11 +487,6 @@ func (v *VirtualizationTool) StopContainer(containerId string) error {
 // even if it's still running
 // it waits up to 5 sec for doing the job by libvirt
 func (v *VirtualizationTool) RemoveContainer(containerId string) error {
-	containerInfo, err := v.metadataStore.GetContainerInfo(containerId)
-	if err != nil {
-		glog.Errorf("Error when retrieving container '%s' info from metadata store: %v", containerId, err)
-		return err
-	}
 
 	// Give a chance to gracefully stop domain
 	// TODO: handle errors - there could be e.x. connection errori
@@ -500,14 +495,16 @@ func (v *VirtualizationTool) RemoveContainer(containerId string) error {
 		return err
 	}
 
-	if err := v.StopContainer(containerId); err != nil {
-		if err := domain.Destroy(); err != nil {
+	if domain != nil {
+		if err := v.StopContainer(containerId); err != nil {
+			if err := domain.Destroy(); err != nil {
+				return err
+			}
+		}
+
+		if err := domain.Undefine(); err != nil {
 			return err
 		}
-	}
-
-	if err := domain.Undefine(); err != nil {
-		return err
 	}
 
 	// Wait until domain is really removed or timeout after 5 sec.
@@ -523,29 +520,37 @@ func (v *VirtualizationTool) RemoveContainer(containerId string) error {
 		return err
 	}
 
-	if containerInfo.NocloudFile != "" {
-		if err := os.Remove(containerInfo.NocloudFile); err != nil {
-			glog.Warning("Error removing nocloud file %q: %v", containerInfo.NocloudFile, err)
-		}
-	}
-
-	if err := v.metadataStore.RemoveContainer(containerId); err != nil {
-		glog.Errorf("Error when removing container '%s' from metadata store: %v", containerId, err)
-		return err
-	}
-
-	if err := v.RemoveVolume(containerInfo.RootImageVolumeName); err != nil {
-		glog.Errorf("Error when removing image snapshot with name '%s': %v", containerInfo.RootImageVolumeName, err)
-		return err
-	}
-
-	annotations, err := LoadAnnotations(containerInfo.SandBoxAnnotations)
+	containerInfo, err := v.metadataStore.GetContainerInfo(containerId)
 	if err != nil {
+		glog.Errorf("Error when retrieving container '%s' info from metadata store: %v", containerId, err)
 		return err
 	}
-	if len(annotations.Volumes) > 0 {
-		if err := v.volumeStorage.CleanAttachedQCOW2Volumes(annotations.Volumes, containerId); err != nil {
+
+	if containerInfo != nil {
+		if containerInfo.NocloudFile != "" {
+			if err := os.Remove(containerInfo.NocloudFile); err != nil {
+				glog.Warning("Error removing nocloud file %q: %v", containerInfo.NocloudFile, err)
+			}
+		}
+
+		if err := v.metadataStore.RemoveContainer(containerId); err != nil {
+			glog.Errorf("Error when removing container '%s' from metadata store: %v", containerId, err)
 			return err
+		}
+
+		if err := v.RemoveVolume(containerInfo.RootImageVolumeName); err != nil {
+			glog.Errorf("Error when removing image snapshot with name '%s': %v", containerInfo.RootImageVolumeName, err)
+			return err
+		}
+
+		annotations, err := LoadAnnotations(containerInfo.SandBoxAnnotations)
+		if err != nil {
+			return err
+		}
+		if len(annotations.Volumes) > 0 {
+			if err := v.volumeStorage.CleanAttachedQCOW2Volumes(annotations.Volumes, containerId); err != nil {
+				return err
+			}
 		}
 	}
 
