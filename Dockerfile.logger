@@ -1,0 +1,27 @@
+FROM ubuntu:16.04
+
+COPY ./_output/virtlet_log /.
+CMD /virtlet_log
+
+# Build me with:
+# $ docker build -t mirantis/virtlet-log -f Dockerfile.logger .
+#
+# Run me with:
+# $ docker run -it --env VIRTLET_VM_LOGS=<folder-path> --env KUBERNETES_POD_LOGS=<folder-path> mirantis/virtlet-log
+# where VIRTLET_VM_LOGS is path to folder where Virtlet dumpy VM logs to e.g.:
+#
+# /var/log/virtlet/vms
+#  |- vm01
+#     |- raw.log
+#  |- vm02
+#     |- raw.log
+#
+# and KUBERNETES_POD_LOGS is path to folder where Kubernetes expects logs for its containers/VMs e.g.:
+#
+# /var/log/pods
+#  |- vm01
+#     |- _0.log
+#  |- vm02
+#     |- _0.log
+#
+# The idea is to mount Virtlet logs from Virtlet container and Kubernetes logs dir from host.
