@@ -25,6 +25,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -54,6 +55,9 @@ const (
 	diskLetterStr               = "bcdefghijklmnopqrstu"
 
 	podNameString = "@podname@"
+
+	vmLogBaseDir  = "/var/log/vms"
+	vmLogFileName = "raw.log"
 )
 
 var diskLetters = strings.Split(diskLetterStr, "")
@@ -77,6 +81,7 @@ type VirtletDomainSettings struct {
 	rootDiskFilepath string
 	netNSPath        string
 	cniConfig        string
+	vmLogToFile      bool
 }
 
 func canUseKvm() bool {
@@ -101,8 +106,6 @@ func (ds *VirtletDomainSettings) createDomain() *libvirtxml.Domain {
 			Emulator: "/vmwrapper",
 			Inputs:   []libvirtxml.DomainInput{libvirtxml.DomainInput{Type: "tablet", Bus: "usb"}},
 			Graphics: []libvirtxml.DomainGraphic{libvirtxml.DomainGraphic{Type: "vnc", Port: -1}},
-			Serials:  []libvirtxml.DomainChardev{libvirtxml.DomainChardev{Type: "pty", Target: &libvirtxml.DomainChardevTarget{Port: "0"}}},
-			Consoles: []libvirtxml.DomainChardev{libvirtxml.DomainChardev{Type: "pty", Target: &libvirtxml.DomainChardevTarget{Type: "serial", Port: "0"}}},
 			Videos:   []libvirtxml.DomainVideo{libvirtxml.DomainVideo{Model: libvirtxml.DomainVideoModel{Type: "cirrus"}}},
 			Disks: []libvirtxml.DomainDisk{libvirtxml.DomainDisk{
 				Type:   "file",
@@ -277,6 +280,58 @@ func (v *VirtualizationTool) addVolumesToDomain(podID, podName string, domain *l
 	return nil
 }
 
+func vmLogToFile() bool {
+	if os.Getenv("VIRTLET_VM_LOG_TO_FILE") != "" {
+		return true
+	}
+	return false
+}
+
+func (v *VirtualizationTool) RemoveLibvirtSandboxLog(sandboxId string) error {
+	return os.RemoveAll(filepath.Join(vmLogBaseDir, sandboxId))
+}
+
+func (v *VirtualizationTool) addSerialDevicesToDomain(sandboxId string, domain *libvirtxml.Domain, settings VirtletDomainSettings) error {
+	if settings.vmLogToFile {
+		logDir := filepath.Join(vmLogBaseDir, sandboxId)
+		logPath := filepath.Join(logDir, vmLogFileName)
+
+		// Prepare directory where libvirt will store log file to.
+		if err := os.Mkdir(logDir, 0777); err != nil {
+			return fmt.Errorf("failed to create vmLogDir '%s': %s", logDir, err.Error())
+		}
+
+		domain.Devices.Serials = []libvirtxml.DomainChardev{
+			libvirtxml.DomainChardev{
+				Type:   "file",
+				Target: &libvirtxml.DomainChardevTarget{Port: "0"},
+				Source: &libvirtxml.DomainChardevSource{Path: logPath},
+			},
+		}
+		domain.Devices.Consoles = []libvirtxml.DomainChardev{
+			libvirtxml.DomainChardev{
+				Type:   "file",
+				Target: &libvirtxml.DomainChardevTarget{Type: "serial", Port: "0"},
+				Source: &libvirtxml.DomainChardevSource{Path: logPath},
+			},
+		}
+	} else {
+		domain.Devices.Serials = []libvirtxml.DomainChardev{
+			libvirtxml.DomainChardev{
+				Type:   "pty",
+				Target: &libvirtxml.DomainChardevTarget{Port: "0"},
+			},
+		}
+		domain.Devices.Consoles = []libvirtxml.DomainChardev{
+			libvirtxml.DomainChardev{
+				Type:   "pty",
+				Target: &libvirtxml.DomainChardevTarget{Type: "serial", Port: "0"},
+			},
+		}
+	}
+	return nil
+}
+
 type VirtualizationTool struct {
 	tool           DomainOperations
 	volumeStorage  *StorageTool
@@ -306,9 +361,10 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 	}
 
 	settings := VirtletDomainSettings{
-		domainUUID: uuid,
-		netNSPath:  netNSPath,
-		cniConfig:  cniConfig,
+		domainUUID:  uuid,
+		netNSPath:   netNSPath,
+		cniConfig:   cniConfig,
+		vmLogToFile: vmLogToFile(),
 	}
 
 	if in.Config == nil || in.Config.Metadata == nil || in.Config.Image == nil || in.SandboxConfig == nil || in.SandboxConfig.Metadata == nil {
@@ -368,6 +424,10 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 	domain := settings.createDomain()
 
 	if err = v.addVolumesToDomain(in.PodSandboxId, in.SandboxConfig.Metadata.Name, domain, annotations.Volumes); err != nil {
+		return "", err
+	}
+
+	if err = v.addSerialDevicesToDomain(in.PodSandboxId, domain, settings); err != nil {
 		return "", err
 	}
 

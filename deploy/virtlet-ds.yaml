@@ -94,6 +94,8 @@ spec:
           name: k8s-flexvolume-plugins-dir
         - mountPath: /var/lib/kubelet/pods
           name: k8s-pods-dir
+        - name: vms-log
+          mountPath: /var/log/vms
         securityContext:
           privileged: true
         env:
@@ -104,6 +106,8 @@ spec:
         # Uncomment the following to disable KVM:
         # - name: VIRTLET_DISABLE_KVM
         #   value: "y"
+        - name: VIRTLET_VM_LOG_TO_FILE
+          value: "y"
       volumes:
       - hostPath:
           path: /sys/fs/cgroup
@@ -156,6 +160,9 @@ spec:
       - hostPath:
           path: /var/lib
         name: var-lib
+      - hostPath:
+          path: /var/log/virtlet/vms
+        name: vms-log  
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding
