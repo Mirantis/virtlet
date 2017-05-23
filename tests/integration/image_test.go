@@ -133,8 +133,6 @@ func TestImagePull(t *testing.T) {
 	it := newImageTester(t)
 	defer it.stop()
 	it.pullImage()
-	// make sure existing image is handled correctly
-	it.pullImage()
 }
 
 func TestImageStatus(t *testing.T) {
