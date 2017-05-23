@@ -13,7 +13,7 @@ kubectl="${HOME}/.kubeadm-dind-cluster/kubectl"
 BASE_LOCATION="${BASE_LOCATION:-https://raw.githubusercontent.com/Mirantis/virtlet/master/}"
 # Convenience setting for local testing:
 # BASE_LOCATION="${HOME}/work/kubernetes/src/github.com/Mirantis/virtlet"
-DEPLOY_LOG_CONTAINER=1 # 0 = don't deploy, 1 = deploy, 2 = inject local log image and deploy
+DEPLOY_LOG_CONTAINER=${DEPLOY_LOG_CONTAINER:-0} # 0 = don't deploy, 1 = deploy, 2 = inject local log image and deploy
 
 function demo::step {
   local OPTS=""
