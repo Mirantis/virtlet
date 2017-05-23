@@ -125,20 +125,33 @@ func (v *VirtletManager) Version(ctx context.Context, in *kubeapi.VersionRequest
 
 func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSandboxRequest) (*kubeapi.RunPodSandboxResponse, error) {
 	config := in.GetConfig()
-	podId := config.GetMetadata().Uid
-	name := config.GetMetadata().Name
-	glog.V(2).Infof("RunPodSandbox called for pod %s (%s)", name, podId)
+	if config == nil {
+		glog.Errorf("No pod sandbox config passed to RunPodSandbox")
+		return nil, errors.New("no pod sandbox config passed to RunPodSandbox")
+	}
+	podName := "<no metadata>"
+	if config.Metadata != nil {
+		podName = config.Metadata.Name
+	}
+	if err := validatePodSandboxConfig(config); err != nil {
+		glog.Errorf("Invalid pod config while creating pod sandbox for pod %s: %v", podName, err)
+		return nil, err
+	}
+	podId := config.Metadata.Uid
+	podNs := config.Metadata.Namespace
+
+	glog.V(2).Infof("RunPodSandbox called for pod %s (%s)", podName, podId)
 	glog.V(3).Infof("RunPodSandbox: %s", spew.Sdump(in))
 	glog.V(2).Infof("Sandbox config annotations: %v", config.GetAnnotations())
 
 	if err := cni.CreateNetNS(podId); err != nil {
-		glog.Errorf("Error when creating new netns for pod %s (%s): %v", name, podId, err)
+		glog.Errorf("Error when creating new netns for pod %s (%s): %v", podName, podId, err)
 		return nil, err
 	}
 
-	netConfig, err := v.cniClient.AddSandboxToNetwork(podId)
+	netConfig, err := v.cniClient.AddSandboxToNetwork(podId, podName, podNs)
 	if err != nil {
-		glog.Errorf("Error when adding pod %s (%s) to CNI network: %v", name, podId, err)
+		glog.Errorf("Error when adding pod %s (%s) to CNI network: %v", podName, podId, err)
 		return nil, err
 	}
 
@@ -156,20 +169,20 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 
 	bytesNetConfig, err := cni.ResultToBytes(netConfig)
 	if err != nil {
-		glog.Errorf("Error during network configuration result marshaling for pod %s (%s): %v", name, podId, err)
-		if secondErr := v.cniClient.RemoveSandboxFromNetwork(podId); secondErr != nil {
-			glog.Errorf("Error when removing pod %s (%s) from CNI network:", name, podId, err)
+		glog.Errorf("Error during network configuration result marshaling for pod %s (%s): %v", podName, podId, err)
+		if rmErr := v.cniClient.RemoveSandboxFromNetwork(podId, podName, podNs); rmErr != nil {
+			glog.Errorf("Error when removing pod %s (%s) from CNI network:", podName, podId, rmErr)
 		}
 		return nil, err
 	}
-	glog.V(3).Infof("CNI configuration for pod %s (%s): %s", name, podId, string(bytesNetConfig))
+	glog.V(3).Infof("CNI configuration for pod %s (%s): %s", podName, podId, string(bytesNetConfig))
 
 	if err := validatePodSandboxConfig(config); err != nil {
-		glog.Errorf("Invalid pod config while creating pod sandbox for pod %s (%s): %v", name, podId, err)
+		glog.Errorf("Invalid pod config while creating pod sandbox for pod %s (%s): %v", podName, podId, err)
 		return nil, err
 	}
 	if err := v.metadataStore.SetPodSandbox(config, bytesNetConfig); err != nil {
-		glog.Errorf("Error when creating pod sandbox for pod %s (%s): %v", name, podId, err)
+		glog.Errorf("Error when creating pod sandbox for pod %s (%s): %v", podName, podId, err)
 		return nil, err
 	}
 
@@ -220,18 +233,24 @@ func (v *VirtletManager) RemovePodSandbox(ctx context.Context, in *kubeapi.Remov
 	glog.V(2).Infof("RemovePodSandbox called for pod %s", podSandboxId)
 	glog.V(3).Infof("RemovePodSandbox: %s", spew.Sdump(in))
 
+	podName, podNs, err := v.metadataStore.GetPodSandboxNameAndNamespace(podSandboxId)
+	if err != nil {
+		glog.Errorf("Error retrieving pod info for pod sandbox %q during removal: %v", podSandboxId, err)
+		// still will try to remove the pod
+	}
+
 	if err := v.metadataStore.RemovePodSandbox(podSandboxId); err != nil {
-		glog.Errorf("Error when removing pod sandbox '%s': %v", podSandboxId, err)
+		glog.Errorf("Error when removing pod sandbox %q: %v", podSandboxId, err)
 		return nil, err
 	}
 
-	if err := v.cniClient.RemoveSandboxFromNetwork(podSandboxId); err != nil {
-		glog.Errorf("Error when removing pod sandbox '%s' from CNI network: %v", podSandboxId, err)
+	if err := v.cniClient.RemoveSandboxFromNetwork(podSandboxId, podName, podNs); err != nil {
+		glog.Errorf("Error when removing pod sandbox %q from CNI network: %v", podSandboxId, err)
 		return nil, err
 	}
 
 	if err := cni.DestroyNetNS(podSandboxId); err != nil {
-		glog.Errorf("Error when removing network namespace for pod sandbox %s: %v", podSandboxId, err)
+		glog.Errorf("Error when removing network namespace for pod sandbox %q: %v", podSandboxId, err)
 		return nil, err
 	}
 

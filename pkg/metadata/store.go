@@ -51,6 +51,7 @@ type SandboxMetadataStore interface {
 	GetPodSandboxStatus(podId string) (*kubeapi.PodSandboxStatus, error)
 	ListPodSandbox(filter *kubeapi.PodSandboxFilter) ([]*kubeapi.PodSandbox, error)
 	GetPodNetworkConfigurationAsBytes(podId string) ([]byte, error)
+	GetPodSandboxNameAndNamespace(podId string) (string, string, error)
 }
 
 // ContainerMetadataStore contains methods to operate on containers (VMs)
