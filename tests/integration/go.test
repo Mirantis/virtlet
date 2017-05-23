@@ -17,8 +17,14 @@ python -m SimpleHTTPServer 80 >/tmp/http_server.log &
 HTTP_SERVER_PID=$!
 popd
 
-go test -v .
-retval=$?
+if [ $# -ne 0 ] ; then
+  go test -test.v -run $*
+  retval=$?
+else
+  go test -v .
+  retval=$?
+fi
+
 kill $HTTP_SERVER_PID
 
 exit $retval
