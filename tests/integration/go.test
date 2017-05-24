@@ -1,25 +1,21 @@
 #!/bin/bash
-
-trace() {
-  $*
-  retval=$?
-  if [ $retval -ne 0 ] ; then
-    exit $retval
-  fi
-}
+set -o errexit
+set -o nounset
+set -o pipefail
+set -o errtrace
 
 cleanup() {
-  if [ ! -z "${HTTP_SERVER_PID}" ] ; then
+  if [[ ${HTTP_SERVER_PID:-} ]] ; then
     kill ${HTTP_SERVER_PID}
   fi
 }
 
-trap cleanup SIGHUP SIGINT SIGTERM EXIT
+trap cleanup EXIT
 
 mkdir -p /tmp/image_store
 pushd /tmp/image_store
-trace curl http://download.cirros-cloud.net/0.3.3/cirros-0.3.3-x86_64-disk.img -o cirros-0.3.3-x86_64-disk.img
-trace curl http://download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img -o cirros-0.3.4-x86_64-disk.img
+curl http://download.cirros-cloud.net/0.3.3/cirros-0.3.3-x86_64-disk.img -o cirros-0.3.3-x86_64-disk.img
+curl http://download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img -o cirros-0.3.4-x86_64-disk.img
 ln -s . copy
 python -m SimpleHTTPServer 80 >/tmp/http_server.log &
 HTTP_SERVER_PID=$!
@@ -27,10 +23,6 @@ popd
 
 if [ $# -ne 0 ] ; then
   go test -test.v -run $*
-  retval=$?
 else
   go test -v .
-  retval=$?
 fi
-
-exit $retval
