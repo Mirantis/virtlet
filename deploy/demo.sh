@@ -199,12 +199,12 @@ demo::start-dind-cluster
 if [[ ${INJECT_LOCAL_IMAGE:-} ]]; then
   demo::inject-local-image
 fi
-if [[ ${DEPLOY_LOG_CONTAINER:-} == 2 ]]; then
+if [[ ${DEPLOY_LOG_CONTAINER} == 2 ]]; then
   demo::inject-local-log-image
 fi 
 demo::label-node
 demo::start-virtlet
-if [[ ${DEPLOY_LOG_CONTAINER:-} > 0 ]]; then
+if [[ ${DEPLOY_LOG_CONTAINER} > 0 ]]; then
   demo::start-virtlet-log  
 fi
 demo::start-nginx

@@ -52,7 +52,16 @@ function wait-for-pod {
 wait-for-pod cirros-vm
 
 cd "${SCRIPT_DIR}"
-"${SCRIPT_DIR}/vmchat.exp" @cirros-vm
+"${SCRIPT_DIR}/vmchat.exp" cirros-vm
+
+# test logging
+
+virshid=$($virsh list | grep "\-cirros-vm " | cut -f2 -d " ")
+logpath=$($virsh dumpxml $virshid | xmllint --xpath 'string(//serial[@type="file"]/source/@path)' -)
+sandboxid=$(echo $logpath | sed 's#/var/log/vms/##' | sed 's#/raw.log##')
+nodeid=$(docker ps | grep kube-node-1 | cut -f1 -d " ")
+
+"${SCRIPT_DIR}/vmlogs.exp" $nodeid $sandboxid
 
 # test ceph RBD
 
@@ -63,7 +72,7 @@ if [[ "${vm_hostname}" != "${expected_hostname}" ]]; then
   exit 1
 fi
 
-virtlet_pod_name=$(kubectl get pods --namespace=kube-system | grep virtlet | awk '{print $1}')
+virtlet_pod_name=$(kubectl get pods --namespace=kube-system | grep -v virtlet-log | grep virtlet | awk '{print $1}')
 
 # Run one-node ceph cluster
 "${SCRIPT_DIR}/run_ceph.sh" "${SCRIPT_DIR}"
@@ -76,7 +85,7 @@ if [ "$(${virsh} domblklist @cirros-vm-rbd | grep rbd-test-image | wc -l)" != "1
 fi
 
 # wait for login prompt to appear
-"${SCRIPT_DIR}/vmchat-short.exp" @cirros-vm-rbd
+"${SCRIPT_DIR}/vmchat-short.exp" cirros-vm-rbd
 
 "${vmssh}" cirros@cirros-vm-rbd 'sudo /usr/sbin/mkfs.ext2 /dev/vdc && sudo mount /dev/vdc /mnt && ls -l /mnt | grep lost+found'
 
@@ -137,7 +146,7 @@ kubectl convert -f "${SCRIPT_DIR}/../../examples/cirros-vm.yaml" --local -o json
 wait-for-pod cirros-vm
 
 # wait for login prompt to appear
-"${SCRIPT_DIR}/vmchat-short.exp" @cirros-vm
+"${SCRIPT_DIR}/vmchat-short.exp" cirros-vm
 
 verify-cpu-count 2
 

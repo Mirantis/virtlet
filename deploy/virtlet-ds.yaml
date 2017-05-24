@@ -107,8 +107,8 @@ spec:
         # - name: VIRTLET_DISABLE_KVM
         #   value: "y"
         # Uncomment the following to redirect VM logs to file:
-        # - name: VIRTLET_VM_LOG_TO_FILE
-        #   value: "y"
+        - name: VIRTLET_VM_LOG_TO_FILE
+          value: "y"
       volumes:
       - hostPath:
           path: /sys/fs/cgroup

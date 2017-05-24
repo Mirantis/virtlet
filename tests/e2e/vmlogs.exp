@@ -14,15 +14,29 @@
 # limitations under the License.
 
 set timeout 600
-set vmname [lindex $argv 0]
+set nodeid [lindex $argv 0]
+set sandboxid [lindex $argv 1]
 
-source ./common.exp
+spawn docker exec -it ${nodeid} /bin/bash
 
-connect_ssh $vmname
+#
+# Check raw logs
+#
 
-send "exit\r"
+send "cat /var/log/virtlet/vms/${sandboxid}/raw.log\r"
 
 expect {
-    timeout { puts "login prompt timeout"; exit 1 }
-    "Connection to ${vmname}.default closed."
+	timeout { puts "checking raw log file timeout"; exit 1 }
+	"login as 'cirros' user. default password: 'cubswin:)'. use 'sudo' for root."
+}
+
+#
+# Check formatted logs
+#
+
+send "cat /var/log/pods/${sandboxid}/_0.log\r"
+
+expect {
+	timeout { puts "checking formatted log file timeout"; exit 1 }
+	-re {\{"time": ".+", "stream": "stdout","log":"login as 'cirros' user\. default password: 'cubswin:\)'\. use 'sudo' for root.\\n"\}}
 }

@@ -298,7 +298,7 @@ func (v *VirtualizationTool) addSerialDevicesToDomain(sandboxId string, domain *
 
 		// Prepare directory where libvirt will store log file to.
 		if err := os.Mkdir(logDir, 0777); err != nil {
-			return fmt.Errorf("failed to create vmLogDir '%s': %s", logDir, err.Error())
+			glog.Warningf("failed to create vmLogDir '%s': %s", logDir, err.Error())
 		}
 
 		domain.Devices.Serials = []libvirtxml.DomainChardev{
