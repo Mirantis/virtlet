@@ -22,7 +22,7 @@ import (
 	"github.com/hpcloud/tail"
 )
 
-func NewFakeVirtletLogger(virtletFolder, kubernetesFolder string) *fakeVirtletLogger {
+func newFakeVirtletLogger(virtletFolder, kubernetesFolder string) *fakeVirtletLogger {
 	logger := &fakeVirtletLogger{}
 	logger.config = virtletLoggerConf{
 		VirtletFolder:      virtletFolder,

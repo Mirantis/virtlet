@@ -187,7 +187,7 @@ func TestVirtletLogger_SpawnWorkers(t *testing.T) {
 	baseDir, baseInDir, baseOutDir := setupDirStructure([]string{"sandbox01"}, "Foo Bar\n")
 	defer os.RemoveAll(baseDir)
 
-	logger := NewFakeVirtletLogger(baseInDir, baseOutDir)
+	logger := newFakeVirtletLogger(baseInDir, baseOutDir)
 	statusCh := logger.workerRunner.(*fakeWorkerRunner).InitStatusChannel()
 
 	// This is what we're testing here.

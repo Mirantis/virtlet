@@ -31,21 +31,27 @@ import (
 * besides Virtlet container. It periodaically checks for new log folders and spawns
 * one worker for each log folder. Worker then "tail -F"s log file and converts each line
 * into JSON format that is expected by Kubernetes and lands output to the location where
-* Kubernetes expects it. This way "kubectl logs <VM>" suddnely starts working, as well as
+* Kubernetes expects it. This way "kubectl logs <VM>" suddenly starts working, as well as
 * the "Logs" tab on Kubernetes Dashboard.
  */
+
+const (
+	DEFAULT_SLEEP_SECONDS = 10
+)
 
 func main() {
 	virtletFolder := os.Getenv("VIRTLET_VM_LOGS")
 	kubernetesFolder := os.Getenv("KUBERNETES_POD_LOGS")
-	sleepInterval := 10 // seconds
-	if i, err := strconv.Atoi(os.Getenv("SLEEP_SECONDS")); err == nil {
-		sleepInterval = i
-	}
-
 	if virtletFolder == "" || kubernetesFolder == "" {
 		fmt.Println("VIRTLET_VM_LOGS and KUBERNETES_POD_LOGS environment variables must be set")
 		os.Exit(-1)
+	}
+
+	sleepInterval := DEFAULT_SLEEP_SECONDS
+	if i, err := strconv.Atoi(os.Getenv("SLEEP_SECONDS")); err == nil {
+		sleepInterval = i
+	} else {
+		fmt.Println("failed to parse SLEEP_SECONDS variable into int, fallback to 10 seconds.")
 	}
 
 	fmt.Println("starting VirtletLogger")

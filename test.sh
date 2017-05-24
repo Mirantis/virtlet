@@ -20,5 +20,5 @@ build/cmd.sh test
 docker build -t mirantis/virtlet .
 docker build -t mirantis/virtlet-log -f Dockerfile.logger .
 
-NONINTERACTIVE=1 NO_VM_CONSOLE=1 INJECT_LOCAL_IMAGE=1 BASE_LOCATION="${SCRIPT_DIR}" DEPLOY_LOG_CONTAINER=2 deploy/demo.sh
+NONINTERACTIVE=1 NO_VM_CONSOLE=1 INJECT_LOCAL_IMAGE=1 BASE_LOCATION="${SCRIPT_DIR}" DEPLOY_LOG_CONTAINER=inject deploy/demo.sh
 tests/e2e/e2e.sh

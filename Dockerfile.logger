@@ -1,4 +1,6 @@
 FROM ubuntu:16.04
+MAINTAINER Ivan Shvedunov <ishvedunov@mirantis.com>
+LABEL Name="virtlet-log" Version="0.1"
 
 COPY ./_output/virtlet_log /.
 CMD /virtlet_log
