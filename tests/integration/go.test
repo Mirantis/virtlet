@@ -8,6 +8,14 @@ trace() {
   fi
 }
 
+cleanup() {
+  if [ ! -z "${HTTP_SERVER_PID}" ] ; then
+    kill ${HTTP_SERVER_PID}
+  fi
+}
+
+trap cleanup SIGHUP SIGINT SIGTERM EXIT
+
 mkdir -p /tmp/image_store
 pushd /tmp/image_store
 trace curl http://download.cirros-cloud.net/0.3.3/cirros-0.3.3-x86_64-disk.img -o cirros-0.3.3-x86_64-disk.img
@@ -24,7 +32,5 @@ else
   go test -v .
   retval=$?
 fi
-
-kill $HTTP_SERVER_PID
 
 exit $retval
