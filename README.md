@@ -6,6 +6,13 @@ At this stage (pre-alpha), it's possible to run Virtlet by following the instruc
 
 [See here](docs/architecture.md) for the description of Virtlet architecture.
 
+## Community
+
+You can join
+[#virtlet](https://kubernetes.slack.com/messages/virtlet/) channel on
+[Kubernetes Slack](https://kubernetes.slack.com/messages). Both the
+users and developers are welcome!
+
 ## Getting started with Virtlet
 
 To try out Virtlet follow the instructions from [Running local environment](docs/devel/running-local-environment.md) and [try out examples](examples/README.md) documents.
