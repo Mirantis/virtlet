@@ -376,7 +376,10 @@ func SetupContainerSideNetwork(info *types.Result) (*ContainerSideNetwork, error
 	if err != nil {
 		return nil, err
 	}
-	if info == nil {
+	// If there are no routes provided, we consider it a broken
+	// config and extract interface config instead. That's the
+	// case with Weave CNI plugin.
+	if info == nil || info.IP4 == nil || len(info.IP4.Routes) == 0 {
 		info, err = ExtractLinkInfo(contVeth)
 		if err != nil {
 			return nil, err
