@@ -1,4 +1,3 @@
-#!/usr/bin/expect -f
 # Copyright 2017 Mirantis
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,16 +12,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set timeout 600
-set vmname [lindex $argv 0]
-
-source ./common.exp
-
-connect_ssh $vmname
-
-send "exit\r"
-
-expect {
-    timeout { puts "login prompt timeout"; exit 1 }
-    "Connection to ${vmname}.default closed."
-}
+check_SCRIPTS = go.test
+TESTS = $(check_SCRIPTS)
