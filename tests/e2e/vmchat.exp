@@ -14,29 +14,11 @@
 # limitations under the License.
 
 set timeout 600
-set domain [lindex $argv 0]
+set vmname [lindex $argv 0]
 
-spawn ../../examples/virsh.sh console $domain
+source ./common.exp
 
-expect {
-    timeout { puts "initial message timeout"; exit 1 }
-    "Escape character"
-}
-send "\r"
-
-expect {
-    timeout { puts "login prompt timeout"; exit 1 }
-    "login:"
-}
-send "cirros\r"
-
-set timeout 20
-expect {
-    timeout { puts "password prompt timeout"; exit 1 }
-    "Password: "
-}
-sleep 3
-send "cubswin:)\r"
+connect_ssh $vmname
 
 # display network config for the purpose of diagnostics
 expect {
@@ -81,7 +63,5 @@ send "exit\r"
 
 expect {
     timeout { puts "login prompt timeout"; exit 1 }
-    "login:"
+    "Connection to ${vmname}.default closed."
 }
-send "\035\r"
-expect eof
