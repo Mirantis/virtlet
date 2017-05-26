@@ -1,0 +1,44 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: virtlet-log
+  namespace: kube-system
+spec:
+  template:
+    metadata:
+      name: virtlet-log
+      labels:
+        runtime: virtlet-log
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: extraRuntime
+                operator: In
+                values:
+                - virtlet
+      containers:
+      - name: virtlet-log
+        image: mirantis/virtlet-log
+        imagePullPolicy: IfNotPresent
+        command:
+          - /virtlet_log
+        volumeMounts:        
+        - name: virtlet-log
+          mountPath: /virtlet-log
+        - name: kubernetes-log
+          mountPath: /kubernetes-log
+        env:
+        - name: VIRTLET_VM_LOGS
+          value: "/virtlet-log"
+        - name: KUBERNETES_POD_LOGS
+          value: "/kubernetes-log"
+      volumes:
+      - hostPath:
+          path: /var/log/virtlet/vms
+        name: virtlet-log 
+      - hostPath:
+          path: /var/log/pods
+        name: kubernetes-log

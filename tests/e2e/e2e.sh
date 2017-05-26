@@ -49,10 +49,81 @@ function wait-for-pod {
   echo >&2
 }
 
+function wait-for-ssh {
+  local vmname=${1}
+  local retries=10
+  while [[ $(../../examples/vmssh.sh "cirros@${vmname}" "echo Hello ${1}" | grep "Hello ${1}" | wc -l) != 1 ]]; do
+    if ((--retries <= 0));then
+      echo "Timed out waiting for ssh to ${vmname}"
+      exit 1
+    fi
+    echo "Waiting for ssh to ${vmname}"
+    sleep 1
+  done
+}
+
+function vmchat-short {
+  local vmname=${1}
+  wait-for-ssh ${vmname}
+
+  count=$(../../examples/vmssh.sh "cirros@${vmname}" "ip a" | grep "eth0:" | wc -l)
+  if [[ ${count} != 1 ]]; then
+    echo "Executing 'ip a' failed. Expected 1 line but got ${count}"
+    exit 1
+  fi
+}
+
+function vmchat {
+  local vmname=${1}
+  vmchat-short ${vmname}
+
+  count=$(../../examples/vmssh.sh "cirros@${vmname}" "ip r" | grep "default via" | wc -l)
+  if [[ ${count} != 1 ]]; then
+    echo "Executing 'ip r' failed. Expected 1 line but got ${count}"
+    exit 1
+  fi
+
+  count=$(../../examples/vmssh.sh "cirros@${vmname}" "ping -c1 8.8.8.8" | grep "1 packets transmitted, 1 packets received, 0% packet loss" | wc -l)
+  if [[ ${count} != 1 ]]; then
+    echo "Executing 'ping -c1 8.8.8.8' failed. Expected 1 line but got ${count}"
+    exit 1
+  fi
+
+  count=$(../../examples/vmssh.sh "cirros@${vmname}" "curl http://nginx.default.svc.cluster.local" | grep "Thank you for using nginx." | wc -l)
+  if [[ ${count} != 1 ]]; then
+    echo "Executing 'curl http://nginx.default.svc.cluster.local' failed. Expected 1 line but got ${count}"
+    exit 1
+  fi
+}
+
 wait-for-pod cirros-vm
 
 cd "${SCRIPT_DIR}"
-"${SCRIPT_DIR}/vmchat.exp" cirros-vm
+vmchat cirros-vm
+
+# test logging
+
+virshid=$($virsh list | grep "\-cirros-vm " | cut -f2 -d " ")
+logpath=$($virsh dumpxml $virshid | xmllint --xpath 'string(//serial[@type="file"]/source/@path)' -)
+filename=$(echo $logpath | sed -E 's#.+/##')
+sandboxid=$(echo $logpath | sed 's#/var/log/vms/##' | sed -E 's#/.+##')
+nodeid=$(docker ps | grep kube-node-1 | cut -f1 -d " ")
+
+count=$(docker exec -it ${nodeid} /bin/bash -c "cat /var/log/virtlet/vms/${sandboxid}/${filename}" | \
+     grep "login as 'cirros' user. default password: 'cubswin:)'. use 'sudo' for root." | \
+     wc -l)
+if [[ ${count} != 1 ]]; then
+  echo "Checking raw log file failed. Expected 1 line but got ${count}"
+  exit 1
+fi
+
+count=$(docker exec -it ${nodeid} /bin/bash -c "cat /var/log/pods/${sandboxid}/${filename}" | \
+     grep -E "{\"time\": \".+\", \"stream\": \"stdout\",\"log\":\"login as 'cirros' user. default password:.+'. use 'sudo' for root.+\"}" | \
+     wc -l)
+if [[ ${count} != 1 ]]; then
+  echo "Checking formatted log file failed. Expected 1 line but got ${count}"
+  exit 1
+fi
 
 # test ceph RBD
 
@@ -76,7 +147,7 @@ if [ "$(${virsh} domblklist @cirros-vm-rbd | grep rbd-test-image | wc -l)" != "1
 fi
 
 # wait for login prompt to appear
-"${SCRIPT_DIR}/vmchat-short.exp" cirros-vm-rbd
+vmchat-short cirros-vm-rbd
 
 "${vmssh}" cirros@cirros-vm-rbd 'sudo /usr/sbin/mkfs.ext2 /dev/vdc && sudo mount /dev/vdc /mnt && ls -l /mnt | grep lost+found'
 
@@ -137,7 +208,7 @@ kubectl convert -f "${SCRIPT_DIR}/../../examples/cirros-vm.yaml" --local -o json
 wait-for-pod cirros-vm
 
 # wait for login prompt to appear
-"${SCRIPT_DIR}/vmchat-short.exp" cirros-vm
+vmchat-short cirros-vm
 
 verify-cpu-count 2
 
