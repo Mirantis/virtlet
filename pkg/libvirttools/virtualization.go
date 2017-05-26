@@ -25,6 +25,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -54,6 +55,8 @@ const (
 	diskLetterStr               = "bcdefghijklmnopqrstu"
 
 	podNameString = "@podname@"
+
+	vmLogLocationPty = "pty"
 )
 
 var diskLetters = strings.Split(diskLetterStr, "")
@@ -77,6 +80,7 @@ type VirtletDomainSettings struct {
 	rootDiskFilepath string
 	netNSPath        string
 	cniConfig        string
+	vmLogLocation    string
 }
 
 func canUseKvm() bool {
@@ -101,8 +105,6 @@ func (ds *VirtletDomainSettings) createDomain() *libvirtxml.Domain {
 			Emulator: "/vmwrapper",
 			Inputs:   []libvirtxml.DomainInput{libvirtxml.DomainInput{Type: "tablet", Bus: "usb"}},
 			Graphics: []libvirtxml.DomainGraphic{libvirtxml.DomainGraphic{Type: "vnc", Port: -1}},
-			Serials:  []libvirtxml.DomainChardev{libvirtxml.DomainChardev{Type: "pty", Target: &libvirtxml.DomainChardevTarget{Port: "0"}}},
-			Consoles: []libvirtxml.DomainChardev{libvirtxml.DomainChardev{Type: "pty", Target: &libvirtxml.DomainChardevTarget{Type: "serial", Port: "0"}}},
 			Videos:   []libvirtxml.DomainVideo{libvirtxml.DomainVideo{Model: libvirtxml.DomainVideoModel{Type: "cirrus"}}},
 			Disks: []libvirtxml.DomainDisk{libvirtxml.DomainDisk{
 				Type:   "file",
@@ -277,6 +279,65 @@ func (v *VirtualizationTool) addVolumesToDomain(podID, podName string, domain *l
 	return nil
 }
 
+func vmLogLocation() string {
+	logLocation := os.Getenv("VIRTLET_VM_LOG_LOCATION")
+	if logLocation == "" {
+		return "/var/log/vms"
+	}
+	return logLocation
+}
+
+func (v *VirtualizationTool) RemoveLibvirtSandboxLog(sandboxId string) error {
+	logLocation := vmLogLocation()
+	if logLocation == vmLogLocationPty {
+		return nil
+	}
+	return os.RemoveAll(filepath.Join(logLocation, sandboxId))
+}
+
+func (v *VirtualizationTool) addSerialDevicesToDomain(sandboxId, containerName string, containerAttempt uint32, domain *libvirtxml.Domain, settings VirtletDomainSettings) error {
+	if settings.vmLogLocation != vmLogLocationPty {
+		logDir := filepath.Join(settings.vmLogLocation, sandboxId)
+		logPath := filepath.Join(logDir, fmt.Sprintf("%s_%d.log", containerName, containerAttempt))
+
+		// Prepare directory where libvirt will store log file to.
+		if _, err := os.Stat(logDir); os.IsNotExist(err) {
+			if err := os.Mkdir(logDir, 0644); err != nil {
+				return fmt.Errorf("failed to create vmLogDir '%s': %s", logDir, err.Error())
+			}
+		}
+
+		domain.Devices.Serials = []libvirtxml.DomainChardev{
+			libvirtxml.DomainChardev{
+				Type:   "file",
+				Target: &libvirtxml.DomainChardevTarget{Port: "0"},
+				Source: &libvirtxml.DomainChardevSource{Path: logPath},
+			},
+		}
+		domain.Devices.Consoles = []libvirtxml.DomainChardev{
+			libvirtxml.DomainChardev{
+				Type:   "file",
+				Target: &libvirtxml.DomainChardevTarget{Type: "serial", Port: "0"},
+				Source: &libvirtxml.DomainChardevSource{Path: logPath},
+			},
+		}
+	} else {
+		domain.Devices.Serials = []libvirtxml.DomainChardev{
+			libvirtxml.DomainChardev{
+				Type:   "pty",
+				Target: &libvirtxml.DomainChardevTarget{Port: "0"},
+			},
+		}
+		domain.Devices.Consoles = []libvirtxml.DomainChardev{
+			libvirtxml.DomainChardev{
+				Type:   "pty",
+				Target: &libvirtxml.DomainChardevTarget{Type: "serial", Port: "0"},
+			},
+		}
+	}
+	return nil
+}
+
 type VirtualizationTool struct {
 	tool           DomainOperations
 	volumeStorage  *StorageTool
@@ -306,9 +367,10 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 	}
 
 	settings := VirtletDomainSettings{
-		domainUUID: uuid,
-		netNSPath:  netNSPath,
-		cniConfig:  cniConfig,
+		domainUUID:    uuid,
+		netNSPath:     netNSPath,
+		cniConfig:     cniConfig,
+		vmLogLocation: vmLogLocation(),
 	}
 
 	if in.Config == nil || in.Config.Metadata == nil || in.Config.Image == nil || in.SandboxConfig == nil || in.SandboxConfig.Metadata == nil {
@@ -368,6 +430,15 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 	domain := settings.createDomain()
 
 	if err = v.addVolumesToDomain(in.PodSandboxId, in.SandboxConfig.Metadata.Name, domain, annotations.Volumes); err != nil {
+		return "", err
+	}
+
+	// Comment out when [https://github.com/Mirantis/virtlet/issues/295] is resolved.
+	// (also import "k8s.io/kubernetes/pkg/kubelet/types")
+	// containerName := in.Config.Labels[types.KubernetesContainerNameLabel]
+	containerName := ""
+	containerAttempt := in.Config.Metadata.Attempt
+	if err = v.addSerialDevicesToDomain(in.PodSandboxId, containerName, containerAttempt, domain, settings); err != nil {
 		return "", err
 	}
 
