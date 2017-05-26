@@ -54,6 +54,16 @@ wait-for-pod cirros-vm
 cd "${SCRIPT_DIR}"
 "${SCRIPT_DIR}/vmchat.exp" cirros-vm
 
+# test logging
+
+virshid=$($virsh list | grep "\-cirros-vm " | cut -f2 -d " ")
+logpath=$($virsh dumpxml $virshid | xmllint --xpath 'string(//serial[@type="file"]/source/@path)' -)
+filename=$(echo $logpath | sed -E 's#.+/##')
+sandboxid=$(echo $logpath | sed 's#/var/log/vms/##' | sed -E 's#/.+##')
+nodeid=$(docker ps | grep kube-node-1 | cut -f1 -d " ")
+
+"${SCRIPT_DIR}/vmlogs.exp" $nodeid $sandboxid $filename
+
 # test ceph RBD
 
 vm_hostname="$("${vmssh}" cirros@cirros-vm cat /etc/hostname)"
