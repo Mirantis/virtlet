@@ -1,0 +1,43 @@
+#!/usr/bin/expect -f
+# Copyright 2017 Mirantis
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+set timeout 600
+set nodeid [lindex $argv 0]
+set sandboxid [lindex $argv 1]
+set filename [lindex $argv 2]
+
+spawn docker exec -it ${nodeid} /bin/bash
+
+#
+# Check raw logs
+#
+
+send "cat /var/log/virtlet/vms/${sandboxid}/${filename}\r"
+
+expect {
+	timeout { puts "checking raw log file timeout"; exit 1 }
+	"login as 'cirros' user. default password: 'cubswin:)'. use 'sudo' for root."
+}
+
+#
+# Check formatted logs
+#
+
+send "cat /var/log/pods/${sandboxid}/${filename}\r"
+
+expect {
+	timeout { puts "checking formatted log file timeout"; exit 1 }
+	-re {\{"time": ".+", "stream": "stdout","log":"login as 'cirros' user\. default password: 'cubswin:\)'\. use 'sudo' for root.\\n"\}}
+}
