@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	libvirt "github.com/libvirt/libvirt-go"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 	"k8s.io/apimachinery/pkg/fields"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
@@ -370,6 +371,10 @@ func (v *VirtualizationTool) addSerialDevicesToDomain(sandboxId string, containe
 }
 
 func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest, netNSPath, cniConfig string) (string, error) {
+	var err error
+	var domainXML string
+	var domainPtr *libvirt.Domain
+
 	if in.Config == nil || in.Config.Metadata == nil || in.Config.Image == nil || in.SandboxConfig == nil || in.SandboxConfig.Metadata == nil {
 		return "", errors.New("invalid input data")
 	}
@@ -390,6 +395,12 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 
 	if settings.domainName == "" {
 		settings.domainName = settings.domainUUID
+	}
+
+	// Check annotations before creating/defining anything for domain
+	annotations, err := LoadAnnotations(sandboxAnnotations)
+	if err != nil {
+		return "", err
 	}
 
 	cloneName := "root_" + settings.domainUUID
@@ -423,18 +434,18 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 
 	nocloudFile, err := v.addVolumesToDomain(in.PodSandboxId, in.SandboxConfig.Metadata.Name, in.SandboxConfig.Metadata.Namespace, domainConf, annotations)
 	if err != nil {
-		return "", err
+		goto Cleanup
 	}
 
 	containerAttempt := in.Config.Metadata.Attempt
 	if err = v.addSerialDevicesToDomain(in.PodSandboxId, containerAttempt, domainConf, settings); err != nil {
-		return "", err
+		goto Cleanup
 	}
 
 	v.metadataStore.SetContainer(settings.domainName, settings.domainUUID, in.PodSandboxId, config.Image.Image, cloneName, config.Labels, config.Annotations, nocloudFile, v.timeFunc)
 
 	if _, err := v.domainConn.DefineDomain(domainConf); err != nil {
-		return "", err
+		goto Cleanup
 	}
 
 	domain, err := v.domainConn.LookupDomainByUUIDString(settings.domainUUID)
@@ -444,19 +455,37 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 		_, err = domain.State()
 	}
 	if err != nil {
-		return "", err
+		goto Cleanup
 	}
 
-	return settings.domainUUID, nil
+Cleanup:
+	if err != nil {
+		if rmErr := v.RemoveContainer(settings.domainUUID); rmErr != nil {
+			return "", fmt.Errorf("Container creation error: %v \n %v", err, rmErr)
+		} else {
+			return "", err
+		}
+	} else {
+
+		return settings.domainUUID, nil
+	}
 }
 
 func (v *VirtualizationTool) StartContainer(containerId string) error {
 	domain, err := v.domainConn.LookupDomainByUUIDString(containerId)
-	if err != nil {
-		return err
+	if err == nil {
+		err = domain.Create(domain)
 	}
 
-	return domain.Create()
+	if err != nil {
+		if rmErr := v.RemoveContainer(containerId); rmErr != nil {
+			return fmt.Errorf("Container start error: %v \n %v", err, rmErr)
+		} else {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (v *VirtualizationTool) StopContainer(containerId string) error {
@@ -491,7 +520,7 @@ func (v *VirtualizationTool) RemoveContainer(containerId string) error {
 	// Give a chance to gracefully stop domain
 	// TODO: handle errors - there could be e.x. connection errori
 	domain, err := v.domainConn.LookupDomainByUUIDString(containerId)
-	if err != nil {
+	if err != nil && err != virt.ErrDomainNotFound {
 		return err
 	}
 
