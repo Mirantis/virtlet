@@ -10,7 +10,8 @@ At this stage (pre-alpha), it's possible to run Virtlet by following the instruc
 
 You can join
 [#virtlet](https://kubernetes.slack.com/messages/virtlet/) channel on
-[Kubernetes Slack](https://kubernetes.slack.com/messages). Both the
+[Kubernetes Slack](https://kubernetes.slack.com/messages)
+(register at [slack.k8s.io](http://slack.k8s.io) if you're not in k8s group already). Both the
 users and developers are welcome!
 
 ## Getting started with Virtlet
@@ -48,6 +49,14 @@ The demo script will check for KVM support on the host and will make Virtlet use
 The demo is based on [kubeadm-dind-cluster](https://github.com/Mirantis/kubeadm-dind-cluster) project. **Docker btrfs storage driver is currently unsupported.** Please refer to `kubeadm-dind-cluster` documentation for more info.
 
 You can remove the test cluster with `./dind-cluster-v1.6.sh clean` when you no longer need it.
+
+## External projects using Virtlet
+Even if Virtlet is in pre-alpha stage at this point, we have some external projects using it already.
+One interesting usecase is that of [MIKELANGELO project](https://www.mikelangelo-project.eu/) that
+runs [OSv unikernels](http://osv.io) on Kubernetes using Virtlet. Unikernels are special case of VMs
+that are extremely small in size (20MB or so) and can only run a single process each. Nevertheless,
+Virtlet has no problems handling them on Kubernetes as demonstrated in this
+[osv-microservice-demo](https://github.com/mikelangelo-project/osv-microservice-demo#deploying-unikernels-on-kubernetes).
 
 ## Need any help with Virtlet?
 
