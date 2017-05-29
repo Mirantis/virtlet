@@ -46,8 +46,8 @@ func (it *imageTester) stop() {
 	it.manager.Close()
 }
 
-func (it *imageTester) pullImage() {
-	imageSpec := &kubeapi.ImageSpec{Image: imageCirrosUrl}
+func (it *imageTester) pullImage(url string) {
+	imageSpec := &kubeapi.ImageSpec{Image: url}
 	in := &kubeapi.PullImageRequest{
 		Image:         imageSpec,
 		Auth:          &kubeapi.AuthConfig{},
@@ -59,6 +59,10 @@ func (it *imageTester) pullImage() {
 	} else if resp.ImageRef != imageSpec.Image {
 		it.t.Fatalf("PullImage(): bad ImageRef in the response: %q instead of %q", resp.ImageRef, imageSpec)
 	}
+}
+
+func (it *imageTester) pullSampleImage() {
+	it.pullImage(imageCirrosUrl)
 }
 
 func (it *imageTester) queryImage() *kubeapi.Image {
@@ -132,9 +136,7 @@ func (it *imageTester) verifyNoImagesListed(filter *kubeapi.ImageFilter) {
 func TestImagePull(t *testing.T) {
 	it := newImageTester(t)
 	defer it.stop()
-	it.pullImage()
-	// make sure existing image is handled correctly
-	it.pullImage()
+	it.pullSampleImage()
 }
 
 func TestImageStatus(t *testing.T) {
@@ -142,14 +144,14 @@ func TestImageStatus(t *testing.T) {
 	defer it.stop()
 
 	it.verifyNoImage()
-	it.pullImage()
+	it.pullSampleImage()
 	it.verifyImage(it.queryImage())
 }
 
 func TestRemoveImage(t *testing.T) {
 	it := newImageTester(t)
 	defer it.stop()
-	it.pullImage()
+	it.pullSampleImage()
 
 	imageSpec := &kubeapi.ImageSpec{Image: imageCirrosUrl}
 	in := &kubeapi.RemoveImageRequest{
@@ -161,21 +163,21 @@ func TestRemoveImage(t *testing.T) {
 	it.verifyNoImage()
 
 	// re-pull should work correctly after image removal
-	it.pullImage()
+	it.pullSampleImage()
 	it.verifyImage(it.queryImage())
 }
 
 func TestListImages(t *testing.T) {
 	it := newImageTester(t)
 	defer it.stop()
-	it.pullImage()
+	it.pullSampleImage()
 	it.verifySingleImageListed(nil)
 }
 
 func TestListImagesWithFilter(t *testing.T) {
 	it := newImageTester(t)
 	defer it.stop()
-	it.pullImage()
+	it.pullSampleImage()
 	noSuchImage := "example.com/no-such-image"
 	it.verifyNoImagesListed(&kubeapi.ImageFilter{Image: &kubeapi.ImageSpec{Image: noSuchImage}})
 	it.verifySingleImageListed(&kubeapi.ImageFilter{Image: &kubeapi.ImageSpec{Image: imageCirrosUrl}})
@@ -183,9 +185,9 @@ func TestListImagesWithFilter(t *testing.T) {
 
 func getImageFileModificationTime() (time.Time, error) {
 	// Hardcoded file name for image:
-	// "download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img"
+	// "localhost/cirros-0.3.4-x86_64-disk.img"
 	// used by it.pullImage
-	imageFileName := "cdb29fccb47c1a69b1931685596258cfb760cb87_cirros-0.3.4-x86_64-disk.img"
+	imageFileName := "a6d362222f2b09929f9bf12154ea367d830908d0_cirros-0.3.4-x86_64-disk.img"
 	fileInfo, err := os.Stat(path.Join("/var/lib/libvirt/images", imageFileName))
 	if err != nil {
 		return time.Time{}, err
@@ -198,13 +200,13 @@ func TestImageRedownload(t *testing.T) {
 	it := newImageTester(t)
 	defer it.stop()
 
-	it.pullImage()
+	it.pullSampleImage()
 	firstTime, err := getImageFileModificationTime()
 	if err != nil {
 		t.Fatal("Can't stat cirros image in libvirt store:", err)
 	}
 
-	it.pullImage()
+	it.pullSampleImage()
 
 	secondTime, err := getImageFileModificationTime()
 	if err != nil {
@@ -213,5 +215,18 @@ func TestImageRedownload(t *testing.T) {
 
 	if firstTime.Equal(secondTime) {
 		t.Fatal("Image in libvirt store was not modified by second call to PullImage")
+	}
+}
+
+func TestImagesWithSameName(t *testing.T) {
+	it := newImageTester(t)
+	defer it.stop()
+
+	it.pullSampleImage()
+	it.pullImage(imageCopyCirrosUrl)
+
+	imagesCount := len(it.listImages(nil))
+	if imagesCount != 2 {
+		t.Fatal("Expected two images in store, get: %d", imagesCount)
 	}
 }

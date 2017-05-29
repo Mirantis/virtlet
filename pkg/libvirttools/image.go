@@ -43,7 +43,7 @@ func ImageNameToVolumeName(imageName string) (string, error) {
 	}
 
 	h := sha1.New()
-	io.WriteString(h, u.Path)
+	io.WriteString(h, u.String())
 
 	segments := strings.Split(u.Path, "/")
 
