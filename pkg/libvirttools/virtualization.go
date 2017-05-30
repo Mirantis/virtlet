@@ -54,6 +54,8 @@ const (
 	diskLetterStr               = "bcdefghijklmnopqrstu"
 
 	podNameString = "@podname@"
+
+	containerNsUuid = "67b7fb47-7735-4b64-86d2-6d062d121966"
 )
 
 var diskLetters = strings.Split(diskLetterStr, "")
@@ -300,19 +302,14 @@ func NewVirtualizationTool(conn *libvirt.Connect, volumesPoolName string, images
 }
 
 func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest, imageName string, netNSPath, cniConfig string) (string, error) {
-	uuid, err := utils.NewUuid()
-	if err != nil {
-		return "", err
+	if in.Config == nil || in.Config.Metadata == nil || in.Config.Image == nil || in.SandboxConfig == nil || in.SandboxConfig.Metadata == nil {
+		return "", errors.New("invalid input data")
 	}
 
 	settings := VirtletDomainSettings{
-		domainUUID: uuid,
+		domainUUID: utils.NewUuid5(containerNsUuid, in.PodSandboxId),
 		netNSPath:  netNSPath,
 		cniConfig:  cniConfig,
-	}
-
-	if in.Config == nil || in.Config.Metadata == nil || in.Config.Image == nil || in.SandboxConfig == nil || in.SandboxConfig.Metadata == nil {
-		return "", errors.New("invalid input data")
 	}
 
 	config := in.Config
