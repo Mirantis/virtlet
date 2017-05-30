@@ -216,7 +216,7 @@
             },
             "Auth": null,
             "Source": {
-              "File": "",
+              "File": "/var/lib/virtlet/root_231700d5-c9a6-5a49-738d-99a954c51550",
               "Device": "",
               "Protocol": "",
               "Name": "",
@@ -241,7 +241,7 @@
             },
             "Auth": null,
             "Source": {
-              "File": "",
+              "File": "/var/lib/virtlet/231700d5-c9a6-5a49-738d-99a954c51550-vol1",
               "Device": "",
               "Protocol": "",
               "Name": "",
@@ -266,7 +266,7 @@
             },
             "Auth": null,
             "Source": {
-              "File": "",
+              "File": "/var/lib/virtlet/231700d5-c9a6-5a49-738d-99a954c51550-vol2",
               "Device": "",
               "Protocol": "",
               "Name": "",
@@ -291,7 +291,7 @@
             },
             "Auth": null,
             "Source": {
-              "File": "",
+              "File": "/var/lib/virtlet/231700d5-c9a6-5a49-738d-99a954c51550-vol3",
               "Device": "",
               "Protocol": "",
               "Name": "",
