@@ -30,13 +30,13 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	libvirt "github.com/libvirt/libvirt-go"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 	"k8s.io/apimachinery/pkg/fields"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
 	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/utils"
+	"github.com/Mirantis/virtlet/pkg/virt"
 )
 
 const (
@@ -97,7 +97,7 @@ func (ds *VirtletDomainSettings) createDomain() *libvirtxml.Domain {
 		emulator = noKvmEmulator
 	}
 
-	domain := &libvirtxml.Domain{
+	return &libvirtxml.Domain{
 
 		Devices: &libvirtxml.DomainDeviceList{
 			Emulator: "/vmwrapper",
@@ -147,16 +147,10 @@ func (ds *VirtletDomainSettings) createDomain() *libvirtxml.Domain {
 			},
 		},
 	}
-	return domain
 }
 
 func (v *VirtualizationTool) createBootImageClone(cloneName, imageName string) (string, error) {
-	imageVolumeName, err := ImageNameToVolumeName(imageName)
-	if err != nil {
-		return "", err
-	}
-
-	imageVolume, err := v.imagesStorage.LookupVolume(imageVolumeName)
+	imageVolume, err := v.imageManager.GetImageVolume(imageName)
 	if err != nil {
 		return "", err
 	}
@@ -166,7 +160,7 @@ func (v *VirtualizationTool) createBootImageClone(cloneName, imageName string) (
 		return "", err
 	}
 
-	return vol.GetPath()
+	return vol.Path()
 }
 
 func gatherFlexvolumeDriverVolumeDefinitions(podID, podName string, lettersInd int) ([]FlexVolumeInfo, error) {
@@ -229,7 +223,7 @@ func gatherFlexvolumeDriverVolumeDefinitions(podID, podName string, lettersInd i
 				}
 				switch fileInfo.Name() {
 				case "disk.xml":
-					disk := libvirtxml.DomainDisk{}
+					var disk libvirtxml.DomainDisk
 					if err := xml.Unmarshal(content, &disk); err != nil {
 						return nil, err
 					}
@@ -257,15 +251,17 @@ func (v *VirtualizationTool) addVolumesToDomain(podID, podName string, domain *l
 	glog.V(2).Infof("FlexVolumes set to process: %v", flexVolumeInfos)
 	for _, flexVolumeInfo := range flexVolumeInfos {
 		if flexVolumeInfo.SecretXML != "" {
-			secret, err := v.tool.DefineSecretFromXML(flexVolumeInfo.SecretXML)
-			if err != nil {
+			var secretDef libvirtxml.Secret
+			if err := secretDef.Unmarshal(flexVolumeInfo.SecretXML); err != nil {
 				return err
 			}
 			key, err := base64.StdEncoding.DecodeString(flexVolumeInfo.Key)
 			if err != nil {
 				return err
 			}
-			secret.SetValue(key, 0)
+			if err := v.domainConn.DefineSecret(&secretDef, key); err != nil {
+				return err
+			}
 		}
 		domain.Devices.Disks = append(domain.Devices.Disks, *flexVolumeInfo.Disk)
 	}
@@ -280,28 +276,27 @@ func (v *VirtualizationTool) addVolumesToDomain(podID, podName string, domain *l
 }
 
 type VirtualizationTool struct {
-	tool           DomainOperations
+	domainConn     virt.VirtDomainConnection
 	volumeStorage  *StorageTool
-	imagesStorage  *StorageTool
+	imageManager   ImageManager
 	volumePoolName string
 	metadataStore  metadata.MetadataStore
 }
 
-func NewVirtualizationTool(conn *libvirt.Connect, volumesPoolName string, imagesStorage *StorageTool, rawDevices string, metadataStore metadata.MetadataStore) (*VirtualizationTool, error) {
-	storageTool, err := NewStorageTool(conn, volumesPoolName, rawDevices)
+func NewVirtualizationTool(domainConn virt.VirtDomainConnection, storageConn virt.VirtStorageConnection, imageManager ImageManager, metadataStore metadata.MetadataStore, volumesPoolName, rawDevices string) (*VirtualizationTool, error) {
+	storageTool, err := NewStorageTool(storageConn, volumesPoolName, rawDevices)
 	if err != nil {
 		return nil, err
 	}
-	tool := NewLibvirtDomainOperations(conn)
 	return &VirtualizationTool{
-		tool:          tool,
+		domainConn:    domainConn,
 		volumeStorage: storageTool,
-		imagesStorage: imagesStorage,
+		imageManager:  imageManager,
 		metadataStore: metadataStore,
 	}, nil
 }
 
-func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest, imageName string, netNSPath, cniConfig string) (string, error) {
+func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest, netNSPath, cniConfig string) (string, error) {
 	if in.Config == nil || in.Config.Metadata == nil || in.Config.Image == nil || in.SandboxConfig == nil || in.SandboxConfig.Metadata == nil {
 		return "", errors.New("invalid input data")
 	}
@@ -322,12 +317,16 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 	if settings.domainName == "" {
 		settings.domainName = settings.domainUUID
 	} else {
-		// check whether the domain with such name already exists, if so - return it's uuid
+		// check whether the domain with such name already exists, and if so, return it's uuid
 		domainName := in.PodSandboxId + "-" + settings.domainName
-		domain, _ := v.tool.LookupByName(domainName)
-		if domain != nil {
-			if domainID, err := v.tool.GetUUIDString(domain); err == nil {
-				// TODO: This is temp workaround for returning existent domain on create container call to overcome SyncPod issues
+		domain, err := v.domainConn.LookupDomainByName(domainName)
+		if err != nil && err != virt.ErrDomainNotFound {
+			return "", fmt.Errorf("failed to look up domain %q: %v", domainName, err)
+		}
+		if err == nil {
+			if domainID, err := domain.UUIDString(); err == nil {
+				// FIXME: this is a temp workaround for an existing domain being returned on create container call
+				// (this causing SyncPod issues)
 				return domainID, nil
 			} else {
 				glog.Errorf("Failed to get UUID for domain with name: %s due to %v", domainName, err)
@@ -337,7 +336,7 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 	}
 
 	cloneName := "root_" + settings.domainUUID
-	settings.rootDiskFilepath, err = v.createBootImageClone(cloneName, imageName)
+	settings.rootDiskFilepath, err = v.createBootImageClone(cloneName, config.Image.Image)
 	if err != nil {
 		return "", err
 	}
@@ -362,28 +361,23 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 	}
 	settings.vcpuNum = annotations.VCPUCount
 	settings.useKvm = canUseKvm()
-	domain := settings.createDomain()
+	domainConf := settings.createDomain()
 
-	if err = v.addVolumesToDomain(in.PodSandboxId, in.SandboxConfig.Metadata.Name, domain, annotations.Volumes); err != nil {
+	if err = v.addVolumesToDomain(in.PodSandboxId, in.SandboxConfig.Metadata.Name, domainConf, annotations.Volumes); err != nil {
 		return "", err
 	}
 
-	domainXML, err := domain.Marshal()
+	if _, err := v.domainConn.DefineDomain(domainConf); err != nil {
+		return "", err
+	}
+
+	domain, err := v.domainConn.LookupDomainByUUIDString(settings.domainUUID)
+	if err == nil {
+		// FIXME: do we really need this?
+		// (this causes an GetInfo() call on the domain in case of libvirt)
+		_, err = domain.State()
+	}
 	if err != nil {
-		return "", err
-	}
-
-	glog.V(2).Infof("Creating domain:\n%s", domainXML)
-	if _, err := v.tool.DefineFromXML(domainXML); err != nil {
-		return "", err
-	}
-
-	domainPtr, err := v.tool.LookupByUUIDString(settings.domainUUID)
-	if err != nil {
-		return "", err
-	}
-
-	if _, err := v.tool.GetDomainInfo(domainPtr); err != nil {
 		return "", err
 	}
 
@@ -391,16 +385,16 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 }
 
 func (v *VirtualizationTool) StartContainer(containerId string) error {
-	domain, err := v.tool.LookupByUUIDString(containerId)
+	domain, err := v.domainConn.LookupDomainByUUIDString(containerId)
 	if err != nil {
 		return err
 	}
 
-	return v.tool.Create(domain)
+	return domain.Create()
 }
 
 func (v *VirtualizationTool) StopContainer(containerId string) error {
-	domain, err := v.tool.LookupByUUIDString(containerId)
+	domain, err := v.domainConn.LookupDomainByUUIDString(containerId)
 	if err != nil {
 		return err
 	}
@@ -408,18 +402,18 @@ func (v *VirtualizationTool) StopContainer(containerId string) error {
 	// To process cases when VM is booting and cannot handle the shutdown signal
 	// send sequential shutdown requests with 1 sec interval until domain is shutoff or time after 60 sec.
 	return utils.WaitLoop(func() (bool, error) {
-		v.tool.Shutdown(domain)
+		domain.Shutdown()
 
-		domain, err := v.tool.LookupByUUIDString(containerId)
+		_, err := v.domainConn.LookupDomainByUUIDString(containerId)
 		if err != nil {
 			return true, err
 		}
 
-		di, err := v.tool.GetDomainInfo(domain)
+		state, err := domain.State()
 		if err != nil {
 			return false, err
 		}
-		return di.State == libvirt.DOMAIN_SHUTDOWN || di.State == libvirt.DOMAIN_SHUTOFF, nil
+		return state == virt.DOMAIN_SHUTDOWN || state == virt.DOMAIN_SHUTOFF, nil
 	}, domainShutdownRetryInterval, domainShutdownTimeout)
 }
 
@@ -435,43 +429,30 @@ func (v *VirtualizationTool) RemoveContainer(containerId string) error {
 
 	// Give a chance to gracefully stop domain
 	// TODO: handle errors - there could be e.x. connection errori
-	domain, err := v.tool.LookupByUUIDString(containerId)
+	domain, err := v.domainConn.LookupDomainByUUIDString(containerId)
 	if err != nil {
 		return err
 	}
 
 	if err := v.StopContainer(containerId); err != nil {
-		if err := v.tool.Destroy(domain); err != nil {
+		if err := domain.Destroy(); err != nil {
 			return err
 		}
 	}
 
-	if err := v.tool.Undefine(domain); err != nil {
+	if err := domain.Undefine(); err != nil {
 		return err
 	}
 
 	// Wait until domain is really removed or timeout after 5 sec.
 	if err := utils.WaitLoop(func() (bool, error) {
-		domain, err := v.tool.LookupByUUIDString(containerId)
-		if domain != nil && err != nil {
-			return false, nil
-		}
-
-		// There must be an error
-		if err == nil {
-			return false, errors.New("libvirt returned no domain and no error - this is incorrect")
-		}
-
-		lastLibvirtErr, ok := err.(libvirt.Error)
-		if !ok {
-			return false, errors.New("Failed to cast error to libvirt.Error type")
-		}
-		if lastLibvirtErr.Code == libvirt.ERR_NO_DOMAIN {
+		if _, err := v.domainConn.LookupDomainByUUIDString(containerId); err == virt.ErrDomainNotFound {
 			return true, nil
+		} else if err != nil {
+			// Unexpected error occured
+			return false, fmt.Errorf("error looking up domain %q: %v", containerId, err)
 		}
-
-		// Other error occured
-		return false, err
+		return false, nil
 	}, domainDestroyCheckInterval, domainDestroyTimeout); err != nil {
 		return err
 	}
@@ -499,29 +480,29 @@ func (v *VirtualizationTool) RemoveContainer(containerId string) error {
 	return nil
 }
 
-func libvirtToKubeState(domainState libvirt.DomainState, lastState kubeapi.ContainerState) kubeapi.ContainerState {
+func virtToKubeState(domainState virt.DomainState, lastState kubeapi.ContainerState) kubeapi.ContainerState {
 	var containerState kubeapi.ContainerState
 
 	switch domainState {
-	case libvirt.DOMAIN_RUNNING:
+	case virt.DOMAIN_RUNNING:
 		containerState = kubeapi.ContainerState_CONTAINER_RUNNING
-	case libvirt.DOMAIN_PAUSED:
+	case virt.DOMAIN_PAUSED:
 		if lastState == kubeapi.ContainerState_CONTAINER_CREATED {
 			containerState = kubeapi.ContainerState_CONTAINER_CREATED
 		} else {
 			containerState = kubeapi.ContainerState_CONTAINER_EXITED
 		}
-	case libvirt.DOMAIN_SHUTDOWN:
+	case virt.DOMAIN_SHUTDOWN:
 		containerState = kubeapi.ContainerState_CONTAINER_EXITED
-	case libvirt.DOMAIN_SHUTOFF:
+	case virt.DOMAIN_SHUTOFF:
 		if lastState == kubeapi.ContainerState_CONTAINER_CREATED {
 			containerState = kubeapi.ContainerState_CONTAINER_CREATED
 		} else {
 			containerState = kubeapi.ContainerState_CONTAINER_EXITED
 		}
-	case libvirt.DOMAIN_CRASHED:
+	case virt.DOMAIN_CRASHED:
 		containerState = kubeapi.ContainerState_CONTAINER_EXITED
-	case libvirt.DOMAIN_PMSUSPENDED:
+	case virt.DOMAIN_PMSUSPENDED:
 		containerState = kubeapi.ContainerState_CONTAINER_EXITED
 	default:
 		containerState = kubeapi.ContainerState_CONTAINER_UNKNOWN
@@ -530,7 +511,7 @@ func libvirtToKubeState(domainState libvirt.DomainState, lastState kubeapi.Conta
 	return containerState
 }
 
-func (v *VirtualizationTool) getContainerInfo(domain *libvirt.Domain, containerId string) (*metadata.ContainerInfo, error) {
+func (v *VirtualizationTool) getContainerInfo(domain virt.VirtDomain, containerId string) (*metadata.ContainerInfo, error) {
 	containerInfo, err := v.metadataStore.GetContainerInfo(containerId)
 	if err != nil {
 		return nil, err
@@ -539,12 +520,12 @@ func (v *VirtualizationTool) getContainerInfo(domain *libvirt.Domain, containerI
 		return nil, nil
 	}
 
-	domainInfo, err := v.tool.GetDomainInfo(domain)
+	state, err := domain.State()
 	if err != nil {
 		return nil, err
 	}
 
-	containerState := libvirtToKubeState(domainInfo.State, containerInfo.State)
+	containerState := virtToKubeState(state, containerInfo.State)
 	if containerInfo.State != containerState {
 		if err := v.metadataStore.UpdateState(containerId, byte(containerState)); err != nil {
 			return nil, err
@@ -586,8 +567,8 @@ func filterContainer(container *kubeapi.Container, filter *kubeapi.ContainerFilt
 	return true
 }
 
-func (v *VirtualizationTool) getContainer(domain *libvirt.Domain) (*kubeapi.Container, error) {
-	containerId, err := v.tool.GetUUIDString(domain)
+func (v *VirtualizationTool) getContainer(domain virt.VirtDomain) (*kubeapi.Container, error) {
+	containerId, err := domain.UUIDString()
 	if err != nil {
 		return nil, err
 	}
@@ -636,7 +617,7 @@ func (v *VirtualizationTool) ListContainers(filter *kubeapi.ContainerFilter) ([]
 
 			// Query libvirt for domain found in metadata store
 			// TODO: Distinguish lack of domain from other errors
-			domain, err := v.tool.LookupByUUIDString(filter.Id)
+			domain, err := v.domainConn.LookupDomainByUUIDString(filter.Id)
 			if err != nil {
 				// There's no such domain - looks like it's already removed, so return an empty list
 				return containers, nil
@@ -670,7 +651,7 @@ func (v *VirtualizationTool) ListContainers(filter *kubeapi.ContainerFilter) ([]
 			}
 
 			// TODO: Distinguish lack of domain from other errors
-			domain, err := v.tool.LookupByUUIDString(domainID)
+			domain, err := v.domainConn.LookupDomainByUUIDString(domainID)
 			if err != nil {
 				// There's no such domain - looks like it's already removed, so return an empty list
 				return containers, nil
@@ -687,12 +668,12 @@ func (v *VirtualizationTool) ListContainers(filter *kubeapi.ContainerFilter) ([]
 	}
 
 	// Get list of all defined domains from libvirt and check each container against remained filter settings
-	domains, err := v.tool.ListAll()
+	domains, err := v.domainConn.ListDomains()
 	if err != nil {
 		return nil, err
 	}
 	for _, domain := range domains {
-		container, err := v.getContainer(&domain)
+		container, err := v.getContainer(domain)
 		if err != nil {
 			return nil, err
 		}
@@ -706,7 +687,7 @@ func (v *VirtualizationTool) ListContainers(filter *kubeapi.ContainerFilter) ([]
 }
 
 func (v *VirtualizationTool) ContainerStatus(containerId string) (*kubeapi.ContainerStatus, error) {
-	domain, err := v.tool.LookupByUUIDString(containerId)
+	domain, err := v.domainConn.LookupDomainByUUIDString(containerId)
 	if err != nil {
 		return nil, err
 	}
