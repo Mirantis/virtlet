@@ -45,18 +45,23 @@ var capacityUnits = map[string]uint64{
 }
 
 type FakeStorageConnection struct {
+	rec   Recorder
 	pools map[string]*FakeStoragePool
 }
 
-func NewFakeStorageConnection() *FakeStorageConnection {
-	return &FakeStorageConnection{make(map[string]*FakeStoragePool)}
+func NewFakeStorageConnection(rec Recorder) *FakeStorageConnection {
+	return &FakeStorageConnection{
+		rec:   rec,
+		pools: make(map[string]*FakeStoragePool),
+	}
 }
 
 func (sc *FakeStorageConnection) CreateStoragePool(def *libvirtxml.StoragePool) (virt.VirtStoragePool, error) {
+	sc.rec.Rec("CreateStoragePool", def)
 	if _, found := sc.pools[def.Name]; found {
 		return nil, fmt.Errorf("storage pool already exists: %v", def.Name)
 	}
-	p := newFakeStoragePool()
+	p := newFakeStoragePool(NewChildRecorder(sc.rec, def.Name), def.Name)
 	sc.pools[def.Name] = p
 	return p, nil
 }
@@ -70,18 +75,24 @@ func (sc *FakeStorageConnection) LookupStoragePoolByName(name string) (virt.Virt
 }
 
 type FakeStoragePool struct {
+	rec     Recorder
+	name    string
 	volumes map[string]*FakeStorageVolume
 }
 
-func newFakeStoragePool() *FakeStoragePool {
-	return &FakeStoragePool{volumes: make(map[string]*FakeStorageVolume)}
+func newFakeStoragePool(rec Recorder, name string) *FakeStoragePool {
+	return &FakeStoragePool{
+		rec:     rec,
+		name:    name,
+		volumes: make(map[string]*FakeStorageVolume),
+	}
 }
 
-func (p *FakeStoragePool) CreateStorageVol(def *libvirtxml.StorageVolume) (virt.VirtStorageVolume, error) {
+func (p *FakeStoragePool) createStorageVol(def *libvirtxml.StorageVolume) (virt.VirtStorageVolume, error) {
 	if _, found := p.volumes[def.Name]; found {
 		return nil, fmt.Errorf("storage volume already exists: %v", def.Name)
 	}
-	v, err := newFakeStorageVolume(p, def)
+	v, err := newFakeStorageVolume(NewChildRecorder(p.rec, def.Name), p, def)
 	if err != nil {
 		return nil, err
 	}
@@ -89,10 +100,19 @@ func (p *FakeStoragePool) CreateStorageVol(def *libvirtxml.StorageVolume) (virt.
 	return v, nil
 }
 
+func (p *FakeStoragePool) CreateStorageVol(def *libvirtxml.StorageVolume) (virt.VirtStorageVolume, error) {
+	p.rec.Rec("CreateStorageVol", def)
+	return p.createStorageVol(def)
+}
+
 func (p *FakeStoragePool) CreateStorageVolClone(def *libvirtxml.StorageVolume, from virt.VirtStorageVolume) (virt.VirtStorageVolume, error) {
+	p.rec.Rec("CreateStorageVolClone", map[string]interface{}{
+		"def":  def,
+		"from": from.(*FakeStorageVolume).descriptiveName(),
+	})
 	d := *def
 	d.Capacity = &libvirtxml.StorageVolumeSize{Unit: "b", Value: from.(*FakeStorageVolume).size}
-	return p.CreateStorageVol(&d)
+	return p.createStorageVol(&d)
 }
 
 func (p *FakeStoragePool) ListAllVolumes() ([]virt.VirtStorageVolume, error) {
@@ -126,7 +146,7 @@ func (p *FakeStoragePool) ImageToVolume(def *libvirtxml.StorageVolume, sourcePat
 	return p.CreateStorageVol(def)
 }
 
-func (p *FakeStoragePool) RemoveVolumeByName(name string) error {
+func (p *FakeStoragePool) removeVolumeByName(name string) error {
 	if _, found := p.volumes[name]; !found {
 		return virt.ErrStorageVolumeNotFound
 	}
@@ -134,20 +154,27 @@ func (p *FakeStoragePool) RemoveVolumeByName(name string) error {
 	return nil
 }
 
+func (p *FakeStoragePool) RemoveVolumeByName(name string) error {
+	p.rec.Rec("RemoveVolumeByName", name)
+	return p.removeVolumeByName(name)
+}
+
 type FakeStorageVolume struct {
+	rec  Recorder
 	pool *FakeStoragePool
 	name string
 	path string
 	size uint64
 }
 
-func newFakeStorageVolume(pool *FakeStoragePool, def *libvirtxml.StorageVolume) (*FakeStorageVolume, error) {
+func newFakeStorageVolume(rec Recorder, pool *FakeStoragePool, def *libvirtxml.StorageVolume) (*FakeStorageVolume, error) {
 	path := ""
 	if def.Target != nil {
 		path = def.Target.Path
 	}
 
 	v := &FakeStorageVolume{
+		rec:  rec,
 		pool: pool,
 		name: def.Name,
 		path: path,
@@ -163,6 +190,10 @@ func newFakeStorageVolume(pool *FakeStoragePool, def *libvirtxml.StorageVolume) 
 	return v, nil
 }
 
+func (v *FakeStorageVolume) descriptiveName() string {
+	return v.pool.name + "." + v.name
+}
+
 func (v *FakeStorageVolume) Name() string {
 	return v.name
 }
@@ -176,5 +207,6 @@ func (v *FakeStorageVolume) Path() (string, error) {
 }
 
 func (v *FakeStorageVolume) Remove() error {
-	return v.pool.RemoveVolumeByName(v.name)
+	v.rec.Rec("Remove", nil)
+	return v.pool.removeVolumeByName(v.name)
 }

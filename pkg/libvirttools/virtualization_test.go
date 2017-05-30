@@ -49,7 +49,7 @@ func TestContainerLifecycle(t *testing.T) {
 	downloader := utils.NewFakeDownloader(tmpDir)
 	rec := fake.NewToplevelRecorder()
 	domainConn := fake.NewFakeDomainConnection(rec.Child("domain conn"))
-	storageConn := fake.NewFakeStorageConnection()
+	storageConn := fake.NewFakeStorageConnection(rec.Child("storage"))
 
 	boltClient, err := bolttools.NewFakeBoltClient()
 	if err != nil {
