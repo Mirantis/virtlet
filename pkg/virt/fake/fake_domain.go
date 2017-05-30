@@ -27,19 +27,25 @@ import (
 )
 
 type FakeDomainConnection struct {
+	rec           Recorder
 	domains       map[string]*FakeDomain
 	domainsByUuid map[string]*FakeDomain
 }
 
 var _ virt.VirtDomainConnection = &FakeDomainConnection{}
 
-func NewFakeDomainConnection() *FakeDomainConnection {
+func NewFakeDomainConnection(rec Recorder) *FakeDomainConnection {
+	if rec == nil {
+		rec = NullRecorder
+	}
 	return &FakeDomainConnection{
+		rec:           rec,
 		domains:       make(map[string]*FakeDomain),
 		domainsByUuid: make(map[string]*FakeDomain),
 	}
 }
 
+// func (dc *FakeDomainConnection) rec(name string, v interface{})
 func (dc *FakeDomainConnection) removeDomain(d *FakeDomain) {
 	if _, found := dc.domains[d.name]; !found {
 		log.Panicf("domain %q not found", d.name)
@@ -52,6 +58,7 @@ func (dc *FakeDomainConnection) removeDomain(d *FakeDomain) {
 }
 
 func (dc *FakeDomainConnection) DefineDomain(def *libvirtxml.Domain) (virt.VirtDomain, error) {
+	dc.rec.Rec("DefineDomain", def)
 	if _, found := dc.domains[def.Name]; found {
 		return nil, fmt.Errorf("domain %q already defined", def.Name)
 	}
@@ -77,6 +84,7 @@ func (dc *FakeDomainConnection) ListDomains() ([]virt.VirtDomain, error) {
 	for n, name := range names {
 		r[n] = dc.domains[name]
 	}
+	dc.rec.Rec("ListDomains", names)
 	return r, nil
 }
 
@@ -95,11 +103,15 @@ func (dc *FakeDomainConnection) LookupDomainByUUIDString(uuid string) (virt.Virt
 }
 
 func (dc *FakeDomainConnection) DefineSecret(def *libvirtxml.Secret, value []byte) error {
-	// TODO: record
+	dc.rec.Rec("DefineSecret", map[string]interface{}{
+		"def":   def,
+		"value": fmt.Sprintf("% x", value),
+	})
 	return nil
 }
 
 type FakeDomain struct {
+	rec     Recorder
 	dc      *FakeDomainConnection
 	removed bool
 	created bool
@@ -110,6 +122,7 @@ type FakeDomain struct {
 
 func newFakeDomain(dc *FakeDomainConnection, name, uuid string) *FakeDomain {
 	return &FakeDomain{
+		rec:   NewChildRecorder(dc.rec, name),
 		dc:    dc,
 		state: virt.DOMAIN_SHUTOFF,
 		name:  name,
@@ -118,6 +131,7 @@ func newFakeDomain(dc *FakeDomainConnection, name, uuid string) *FakeDomain {
 }
 
 func (d *FakeDomain) Create() error {
+	d.rec.Rec("Create", nil)
 	if d.removed {
 		return fmt.Errorf("Create() called on a removed (undefined) domain %q", d.name)
 	}
@@ -133,6 +147,7 @@ func (d *FakeDomain) Create() error {
 }
 
 func (d *FakeDomain) Destroy() error {
+	d.rec.Rec("Desroy", nil)
 	if d.removed {
 		return fmt.Errorf("Destroy() called on a removed (undefined) domain %q", d.name)
 	}
@@ -141,6 +156,7 @@ func (d *FakeDomain) Destroy() error {
 }
 
 func (d *FakeDomain) Undefine() error {
+	d.rec.Rec("Undefine", nil)
 	if d.removed {
 		return fmt.Errorf("Undefine(): domain %q already removed", d.name)
 	}
@@ -150,6 +166,7 @@ func (d *FakeDomain) Undefine() error {
 }
 
 func (d *FakeDomain) Shutdown() error {
+	d.rec.Rec("Shutdown", nil)
 	if d.removed {
 		return fmt.Errorf("Shutdown() called on a removed (undefined) domain %q", d.name)
 	}

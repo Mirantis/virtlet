@@ -281,6 +281,7 @@ type VirtualizationTool struct {
 	imageManager   ImageManager
 	volumePoolName string
 	metadataStore  metadata.MetadataStore
+	timeFunc       func() time.Time
 }
 
 func NewVirtualizationTool(domainConn virt.VirtDomainConnection, storageConn virt.VirtStorageConnection, imageManager ImageManager, metadataStore metadata.MetadataStore, volumesPoolName, rawDevices string) (*VirtualizationTool, error) {
@@ -293,7 +294,12 @@ func NewVirtualizationTool(domainConn virt.VirtDomainConnection, storageConn vir
 		volumeStorage: storageTool,
 		imageManager:  imageManager,
 		metadataStore: metadataStore,
+		timeFunc:      time.Now,
 	}, nil
+}
+
+func (v *VirtualizationTool) SetTimeFunc(timeFunc func() time.Time) {
+	v.timeFunc = timeFunc
 }
 
 func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest, netNSPath, cniConfig string) (string, error) {
@@ -347,7 +353,7 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 	}
 	settings.vcpuNum = annotations.VCPUCount
 
-	v.metadataStore.SetContainer(settings.domainName, settings.domainUUID, in.PodSandboxId, config.Image.Image, cloneName, config.Labels, config.Annotations)
+	v.metadataStore.SetContainer(settings.domainName, settings.domainUUID, in.PodSandboxId, config.Image.Image, cloneName, config.Labels, config.Annotations, v.timeFunc)
 
 	if config.Linux != nil && config.Linux.Resources != nil {
 		settings.memory = int(config.Linux.Resources.MemoryLimitInBytes)
@@ -533,7 +539,7 @@ func (v *VirtualizationTool) getContainerInfo(domain virt.VirtDomain, containerI
 		if err := v.metadataStore.UpdateState(containerId, byte(containerState)); err != nil {
 			return nil, err
 		}
-		startedAt := time.Now().UnixNano()
+		startedAt := v.timeFunc().UnixNano()
 		if containerState == kubeapi.ContainerState_CONTAINER_RUNNING {
 			strStartedAt := strconv.FormatInt(startedAt, 10)
 			if err := v.metadataStore.UpdateStartedAt(containerId, strStartedAt); err != nil {

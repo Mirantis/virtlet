@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"syscall"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
@@ -187,7 +188,7 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 		glog.Errorf("Invalid pod config while creating pod sandbox for pod %s (%s): %v", podName, podId, err)
 		return nil, err
 	}
-	if err := v.metadataStore.SetPodSandbox(config, bytesNetConfig); err != nil {
+	if err := v.metadataStore.SetPodSandbox(config, bytesNetConfig, time.Now); err != nil {
 		glog.Errorf("Error when creating pod sandbox for pod %s (%s): %v", podName, podId, err)
 		return nil, err
 	}

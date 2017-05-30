@@ -1,0 +1,271 @@
+[
+  {
+    "name": "domain conn: ListDomains",
+    "data": []
+  },
+  {
+    "name": "domain conn: DefineDomain",
+    "data": {
+      "XMLName": {
+        "Space": "",
+        "Local": ""
+      },
+      "Type": "kvm",
+      "Name": "231700d5-c9a6-5a49-738d-99a954c51550-container1",
+      "UUID": "231700d5-c9a6-5a49-738d-99a954c51550",
+      "Memory": {
+        "Value": 1024,
+        "Unit": "MiB"
+      },
+      "CurrentMemory": null,
+      "MaximumMemory": null,
+      "MemoryBacking": {
+        "Locked": {}
+      },
+      "VCPU": {
+        "Placement": "",
+        "CPUSet": "",
+        "Current": "",
+        "Value": 1
+      },
+      "CPU": null,
+      "CPUTune": {
+        "Shares": {
+          "Value": 0
+        },
+        "Period": {
+          "Value": 0
+        },
+        "Quota": {
+          "Value": 0
+        }
+      },
+      "Resource": null,
+      "Devices": {
+        "Emulator": "/vmwrapper",
+        "Controllers": null,
+        "Disks": [
+          {
+            "Type": "file",
+            "Device": "disk",
+            "Snapshot": "",
+            "Driver": {
+              "Name": "qemu",
+              "Type": "qcow2"
+            },
+            "Auth": null,
+            "Source": {
+              "File": "",
+              "Device": "",
+              "Protocol": "",
+              "Name": "",
+              "Pool": "",
+              "Volume": "",
+              "Hosts": null,
+              "StartupPolicy": ""
+            },
+            "Target": {
+              "Dev": "vda",
+              "Bus": "virtio"
+            },
+            "ReadOnly": null
+          }
+        ],
+        "Filesystems": null,
+        "Interfaces": null,
+        "Serials": [
+          {
+            "Type": "pty",
+            "TTY": "",
+            "Source": null,
+            "Target": {
+              "Type": "",
+              "Port": "0"
+            },
+            "Alias": null,
+            "Address": null
+          }
+        ],
+        "Consoles": [
+          {
+            "Type": "pty",
+            "TTY": "",
+            "Source": null,
+            "Target": {
+              "Type": "serial",
+              "Port": "0"
+            },
+            "Alias": null,
+            "Address": null
+          }
+        ],
+        "Inputs": [
+          {
+            "Type": "tablet",
+            "Bus": "usb"
+          }
+        ],
+        "Graphics": [
+          {
+            "Type": "vnc",
+            "AutoPort": "",
+            "Port": -1,
+            "TLSPort": 0,
+            "WebSocket": 0,
+            "Listen": "",
+            "Socket": "",
+            "Keymap": "",
+            "Passwd": "",
+            "PasswdValidTo": "",
+            "Connected": "",
+            "SharePolicy": "",
+            "DefaultMode": "",
+            "Display": "",
+            "XAuth": "",
+            "FullScreen": "",
+            "ReplaceUser": "",
+            "MultiUser": "",
+            "Listeners": null
+          }
+        ],
+        "Videos": [
+          {
+            "Model": {
+              "Type": "cirrus"
+            }
+          }
+        ],
+        "Channels": null
+      },
+      "OS": {
+        "Type": {
+          "Arch": "",
+          "Machine": "",
+          "Type": "hvm"
+        },
+        "Loader": null,
+        "NVRam": null,
+        "Kernel": "",
+        "Initrd": "",
+        "KernelArgs": "",
+        "BootDevices": [
+          {
+            "Dev": "hd"
+          }
+        ],
+        "BootMenu": null,
+        "SMBios": null,
+        "BIOS": null,
+        "Init": "",
+        "InitArgs": null
+      },
+      "SysInfo": null,
+      "OnPoweroff": "destroy",
+      "OnReboot": "restart",
+      "OnCrash": "restart",
+      "Features": {
+        "PAE": null,
+        "ACPI": {},
+        "APIC": null,
+        "HAP": null,
+        "Viridian": null,
+        "PrivNet": null,
+        "HyperV": null,
+        "KVM": null,
+        "PVSpinlock": null,
+        "PMU": null,
+        "VMPort": null,
+        "GIC": null,
+        "SMM": null
+      },
+      "CMDLine": {
+        "Args": null,
+        "Envs": [
+          {
+            "Name": "VIRTLET_EMULATOR",
+            "Value": "/usr/bin/kvm"
+          },
+          {
+            "Name": "VIRTLET_NS",
+            "Value": "/tmp/fakenetns"
+          },
+          {
+            "Name": "VIRTLET_CNI_CONFIG",
+            "Value": "{\"noCniForNow\":true}"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "domain conn: ListDomains",
+    "data": [
+      "231700d5-c9a6-5a49-738d-99a954c51550-container1"
+    ]
+  },
+  {
+    "name": "container list after the container is created",
+    "data": [
+      {
+        "id": "231700d5-c9a6-5a49-738d-99a954c51550",
+        "pod_sandbox_id": "69eec606-0493-5825-73a4-c5e0c0236155",
+        "metadata": {
+          "name": "231700d5-c9a6-5a49-738d-99a954c51550"
+        },
+        "image": {
+          "image": "fake/image1"
+        },
+        "image_ref": "fake/image1",
+        "created_at": 1496175540000000000
+      }
+    ]
+  },
+  {
+    "name": "domain conn: 231700d5-c9a6-5a49-738d-99a954c51550-container1: Create"
+  },
+  {
+    "name": "container status the container is created",
+    "data": {
+      "id": "231700d5-c9a6-5a49-738d-99a954c51550",
+      "metadata": {
+        "name": "container1"
+      },
+      "state": 1,
+      "created_at": 1496175540000000000,
+      "started_at": 1496175541000000000,
+      "image": {
+        "image": "fake/image1"
+      },
+      "image_ref": "fake/image1"
+    }
+  },
+  {
+    "name": "domain conn: 231700d5-c9a6-5a49-738d-99a954c51550-container1: Shutdown"
+  },
+  {
+    "name": "container status the container is stopped",
+    "data": {
+      "id": "231700d5-c9a6-5a49-738d-99a954c51550",
+      "metadata": {
+        "name": "container1"
+      },
+      "state": 2,
+      "created_at": 1496175540000000000,
+      "started_at": 1496175541000000000,
+      "image": {
+        "image": "fake/image1"
+      },
+      "image_ref": "fake/image1"
+    }
+  },
+  {
+    "name": "domain conn: 231700d5-c9a6-5a49-738d-99a954c51550-container1: Shutdown"
+  },
+  {
+    "name": "domain conn: 231700d5-c9a6-5a49-738d-99a954c51550-container1: Undefine"
+  },
+  {
+    "name": "domain conn: ListDomains",
+    "data": []
+  }
+]
