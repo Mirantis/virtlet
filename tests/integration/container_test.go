@@ -60,7 +60,54 @@ func newContainerTester(t *testing.T) *containerTester {
 	}
 }
 
+func (ct *containerTester) cleanupContainers() {
+	ctx := context.Background()
+	resp, err := ct.runtimeServiceClient.ListContainers(ctx, &kubeapi.ListContainersRequest{})
+	if err != nil {
+		ct.t.Log("warning: couldn't list containers")
+	}
+	for _, container := range resp.Containers {
+		_, err := ct.runtimeServiceClient.StopContainer(ctx, &kubeapi.StopContainerRequest{
+			ContainerId: container.Id,
+		})
+		if err != nil {
+			ct.t.Log("warning: couldn't stop container %q", container.Id)
+		}
+		_, err = ct.runtimeServiceClient.RemoveContainer(ctx, &kubeapi.RemoveContainerRequest{
+			ContainerId: container.Id,
+		})
+		if err != nil {
+			ct.t.Log("warning: couldn't remove container %q", container.Id)
+		}
+	}
+}
+
+func (ct *containerTester) cleanupPods() {
+	ctx := context.Background()
+	podList, err := ct.runtimeServiceClient.ListPodSandbox(ctx, &kubeapi.ListPodSandboxRequest{})
+	if err != nil {
+		ct.t.Log("warning: couldn't list pods for removal")
+		return
+	}
+	for _, pod := range podList.Items {
+		_, err := ct.runtimeServiceClient.StopPodSandbox(ctx, &kubeapi.StopPodSandboxRequest{
+			PodSandboxId: pod.Id,
+		})
+		if err != nil {
+			ct.t.Log("warning: couldn't stop pod sandbox %q", pod.Id)
+		}
+		_, err = ct.runtimeServiceClient.RemovePodSandbox(ctx, &kubeapi.RemovePodSandboxRequest{
+			PodSandboxId: pod.Id,
+		})
+		if err != nil {
+			ct.t.Log("warning: couldn't remove container %q", pod.Id)
+		}
+	}
+}
+
 func (ct *containerTester) teardown() {
+	ct.cleanupContainers()
+	ct.cleanupPods()
 	ct.manager.Close()
 }
 
