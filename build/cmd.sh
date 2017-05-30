@@ -11,13 +11,22 @@ build_name="virtlet_build"
 container_name="${build_name}-$(openssl rand -hex 16)"
 build_image=${build_name}:latest
 volume_name=virtlet_src
+skip_image_check=
 exclude=(
     --exclude 'vendor'
     --exclude .git
     --exclude _output
+    --exclude '*.png'
 )
 
 function ensure_build_image {
+    # for commands like 'gotest' and 'gobuild' which are usually
+    # invoked by an editor with possibility that their output may be
+    # delayed, there's no sense in building the image here or wasting
+    # time checking for it
+    if [[ ${skip_image_check} ]]; then
+        return
+    fi
     # can't use 'docker images -q' due to https://github.com/docker/docker/issues/28895
     if ! docker history -q "${build_image}" >& /dev/null; then
         docker build -t "${build_image}" -f "${project_dir}/Dockerfile.build" "${project_dir}"
@@ -160,9 +169,11 @@ shift
 
 case "${cmd}" in
     gotest)
+        skip_image_check=y
         gotest "$@"
         ;;
     gobuild)
+        skip_image_check=y
         gobuild "$@"
         ;;
     build)
