@@ -93,6 +93,10 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 	ct.virtTool.SetTimeFunc(ct.fakeTime)
 	// avoid unneeded difs in the golden master data
 	ct.virtTool.SetForceKVM(true)
+	ct.virtTool.volumeStorage.SetFormatDisk(func(path string) error {
+		ct.rec.Rec("FormatDisk", path)
+		return nil
+	})
 
 	// TODO: move image metadata store & name conversion to ImageTool
 	// (i.e. methods like RemoveImage should accept image name)
@@ -224,10 +228,24 @@ func TestDomainDefinitions(t *testing.T) {
 				"VirtletVolumes": `[{"Name": "vol", "Format": "rawDevice", "Path": "/dev/loop0"}]`,
 			},
 		},
+		{
+			name: "volumes",
+			annotations: map[string]string{
+				"VirtletVolumes": `[{"Name": "vol1"}, {"Name": "vol2", "Format": "qcow2", "Capacity": "2", "CapacityUnit": "MB"}, {"Name": "vol3"}]`,
+			},
+		},
+		{
+			name: "vcpu count",
+			annotations: map[string]string{
+				"VirtletVCPUCount": "4",
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := fake.NewToplevelRecorder()
 			rec.AddFilter("DefineDomain")
+			rec.AddFilter("CreateStorageVol")
+			rec.AddFilter("CreateStorageVolClone")
 
 			ct := newContainerTester(t, rec)
 			defer ct.teardown()
