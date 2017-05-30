@@ -19,6 +19,7 @@ package bolttools
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
@@ -56,7 +57,7 @@ func TestRemovePodSandbox(t *testing.T) {
 		uid := ""
 		if tc.sandbox != nil {
 			uid = tc.sandbox.GetMetadata().Uid
-			if err := b.SetPodSandbox(tc.sandbox, []byte{}); err != nil {
+			if err := b.SetPodSandbox(tc.sandbox, []byte{}, time.Now); err != nil {
 				t.Fatal(err)
 			}
 		}

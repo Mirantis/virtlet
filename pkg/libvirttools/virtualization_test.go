@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
+	"time"
 
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
@@ -27,6 +28,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/Mirantis/virtlet/pkg/virt/fake"
 	"github.com/Mirantis/virtlet/tests/criapi"
+	"github.com/Mirantis/virtlet/tests/gm"
 )
 
 const (
@@ -35,6 +37,8 @@ const (
 )
 
 func TestContainerLifecycle(t *testing.T) {
+	curTime := time.Date(2017, 5, 30, 20, 19, 0, 0, time.UTC)
+	fakeTime := func() time.Time { return curTime }
 	sandboxes := criapi.GetSandboxes(1)
 	tmpDir, err := ioutil.TempDir("", "virtualization-test-")
 	if err != nil {
@@ -43,7 +47,8 @@ func TestContainerLifecycle(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	downloader := utils.NewFakeDownloader(tmpDir)
-	domainConn := fake.NewFakeDomainConnection()
+	rec := fake.NewToplevelRecorder()
+	domainConn := fake.NewFakeDomainConnection(rec.Child("domain conn"))
 	storageConn := fake.NewFakeStorageConnection()
 
 	boltClient, err := bolttools.NewFakeBoltClient()
@@ -62,14 +67,15 @@ func TestContainerLifecycle(t *testing.T) {
 	}
 
 	imageTool, err := NewImageTool(storageConn, downloader, "default")
-
 	if err != nil {
 		t.Fatalf("Failed to create ImageTool: %v", err)
 	}
+
 	virtTool, err := NewVirtualizationTool(domainConn, storageConn, imageTool, boltClient, "volumes", "loop*")
 	if err != nil {
 		t.Fatalf("failed to create VirtualizationTool: %v", err)
 	}
+	virtTool.SetTimeFunc(fakeTime)
 
 	// TODO: move image metadata store & name conversion to ImageTool
 	// (i.e. methods like RemoveImage should accept image name)
@@ -82,7 +88,7 @@ func TestContainerLifecycle(t *testing.T) {
 		t.Fatalf("Error pulling image %q to volume %q: %v", fakeImageName, imageVolumeName, err)
 	}
 
-	if err := boltClient.SetPodSandbox(sandboxes[0], []byte(fakeCNIConfig)); err != nil {
+	if err := boltClient.SetPodSandbox(sandboxes[0], []byte(fakeCNIConfig), fakeTime); err != nil {
 		t.Fatalf("Failed to store pod sandbox: %v", err)
 	}
 
@@ -121,7 +127,9 @@ func TestContainerLifecycle(t *testing.T) {
 	case containers[0].State != kubeapi.ContainerState_CONTAINER_CREATED:
 		t.Errorf("Bad container state: %v instead of %v", containers[0].State, kubeapi.ContainerState_CONTAINER_CREATED)
 	}
+	rec.Rec("container list after the container is created", containers)
 
+	curTime = curTime.Add(1 * time.Second)
 	if err = virtTool.StartContainer(containerId); err != nil {
 		t.Fatalf("StartContainer failed for container %q: %v", containerId, err)
 	}
@@ -133,6 +141,7 @@ func TestContainerLifecycle(t *testing.T) {
 	case status.State != kubeapi.ContainerState_CONTAINER_RUNNING:
 		t.Errorf("Bad container state: %v instead of %v", containers[0].State, kubeapi.ContainerState_CONTAINER_RUNNING)
 	}
+	rec.Rec("container status the container is created", status)
 
 	if err = virtTool.StopContainer(containerId); err != nil {
 		t.Fatalf("StopContainer failed for container %q: %v", containerId, err)
@@ -145,6 +154,7 @@ func TestContainerLifecycle(t *testing.T) {
 	case status.State != kubeapi.ContainerState_CONTAINER_EXITED:
 		t.Errorf("Bad container state: %v instead of %v", containers[0].State, kubeapi.ContainerState_CONTAINER_EXITED)
 	}
+	rec.Rec("container status the container is stopped", status)
 
 	if err = virtTool.RemoveContainer(containerId); err != nil {
 		t.Fatalf("RemoveContainer failed for container %q: %v", containerId, err)
@@ -157,4 +167,6 @@ func TestContainerLifecycle(t *testing.T) {
 	case len(containers) != 0:
 		t.Errorf("Unexpected containers when no containers are started: %#v", containers)
 	}
+
+	gm.Verify(t, rec.Content())
 }
