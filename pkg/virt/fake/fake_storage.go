@@ -19,6 +19,7 @@ package fake
 import (
 	"fmt"
 	"os"
+	"path"
 	"sort"
 
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
@@ -61,7 +62,11 @@ func (sc *FakeStorageConnection) CreateStoragePool(def *libvirtxml.StoragePool) 
 	if _, found := sc.pools[def.Name]; found {
 		return nil, fmt.Errorf("storage pool already exists: %v", def.Name)
 	}
-	p := newFakeStoragePool(NewChildRecorder(sc.rec, def.Name), def.Name)
+	poolPath := "/"
+	if def.Target != nil {
+		poolPath = def.Target.Path
+	}
+	p := newFakeStoragePool(NewChildRecorder(sc.rec, def.Name), def.Name, poolPath)
 	sc.pools[def.Name] = p
 	return p, nil
 }
@@ -77,13 +82,15 @@ func (sc *FakeStorageConnection) LookupStoragePoolByName(name string) (virt.Virt
 type FakeStoragePool struct {
 	rec     Recorder
 	name    string
+	path    string
 	volumes map[string]*FakeStorageVolume
 }
 
-func newFakeStoragePool(rec Recorder, name string) *FakeStoragePool {
+func newFakeStoragePool(rec Recorder, name, poolPath string) *FakeStoragePool {
 	return &FakeStoragePool{
 		rec:     rec,
 		name:    name,
+		path:    poolPath,
 		volumes: make(map[string]*FakeStorageVolume),
 	}
 }
@@ -168,16 +175,19 @@ type FakeStorageVolume struct {
 }
 
 func newFakeStorageVolume(rec Recorder, pool *FakeStoragePool, def *libvirtxml.StorageVolume) (*FakeStorageVolume, error) {
-	path := ""
+	volPath := ""
 	if def.Target != nil {
-		path = def.Target.Path
+		volPath = def.Target.Path
+	}
+	if volPath == "" {
+		volPath = path.Join(pool.path, def.Name)
 	}
 
 	v := &FakeStorageVolume{
 		rec:  rec,
 		pool: pool,
 		name: def.Name,
-		path: path,
+		path: volPath,
 	}
 	if def.Capacity != nil {
 		coef, found := capacityUnits[def.Capacity.Unit]
