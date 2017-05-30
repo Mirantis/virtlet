@@ -38,8 +38,7 @@ func TestContainerStatuses(t *testing.T) {
 	})
 	if len(listResp.Containers) != 1 {
 		t.Errorf("Expected single container, instead got: %d", len(listResp.Containers))
-	}
-	if listResp.Containers[0].Id != container.ContainerId {
+	} else if listResp.Containers[0].Id != container.ContainerId {
 		t.Errorf("Didn't find expected container id %s in returned containers list %v", container.ContainerId, listResp.Containers)
 	}
 
