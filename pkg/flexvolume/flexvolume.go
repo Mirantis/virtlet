@@ -23,8 +23,6 @@ import (
 	"os"
 	"strings"
 
-	uuid "github.com/nu7hatch/gouuid"
-
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
@@ -57,14 +55,6 @@ func init() {
 type Mounter interface {
 	Mount(source string, target string, fstype string) error
 	Unmount(target string) error
-}
-
-func NewUuid() string {
-	u, err := uuid.NewV4()
-	if err != nil {
-		panic("can't generate UUID")
-	}
-	return u.String()
 }
 
 type UuidGen func() string
