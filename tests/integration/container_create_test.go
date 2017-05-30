@@ -182,19 +182,21 @@ func TestContainerCreateStartListRemove(t *testing.T) {
 			expectedContainers: []int{0, 1},
 		},
 	} {
-		listResp := ct.listContainers(tc.containerFilter(ct))
-		expectedIds := tc.expectedIds(ct)
-		actualIds := make([]string, len(listResp.Containers))
-		for n, container := range listResp.Containers {
-			actualIds[n] = container.Id
-		}
-		sort.Strings(expectedIds)
-		sort.Strings(actualIds)
-		expectedIdStr := strings.Join(expectedIds, ",")
-		actualIdStr := strings.Join(actualIds, ",")
-		if expectedIdStr != actualIdStr {
-			t.Errorf("bad container list: %q instead of %q", actualIdStr, expectedIdStr)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			listResp := ct.listContainers(tc.containerFilter(ct))
+			expectedIds := tc.expectedIds(ct)
+			actualIds := make([]string, len(listResp.Containers))
+			for n, container := range listResp.Containers {
+				actualIds[n] = container.Id
+			}
+			sort.Strings(expectedIds)
+			sort.Strings(actualIds)
+			expectedIdStr := strings.Join(expectedIds, ",")
+			actualIdStr := strings.Join(actualIds, ",")
+			if expectedIdStr != actualIdStr {
+				t.Errorf("bad container list: %q instead of %q", actualIdStr, expectedIdStr)
+			}
+		})
 	}
 
 	for _, container := range ct.containers {
