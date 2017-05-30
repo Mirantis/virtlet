@@ -16,6 +16,8 @@ limitations under the License.
 
 package fake
 
+import "strings"
+
 type Record struct {
 	Name string      `json:"name"`
 	Data interface{} `json:"data,omitempty"`
@@ -32,7 +34,8 @@ func (r *nullRecorder) Rec(name string, data interface{}) {}
 var NullRecorder = &nullRecorder{}
 
 type TopLevelRecorder struct {
-	recs []*Record
+	recs    []*Record
+	filters []string
 }
 
 func NewToplevelRecorder() *TopLevelRecorder {
@@ -40,7 +43,9 @@ func NewToplevelRecorder() *TopLevelRecorder {
 }
 
 func (r *TopLevelRecorder) Rec(name string, data interface{}) {
-	r.recs = append(r.recs, &Record{Name: name, Data: data})
+	if r.nameMatches(name) {
+		r.recs = append(r.recs, &Record{Name: name, Data: data})
+	}
 }
 
 func (r *TopLevelRecorder) Content() []*Record {
@@ -49,6 +54,22 @@ func (r *TopLevelRecorder) Content() []*Record {
 
 func (r *TopLevelRecorder) Child(prefix string) *ChildRecorder {
 	return NewChildRecorder(r, prefix)
+}
+
+func (r *TopLevelRecorder) AddFilter(filter string) {
+	r.filters = append(r.filters, filter)
+}
+
+func (r *TopLevelRecorder) nameMatches(name string) bool {
+	if len(r.filters) == 0 {
+		return true
+	}
+	for _, f := range r.filters {
+		if strings.Contains(name, f) {
+			return true
+		}
+	}
+	return false
 }
 
 type ChildRecorder struct {
