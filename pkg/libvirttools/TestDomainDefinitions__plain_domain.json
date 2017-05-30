@@ -1,5 +1,68 @@
 [
   {
+    "name": "storage: default: CreateStorageVol",
+    "data": {
+      "XMLName": {
+        "Space": "",
+        "Local": ""
+      },
+      "Type": "",
+      "Name": "0d24dac87b6d48c5c3de11956f1774ef9a57a004_image1",
+      "Key": "",
+      "Allocation": {
+        "Unit": "",
+        "Value": 0
+      },
+      "Capacity": {
+        "Unit": "b",
+        "Value": 11
+      },
+      "Physical": null,
+      "Target": {
+        "Path": "/var/lib/libvirt/images/0d24dac87b6d48c5c3de11956f1774ef9a57a004_image1",
+        "Format": null,
+        "Permissions": null,
+        "Timestamps": null,
+        "Compat": "",
+        "NoCOW": null,
+        "Features": null,
+        "Encryption": null
+      },
+      "BackingStore": null
+    }
+  },
+  {
+    "name": "storage: volumes: CreateStorageVolClone",
+    "data": {
+      "def": {
+        "XMLName": {
+          "Space": "",
+          "Local": ""
+        },
+        "Type": "file",
+        "Name": "root_231700d5-c9a6-5a49-738d-99a954c51550",
+        "Key": "",
+        "Allocation": null,
+        "Capacity": null,
+        "Physical": null,
+        "Target": {
+          "Path": "",
+          "Format": {
+            "Type": "qcow2"
+          },
+          "Permissions": null,
+          "Timestamps": null,
+          "Compat": "",
+          "NoCOW": null,
+          "Features": null,
+          "Encryption": null
+        },
+        "BackingStore": null
+      },
+      "from": "default.0d24dac87b6d48c5c3de11956f1774ef9a57a004_image1"
+    }
+  },
+  {
     "name": "domain conn: DefineDomain",
     "data": {
       "XMLName": {

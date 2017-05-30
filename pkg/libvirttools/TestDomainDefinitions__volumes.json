@@ -63,6 +63,108 @@
     }
   },
   {
+    "name": "storage: volumes: CreateStorageVol",
+    "data": {
+      "XMLName": {
+        "Space": "",
+        "Local": ""
+      },
+      "Type": "",
+      "Name": "231700d5-c9a6-5a49-738d-99a954c51550-vol1",
+      "Key": "",
+      "Allocation": {
+        "Unit": "",
+        "Value": 0
+      },
+      "Capacity": {
+        "Unit": "MB",
+        "Value": 1024
+      },
+      "Physical": null,
+      "Target": {
+        "Path": "",
+        "Format": {
+          "Type": "qcow2"
+        },
+        "Permissions": null,
+        "Timestamps": null,
+        "Compat": "",
+        "NoCOW": null,
+        "Features": null,
+        "Encryption": null
+      },
+      "BackingStore": null
+    }
+  },
+  {
+    "name": "storage: volumes: CreateStorageVol",
+    "data": {
+      "XMLName": {
+        "Space": "",
+        "Local": ""
+      },
+      "Type": "",
+      "Name": "231700d5-c9a6-5a49-738d-99a954c51550-vol2",
+      "Key": "",
+      "Allocation": {
+        "Unit": "",
+        "Value": 0
+      },
+      "Capacity": {
+        "Unit": "MB",
+        "Value": 2
+      },
+      "Physical": null,
+      "Target": {
+        "Path": "",
+        "Format": {
+          "Type": "qcow2"
+        },
+        "Permissions": null,
+        "Timestamps": null,
+        "Compat": "",
+        "NoCOW": null,
+        "Features": null,
+        "Encryption": null
+      },
+      "BackingStore": null
+    }
+  },
+  {
+    "name": "storage: volumes: CreateStorageVol",
+    "data": {
+      "XMLName": {
+        "Space": "",
+        "Local": ""
+      },
+      "Type": "",
+      "Name": "231700d5-c9a6-5a49-738d-99a954c51550-vol3",
+      "Key": "",
+      "Allocation": {
+        "Unit": "",
+        "Value": 0
+      },
+      "Capacity": {
+        "Unit": "MB",
+        "Value": 1024
+      },
+      "Physical": null,
+      "Target": {
+        "Path": "",
+        "Format": {
+          "Type": "qcow2"
+        },
+        "Permissions": null,
+        "Timestamps": null,
+        "Compat": "",
+        "NoCOW": null,
+        "Features": null,
+        "Encryption": null
+      },
+      "BackingStore": null
+    }
+  },
+  {
     "name": "domain conn: DefineDomain",
     "data": {
       "XMLName": {
@@ -130,17 +232,17 @@
             "ReadOnly": null
           },
           {
-            "Type": "block",
+            "Type": "file",
             "Device": "disk",
             "Snapshot": "",
             "Driver": {
               "Name": "qemu",
-              "Type": "raw"
+              "Type": "qcow2"
             },
             "Auth": null,
             "Source": {
               "File": "",
-              "Device": "/dev/loop0",
+              "Device": "",
               "Protocol": "",
               "Name": "",
               "Pool": "",
@@ -150,6 +252,56 @@
             },
             "Target": {
               "Dev": "vdb",
+              "Bus": "virtio"
+            },
+            "ReadOnly": null
+          },
+          {
+            "Type": "file",
+            "Device": "disk",
+            "Snapshot": "",
+            "Driver": {
+              "Name": "qemu",
+              "Type": "qcow2"
+            },
+            "Auth": null,
+            "Source": {
+              "File": "",
+              "Device": "",
+              "Protocol": "",
+              "Name": "",
+              "Pool": "",
+              "Volume": "",
+              "Hosts": null,
+              "StartupPolicy": ""
+            },
+            "Target": {
+              "Dev": "vdc",
+              "Bus": "virtio"
+            },
+            "ReadOnly": null
+          },
+          {
+            "Type": "file",
+            "Device": "disk",
+            "Snapshot": "",
+            "Driver": {
+              "Name": "qemu",
+              "Type": "qcow2"
+            },
+            "Auth": null,
+            "Source": {
+              "File": "",
+              "Device": "",
+              "Protocol": "",
+              "Name": "",
+              "Pool": "",
+              "Volume": "",
+              "Hosts": null,
+              "StartupPolicy": ""
+            },
+            "Target": {
+              "Dev": "vdd",
               "Bus": "virtio"
             },
             "ReadOnly": null

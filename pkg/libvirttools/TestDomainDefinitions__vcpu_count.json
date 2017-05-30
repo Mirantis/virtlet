@@ -85,7 +85,7 @@
         "Placement": "",
         "CPUSet": "",
         "Current": "",
-        "Value": 1
+        "Value": 4
       },
       "CPU": null,
       "CPUTune": {
@@ -125,31 +125,6 @@
             },
             "Target": {
               "Dev": "vda",
-              "Bus": "virtio"
-            },
-            "ReadOnly": null
-          },
-          {
-            "Type": "block",
-            "Device": "disk",
-            "Snapshot": "",
-            "Driver": {
-              "Name": "qemu",
-              "Type": "raw"
-            },
-            "Auth": null,
-            "Source": {
-              "File": "",
-              "Device": "/dev/loop0",
-              "Protocol": "",
-              "Name": "",
-              "Pool": "",
-              "Volume": "",
-              "Hosts": null,
-              "StartupPolicy": ""
-            },
-            "Target": {
-              "Dev": "vdb",
               "Bus": "virtio"
             },
             "ReadOnly": null

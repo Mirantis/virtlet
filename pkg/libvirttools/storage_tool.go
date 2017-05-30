@@ -65,6 +65,7 @@ type StorageTool struct {
 	name       string
 	rawDevices []string
 	pool       virt.VirtStoragePool
+	formatDisk func(path string) error
 }
 
 func NewStorageTool(conn virt.VirtStorageConnection, poolName, rawDevices string) (*StorageTool, error) {
@@ -72,7 +73,16 @@ func NewStorageTool(conn virt.VirtStorageConnection, poolName, rawDevices string
 	if err != nil {
 		return nil, err
 	}
-	return &StorageTool{name: poolName, pool: pool, rawDevices: strings.Split(rawDevices, ",")}, nil
+	return &StorageTool{
+		name:       poolName,
+		pool:       pool,
+		rawDevices: strings.Split(rawDevices, ","),
+		formatDisk: diskimage.FormatDisk,
+	}, nil
+}
+
+func (s *StorageTool) SetFormatDisk(formatDisk func(path string) error) {
+	s.formatDisk = formatDisk
 }
 
 func (s *StorageTool) CreateQCOW2Volume(name string, capacity uint64, capacityUnit string) (virt.VirtStorageVolume, error) {
@@ -149,7 +159,7 @@ func (s *StorageTool) PrepareVolumesToBeAttached(volumes []*VirtletVolume, conta
 				return nil, err
 			}
 
-			err = diskimage.FormatDisk(path)
+			err = s.formatDisk(path)
 			if err != nil {
 				return nil, err
 			}
