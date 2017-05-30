@@ -25,11 +25,27 @@ import (
 	"github.com/golang/glog"
 )
 
-// DownloadFile downloads a file via an URL constructed as 'protocol://location'
-// and saves it in temporary file in default system directory for temporary files.
-// Returns path to this temporary file.
-func DownloadFile(protocol, location string) (string, error) {
-	url := fmt.Sprintf("%s://%s", protocol, location)
+// Downloader is an interface for downloading files from web
+type Downloader interface {
+	// DownloadFile downloads the specified file and returns path
+	// to it
+	DownloadFile(location string) (string, error)
+}
+
+type defaultDownloader struct {
+	protocol string
+}
+
+// NewDownloader returns the default downloader for 'protocol'.
+// The default downloader downloads a file via an URL constructed as
+// 'protocol://location' and saves it in temporary file in default
+// system directory for temporary files
+func NewDownloader(protocol string) Downloader {
+	return &defaultDownloader{protocol}
+}
+
+func (d *defaultDownloader) DownloadFile(location string) (string, error) {
+	url := fmt.Sprintf("%s://%s", d.protocol, location)
 
 	tempFile, err := ioutil.TempFile("", "virtlet_")
 	if err != nil {
