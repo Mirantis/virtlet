@@ -21,6 +21,8 @@ import (
 
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/types"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/golang/glog"
 )
 
 type Client struct {
@@ -40,22 +42,44 @@ func NewClient(pluginsDir, configsDir string) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) AddSandboxToNetwork(podId string) (*types.Result, error) {
-	netnsPath := PodNetNSPath(podId)
-	rt := &libcni.RuntimeConf{
+func (c *Client) cniRuntimeConf(podId, podName, podNs string) *libcni.RuntimeConf {
+	return &libcni.RuntimeConf{
 		ContainerID: podId,
-		NetNS:       netnsPath,
+		NetNS:       PodNetNSPath(podId),
 		IfName:      "virtlet-eth0",
+		Args: [][2]string{
+			{"IgnoreUnknown", "1"},
+			{"K8S_POD_NAMESPACE", podNs},
+			{"K8S_POD_NAME", podName},
+			{"K8S_POD_INFRA_CONTAINER_ID", podId},
+		},
 	}
-	return c.pluginsInterface.AddNetwork(c.configuration, rt)
 }
 
-func (c *Client) RemoveSandboxFromNetwork(podId string) error {
-	netnsPath := PodNetNSPath(podId)
-	rt := &libcni.RuntimeConf{
-		ContainerID: podId,
-		NetNS:       netnsPath,
-		IfName:      "virtlet-eth0",
+func (c *Client) AddSandboxToNetwork(podId, podName, podNs string) (*types.Result, error) {
+	cniConf := c.cniRuntimeConf(podId, podName, podNs)
+	glog.V(3).Infof("AddSandboxToNetwork: podId %q, podName %q, podNs %q, config:\n%s",
+		podId, podName, podNs, spew.Sdump(cniConf))
+	r, err := c.pluginsInterface.AddNetwork(c.configuration, cniConf)
+	if err == nil {
+		glog.V(3).Infof("AddSandboxToNetwork: podId %q, podName %q, podNs %q: result:\n%s",
+			podId, podName, podNs, spew.Sdump(r))
+	} else {
+		glog.V(3).Infof("AddSandboxToNetwork: podId %q, podName %q, podNs %q: error: %v",
+			podId, podName, podNs, err)
 	}
-	return c.pluginsInterface.DelNetwork(c.configuration, rt)
+	return r, err
+}
+
+func (c *Client) RemoveSandboxFromNetwork(podId, podName, podNs string) error {
+	glog.V(3).Infof("RemoveSandboxFromNetwork: podId %q, podName %q, podNs %q", podId, podName, podNs)
+	err := c.pluginsInterface.DelNetwork(c.configuration, c.cniRuntimeConf(podId, podName, podNs))
+	if err == nil {
+		glog.V(3).Infof("RemoveSandboxFromNetwork: podId %q, podName %q, podNs %q: success",
+			podId, podName, podNs)
+	} else {
+		glog.V(3).Infof("RemoveSandboxFromNetwork: podId %q, podName %q, podNs %q: error: %v",
+			podId, podName, podNs, err)
+	}
+	return err
 }

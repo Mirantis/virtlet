@@ -313,14 +313,27 @@ func TestExtractLinkInfo(t *testing.T) {
 }
 
 func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, info *types.Result) {
-	returnedInfo, _, err := SetupContainerSideNetwork(info)
+	origHwAddr := origContVeth.Attrs().HardwareAddr
+	csn, err := SetupContainerSideNetwork(info)
 	if err != nil {
 		log.Panicf("failed to set up container side network: %v", err)
 	}
-	if !reflect.DeepEqual(*returnedInfo, expectedExtractedLinkInfo) {
+	if !reflect.DeepEqual(*csn.Result, expectedExtractedLinkInfo) {
 		t.Errorf("interface info mismatch. Expected:\n%s\nActual:\n%s",
-			spew.Sdump(expectedExtractedLinkInfo), spew.Sdump(*returnedInfo))
+			spew.Sdump(expectedExtractedLinkInfo), spew.Sdump(*csn.Result))
 	}
+	if !reflect.DeepEqual(origHwAddr, csn.HardwareAddr) {
+		t.Errorf("bad hwaddr returned from SetupContainerSideNetwork: %v instead of %v", csn.HardwareAddr, origHwAddr)
+	}
+	// re-query origContVeth attrs
+	origContVeth, err = netlink.LinkByName(origContVeth.Attrs().Name)
+	if err != nil {
+		log.Panicf("the original cni veth is gone")
+	}
+	if reflect.DeepEqual(origContVeth.Attrs().HardwareAddr, origHwAddr) {
+		t.Errorf("cni veth hardware address didn't change")
+	}
+
 	verifyNoAddressAndRoutes(t, origContVeth)
 
 	bridge := verifyLinkUp(t, "br0", "in-container bridge")
@@ -434,16 +447,25 @@ func TestTeardownContainerSideNetwork(t *testing.T) {
 		if err := StripLink(origContVeth); err != nil {
 			log.Panicf("StripLink() failed: %v", err)
 		}
-		returnedInfo, _, err := SetupContainerSideNetwork(&expectedExtractedLinkInfo)
+		csn, err := SetupContainerSideNetwork(&expectedExtractedLinkInfo)
 		if err != nil {
 			log.Panicf("failed to set up container side network: %v", err)
 		}
 
-		if err := TeardownContainerSideNetwork(returnedInfo); err != nil {
+		if err := csn.Teardown(); err != nil {
 			log.Panicf("failed to tear down container side network: %v", err)
 		}
 
 		verifyNoLinks(t, []string{"br0", "tap0"})
 		verifyVethHaveConfiguration(t, &expectedExtractedLinkInfo)
+
+		// re-quiry origContVeth attrs
+		origContVeth, err = netlink.LinkByName(origContVeth.Attrs().Name)
+		if err != nil {
+			log.Panicf("the original cni veth is gone")
+		}
+		if !reflect.DeepEqual(origContVeth.Attrs().HardwareAddr, csn.HardwareAddr) {
+			t.Errorf("cni veth hardware address wasn't restored")
+		}
 	})
 }

@@ -216,12 +216,6 @@ func child(exitEOF chan bool, sigTERM chan os.Signal) {
 		os.Exit(1)
 	}
 
-	peerHwAddr, err := nettools.GenerateMacAddress()
-	if err != nil {
-		glog.Errorf("Failed to generate mac address: %v", err)
-		os.Exit(1)
-	}
-
 	cniConfig := os.Getenv(cniConfigEnvVar)
 	if cniConfig != "" {
 		if err := json.Unmarshal([]byte(cniConfig), &info); err != nil {
@@ -237,13 +231,13 @@ func child(exitEOF chan bool, sigTERM chan os.Signal) {
 	}
 
 	if err := vmNS.Do(func(ns.NetNS) error {
-		info, tapFile, err := nettools.SetupContainerSideNetwork(info)
+		csn, err := nettools.SetupContainerSideNetwork(info)
 		if err != nil {
 			return err
 		}
 		dhcpConfg := &dhcp.Config{
-			CNIResult:           *info,
-			PeerHardwareAddress: peerHwAddr,
+			CNIResult:           *csn.Result,
+			PeerHardwareAddress: csn.HardwareAddr,
 		}
 		dhcpServer := dhcp.NewServer(dhcpConfg)
 		if err := dhcpServer.SetupListener("0.0.0.0"); err != nil {
@@ -265,7 +259,7 @@ func child(exitEOF chan bool, sigTERM chan os.Signal) {
 			// Qemu process is started with 3d FD set to already opened TAP device
 			"tap,id=tap0,fd=3",
 			"-device",
-			"virtio-net-pci,netdev=tap0,id=net0,mac=" + peerHwAddr.String(),
+			"virtio-net-pci,netdev=tap0,id=net0,mac=" + csn.HardwareAddr.String(),
 		}
 
 		// Running qemu process inside virtlet' net namespace
@@ -274,7 +268,7 @@ func child(exitEOF chan bool, sigTERM chan os.Signal) {
 		// On catching SIGTERM just forward it to qemu process and wait for it to exit.
 
 		if err = virtletNS.Do(func(ns.NetNS) error {
-			err, _ := runCommand(emulator, append(emulatorArgs, netArgs...), exitEOF, sigTERM, tapFile)
+			err, _ := runCommand(emulator, append(emulatorArgs, netArgs...), exitEOF, sigTERM, csn.TapFile)
 			return err
 		}); err != nil {
 			glog.Error("Error occurred while starting subprocess in Virtlet base network namespace: %s", err)
@@ -290,7 +284,7 @@ func child(exitEOF chan bool, sigTERM chan os.Signal) {
 		default:
 		}
 
-		if err := nettools.TeardownContainerSideNetwork(info); err != nil {
+		if err := csn.Teardown(); err != nil {
 			return err
 		}
 

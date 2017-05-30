@@ -39,7 +39,7 @@ The demo will start a test cluster, deploy Virtlet on it and then boot a [CirrOS
 examples/vmssh.sh cirros@cirros-vm [command...]
 ```
 
-By default, CNI bridge plugin is used for cluster networking. Another option is using [flannel](https://github.com/coreos/flannel). To do so, run demo script like this:
+By default, CNI bridge plugin is used for cluster networking. It's also possible to override this with `flannel` or `weave` plugin, e.g.:
 ```
 CNI_PLUGIN=flannel ./demo.sh
 ```

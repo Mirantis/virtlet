@@ -334,6 +334,33 @@ func updateEbTables(interfaceName, command string) error {
 	return nil
 }
 
+func setHardwareAddr(link netlink.Link, hwaddr net.HardwareAddr) error {
+	if err := netlink.LinkSetDown(link); err != nil {
+		return fmt.Errorf("can't bring down the link: %v", err)
+	}
+	if err := netlink.LinkSetHardwareAddr(link, hwaddr); err != nil {
+		return fmt.Errorf("can't set hardware address for the link: %v", err)
+	}
+	if err := netlink.LinkSetUp(link); err != nil {
+		return fmt.Errorf("can't bring up the link: %v", err)
+	}
+
+	return nil
+}
+
+// ContainerSideNetwork struct describes the container (VM) network
+// namespace properties
+type ContainerSideNetwork struct {
+	// Result contains CNI result object describing the network settings
+	Result *types.Result
+	// TapFile contains an open File object pointing to Tap device inside
+	// the network namespace
+	TapFile *os.File
+	// HardwareAddr stores the original hardware address of the
+	// CNI veth interface
+	HardwareAddr net.HardwareAddr
+}
+
 // SetupContainerSideNetwork sets up networking in container
 // namespace.  It does so by calling ExtractLinkInfo() first unless
 // non-nil info argument is provided and then preparing the following
@@ -343,20 +370,32 @@ func updateEbTables(interfaceName, command string) error {
 // The bridge (br0) gets assigned a link-local address to be used
 // for dhcp server.
 // The function should be called from within container namespace.
-// Returns container network info (CNI Result) and error, if any
-func SetupContainerSideNetwork(info *types.Result) (*types.Result, *os.File, error) {
+// Returns container network struct and an error, if any
+func SetupContainerSideNetwork(info *types.Result) (*ContainerSideNetwork, error) {
 	contVeth, err := FindVeth()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	if info == nil {
+	// If there are no routes provided, we consider it a broken
+	// config and extract interface config instead. That's the
+	// case with Weave CNI plugin.
+	if info == nil || info.IP4 == nil || len(info.IP4.Routes) == 0 {
 		info, err = ExtractLinkInfo(contVeth)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 	}
-	if err := StripLink(contVeth); err != nil {
-		return nil, nil, err
+
+	hwAddr := contVeth.Attrs().HardwareAddr
+	newHwAddr, err := GenerateMacAddress()
+	if err == nil {
+		err = setHardwareAddr(contVeth, newHwAddr)
+	}
+	if err == nil {
+		err = StripLink(contVeth)
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	tap := &netlink.Tuntap{
@@ -368,37 +407,37 @@ func SetupContainerSideNetwork(info *types.Result) (*types.Result, *os.File, err
 		Mode: netlink.TUNTAP_MODE_TAP,
 	}
 	if err := netlink.LinkAdd(tap); err != nil {
-		return nil, nil, fmt.Errorf("failed to create tap interface: %v", err)
+		return nil, fmt.Errorf("failed to create tap interface: %v", err)
 	}
 
 	if err := netlink.LinkSetUp(tap); err != nil {
-		return nil, nil, fmt.Errorf("failed to set %q up: %v", tapInterfaceName, err)
+		return nil, fmt.Errorf("failed to set %q up: %v", tapInterfaceName, err)
 	}
 
 	br, err := SetupBridge(containerBridgeName, []netlink.Link{contVeth, tap})
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create bridge: %v", err)
+		return nil, fmt.Errorf("failed to create bridge: %v", err)
 	}
 
 	if err := netlink.AddrAdd(br, mustParseAddr(internalDhcpAddr)); err != nil {
-		return nil, nil, fmt.Errorf("failed to set address for the bridge: %v", err)
+		return nil, fmt.Errorf("failed to set address for the bridge: %v", err)
 	}
 
 	// Add ebtables DHCP blocking rules
 	if err := updateEbTables(contVeth.Attrs().Name, "-A"); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if err := bringUpLoopback(); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	tapFile, err := OpenTAP(tapInterfaceName)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to open tap: %v", err)
+		return nil, fmt.Errorf("failed to open tap: %v", err)
 	}
 
-	return info, tapFile, nil
+	return &ContainerSideNetwork{info, tapFile, hwAddr}, nil
 }
 
 // TeardownBridge removes links from bridge and sets it down
@@ -433,12 +472,12 @@ func ConfigureLink(link netlink.Link, info *types.Result) error {
 	return nil
 }
 
-// TeardownContainerSideNetwork cleans up container network configuration.
+// Teardown cleans up container network configuration.
 // It does so by invoking teardown sequence which removes ebtables rules, links
 // and addresses in an order opposite to that of their creation in SetupContainerSideNetwork.
 // The end result is the same network configuration in the container network namespace
 // as it was before SetupContainerSideNetwork() call.
-func TeardownContainerSideNetwork(info *types.Result) error {
+func (csn *ContainerSideNetwork) Teardown() error {
 	contVeth, err := FindVeth()
 	if err != nil {
 		return err
@@ -479,7 +518,11 @@ func TeardownContainerSideNetwork(info *types.Result) error {
 		return err
 	}
 
-	return ConfigureLink(contVeth, info)
+	if err := setHardwareAddr(contVeth, csn.HardwareAddr); err != nil {
+		return err
+	}
+
+	return ConfigureLink(contVeth, csn.Result)
 }
 
 // copied from:
