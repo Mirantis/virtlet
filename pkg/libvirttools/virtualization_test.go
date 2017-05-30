@@ -76,6 +76,8 @@ func TestContainerLifecycle(t *testing.T) {
 		t.Fatalf("failed to create VirtualizationTool: %v", err)
 	}
 	virtTool.SetTimeFunc(fakeTime)
+	// avoid unneeded difs in the golden master data
+	virtTool.SetForceKVM(true)
 
 	// TODO: move image metadata store & name conversion to ImageTool
 	// (i.e. methods like RemoveImage should accept image name)

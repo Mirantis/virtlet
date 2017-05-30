@@ -282,6 +282,7 @@ type VirtualizationTool struct {
 	volumePoolName string
 	metadataStore  metadata.MetadataStore
 	timeFunc       func() time.Time
+	forceKVM       bool
 }
 
 func NewVirtualizationTool(domainConn virt.VirtDomainConnection, storageConn virt.VirtStorageConnection, imageManager ImageManager, metadataStore metadata.MetadataStore, volumesPoolName, rawDevices string) (*VirtualizationTool, error) {
@@ -296,6 +297,10 @@ func NewVirtualizationTool(domainConn virt.VirtDomainConnection, storageConn vir
 		metadataStore: metadataStore,
 		timeFunc:      time.Now,
 	}, nil
+}
+
+func (v *VirtualizationTool) SetForceKVM(forceKVM bool) {
+	v.forceKVM = forceKVM
 }
 
 func (v *VirtualizationTool) SetTimeFunc(timeFunc func() time.Time) {
@@ -369,7 +374,7 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 		settings.memoryUnit = defaultMemoryUnit
 	}
 
-	settings.useKvm = canUseKvm()
+	settings.useKvm = v.forceKVM || canUseKvm()
 	domainConf := settings.createDomain()
 
 	if err = v.addVolumesToDomain(in.PodSandboxId, in.SandboxConfig.Metadata.Name, domainConf, annotations.Volumes); err != nil {
