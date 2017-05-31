@@ -57,6 +57,18 @@ type Mounter interface {
 	Unmount(target string) error
 }
 
+type nullMounter struct{}
+
+func (m *nullMounter) Mount(source string, target string, fstype string) error {
+	return nil
+}
+
+func (m *nullMounter) Unmount(target string) error {
+	return nil
+}
+
+var NullMounter = &nullMounter{}
+
 type UuidGen func() string
 
 type volumeHandler func(uuidGen UuidGen, targetDir string, opts volumeOpts) (map[string][]byte, error)

@@ -17,14 +17,17 @@ limitations under the License.
 package libvirttools
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
 	"github.com/Mirantis/virtlet/pkg/bolttools"
+	"github.com/Mirantis/virtlet/pkg/flexvolume"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/Mirantis/virtlet/pkg/virt/fake"
 	"github.com/Mirantis/virtlet/tests/criapi"
@@ -32,19 +35,27 @@ import (
 )
 
 const (
-	fakeImageName = "fake/image1"
-	fakeCNIConfig = `{"noCniForNow":true}`
+	fakeImageName   = "fake/image1"
+	fakeCNIConfig   = `{"noCniForNow":true}`
+	noCloudMetaData = `
+instance-id: some-instance-id
+local-hostname: foobar
+`
+	noCloudUserData = `#cloud-config
+users:
+  - name: foo
+`
 )
 
 type containerTester struct {
-	t          *testing.T
-	curTime    time.Time
-	fakeTime   func() time.Time
-	tmpDir     string
-	sandbox    *kubeapi.PodSandboxConfig
-	virtTool   *VirtualizationTool
-	rec        *fake.TopLevelRecorder
-	boltClient *bolttools.BoltClient
+	t              *testing.T
+	curTime        time.Time
+	fakeTime       func() time.Time
+	tmpDir         string
+	kubeletRootDir string
+	virtTool       *VirtualizationTool
+	rec            *fake.TopLevelRecorder
+	boltClient     *bolttools.BoltClient
 }
 
 func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTester {
@@ -97,6 +108,8 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 		ct.rec.Rec("FormatDisk", path)
 		return nil
 	})
+	ct.kubeletRootDir = filepath.Join(ct.tmpDir, "kubelet-root")
+	ct.virtTool.SetKubeletRootDir(ct.kubeletRootDir)
 
 	// TODO: move image metadata store & name conversion to ImageTool
 	// (i.e. methods like RemoveImage should accept image name)
@@ -213,9 +226,13 @@ func TestContainerLifecycle(t *testing.T) {
 }
 
 func TestDomainDefinitions(t *testing.T) {
+	flexVolumeDriver := flexvolume.NewFlexVolumeDriver(func() string {
+		return "fa1f16d1-5bf7-412e-8d68-4f15c43f3771"
+	}, flexvolume.NullMounter)
 	for _, tc := range []struct {
 		name        string
 		annotations map[string]string
+		flexVolumes map[string]map[string]interface{}
 	}{
 		{
 			name: "plain domain",
@@ -240,12 +257,38 @@ func TestDomainDefinitions(t *testing.T) {
 				"VirtletVCPUCount": "4",
 			},
 		},
+		{
+			name: "ceph flexvolume",
+			flexVolumes: map[string]map[string]interface{}{
+				"ceph": map[string]interface{}{
+					"type":    "ceph",
+					"monitor": "127.0.0.1:6789",
+					"pool":    "libvirt-pool",
+					"volume":  "rbd-test-image",
+					"secret":  "Zm9vYmFyCg==",
+					"user":    "libvirt",
+				},
+			},
+		},
+		{
+			name: "cloud-init",
+			flexVolumes: map[string]map[string]interface{}{
+				"nocloud": map[string]interface{}{
+					"type":     "nocloud",
+					"metadata": noCloudMetaData,
+					"userdata": noCloudUserData,
+				},
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := fake.NewToplevelRecorder()
+			rec.AddFilter("DefineSecret")
+			rec.AddFilter("FormatDisk")
 			rec.AddFilter("DefineDomain")
 			rec.AddFilter("CreateStorageVol")
 			rec.AddFilter("CreateStorageVolClone")
+			rec.AddFilter("iso image")
 
 			ct := newContainerTester(t, rec)
 			defer ct.teardown()
@@ -253,6 +296,19 @@ func TestDomainDefinitions(t *testing.T) {
 			sandbox := criapi.GetSandboxes(1)[0]
 			sandbox.Annotations = tc.annotations
 			ct.setPodSandbox(sandbox)
+
+			for name, def := range tc.flexVolumes {
+				targetDir := filepath.Join(ct.kubeletRootDir, sandbox.Metadata.Uid, "volumes/virtlet~flexvolume_driver", name)
+				resultStr := flexVolumeDriver.Run([]string{"mount", targetDir, utils.MapToJson(def)})
+				var r map[string]interface{}
+				if err := json.Unmarshal([]byte(resultStr), &r); err != nil {
+					t.Errorf("failed to unmarshal flexvolume definition")
+					continue
+				}
+				if r["status"] != "Success" {
+					t.Errorf("mounting flexvolume %q failed: %s", name, r["message"])
+				}
+			}
 
 			containerId, err := ct.virtTool.CreateContainer(&kubeapi.CreateContainerRequest{
 				PodSandboxId: sandbox.Metadata.Uid,

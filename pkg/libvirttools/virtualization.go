@@ -25,6 +25,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -55,7 +56,9 @@ const (
 
 	podNameString = "@podname@"
 
-	containerNsUuid = "67b7fb47-7735-4b64-86d2-6d062d121966"
+	containerNsUuid       = "67b7fb47-7735-4b64-86d2-6d062d121966"
+	defaultKubeletRootDir = "/var/lib/kubelet/pods"
+	flexVolumeSubdir      = "volumes/virtlet~flexvolume_driver"
 )
 
 var diskLetters = strings.Split(diskLetterStr, "")
@@ -149,6 +152,48 @@ func (ds *VirtletDomainSettings) createDomain() *libvirtxml.Domain {
 	}
 }
 
+type VirtualizationTool struct {
+	domainConn     virt.VirtDomainConnection
+	volumeStorage  *StorageTool
+	imageManager   ImageManager
+	volumePoolName string
+	metadataStore  metadata.MetadataStore
+	timeFunc       func() time.Time
+	forceKVM       bool
+	kubeletRootDir string
+}
+
+func NewVirtualizationTool(domainConn virt.VirtDomainConnection, storageConn virt.VirtStorageConnection, imageManager ImageManager, metadataStore metadata.MetadataStore, volumesPoolName, rawDevices string) (*VirtualizationTool, error) {
+	storageTool, err := NewStorageTool(storageConn, volumesPoolName, rawDevices)
+	if err != nil {
+		return nil, err
+	}
+	return &VirtualizationTool{
+		domainConn:    domainConn,
+		volumeStorage: storageTool,
+		imageManager:  imageManager,
+		metadataStore: metadataStore,
+		timeFunc:      time.Now,
+		// FIXME: kubelet's --root-dir may be something other than /var/lib/kubelet
+		// Need to remove it from daemonset mounts (both dev and non-dev)
+		// Use 'nsenter -t 1 -m -- tar ...' or something to grab the path
+		// from root namespace
+		kubeletRootDir: defaultKubeletRootDir,
+	}, nil
+}
+
+func (v *VirtualizationTool) SetForceKVM(forceKVM bool) {
+	v.forceKVM = forceKVM
+}
+
+func (v *VirtualizationTool) SetTimeFunc(timeFunc func() time.Time) {
+	v.timeFunc = timeFunc
+}
+
+func (v *VirtualizationTool) SetKubeletRootDir(kubeletRootDir string) {
+	v.kubeletRootDir = kubeletRootDir
+}
+
 func (v *VirtualizationTool) createBootImageClone(cloneName, imageName string) (string, error) {
 	imageVolume, err := v.imageManager.GetImageVolume(imageName)
 	if err != nil {
@@ -163,16 +208,10 @@ func (v *VirtualizationTool) createBootImageClone(cloneName, imageName string) (
 	return vol.Path()
 }
 
-func gatherFlexvolumeDriverVolumeDefinitions(podID, podName string, lettersInd int) ([]FlexVolumeInfo, error) {
-	// FIXME: kubelet's --root-dir may be something other than /var/lib/kubelet
-	// Need to remove it from daemonset mounts (both dev and non-dev)
-	// Use 'nsenter -t 1 -m -- tar ...' or something to grab the path
-	// from root namespace
-	var flexInfos []FlexVolumeInfo
-	dir := fmt.Sprintf("/var/lib/kubelet/pods/%s/volumes/virtlet~flexvolume_driver", podID)
-	_, err := os.Stat(dir)
-	if os.IsNotExist(err) {
-		return flexInfos, nil
+func (v *VirtualizationTool) scanFlexVolumes(podId, podName string, lettersInd int) ([]FlexVolumeInfo, error) {
+	dir := filepath.Join(v.kubeletRootDir, podId, flexVolumeSubdir)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return nil, nil
 	} else if err != nil {
 		return nil, err
 	}
@@ -184,66 +223,68 @@ func gatherFlexvolumeDriverVolumeDefinitions(podID, podName string, lettersInd i
 	}
 
 	glog.V(2).Infof("Found FlexVolumes definitions at %s:\n%v", dir, vols)
+	var flexInfos []FlexVolumeInfo
 	for _, vol := range vols {
 		fileInfo, err := os.Stat(path.Join(dir, vol.Name()))
 		if err != nil {
 			return nil, err
 		}
-		if fileInfo.IsDir() {
-			if lettersInd == len(diskLetters) {
-				glog.Errorf("Had to omit attaching of one ore more flex volumes. Limit on number is: %d", lettersInd)
-				return flexInfos, nil
+		if !fileInfo.IsDir() {
+			continue
+		}
+		if lettersInd == len(diskLetters) {
+			glog.Errorf("Had to omit attaching of one ore more flex volumes. Limit on number is: %d", lettersInd)
+			return flexInfos, nil
+		}
+		fileInfos, err := ioutil.ReadDir(path.Join(dir, vol.Name()))
+		glog.V(2).Infof("Found FlexVolume definition parts in nested dir %s:\n %v", vol.Name(), fileInfos)
+		if err != nil {
+			return nil, err
+		}
+		var flexvol FlexVolumeInfo
+		for _, fileInfo := range fileInfos {
+			curPath := path.Join(dir, vol.Name(), fileInfo.Name())
+			if fileInfo.IsDir() {
+				isoName := fileInfo.Name()
+				if !strings.HasSuffix(isoName, ".cd") {
+					return nil, fmt.Errorf("unexpected directory %q: must have .cd suffix", curPath)
+				}
+				volId := isoName[:len(isoName)-3]
+				isoPath := path.Join(dir, vol.Name(), volId+".iso")
+				if err := maybeInjectPodName(path.Join(curPath, "meta-data"), podName); err != nil {
+					return nil, fmt.Errorf("error injecting the pod name: %v", err)
+				}
+				if err := utils.GenIsoImage(isoPath, volId, curPath); err != nil {
+					return nil, fmt.Errorf("error generating iso image: %v", err)
+				}
+				continue
 			}
-			fileInfos, err := ioutil.ReadDir(path.Join(dir, vol.Name()))
-			glog.V(2).Infof("Found FlexVolume definition parts in nested dir %s:\n %v", vol.Name(), fileInfos)
+			content, err := ioutil.ReadFile(curPath)
 			if err != nil {
 				return nil, err
 			}
-			var flexvol FlexVolumeInfo
-			for _, fileInfo := range fileInfos {
-				curPath := path.Join(dir, vol.Name(), fileInfo.Name())
-				if fileInfo.IsDir() {
-					isoName := fileInfo.Name()
-					if !strings.HasSuffix(isoName, ".cd") {
-						return nil, fmt.Errorf("unexpected directory %q: must have .cd suffix", curPath)
-					}
-					volId := isoName[:len(isoName)-3]
-					isoPath := path.Join(dir, vol.Name(), volId+".iso")
-					if err := maybeInjectPodName(path.Join(curPath, "meta-data"), podName); err != nil {
-						return nil, fmt.Errorf("error injecting the pod name: %v", err)
-					}
-					if err := utils.GenIsoImage(isoPath, volId, curPath); err != nil {
-						return nil, fmt.Errorf("error generating iso image: %v", err)
-					}
-					continue
-				}
-				content, err := ioutil.ReadFile(curPath)
-				if err != nil {
+			switch fileInfo.Name() {
+			case "disk.xml":
+				var disk libvirtxml.DomainDisk
+				if err := xml.Unmarshal(content, &disk); err != nil {
 					return nil, err
 				}
-				switch fileInfo.Name() {
-				case "disk.xml":
-					var disk libvirtxml.DomainDisk
-					if err := xml.Unmarshal(content, &disk); err != nil {
-						return nil, err
-					}
-					flexvol.Disk = &disk
-				case "secret.xml":
-					flexvol.SecretXML = string(content)
-				case "key":
-					flexvol.Key = string(content)
-				}
+				flexvol.Disk = &disk
+			case "secret.xml":
+				flexvol.SecretXML = string(content)
+			case "key":
+				flexvol.Key = string(content)
 			}
-			flexvol.Disk.Target.Dev = "vd" + diskLetters[lettersInd]
-			lettersInd++
-			flexInfos = append(flexInfos, flexvol)
 		}
+		flexvol.Disk.Target.Dev = "vd" + diskLetters[lettersInd]
+		lettersInd++
+		flexInfos = append(flexInfos, flexvol)
 	}
 	return flexInfos, nil
 }
 
 func (v *VirtualizationTool) addVolumesToDomain(podID, podName string, domain *libvirtxml.Domain, virtletVols []*VirtletVolume) error {
-	flexVolumeInfos, err := gatherFlexvolumeDriverVolumeDefinitions(podID, podName, 0)
+	flexVolumeInfos, err := v.scanFlexVolumes(podID, podName, 0)
 	if err != nil {
 		return err
 	}
@@ -273,38 +314,6 @@ func (v *VirtualizationTool) addVolumesToDomain(podID, podName string, domain *l
 
 	domain.Devices.Disks = append(domain.Devices.Disks, volumes...)
 	return nil
-}
-
-type VirtualizationTool struct {
-	domainConn     virt.VirtDomainConnection
-	volumeStorage  *StorageTool
-	imageManager   ImageManager
-	volumePoolName string
-	metadataStore  metadata.MetadataStore
-	timeFunc       func() time.Time
-	forceKVM       bool
-}
-
-func NewVirtualizationTool(domainConn virt.VirtDomainConnection, storageConn virt.VirtStorageConnection, imageManager ImageManager, metadataStore metadata.MetadataStore, volumesPoolName, rawDevices string) (*VirtualizationTool, error) {
-	storageTool, err := NewStorageTool(storageConn, volumesPoolName, rawDevices)
-	if err != nil {
-		return nil, err
-	}
-	return &VirtualizationTool{
-		domainConn:    domainConn,
-		volumeStorage: storageTool,
-		imageManager:  imageManager,
-		metadataStore: metadataStore,
-		timeFunc:      time.Now,
-	}, nil
-}
-
-func (v *VirtualizationTool) SetForceKVM(forceKVM bool) {
-	v.forceKVM = forceKVM
-}
-
-func (v *VirtualizationTool) SetTimeFunc(timeFunc func() time.Time) {
-	v.timeFunc = timeFunc
 }
 
 func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest, netNSPath, cniConfig string) (string, error) {
