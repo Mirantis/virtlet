@@ -345,13 +345,21 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 		return "", err
 	}
 
+	annotations, err := LoadAnnotations(sandboxAnnotations)
+	if err != nil {
+		return "", err
+	}
+	settings.vcpuNum = annotations.VCPUCount
+
 	v.metadataStore.SetContainer(settings.domainName, settings.domainUUID, in.PodSandboxId, config.Image.Image, cloneName, config.Labels, config.Annotations)
 
 	if config.Linux != nil && config.Linux.Resources != nil {
 		settings.memory = int(config.Linux.Resources.MemoryLimitInBytes)
 		settings.cpuShares = uint(config.Linux.Resources.CpuShares)
 		settings.cpuPeriod = uint64(config.Linux.Resources.CpuPeriod)
-		settings.cpuQuota = config.Linux.Resources.CpuQuota
+		// Specified cpu bandwidth limits for domains actually are set equal per each vCPU by libvirt
+		// Thus, to limit overall VM's cpu threads consumption by set value in pod definition need to perform division
+		settings.cpuQuota = config.Linux.Resources.CpuQuota / int64(settings.vcpuNum)
 	}
 	settings.memoryUnit = "b"
 	if settings.memory == 0 {
@@ -359,11 +367,6 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 		settings.memoryUnit = defaultMemoryUnit
 	}
 
-	annotations, err := LoadAnnotations(sandboxAnnotations)
-	if err != nil {
-		return "", err
-	}
-	settings.vcpuNum = annotations.VCPUCount
 	settings.useKvm = canUseKvm()
 	domain := settings.createDomain()
 
