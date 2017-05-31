@@ -19,12 +19,17 @@ package fake
 import (
 	"fmt"
 	"log"
+	"path/filepath"
+	"regexp"
 	"sort"
 
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
+	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 	"github.com/Mirantis/virtlet/pkg/virt"
 )
+
+var kubeletRootRx = regexp.MustCompile("^.*/kubelet-root/")
 
 type FakeDomainConnection struct {
 	rec           Recorder
@@ -58,7 +63,25 @@ func (dc *FakeDomainConnection) removeDomain(d *FakeDomain) {
 }
 
 func (dc *FakeDomainConnection) DefineDomain(def *libvirtxml.Domain) (virt.VirtDomain, error) {
+	if def.Devices != nil {
+		for _, disk := range def.Devices.Disks {
+			if disk.Type != "file" || disk.Source == nil || !kubeletRootRx.MatchString(disk.Source.File) {
+				continue
+			}
+			origPath := disk.Source.File
+			disk.Source.File = kubeletRootRx.ReplaceAllString(origPath, ".../")
+			if filepath.Ext(origPath) == ".iso" {
+				m, err := testutils.IsoToMap(origPath)
+				if err != nil {
+					return nil, fmt.Errorf("bad iso image: %q", origPath)
+				}
+				dc.rec.Rec("iso image", m)
+			}
+		}
+	}
 	dc.rec.Rec("DefineDomain", def)
+	// TODO: dump any ISOs mentioned in disks (Type=file) as json
+	// Include file name (base) in rec name
 	if _, found := dc.domains[def.Name]; found {
 		return nil, fmt.Errorf("domain %q already defined", def.Name)
 	}
