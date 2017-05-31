@@ -172,7 +172,10 @@ func (b *BoltClient) GetContainerInfo(containerId string) (*metadata.ContainerIn
 
 		bucket := parentBucket.Bucket([]byte(containerId))
 		if bucket == nil {
-			// Container info removed, but sandbox still exists
+			// Can happen if:
+			// 1. Container info removed, but sandbox still exists
+			// 2. There's externally defined domain in libvirt daemon
+			//    using `virsh`or libvirt api, not registered in bolt
 			return nil
 		}
 

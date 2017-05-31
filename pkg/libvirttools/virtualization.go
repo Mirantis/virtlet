@@ -603,6 +603,10 @@ func (v *VirtualizationTool) getContainer(domain *libvirt.Domain) (*kubeapi.Cont
 		return nil, err
 	}
 
+	if containerInfo == nil {
+		return nil, nil
+	}
+
 	podSandboxId := containerInfo.SandboxId
 
 	metadata := &kubeapi.ContainerMetadata{
@@ -701,6 +705,15 @@ func (v *VirtualizationTool) ListContainers(filter *kubeapi.ContainerFilter) ([]
 		container, err := v.getContainer(&domain)
 		if err != nil {
 			return nil, err
+		}
+
+		if container == nil {
+			containerId, err := v.tool.GetUUIDString(&domain)
+			if err != nil {
+				return nil, err
+			}
+			glog.V(0).Infof("Failed to find info in bolt for domain with id: %s, so just ignoring as not handled by virtlet.", containerId)
+			continue
 		}
 
 		if filterContainer(container, filter) {
