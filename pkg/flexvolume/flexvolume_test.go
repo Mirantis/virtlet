@@ -32,34 +32,28 @@ import (
 )
 
 const (
-	cephDisk = `
-<disk type="network" device="disk">
-  <driver name="qemu" type="raw"/>
+	cephDisk = `<DomainDisk type="network" device="disk">
+  <driver name="qemu" type="raw"></driver>
   <auth username="libvirt">
-    <secret type="ceph" uuid="abb67e3c-71b3-4ddd-5505-8c4215d5c4eb"/>
+    <secret type="ceph" uuid="abb67e3c-71b3-4ddd-5505-8c4215d5c4eb"></secret>
   </auth>
   <source protocol="rbd" name="libvirt-pool/rbd-test-image">
-    <host name="127.0.0.1" port="6789"/>
+    <host name="127.0.0.1" port="6789"></host>
   </source>
-  <target dev="%s" bus="virtio"/>
-</disk>
-`
-	cephSecret = `
-<secret ephemeral='no' private='no'>
+  <target bus="virtio"></target>
+</DomainDisk>`
+	cephSecret = `<secret ephemeral="no" private="no">
   <uuid>abb67e3c-71b3-4ddd-5505-8c4215d5c4eb</uuid>
-  <usage type='ceph'>
+  <usage type="ceph">
     <name>libvirt</name>
   </usage>
-</secret>
-`
-	noCloudDiskTestTemplate = `
-<disk type="file" device="disk">
-  <driver name="qemu" type="raw"/>
-  <source file='%s'/>
-  <readonly/>
-  <target dev="%%s" bus="virtio"/>
-</disk>
-`
+</secret>`
+	noCloudDiskTestTemplate = `<DomainDisk type="file" device="disk">
+  <driver name="qemu" type="raw"></driver>
+  <source file="%s"></source>
+  <target bus="virtio"></target>
+  <readonly></readonly>
+</DomainDisk>`
 	noCloudMetaData = `
 instance-id: some-instance-id
 local-hostname: foobar
