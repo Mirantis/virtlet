@@ -43,6 +43,7 @@ if [[ -z "${KEYFILE:-}" ]]; then
 fi
 
 ssh -oProxyCommand="kubectl exec -i -n kube-system ${virtlet_pod_name} -- nc -q0 ${pod_ip} 22" \
+    -o ConnectTimeout=40 \
     -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \
     -i "${KEYFILE}" \
     "${user_prefix}${pod_name}.${pod_namespace}" "$@"

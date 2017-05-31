@@ -375,7 +375,7 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 		settings.cpuPeriod = uint64(config.Linux.Resources.CpuPeriod)
 		// Specified cpu bandwidth limits for domains actually are set equal per each vCPU by libvirt
 		// Thus, to limit overall VM's cpu threads consumption by set value in pod definition need to perform division
-		settings.cpuQuota = config.Linux.Resources.CpuQuota / int64(settings.vcpuNum)
+		settings.cpuQuota = config.Linux.Resources.CpuQuota // / int64(settings.vcpuNum)
 	}
 	settings.memoryUnit = "b"
 	if settings.memory == 0 {

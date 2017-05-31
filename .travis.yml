@@ -20,6 +20,11 @@ before_install:
   - sudo apt-get -qq update
   - sudo apt-get install -y expect
 
+before_script:
+  - sudo /etc/init.d/mysql stop
+  - sudo /etc/init.d/postgresql stop
+  - sudo /etc/init.d/memcached stop
+
 install: ./autogen.sh
 
 script:
