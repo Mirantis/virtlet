@@ -128,14 +128,14 @@ if [[ ${count} != 1 ]]; then
   exit 1
 fi
 
-# test ceph RBD
-
 vm_hostname="$("${vmssh}" cirros@cirros-vm cat /etc/hostname)"
-expected_hostname=my-cirros-vm
+expected_hostname=cirros-vm
 if [[ "${vm_hostname}" != "${expected_hostname}" ]]; then
   echo "Unexpected vm hostname: ${vm_hostname} instead ${expected_hostname}" >&2
   exit 1
 fi
+
+# test ceph RBD
 
 virtlet_pod_name=$(kubectl get pods --namespace=kube-system | grep -v virtlet-log | grep virtlet | awk '{print $1}')
 

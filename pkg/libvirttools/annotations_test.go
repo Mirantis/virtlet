@@ -100,6 +100,53 @@ func TestVirtletAnnotations(t *testing.T) {
 			},
 		},
 		{
+			name: "cloud-init yaml and ssh keys",
+			annotations: map[string]string{
+				"VirtletCloudInitMetaData": `
+                                  instance-id: foobar`,
+				"VirtletCloudInitUserData": `
+                                  users:
+                                  - name: cloudy`,
+				// empty lines are ignored
+				"VirtletSSHKeys": "key1\n\nkey2\n",
+			},
+			va: &VirtletAnnotations{
+				VCPUCount: 1,
+				MetaData: map[string]interface{}{
+					"instance-id": "foobar",
+				},
+				UserData: map[string]interface{}{
+					"users": []interface{}{
+						map[string]interface{}{
+							"name": "cloudy",
+						},
+					},
+				},
+				SSHKeys: []string{"key1", "key2"},
+			},
+		},
+		{
+			name: "cloud-init user data overwrite set",
+			annotations: map[string]string{
+				"VirtletCloudInitUserDataOverwrite": "true",
+			},
+			va: &VirtletAnnotations{
+				VCPUCount:         1,
+				UserDataOverwrite: true,
+			},
+		},
+		{
+			name: "cloud-init user data script",
+			annotations: map[string]string{
+				"VirtletCloudInitUserDataScript": "#!/bin/sh\necho hi\n",
+			},
+			va: &VirtletAnnotations{
+				VCPUCount:      1,
+				UserDataScript: "#!/bin/sh\necho hi\n",
+			},
+		},
+		// bad metadata items follow
+		{
 			name:        "bad vcpu count",
 			annotations: map[string]string{"VirtletVCPUCount": "256"},
 		},
@@ -155,6 +202,18 @@ func TestVirtletAnnotations(t *testing.T) {
 			name: "bad volume - negative capacity",
 			annotations: map[string]string{
 				"VirtletVolumes": `[{"Name": "badvol", "Capacity": "-1024"}]`,
+			},
+		},
+		{
+			name: "bad cloud-init meta-data",
+			annotations: map[string]string{
+				"VirtletCloudInitMetaData": "{",
+			},
+		},
+		{
+			name: "bad cloud-init user-data",
+			annotations: map[string]string{
+				"VirtletCloudInitUserData": "{",
 			},
 		},
 	} {

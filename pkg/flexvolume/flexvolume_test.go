@@ -48,28 +48,6 @@ const (
     <name>libvirt</name>
   </usage>
 </secret>`
-	noCloudDiskTestTemplate = `<DomainDisk type="file" device="disk">
-  <driver name="qemu" type="raw"></driver>
-  <source file="%s"></source>
-  <target bus="virtio"></target>
-  <readonly></readonly>
-</DomainDisk>`
-	noCloudMetaData = `
-instance-id: some-instance-id
-local-hostname: foobar
-`
-	noCloudUserData = `
-    #cloud-config
-    fqdn: ubuntu-16-vm.mydomain.com
-    users:
-      - name: root
-        ssh-authorized-keys:
-          - ssh-rsa YOUR_KEY_HEWE me@localhost
-    ssh_pwauth: True
-    runcmd:
-    - [ apt-get, update ]
-    - [ apt-get, install, -y, --force-yes, apache2 ]
-`
 )
 
 type fakeMounter struct {
@@ -156,14 +134,7 @@ func TestFlexVolume(t *testing.T) {
 		"secret":  "foobar",
 		"user":    "libvirt",
 	})
-	noCloudJsonOpts := utils.MapToJson(map[string]interface{}{
-		"type":     "nocloud",
-		"metadata": noCloudMetaData,
-		"userdata": noCloudUserData,
-	})
-	noCloudDisk := fmt.Sprintf(noCloudDiskTestTemplate, path.Join(tmpDir, "nocloud/cidata.iso"))
 	cephDir := path.Join(tmpDir, "ceph")
-	noCloudDir := path.Join(tmpDir, "nocloud")
 	for _, step := range []struct {
 		name         string
 		args         []string
@@ -297,38 +268,6 @@ func TestFlexVolume(t *testing.T) {
 			args:    []string{},
 			status:  "Failure",
 			message: "no arguments passed",
-		},
-		{
-			name:   "mount-nocloud",
-			args:   []string{"mount", noCloudDir, noCloudJsonOpts},
-			status: "Success",
-			subdir: "nocloud",
-			files: map[string]interface{}{
-				"disk.xml": noCloudDisk,
-				"cidata.cd": map[string]interface{}{
-					"meta-data": noCloudMetaData,
-					"user-data": noCloudUserData,
-				},
-				".shadowed": map[string]interface{}{
-					"disk.xml": noCloudDisk,
-					"cidata.cd": map[string]interface{}{
-						"meta-data": noCloudMetaData,
-						"user-data": noCloudUserData,
-					},
-				},
-			},
-			mountJournal: []string{
-				fmt.Sprintf("mount: tmpfs %s tmpfs", noCloudDir),
-			},
-		},
-		{
-			name:   "unmount-nocloud",
-			args:   []string{"unmount", noCloudDir},
-			status: "Success",
-			subdir: "nocloud",
-			mountJournal: []string{
-				fmt.Sprintf("unmount: %s", noCloudDir),
-			},
 		},
 	} {
 		t.Run(step.name, func(t *testing.T) {

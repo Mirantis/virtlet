@@ -42,7 +42,7 @@ From [Libvirt spec](http://libvirt.org/formatdomain.html#elementsDisks):
 > **target**
 > The target element controls the bus / device under which the disk is exposed to the guest OS. The dev attribute indicates the "logical" device name. The actual device name specified is not guaranteed to map to the device name in the guest OS. Treat it as a device ordering hint
 
-4. Attached disks are seen inside OS as hard disk devices called dev/vdb, dev/vdc and so on. As said above there is no fixed behaviour form device names as well as regarding to the order on PCI bus.
+4. Attached disks are visible by the OS inside VM as hard disk devices `/dev/vdb`, `/dev/vdc` and so on. As said above there is no fixed behaviour for device names and their order on the PCI bus.
 
 ## Ephemeral Local Storage
 
@@ -105,39 +105,12 @@ When a pod is removed, all the volumes related to it are removed too. This inclu
 
 ### Flexvolume driver
 
-FlexVolume virtlet driver supports attaching Ceph RBDs (RADOS Block Devices) and [NoCloud](http://cloudinit.readthedocs.io/en/latest/topics/datasources/nocloud.html) [cloud-init](https://cloudinit.readthedocs.io/en/latest/) data sources VMs.
+FlexVolume virtlet driver currently supports attaching Ceph RBDs (RADOS Block Devices) to the VMs.
 Cephx authentication can be enabled for the Ceph clusters that are used with this driver.
 
 Virtlet uses [FlexVolume](https://github.com/kubernetes/community/blob/master/contributors/devel/flexvolume.md) mechanism for the volumes to make volume definitions more consistent with volume definitions of non-VM pods and to make it possible to use [PVs and PVCs](https://kubernetes.io/docs/concepts/storage/persistent-volumes/).
 
 As of now, there's no need to mount volumes inside the container, it's enough to define them for the pod, but this may change in future.
-
-#### Using NoCloud Cloud-init data source mechanism
-
-Virtlet currently supports passing static [cloud-init](https://cloudinit.readthedocs.io/en/latest/) data using [NoCloud](http://cloudinit.readthedocs.io/en/latest/topics/datasources/nocloud.html) data sources VMs. In order to do so, you need to define a `flexVolume` based volume for your pod, with `options` containing `type: nocloud`, `metadata` and optional `userdata` fields. The contents of `metadata` and `userdata` fields will be passed as `user-data` and `meta-data` correspondingly to the VM's cloud-init handler. Note that in some cases there can be VM-dependent restrictions, e.g. the image used by [CirrOS example](../examples/cirros-vm.yaml) supplied with Virtlet only supports JSON data in `metadata` field and a script beginning with `#!` in `userdata` field. Below is the relevant fragment of pod definition:
-
-```yaml
-  volumes:
-  - name: nocloud
-    flexVolume:
-      driver: "virtlet/flexvolume_driver"
-      options:
-        type: nocloud
-        metadata: |
-          {
-            "instance-id": "cirros-vm-001",
-            "local-hostname": "my-cirros-vm",
-            "public-keys": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCaJEcFDXEK2ZbX0ZLS1EIYFZRbDAcRfuVjpstSc0De8+sV1aiu+dePxdkuDRwqFtCyk6dEZkssjOkBXtri00MECLkir6FcH3kKOJtbJ6vy3uaJc9w1ERo+wyl6SkAh/+JTJkp7QRXj8oylW5E20LsbnA/dIwWzAF51PPwF7A7FtNg9DnwPqMkxFo1Th/buOMKbP5ZA1mmNNtmzbMpMfJATvVyiv3ccsSJKOiyQr6UG+j7sc/7jMVz5Xk34Vd0l8GwcB0334MchHckmqDB142h/NCWTr8oLakDNvkfC1YneAfAO41hDkUbxPtVBG5M/o7P4fxoqiHEX+ZLfRxDtHB53 me@localhost"
-          }
-
-        userdata: |
-          #!/bin/sh
-          echo "Hi there"
-```
-
-Here we set hostname for the VM, inject an ssh public key and provide a script that executed by cloud-init. There's helper script named [examples/vmssh.sh](../examples/vmssh.sh) that can be used to access VMs over ssh after providing ssh keys for them (it defaults to using a sample key from examples/ directory).
-
-Virtlet's cloud-init mechanism is not finalized yet and will change in future so as to support dynamic metadata generation and passing metadata via the metadata server along with `NoCloud` datasource.
 
 #### Supported features of RBD Volume definition
 
@@ -154,7 +127,7 @@ Virtlet's cloud-init mechanism is not finalized yet and will change in future so
 #### Driver implemetation details
 1. It's expected that the driver's binary resides at `/usr/libexec/kubernetes/kubelet-plugins/volume/exec/virtlet~flexvolume_driver/flexvolume_driver` before kubelet is started. Note that if you're using DaemonSet for virtlet deployment, you don't need to bother about that because in that case it's done automatically.
 1. Kubelet calls the virtlet flexvolume driver and passes volume info to it
-1. Virtlet flexvolume driver uses standard kubelet's dir `/var/lib/kubelet/pods/<pod-id>/volumes/virtlet~flexvolume_driver/<volume-name>` to store the xml definitions to be used by virtlet. Virtlet looks for  `disk.xml`, `secret.xml` and `key` files (`secret.xml` and `key` files are used only if you have cephx auth). For `NoCloud` volumes, there's also a `cidata.cd` directory that's used to generate `cidata.iso` image.
+1. Virtlet flexvolume driver uses standard kubelet's dir `/var/lib/kubelet/pods/<pod-id>/volumes/virtlet~flexvolume_driver/<volume-name>` to store the xml definitions to be used by virtlet. Virtlet looks for  `disk.xml`, `secret.xml` and `key` files (`secret.xml` and `key` files are used only if you have cephx auth).
 
 See below an example with some details:
 ```

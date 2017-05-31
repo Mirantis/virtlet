@@ -54,7 +54,7 @@ $ kubectl logs cirros-vm
 instance-id: cirros-vm-001
 name: N/A
 availability-zone: N/A
-local-hostname: my-cirros-vm
+local-hostname: cirros-vm
 launch-index: N/A
 === cirros: current=0.3.5 uptime=1.75 ===
   ____               ____  ____

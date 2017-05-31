@@ -194,7 +194,7 @@ Connected to domain 411c70b0-1df3-46be-4838-c85474a1b44a-cirros-vm
 Escape character is ^]
 
 login as 'cirros' user. default password: 'cubswin:)'. use 'sudo' for root.
-my-cirros-vm login: cirros
+cirros-vm login: cirros
 Password:
 $
 ```

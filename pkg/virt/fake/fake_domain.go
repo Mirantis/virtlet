@@ -20,16 +20,14 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
-	"regexp"
 	"sort"
+	"strings"
 
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 	"github.com/Mirantis/virtlet/pkg/virt"
 )
-
-var kubeletRootRx = regexp.MustCompile("^.*/kubelet-root/")
 
 type FakeDomainConnection struct {
 	rec           Recorder
@@ -65,12 +63,12 @@ func (dc *FakeDomainConnection) removeDomain(d *FakeDomain) {
 func (dc *FakeDomainConnection) DefineDomain(def *libvirtxml.Domain) (virt.VirtDomain, error) {
 	if def.Devices != nil {
 		for _, disk := range def.Devices.Disks {
-			if disk.Type != "file" || disk.Source == nil || !kubeletRootRx.MatchString(disk.Source.File) {
+			if disk.Type != "file" || disk.Source == nil {
 				continue
 			}
 			origPath := disk.Source.File
-			disk.Source.File = kubeletRootRx.ReplaceAllString(origPath, ".../")
-			if filepath.Ext(origPath) == ".iso" {
+			disk.Source.File = "--volatile-path-replaced-by-FakeDomainConnection--"
+			if filepath.Ext(origPath) == ".iso" || strings.HasPrefix(filepath.Base(origPath), "nocloud-iso") {
 				m, err := testutils.IsoToMap(origPath)
 				if err != nil {
 					return nil, fmt.Errorf("bad iso image: %q", origPath)
