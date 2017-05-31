@@ -603,6 +603,10 @@ func (v *VirtualizationTool) getContainer(domain *libvirt.Domain) (*kubeapi.Cont
 		return nil, err
 	}
 
+	if containerInfo == nil {
+		return nil, nil
+	}
+
 	podSandboxId := containerInfo.SandboxId
 
 	metadata := &kubeapi.ContainerMetadata{
@@ -636,7 +640,7 @@ func (v *VirtualizationTool) ListContainers(filter *kubeapi.ContainerFilter) ([]
 				return nil, err
 			}
 			if containerInfo == nil {
-				// There's no such container - looks like it's already removed, so return an empty list
+				// There's no such container - looks like it's already removed or has been defined externally, so return an empty list
 				return containers, nil
 			}
 
@@ -671,7 +675,7 @@ func (v *VirtualizationTool) ListContainers(filter *kubeapi.ContainerFilter) ([]
 				return nil, err
 			}
 			if containerInfo == nil {
-				// There's no such container - looks like it's already removed, but still is mentioned in sandbox
+				// There's no such container - looks like it's already removed or has been defined externally, but still is mentioned in sandbox
 				return nil, fmt.Errorf("Container metadata not found, but it's still mentioned in sandbox %s", filter.PodSandboxId)
 			}
 
@@ -703,7 +707,7 @@ func (v *VirtualizationTool) ListContainers(filter *kubeapi.ContainerFilter) ([]
 			return nil, err
 		}
 
-		if filterContainer(container, filter) {
+		if container != nil && filterContainer(container, filter) {
 			containers = append(containers, container)
 		}
 	}
