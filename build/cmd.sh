@@ -4,6 +4,7 @@ set -o nounset
 set -o pipefail
 set -o errtrace
 
+VIRTLET_SKIP_RSYNC="${VIRTLET_SKIP_RSYNC:-}"
 VIRTLET_RSYNC_PORT="${VIRTLET_RSYNC_PORT:-18730}"
 
 # Note that project_dir must not end with slash
@@ -54,20 +55,22 @@ function get_rsync_addr {
         return 1
     fi
 
-  local container_ip
-  container_ip=$(docker inspect --format '{{ .NetworkSettings.IPAddress }}' virtlet-build)
+    local container_ip
+    container_ip=$(docker inspect --format '{{ .NetworkSettings.IPAddress }}' virtlet-build)
 
-  # Sometimes we can reach rsync through localhost and a NAT'd port.  Other
+    # Sometimes we can reach rsync through localhost and a NAT'd port.  Other
     # times (when we are running in another docker container on the Jenkins
     # machines) we have to talk directly to the container IP.  There is no one
     # strategy that works in all cases so we test to figure out which situation we
     # are in.
     if rsync_probe 127.0.0.1 ${mapped_port}; then
-        RSYNC_ADDR="127.0.0.1:${mapped_port}"
+        echo "127.0.0.1:${mapped_port}" >"${project_dir}/_output/rsync_addr"
         return 0
     elif rsync_probe "${container_ip}" ${VIRTLET_RSYNC_PORT}; then
-        RSYNC_ADDR="${container_ip}:${VIRTLET_RSYNC_PORT}"
+        echo "${container_ip}:${VIRTLET_RSYNC_PORT}" >"${project_dir}/_output/rsync_addr"
         return 0
+    else
+        echo "Could not probe the rsync port" >&2
     fi
 }
 
@@ -75,10 +78,6 @@ function ensure_build_container {
     if ! docker ps --filter=label=virtlet_build | grep -q virtlet-build; then
         ensure_build_image
         cd "${project_dir}"
-        # from build/common.sh in k8s
-        mkdir -p "${project_dir}/_output"
-        dd if=/dev/urandom bs=512 count=1 2>/dev/null | LC_ALL=C tr -dc 'A-Za-z0-9' | dd bs=32 count=1 2>/dev/null >"${rsync_pw_file}"
-        chmod 600 "${rsync_pw_file}"
         # need to mount docker socket into the container because of
         # CRI proxy deployment tests
         docker run -d --privileged \
@@ -95,11 +94,18 @@ function ensure_build_container {
                --name virtlet-build \
                "${build_image}" \
                sleep Infinity
-        docker cp "${rsync_pw_file}" virtlet-build:/rsyncd.password
-        docker exec -d -i virtlet-build /rsyncd.sh
-        get_rsync_addr
-        echo "${RSYNC_ADDR}" >"${project_dir}/_output/rsync_addr"
-    else
+        if [[ ! ${VIRTLET_SKIP_RSYNC} ]]; then
+            # from build/common.sh in k8s
+            mkdir -p "${project_dir}/_output"
+            dd if=/dev/urandom bs=512 count=1 2>/dev/null | LC_ALL=C tr -dc 'A-Za-z0-9' | dd bs=32 count=1 2>/dev/null >"${rsync_pw_file}"
+            chmod 600 "${rsync_pw_file}"
+
+            docker cp "${rsync_pw_file}" virtlet-build:/rsyncd.password
+            docker exec -d -i virtlet-build /rsyncd.sh
+            get_rsync_addr
+        fi
+    fi
+    if [[ ! ${VIRTLET_SKIP_RSYNC} ]]; then
         RSYNC_ADDR="$(cat "${project_dir}/_output/rsync_addr")"
     fi
 }
@@ -113,17 +119,19 @@ function vsh {
 function vcmd {
     ensure_build_container
     cd "${project_dir}"
-    local -a filters=(
-        --filter '- /vendor/'
-        --filter '- /_output/'
-    )
-    if [[ ! ${rsync_git} ]]; then
-        filters+=(--filter '- /.git/')
+    if [[ ! ${VIRTLET_SKIP_RSYNC} ]]; then
+        local -a filters=(
+            --filter '- /vendor/'
+            --filter '- /_output/'
+        )
+        if [[ ! ${rsync_git} ]]; then
+            filters+=(--filter '- /.git/')
+        fi
+        rsync "${filters[@]}" \
+              --password-file "${project_dir}/_output/rsync.password" \
+              -a --delete --compress-level=9 \
+              "${project_dir}/" "rsync://virtlet@${RSYNC_ADDR}/virtlet/"
     fi
-    rsync "${filters[@]}" \
-          --password-file "${project_dir}/_output/rsync.password" \
-          -a --delete --compress-level=9 \
-          "${project_dir}/" "rsync://virtlet@${RSYNC_ADDR}/virtlet/"
     docker exec -i virtlet-build bash -c "$*"
 }
 
