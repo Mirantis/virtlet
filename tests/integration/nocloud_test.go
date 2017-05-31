@@ -17,31 +17,16 @@ limitations under the License.
 package integration
 
 import (
-	"encoding/json"
-	"fmt"
-	"os"
-	"path/filepath"
 	"reflect"
 	"testing"
 
-	"github.com/Mirantis/virtlet/pkg/flexvolume"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 )
 
 const (
-	noCloudMetaData = `
-instance-id: some-instance-id
-local-hostname: @podname@
-`
-	noCloudMetaDataUpdated = `
-instance-id: some-instance-id
-local-hostname: testName_0
-`
-	noCloudUserData = `
-    #cloud-config
-    fqdn: foobar.example.com
-`
+	noCloudMetaData = "{\"instance-id\":\"testName_0.default\",\"local-hostname\":\"testName_0\"}"
+	noCloudUserData = "#cloud-config\n"
 )
 
 func TestCloudInitNoCloud(t *testing.T) {
@@ -51,49 +36,6 @@ func TestCloudInitNoCloud(t *testing.T) {
 	sandbox := ct.sandboxes[0]
 	container := ct.containers[0]
 
-	podDir := fmt.Sprintf("/var/lib/kubelet/pods/%s", sandbox.Metadata.Uid)
-	volumeDir := filepath.Join(podDir, "volumes/virtlet~flexvolume_driver/nocloud")
-	if err := os.MkdirAll(volumeDir, 0755); err != nil {
-		t.Fatalf("can't create volume dir: %v", err)
-	}
-	defer os.RemoveAll(podDir)
-
-	// Here we simulate what kubelet is doing by involing our flexvolume
-	// driver directly.
-	// XXX: there's a subtle difference between what we do here and
-	// what happens on the real system though. In the latter case
-	// virtlet pod doesn't see the contents of tmpfs because hostPath volumes
-	// are mounted privately into the virtlet pod mount ns. Here we
-	// let Virtlet process tmpfs contents. Currently the contents
-	// of flexvolume's tmpfs and the shadowed directory should be the
-	// same though.
-	fv := flexvolume.NewFlexVolumeDriver(func() string {
-		return "abb67e3c-71b3-4ddd-5505-8c4215d5c4eb"
-	}, flexvolume.NewLinuxMounter())
-	noCloudJsonOpts := utils.MapToJson(map[string]interface{}{
-		"type":     "nocloud",
-		"metadata": noCloudMetaData,
-		"userdata": noCloudUserData,
-	})
-	r := fv.Run([]string{"mount", volumeDir, noCloudJsonOpts})
-	var m map[string]interface{}
-	if err := json.Unmarshal([]byte(r), &m); err != nil {
-		t.Fatalf("failed to unmarshal flexvolume mount result: %v", err)
-	}
-	if m["status"] != "Success" {
-		t.Fatalf("flexvolume mount failed, result: %s", r)
-	}
-	defer func() {
-		r := fv.Run([]string{"unmount", volumeDir})
-		if err := json.Unmarshal([]byte(r), &m); err != nil {
-			t.Fatalf("failed to unmarshal flexvolume unmount result: %v", err)
-		}
-		if m["status"] != "Success" {
-			t.Fatalf("flexvolume unmount failed, result: %s", r)
-		}
-
-	}()
-
 	ct.pullImage(imageSpec)
 	ct.runPodSandbox(sandbox)
 	ct.createContainer(sandbox, container, imageSpec, nil)
@@ -101,13 +43,13 @@ func TestCloudInitNoCloud(t *testing.T) {
 
 	ct.waitForContainerRunning(container.ContainerId, container.Name)
 
-	isoPath := runShellCommand(t, "virsh domblklist $(virsh list --name)|grep -o '/var/lib/kubelet.*\\.iso'")
+	isoPath := runShellCommand(t, "virsh domblklist $(virsh list --name)|grep -o '/.*nocloud-iso[^ ]*'")
 	files, err := testutils.IsoToMap(isoPath)
 	if err != nil {
 		t.Fatalf("isoToMap() on %q: %v", isoPath, err)
 	}
 	expectedFiles := map[string]interface{}{
-		"meta-data": noCloudMetaDataUpdated,
+		"meta-data": noCloudMetaData,
 		"user-data": noCloudUserData,
 	}
 	if !reflect.DeepEqual(files, expectedFiles) {

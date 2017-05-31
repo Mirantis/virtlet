@@ -22,14 +22,23 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	// use this instead of "gopkg.in/yaml.v2" so we don't get
+	// map[interface{}]interface{} when unmarshalling cloud-init data
+	"github.com/ghodss/yaml"
 )
 
 const (
 	maxVCPUCount                      = 255
 	defaultVolumeCapacity             = 1024
 	defaultVolumeCapacityUnit         = "MB"
-	VirtletVCPUCountAnnotationKeyName = "VirtletVCPUCount"
-	VirtletVolumesAnnotationKeyName   = "VirtletVolumes"
+	VCPUCountAnnotationKeyName        = "VirtletVCPUCount"
+	VolumesAnnotationKeyName          = "VirtletVolumes"
+	CloudInitMetaDataKeyName          = "VirtletCloudInitMetaData"
+	CloudInitUserDataKeyName          = "VirtletCloudInitUserData"
+	CloudInitUserDataOverwriteKeyName = "VirtletCloudInitUserDataOverwrite"
+	CloudInitUserDataScriptKeyName    = "VirtletCloudInitUserDataScript"
+	SSHKeysKeyName                    = "VirtletSSHKeys"
 )
 
 var capacityUnits []string = []string{
@@ -39,8 +48,13 @@ var capacityUnits []string = []string{
 }
 
 type VirtletAnnotations struct {
-	VCPUCount int
-	Volumes   []*VirtletVolume
+	VCPUCount         int
+	Volumes           []*VirtletVolume
+	MetaData          map[string]interface{}
+	UserData          map[string]interface{}
+	UserDataOverwrite bool
+	UserDataScript    string
+	SSHKeys           []string
 }
 
 type VirtletVolume struct {
@@ -64,7 +78,7 @@ func LoadAnnotations(podAnnotations map[string]string) (*VirtletAnnotations, err
 }
 
 func (va *VirtletAnnotations) parsePodAnnotations(podAnnotations map[string]string) error {
-	if vcpuCountStr, found := podAnnotations[VirtletVCPUCountAnnotationKeyName]; found {
+	if vcpuCountStr, found := podAnnotations[VCPUCountAnnotationKeyName]; found {
 		var err error
 		n, err := strconv.Atoi(vcpuCountStr)
 		if err != nil {
@@ -73,9 +87,37 @@ func (va *VirtletAnnotations) parsePodAnnotations(podAnnotations map[string]stri
 		va.VCPUCount = n
 	}
 
-	if volumesStr, found := podAnnotations[VirtletVolumesAnnotationKeyName]; found {
+	if volumesStr, found := podAnnotations[VolumesAnnotationKeyName]; found {
 		if err := json.Unmarshal([]byte(volumesStr), &va.Volumes); err != nil {
 			return fmt.Errorf("failed to unmarshal virtlet volumes: %v", err)
+		}
+	}
+
+	if metaDataStr, found := podAnnotations[CloudInitMetaDataKeyName]; found {
+		if err := yaml.Unmarshal([]byte(metaDataStr), &va.MetaData); err != nil {
+			return fmt.Errorf("failed to unmarshal cloud-init metadata")
+		}
+	}
+
+	if userDataStr, found := podAnnotations[CloudInitUserDataKeyName]; found {
+		if err := yaml.Unmarshal([]byte(userDataStr), &va.UserData); err != nil {
+			return fmt.Errorf("failed to unmarshal cloud-init userdata")
+		}
+	}
+
+	if podAnnotations[CloudInitUserDataOverwriteKeyName] == "true" {
+		va.UserDataOverwrite = true
+	}
+
+	va.UserDataScript = podAnnotations[CloudInitUserDataScriptKeyName]
+
+	if sshKeysStr, found := podAnnotations[SSHKeysKeyName]; found {
+		keys := strings.Split(sshKeysStr, "\n")
+		for _, k := range keys {
+			k = strings.TrimSpace(k)
+			if k != "" {
+				va.SSHKeys = append(va.SSHKeys, k)
+			}
 		}
 	}
 

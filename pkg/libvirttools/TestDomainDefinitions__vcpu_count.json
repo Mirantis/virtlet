@@ -63,6 +63,13 @@
     }
   },
   {
+    "name": "domain conn: iso image",
+    "data": {
+      "meta-data": "{\"instance-id\":\"testName_0.default\",\"local-hostname\":\"testName_0\"}",
+      "user-data": "#cloud-config\n"
+    }
+  },
+  {
     "name": "domain conn: DefineDomain",
     "data": {
       "XMLName": {
@@ -114,7 +121,7 @@
             },
             "Auth": null,
             "Source": {
-              "File": "/var/lib/virtlet/root_231700d5-c9a6-5a49-738d-99a954c51550",
+              "File": "--volatile-path-replaced-by-FakeDomainConnection--",
               "Device": "",
               "Protocol": "",
               "Name": "",
@@ -128,6 +135,31 @@
               "Bus": "virtio"
             },
             "ReadOnly": null
+          },
+          {
+            "Type": "file",
+            "Device": "disk",
+            "Snapshot": "",
+            "Driver": {
+              "Name": "qemu",
+              "Type": "raw"
+            },
+            "Auth": null,
+            "Source": {
+              "File": "--volatile-path-replaced-by-FakeDomainConnection--",
+              "Device": "",
+              "Protocol": "",
+              "Name": "",
+              "Pool": "",
+              "Volume": "",
+              "Hosts": null,
+              "StartupPolicy": ""
+            },
+            "Target": {
+              "Dev": "vdb",
+              "Bus": "virtio"
+            },
+            "ReadOnly": {}
           }
         ],
         "Filesystems": null,
