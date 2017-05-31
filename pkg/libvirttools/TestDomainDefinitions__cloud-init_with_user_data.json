@@ -66,7 +66,7 @@
     "name": "domain conn: iso image",
     "data": {
       "meta-data": "{\"instance-id\":\"testName_0.default\",\"local-hostname\":\"testName_0\",\"public-keys\":[\"key1\",\"key2\"]}",
-      "user-data": "#cloud-config\n"
+      "user-data": "#cloud-config\nusers:\n- name: cloudy\n"
     }
   },
   {

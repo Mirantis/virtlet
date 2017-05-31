@@ -74,8 +74,7 @@ type UuidGen func() string
 type volumeHandler func(uuidGen UuidGen, targetDir string, opts volumeOpts) (map[string][]byte, error)
 
 var volumeHandlers = map[string]volumeHandler{
-	"ceph":    cephVolumeHandler,
-	"nocloud": noCloudVolumeHandler,
+	"ceph": cephVolumeHandler,
 }
 
 type FlexVolumeDriver struct {

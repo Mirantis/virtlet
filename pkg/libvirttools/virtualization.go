@@ -17,7 +17,6 @@ limitations under the License.
 package libvirttools
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/xml"
 	"errors"
@@ -53,8 +52,6 @@ const (
 	domainDestroyCheckInterval  = 500 * time.Millisecond
 	domainDestroyTimeout        = 5 * time.Second
 	diskLetterStr               = "bcdefghijklmnopqrstu"
-
-	podNameString = "@podname@"
 
 	containerNsUuid       = "67b7fb47-7735-4b64-86d2-6d062d121966"
 	defaultKubeletRootDir = "/var/lib/kubelet/pods"
@@ -208,7 +205,7 @@ func (v *VirtualizationTool) createBootImageClone(cloneName, imageName string) (
 	return vol.Path()
 }
 
-func (v *VirtualizationTool) scanFlexVolumes(podId, podName string, lettersInd int) ([]FlexVolumeInfo, error) {
+func (v *VirtualizationTool) scanFlexVolumes(podId, podName string, letterInd int) ([]FlexVolumeInfo, error) {
 	dir := filepath.Join(v.kubeletRootDir, podId, flexVolumeSubdir)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		return nil, nil
@@ -232,8 +229,8 @@ func (v *VirtualizationTool) scanFlexVolumes(podId, podName string, lettersInd i
 		if !fileInfo.IsDir() {
 			continue
 		}
-		if lettersInd == len(diskLetters) {
-			glog.Errorf("Had to omit attaching of one ore more flex volumes. Limit on number is: %d", lettersInd)
+		if letterInd == len(diskLetters) {
+			glog.Errorf("Had to omit attaching of one ore more flex volumes. Limit on number is: %d", letterInd)
 			return flexInfos, nil
 		}
 		fileInfos, err := ioutil.ReadDir(path.Join(dir, vol.Name()))
@@ -245,18 +242,6 @@ func (v *VirtualizationTool) scanFlexVolumes(podId, podName string, lettersInd i
 		for _, fileInfo := range fileInfos {
 			curPath := path.Join(dir, vol.Name(), fileInfo.Name())
 			if fileInfo.IsDir() {
-				isoName := fileInfo.Name()
-				if !strings.HasSuffix(isoName, ".cd") {
-					return nil, fmt.Errorf("unexpected directory %q: must have .cd suffix", curPath)
-				}
-				volId := isoName[:len(isoName)-3]
-				isoPath := path.Join(dir, vol.Name(), volId+".iso")
-				if err := maybeInjectPodName(path.Join(curPath, "meta-data"), podName); err != nil {
-					return nil, fmt.Errorf("error injecting the pod name: %v", err)
-				}
-				if err := utils.GenIsoImage(isoPath, volId, curPath); err != nil {
-					return nil, fmt.Errorf("error generating iso image: %v", err)
-				}
 				continue
 			}
 			content, err := ioutil.ReadFile(curPath)
@@ -276,44 +261,53 @@ func (v *VirtualizationTool) scanFlexVolumes(podId, podName string, lettersInd i
 				flexvol.Key = string(content)
 			}
 		}
-		flexvol.Disk.Target.Dev = "vd" + diskLetters[lettersInd]
-		lettersInd++
+		flexvol.Disk.Target.Dev = "vd" + diskLetters[letterInd]
+		letterInd++
 		flexInfos = append(flexInfos, flexvol)
 	}
 	return flexInfos, nil
 }
 
-func (v *VirtualizationTool) addVolumesToDomain(podID, podName string, domain *libvirtxml.Domain, virtletVols []*VirtletVolume) error {
-	flexVolumeInfos, err := v.scanFlexVolumes(podID, podName, 0)
+func (v *VirtualizationTool) addVolumesToDomain(podId, podName, podNamespace string, domain *libvirtxml.Domain, annotations *VirtletAnnotations) (string, error) {
+	g := NewCloudInitGenerator(podName, podNamespace, annotations)
+	isoPath, nocloudDiskDef, err := g.GenerateDisk()
 	if err != nil {
-		return err
+		return "", err
+	}
+	nocloudDiskDef.Target.Dev = "vd" + diskLetters[0]
+	domain.Devices.Disks = append(domain.Devices.Disks, *nocloudDiskDef)
+
+	flexVolumeInfos, err := v.scanFlexVolumes(podId, podName, 1)
+	if err != nil {
+		return "", err
 	}
 
-	glog.V(2).Infof("FlexVolumes set to process: %v", flexVolumeInfos)
+	glog.V(2).Infof("FlexVolume to process: %v", flexVolumeInfos)
 	for _, flexVolumeInfo := range flexVolumeInfos {
 		if flexVolumeInfo.SecretXML != "" {
 			var secretDef libvirtxml.Secret
 			if err := secretDef.Unmarshal(flexVolumeInfo.SecretXML); err != nil {
-				return err
+				return "", err
 			}
 			key, err := base64.StdEncoding.DecodeString(flexVolumeInfo.Key)
 			if err != nil {
-				return err
+				return "", err
 			}
 			if err := v.domainConn.DefineSecret(&secretDef, key); err != nil {
-				return err
+				return "", err
 			}
 		}
 		domain.Devices.Disks = append(domain.Devices.Disks, *flexVolumeInfo.Disk)
 	}
 
-	volumes, err := v.volumeStorage.PrepareVolumesToBeAttached(virtletVols, domain.UUID, len(flexVolumeInfos))
+	volumes, err := v.volumeStorage.PrepareVolumesToBeAttached(annotations.Volumes, domain.UUID, len(flexVolumeInfos)+1)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	domain.Devices.Disks = append(domain.Devices.Disks, volumes...)
-	return nil
+
+	return isoPath, nil
 }
 
 func vmLogLocation() string {
@@ -427,8 +421,6 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 	}
 	settings.vcpuNum = annotations.VCPUCount
 
-	v.metadataStore.SetContainer(settings.domainName, settings.domainUUID, in.PodSandboxId, config.Image.Image, cloneName, config.Labels, config.Annotations, v.timeFunc)
-
 	if config.Linux != nil && config.Linux.Resources != nil {
 		settings.memory = int(config.Linux.Resources.MemoryLimitInBytes)
 		settings.cpuShares = uint(config.Linux.Resources.CpuShares)
@@ -446,7 +438,8 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 	settings.useKvm = v.forceKVM || canUseKvm()
 	domainConf := settings.createDomain()
 
-	if err = v.addVolumesToDomain(in.PodSandboxId, in.SandboxConfig.Metadata.Name, domainConf, annotations.Volumes); err != nil {
+	nocloudFile, err := v.addVolumesToDomain(in.PodSandboxId, in.SandboxConfig.Metadata.Name, in.SandboxConfig.Metadata.Namespace, domainConf, annotations)
+	if err != nil {
 		return "", err
 	}
 
@@ -454,6 +447,8 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 	if err = v.addSerialDevicesToDomain(in.PodSandboxId, containerAttempt, domainConf, settings); err != nil {
 		return "", err
 	}
+
+	v.metadataStore.SetContainer(settings.domainName, settings.domainUUID, in.PodSandboxId, config.Image.Image, cloneName, config.Labels, config.Annotations, nocloudFile, v.timeFunc)
 
 	if _, err := v.domainConn.DefineDomain(domainConf); err != nil {
 		return "", err
@@ -543,6 +538,12 @@ func (v *VirtualizationTool) RemoveContainer(containerId string) error {
 		return false, nil
 	}, domainDestroyCheckInterval, domainDestroyTimeout); err != nil {
 		return err
+	}
+
+	if containerInfo.NocloudFile != "" {
+		if err := os.Remove(containerInfo.NocloudFile); err != nil {
+			glog.Warning("Error removing nocloud file %q: %v", containerInfo.NocloudFile, err)
+		}
 	}
 
 	if err := v.metadataStore.RemoveContainer(containerId); err != nil {
@@ -824,23 +825,4 @@ func (v *VirtualizationTool) RemoveVolume(name string) error {
 
 func (v *VirtualizationTool) GetStoragePool() *StorageTool {
 	return v.volumeStorage
-}
-
-func maybeInjectPodName(targetFile, podName string) error {
-	content, err := ioutil.ReadFile(targetFile)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return fmt.Errorf("reading %q: %v", targetFile, err)
-	}
-	toFind := []byte(podNameString)
-	if !bytes.Contains(content, toFind) {
-		return nil
-	}
-	content = bytes.Replace(content, toFind, []byte(podName), -1)
-	if err := ioutil.WriteFile(targetFile, content, 0644); err != nil {
-		return fmt.Errorf("writing %q: %v", targetFile, err)
-	}
-	return nil
 }

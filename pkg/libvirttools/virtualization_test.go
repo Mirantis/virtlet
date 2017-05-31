@@ -35,16 +35,8 @@ import (
 )
 
 const (
-	fakeImageName   = "fake/image1"
-	fakeCNIConfig   = `{"noCniForNow":true}`
-	noCloudMetaData = `
-instance-id: some-instance-id
-local-hostname: foobar
-`
-	noCloudUserData = `#cloud-config
-users:
-  - name: foo
-`
+	fakeImageName = "fake/image1"
+	fakeCNIConfig = `{"noCniForNow":true}`
 )
 
 type containerTester struct {
@@ -272,12 +264,17 @@ func TestDomainDefinitions(t *testing.T) {
 		},
 		{
 			name: "cloud-init",
-			flexVolumes: map[string]map[string]interface{}{
-				"nocloud": map[string]interface{}{
-					"type":     "nocloud",
-					"metadata": noCloudMetaData,
-					"userdata": noCloudUserData,
-				},
+			annotations: map[string]string{
+				"VirtletSSHKeys": "key1\nkey2",
+			},
+		},
+		{
+			name: "cloud-init with user data",
+			annotations: map[string]string{
+				"VirtletSSHKeys": "key1\nkey2",
+				"VirtletCloudInitUserData": `
+                                  users:
+                                  - name: cloudy`,
 			},
 		},
 	} {
