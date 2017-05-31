@@ -20,6 +20,13 @@ import (
 	"testing"
 )
 
+// VerifyNamed generates a file name based on current test name and
+// the 'name' argument and compares its content in git index (i.e.
+// staged or committed if now changes are staged for the file) to
+// the JSON serializes of 'data' argument, ignoring any JSON
+// formatting differences. The test will fail if the data
+// differs. In this case the target file is updated and the user
+// must stage or commit the changes to make the test pass.
 func VerifyNamed(t *testing.T, name string, data interface{}) {
 	testName := t.Name()
 	if name != "" {
@@ -52,6 +59,7 @@ func VerifyNamed(t *testing.T, name string, data interface{}) {
 	}
 }
 
+// Verify invokes VerifyNamed with empty 'name' argument
 func Verify(t *testing.T, data interface{}) {
 	VerifyNamed(t, "", data)
 }
