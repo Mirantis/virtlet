@@ -5,3 +5,4 @@ development.
 * [Running testsuite](running-testsuite.md)
 * [Virtlet guidelines](guidelines.md)
 * [Build tool usage](build-tool.md)
+* [VM logging](vm-logging.md)

@@ -31,3 +31,6 @@ fi
 
 # Ensure that /var/lib/libvirt/images exists on node
 mkdir -p /host-var-lib/libvirt/images
+
+# Ensure that /var/log/virtlet/vms exists on node
+mkdir -p /hostlog/virtlet/vms

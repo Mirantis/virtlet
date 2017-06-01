@@ -1,4 +1,3 @@
-#!/usr/bin/expect -f
 # Copyright 2017 Mirantis
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,21 +12,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set timeout 600
-set domain [lindex $argv 0]
-
-spawn ../../examples/virsh.sh console $domain
-
-expect {
-    timeout { puts "initial message timeout"; exit 1 }
-    "Escape character"
-}
-send "\r"
-
-expect {
-    timeout { puts "login prompt timeout"; exit 1 }
-    "login:"
-}
-
-send "\035\r"
-expect eof
+check_SCRIPTS = go.test
+TESTS = $(check_SCRIPTS)
