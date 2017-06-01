@@ -126,6 +126,11 @@ func TestContainerCreateStartListRemove(t *testing.T) {
 		ct.startContainer(createResp.ContainerId)
 	}
 
+	// Define external domain, i.e. not registered in bolt, to control virtlet performs well in that case
+	if err := defineDummyDomain(); err != nil {
+		t.Errorf("failed to define dummy domain to test List function: %v", err)
+	}
+
 	for _, tc := range []*containerFilterTestCase{
 		{
 			name:               "by container id",

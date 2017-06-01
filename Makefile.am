@@ -16,7 +16,7 @@ export GO15VENDOREXPERIMENT=1
 export CGO_CFLAGS=$(CFLAGS)
 export CGO_LDFLAGS=$(LDFLAGS) $(LIBS)
 
-SUBDIRS = pkg/bolttools pkg/libvirttools pkg/manager pkg/nettools pkg/criproxy tests/integration tests/network pkg/flexvolume
+SUBDIRS = pkg/bolttools pkg/libvirttools pkg/manager pkg/nettools pkg/criproxy tests/integration tests/network pkg/log pkg/flexvolume
 
 # FIXME: add back dockerfilelint.test
 # (as of now, it requires Docker)
@@ -36,6 +36,7 @@ all:
 	go build -o $(builddir)/_output/vmwrapper ./cmd/vmwrapper
 	go build -o $(builddir)/_output/criproxy ./cmd/criproxy
 	go build -o $(builddir)/_output/flexvolume_driver ./cmd/flexvolume_driver
+	go build -o $(builddir)/_output/virtlet_log ./cmd/virtlet_log
 
 verify-glide-installation:
 	@which glide || go get github.com/Masterminds/glide

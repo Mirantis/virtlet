@@ -13,6 +13,7 @@ kubectl="${HOME}/.kubeadm-dind-cluster/kubectl"
 BASE_LOCATION="${BASE_LOCATION:-https://raw.githubusercontent.com/Mirantis/virtlet/master/}"
 # Convenience setting for local testing:
 # BASE_LOCATION="${HOME}/work/kubernetes/src/github.com/Mirantis/virtlet"
+DEPLOY_LOG_CONTAINER=${DEPLOY_LOG_CONTAINER:-deploy} # '' = don't deploy, 'deploy' = deploy, 'inject' = inject local log image and deploy
 
 function demo::step {
   local OPTS=""
@@ -60,6 +61,11 @@ function demo::start-dind-cluster {
 function demo::inject-local-image {
   demo::step "Copying local mirantis/virtlet image into kube-node-1 container"
   docker save mirantis/virtlet | docker exec -i kube-node-1 docker load
+}
+
+function demo::inject-local-log-image {
+  demo::step "Copying local mirantis/virtlet-log image into kube-node-1 container"
+  docker save mirantis/virtlet-log | docker exec -i kube-node-1 docker load
 }
 
 function demo::label-node {
@@ -146,6 +152,11 @@ function demo::start-virtlet {
   demo::wait-for "Virtlet DaemonSet" demo::pods-ready runtime=virtlet
 }
 
+function demo::start-virtlet-log {
+  demo::step "Deploying Virtlet Log DaemonSet"
+  "${kubectl}" create -f "${BASE_LOCATION}/deploy/virtlet-log-ds.yaml"
+}
+
 function demo::start-nginx {
   "${kubectl}" run nginx --image=nginx --expose --port 80
 }
@@ -188,8 +199,14 @@ demo::start-dind-cluster
 if [[ ${INJECT_LOCAL_IMAGE:-} ]]; then
   demo::inject-local-image
 fi
+if [[ ${DEPLOY_LOG_CONTAINER} == "inject" ]]; then
+  demo::inject-local-log-image
+fi 
 demo::label-node
 demo::start-virtlet
+if [[ ${DEPLOY_LOG_CONTAINER} != "" ]]; then
+  demo::start-virtlet-log  
+fi
 demo::start-nginx
 demo::start-image-server
 demo::start-vm

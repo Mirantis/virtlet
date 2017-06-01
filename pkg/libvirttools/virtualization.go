@@ -59,6 +59,7 @@ const (
 	containerNsUuid       = "67b7fb47-7735-4b64-86d2-6d062d121966"
 	defaultKubeletRootDir = "/var/lib/kubelet/pods"
 	flexVolumeSubdir      = "volumes/virtlet~flexvolume_driver"
+	vmLogLocationPty      = "pty"
 )
 
 var diskLetters = strings.Split(diskLetterStr, "")
@@ -82,6 +83,7 @@ type VirtletDomainSettings struct {
 	rootDiskFilepath string
 	netNSPath        string
 	cniConfig        string
+	vmLogLocation    string
 }
 
 func canUseKvm() bool {
@@ -106,8 +108,6 @@ func (ds *VirtletDomainSettings) createDomain() *libvirtxml.Domain {
 			Emulator: "/vmwrapper",
 			Inputs:   []libvirtxml.DomainInput{libvirtxml.DomainInput{Type: "tablet", Bus: "usb"}},
 			Graphics: []libvirtxml.DomainGraphic{libvirtxml.DomainGraphic{Type: "vnc", Port: -1}},
-			Serials:  []libvirtxml.DomainChardev{libvirtxml.DomainChardev{Type: "pty", Target: &libvirtxml.DomainChardevTarget{Port: "0"}}},
-			Consoles: []libvirtxml.DomainChardev{libvirtxml.DomainChardev{Type: "pty", Target: &libvirtxml.DomainChardevTarget{Type: "serial", Port: "0"}}},
 			Videos:   []libvirtxml.DomainVideo{libvirtxml.DomainVideo{Model: libvirtxml.DomainVideoModel{Type: "cirrus"}}},
 			Disks: []libvirtxml.DomainDisk{libvirtxml.DomainDisk{
 				Type:   "file",
@@ -316,15 +316,75 @@ func (v *VirtualizationTool) addVolumesToDomain(podID, podName string, domain *l
 	return nil
 }
 
+func vmLogLocation() string {
+	logLocation := os.Getenv("VIRTLET_VM_LOG_LOCATION")
+	if logLocation == "" {
+		return vmLogLocationPty
+	}
+	return logLocation
+}
+
+func (v *VirtualizationTool) RemoveLibvirtSandboxLog(sandboxId string) error {
+	logLocation := vmLogLocation()
+	if logLocation == vmLogLocationPty {
+		return nil
+	}
+	return os.RemoveAll(filepath.Join(logLocation, sandboxId))
+}
+
+func (v *VirtualizationTool) addSerialDevicesToDomain(sandboxId string, containerAttempt uint32, domain *libvirtxml.Domain, settings VirtletDomainSettings) error {
+	if settings.vmLogLocation != vmLogLocationPty {
+		logDir := filepath.Join(settings.vmLogLocation, sandboxId)
+		logPath := filepath.Join(logDir, fmt.Sprintf("_%d.log", containerAttempt))
+
+		// Prepare directory where libvirt will store log file to.
+		if _, err := os.Stat(logDir); os.IsNotExist(err) {
+			if err := os.Mkdir(logDir, 0644); err != nil {
+				return fmt.Errorf("failed to create vmLogDir '%s': %s", logDir, err.Error())
+			}
+		}
+
+		domain.Devices.Serials = []libvirtxml.DomainChardev{
+			libvirtxml.DomainChardev{
+				Type:   "file",
+				Target: &libvirtxml.DomainChardevTarget{Port: "0"},
+				Source: &libvirtxml.DomainChardevSource{Path: logPath},
+			},
+		}
+		domain.Devices.Consoles = []libvirtxml.DomainChardev{
+			libvirtxml.DomainChardev{
+				Type:   "file",
+				Target: &libvirtxml.DomainChardevTarget{Type: "serial", Port: "0"},
+				Source: &libvirtxml.DomainChardevSource{Path: logPath},
+			},
+		}
+	} else {
+		domain.Devices.Serials = []libvirtxml.DomainChardev{
+			libvirtxml.DomainChardev{
+				Type:   "pty",
+				Target: &libvirtxml.DomainChardevTarget{Port: "0"},
+			},
+		}
+		domain.Devices.Consoles = []libvirtxml.DomainChardev{
+			libvirtxml.DomainChardev{
+				Type:   "pty",
+				Target: &libvirtxml.DomainChardevTarget{Type: "serial", Port: "0"},
+			},
+		}
+	}
+	return nil
+}
+
 func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest, netNSPath, cniConfig string) (string, error) {
 	if in.Config == nil || in.Config.Metadata == nil || in.Config.Image == nil || in.SandboxConfig == nil || in.SandboxConfig.Metadata == nil {
 		return "", errors.New("invalid input data")
 	}
 
 	settings := VirtletDomainSettings{
-		domainUUID: utils.NewUuid5(containerNsUuid, in.PodSandboxId),
-		netNSPath:  netNSPath,
-		cniConfig:  cniConfig,
+		domainUUID:    utils.NewUuid5(containerNsUuid, in.PodSandboxId),
+		netNSPath:     netNSPath,
+		cniConfig:     cniConfig,
+		vmLogLocation: vmLogLocation(),
 	}
 
 	config := in.Config
@@ -361,13 +421,21 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 		return "", err
 	}
 
+	annotations, err := LoadAnnotations(sandboxAnnotations)
+	if err != nil {
+		return "", err
+	}
+	settings.vcpuNum = annotations.VCPUCount
+
 	v.metadataStore.SetContainer(settings.domainName, settings.domainUUID, in.PodSandboxId, config.Image.Image, cloneName, config.Labels, config.Annotations, v.timeFunc)
 
 	if config.Linux != nil && config.Linux.Resources != nil {
 		settings.memory = int(config.Linux.Resources.MemoryLimitInBytes)
 		settings.cpuShares = uint(config.Linux.Resources.CpuShares)
 		settings.cpuPeriod = uint64(config.Linux.Resources.CpuPeriod)
-		settings.cpuQuota = config.Linux.Resources.CpuQuota
+		// Specified cpu bandwidth limits for domains actually are set equal per each vCPU by libvirt
+		// Thus, to limit overall VM's cpu threads consumption by set value in pod definition need to perform division
+		settings.cpuQuota = config.Linux.Resources.CpuQuota / int64(settings.vcpuNum)
 	}
 	settings.memoryUnit = "b"
 	if settings.memory == 0 {
@@ -375,15 +443,15 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 		settings.memoryUnit = defaultMemoryUnit
 	}
 
-	annotations, err := LoadAnnotations(sandboxAnnotations)
-	if err != nil {
-		return "", err
-	}
-	settings.vcpuNum = annotations.VCPUCount
 	settings.useKvm = v.forceKVM || canUseKvm()
 	domainConf := settings.createDomain()
 
 	if err = v.addVolumesToDomain(in.PodSandboxId, in.SandboxConfig.Metadata.Name, domainConf, annotations.Volumes); err != nil {
+		return "", err
+	}
+
+	containerAttempt := in.Config.Metadata.Attempt
+	if err = v.addSerialDevicesToDomain(in.PodSandboxId, containerAttempt, domainConf, settings); err != nil {
 		return "", err
 	}
 
@@ -598,6 +666,10 @@ func (v *VirtualizationTool) getContainer(domain virt.VirtDomain) (*kubeapi.Cont
 		return nil, err
 	}
 
+	if containerInfo == nil {
+		return nil, nil
+	}
+
 	podSandboxId := containerInfo.SandboxId
 
 	metadata := &kubeapi.ContainerMetadata{
@@ -696,6 +768,15 @@ func (v *VirtualizationTool) ListContainers(filter *kubeapi.ContainerFilter) ([]
 		container, err := v.getContainer(domain)
 		if err != nil {
 			return nil, err
+		}
+
+		if container == nil {
+			containerId, err := domain.UUIDString()
+			if err != nil {
+				return nil, err
+			}
+			glog.V(0).Infof("Failed to find info in bolt for domain with id: %s, so just ignoring as not handled by virtlet.", containerId)
+			continue
 		}
 
 		if filterContainer(container, filter) {

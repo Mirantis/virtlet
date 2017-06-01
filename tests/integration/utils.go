@@ -18,12 +18,18 @@ package integration
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"time"
+
+	virtletutils "github.com/Mirantis/virtlet/pkg/utils"
+	libvirt "github.com/libvirt/libvirt-go"
+	libvirtxml "github.com/libvirt/libvirt-go-xml"
 )
 
 const (
-	maxTime = 60
+	maxTime    = 60
+	libvirtUri = "qemu+tcp://localhost/system"
 )
 
 func waitForSocket(filepath string) error {
@@ -35,4 +41,28 @@ func waitForSocket(filepath string) error {
 	}
 
 	return fmt.Errorf("Socket %s doesn't exist", filepath)
+}
+
+func defineDummyDomain() error {
+	conn, err := libvirt.NewConnect(libvirtUri)
+	if err != nil {
+		return err
+	}
+
+	domain := &libvirtxml.Domain{
+		Name: "dummy-" + virtletutils.NewUuid(),
+		Type: "qemu",
+		OS: &libvirtxml.DomainOS{
+			Type: &libvirtxml.DomainOSType{Type: "hvm"},
+		},
+		Memory: &libvirtxml.DomainMemory{Value: 8192, Unit: "KiB"},
+	}
+
+	domainXML, err := domain.Marshal()
+	if err != nil {
+		log.Panicf("XML marshaling: %v", err)
+	}
+
+	_, err = conn.DomainDefineXML(domainXML)
+	return err
 }

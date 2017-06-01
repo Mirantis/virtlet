@@ -261,6 +261,11 @@ func (v *VirtletManager) RemovePodSandbox(ctx context.Context, in *kubeapi.Remov
 		return nil, err
 	}
 
+	if err := v.libvirtVirtualizationTool.RemoveLibvirtSandboxLog(podSandboxId); err != nil {
+		glog.Errorf("Error when removing vm log for pod sandbox %s: %v", podSandboxId, err)
+		return nil, err
+	}
+
 	response := &kubeapi.RemovePodSandboxResponse{}
 	glog.V(3).Infof("RemovePodSandbox response: %s", spew.Sdump(response))
 	return response, nil
