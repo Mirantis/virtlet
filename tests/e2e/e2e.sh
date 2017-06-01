@@ -52,13 +52,16 @@ function wait-for-pod {
 function wait-for-ssh {
   local vmname=${1}
   local retries=10
-  while [[ $(../../examples/vmssh.sh "cirros@${vmname}" "echo Hello ${1}" | grep "Hello ${1}" | wc -l) != 1 ]]; do
-    if ((--retries <= 0));then
-      echo "Timed out waiting for ssh to ${vmname}"
-      exit 1
-    fi
-    echo "Waiting for ssh to ${vmname}"
-    sleep 1
+  # dropbear inside cirros vm on Travis (thus non-KVM) is shaky
+  for ((i = 0; i < 4; i++)); do
+    while ! ../../examples/vmssh.sh "cirros@${vmname}" "echo Hello ${1}" | grep -q "Hello ${1}"; do
+      if ((--retries <= 0));then
+        echo "Timed out waiting for ssh to ${vmname}"
+        exit 1
+      fi
+      echo "Waiting for ssh to ${vmname}"
+      sleep 1
+    done
   done
 }
 

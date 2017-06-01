@@ -20,18 +20,18 @@ import (
 	libvirt "github.com/libvirt/libvirt-go"
 )
 
-type ConnectionTool struct {
-	connection *libvirt.Connect
+type Connection struct {
+	*LibvirtDomainConnection
+	*LibvirtStorageConnection
 }
 
-func NewConnectionTool(uri string) (*ConnectionTool, error) {
+func NewConnection(uri string) (*Connection, error) {
 	conn, err := libvirt.NewConnect(uri)
 	if err != nil {
 		return nil, err
 	}
-	return &ConnectionTool{connection: conn}, nil
-}
-
-func (c *ConnectionTool) Connection() *libvirt.Connect {
-	return c.connection
+	return &Connection{
+		LibvirtDomainConnection:  newLibvirtDomainConnection(conn),
+		LibvirtStorageConnection: newLibvirtStorageConnection(conn),
+	}, nil
 }

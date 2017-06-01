@@ -19,6 +19,7 @@ package bolttools
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/Mirantis/virtlet/tests/criapi"
 	"github.com/boltdb/bolt"
@@ -169,7 +170,7 @@ func SetUpBolt(t *testing.T, sandboxConfigs []*kubeapi.PodSandboxConfig, contain
 	}
 
 	for _, sandbox := range sandboxConfigs {
-		if err := b.SetPodSandbox(sandbox, []byte{}); err != nil {
+		if err := b.SetPodSandbox(sandbox, []byte{}, time.Now); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -179,7 +180,7 @@ func SetUpBolt(t *testing.T, sandboxConfigs []*kubeapi.PodSandboxConfig, contain
 	}
 
 	for _, container := range containerConfigs {
-		if err := b.SetContainer(container.Name, container.ContainerId, container.SandboxId, container.Image, container.RootImageVolumeName, container.Labels, container.Annotations); err != nil {
+		if err := b.SetContainer(container.Name, container.ContainerId, container.SandboxId, container.Image, container.RootImageVolumeName, container.Labels, container.Annotations, time.Now); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -4,18 +4,41 @@ set -o nounset
 set -o pipefail
 set -o errtrace
 
+VIRTLET_SKIP_RSYNC="${VIRTLET_SKIP_RSYNC:-}"
+VIRTLET_RSYNC_PORT="${VIRTLET_RSYNC_PORT:-18730}"
+
 # Note that project_dir must not end with slash
 project_dir="$(cd "$(dirname "${BASH_SOURCE}")/.." && pwd)"
 remote_project_dir="/go/src/github.com/Mirantis/virtlet"
 build_name="virtlet_build"
-container_name="${build_name}-$(openssl rand -hex 16)"
+tmp_container_name="${build_name}-$(openssl rand -hex 16)"
 build_image=${build_name}:latest
 volume_name=virtlet_src
+rsync_git=y
 exclude=(
     --exclude 'vendor'
     --exclude .git
     --exclude _output
+    --exclude '*.png'
 )
+rsync_pw_file="${project_dir}/_output/rsync.password"
+
+# from build/common.sh in k8s
+function rsync_probe {
+    # Wait unil rsync is up and running.
+    local tries=20
+    while (( ${tries} > 0 )) ; do
+        if rsync "rsync://k8s@${1}:${2}/" \
+                 --password-file="${project_dir}/_output/rsyncd.password" \
+           &> /dev/null ; then
+            return 0
+        fi
+        tries=$(( ${tries} - 1))
+        sleep 0.1
+    done
+
+    return 1
+}
 
 function ensure_build_image {
     # can't use 'docker images -q' due to https://github.com/docker/docker/issues/28895
@@ -24,30 +47,40 @@ function ensure_build_image {
     fi
 }
 
-function vsh {
-    ensure_build_image
-    cd "${project_dir}"
-    docker run --rm --privileged -it \
-           -l virtlet_build \
-           -v "virtlet_src:${remote_project_dir}" \
-           -v "virtlet_pkg:/go/pkg" \
-           -v /sys/fs/cgroup:/sys/fs/cgroup \
-           -v /lib/modules:/lib/modules:ro \
-           -v /boot:/boot:ro \
-           -v /var/run/docker.sock:/var/run/docker.sock \
-           -e TRAVIS="${TRAVIS:-}" \
-           -e CRIPROXY_TEST_REMOTE_DOCKER_ENDPOINT="${CRIPROXY_TEST_REMOTE_DOCKER_ENDPOINT:-}" \
-           --name ${container_name} \
-           "${build_image}" env TERM=xterm bash
+function get_rsync_addr {
+    # from build/common.sh in k8s
+    local mapped_port
+    if ! mapped_port=$(docker port virtlet-build 8730 2> /dev/null | cut -d: -f 2) ; then
+        echo "Could not get effective rsync port" >&2
+        return 1
+    fi
+
+    local container_ip
+    container_ip=$(docker inspect --format '{{ .NetworkSettings.IPAddress }}' virtlet-build)
+
+    # Sometimes we can reach rsync through localhost and a NAT'd port.  Other
+    # times (when we are running in another docker container on the Jenkins
+    # machines) we have to talk directly to the container IP.  There is no one
+    # strategy that works in all cases so we test to figure out which situation we
+    # are in.
+    if rsync_probe 127.0.0.1 ${mapped_port}; then
+        echo "127.0.0.1:${mapped_port}" >"${project_dir}/_output/rsync_addr"
+        return 0
+    elif rsync_probe "${container_ip}" ${VIRTLET_RSYNC_PORT}; then
+        echo "${container_ip}:${VIRTLET_RSYNC_PORT}" >"${project_dir}/_output/rsync_addr"
+        return 0
+    else
+        echo "Could not probe the rsync port" >&2
+    fi
 }
 
-function vcmd {
-    ensure_build_image
-    cd "${project_dir}"
-    # need to mount docker socket into the container because of
-    # CRI proxy deployment tests
-    tar -C "${project_dir}" "${exclude[@]}" -cz . |
-        docker run --rm --privileged -i \
+function ensure_build_container {
+    if ! docker ps --filter=label=virtlet_build | grep -q virtlet-build; then
+        ensure_build_image
+        cd "${project_dir}"
+        # need to mount docker socket into the container because of
+        # CRI proxy deployment tests
+        docker run -d --privileged \
                -l virtlet_build \
                -v "virtlet_src:${remote_project_dir}" \
                -v "virtlet_pkg:/go/pkg" \
@@ -57,8 +90,54 @@ function vcmd {
                -v /var/run/docker.sock:/var/run/docker.sock \
                -e TRAVIS="${TRAVIS:-}" \
                -e CRIPROXY_TEST_REMOTE_DOCKER_ENDPOINT="${CRIPROXY_TEST_REMOTE_DOCKER_ENDPOINT:-}" \
-               --name ${container_name} \
-               "${build_image}" bash -c "tar -C '${remote_project_dir}' -xz && $*"
+               -p "${VIRTLET_RSYNC_PORT}:8730" \
+               --name virtlet-build \
+               "${build_image}" \
+               sleep Infinity
+        if [[ ! ${VIRTLET_SKIP_RSYNC} ]]; then
+            # from build/common.sh in k8s
+            mkdir -p "${project_dir}/_output"
+            dd if=/dev/urandom bs=512 count=1 2>/dev/null | LC_ALL=C tr -dc 'A-Za-z0-9' | dd bs=32 count=1 2>/dev/null >"${rsync_pw_file}"
+            chmod 600 "${rsync_pw_file}"
+
+            docker cp "${rsync_pw_file}" virtlet-build:/rsyncd.password
+            docker exec -d -i virtlet-build /rsyncd.sh
+            get_rsync_addr
+        fi
+    fi
+    if [[ ! ${VIRTLET_SKIP_RSYNC} ]]; then
+        RSYNC_ADDR="$(cat "${project_dir}/_output/rsync_addr")"
+    fi
+}
+
+function vsh {
+    ensure_build_container
+    cd "${project_dir}"
+    docker exec -it virtlet-build env TERM=xterm bash
+}
+
+function vcmd {
+    ensure_build_container
+    cd "${project_dir}"
+    if [[ ! ${VIRTLET_SKIP_RSYNC} ]]; then
+        local -a filters=(
+            --filter '- /vendor/'
+            --filter '- /_output/'
+        )
+        if [[ ! ${rsync_git} ]]; then
+            filters+=(--filter '- /.git/')
+        fi
+        rsync "${filters[@]}" \
+              --password-file "${project_dir}/_output/rsync.password" \
+              -a --delete --compress-level=9 \
+              "${project_dir}/" "rsync://virtlet@${RSYNC_ADDR}/virtlet/"
+    fi
+    docker exec -i virtlet-build bash -c "$*"
+}
+
+function vcmd_simple {
+    local cmd="${1}"
+    docker exec virtlet-build bash -c "${cmd}"
 }
 
 function stop {
@@ -69,15 +148,9 @@ function stop {
 }
 
 function copy_output {
-    ensure_build_image
+    ensure_build_container
     cd "${project_dir}"
-    docker run --rm --privileged -i \
-           -v "virtlet_src:${remote_project_dir}" \
-           -v "virtlet_pkg:/go/pkg" \
-           --name ${container_name} \
-           "${build_image}" \
-           bash -c "tar -C '${remote_project_dir}' -cz \$(find . -path '*/_output/*' -type f)" |
-        tar -xvz
+    vcmd_simple "tar -C '${remote_project_dir}' -cz \$(find . -path '*/_output/*' -type f)" | tar -xvz
 }
 
 function copy_dind {
@@ -90,7 +163,7 @@ function copy_dind {
     docker run --rm \
            -v "virtlet_src:${remote_project_dir}" \
            -v kubeadm-dind-kube-node-1:/dind \
-           --name ${container_name} \
+           --name ${tmp_container_name} \
            "${build_image}" \
            /bin/sh -c "cp -av _output/* /dind"
 }
@@ -125,14 +198,17 @@ function clean {
 
 function gotest {
     start_libvirt=""
+    # FIXME: exit 1 in $(virtlet_subdir) doesn't cause the script to exit
+    virtlet_subdir >/dev/null
     subdir="$(virtlet_subdir)"
-    if [[ ${subdir} =~ /integration$ ]]; then
-      start_libvirt="VIRTLET_DISABLE_KVM=${VIRTLET_DISABLE_KVM:-} /start.sh -novirtlet && "
+    if ! vcmd "${start_libvirt}cd '${subdir}' && go test $*"; then
+        vcmd_simple "find . -name 'Test*.json' | xargs tar -c -T -" | tar -C "${project_dir}" -x
     fi
-    vcmd "${start_libvirt}cd '${subdir}' && go test $*"
 }
 
 function gobuild {
+    # FIXME: exit 1 in $(virtlet_subdir) doesn't cause the script to exit
+    virtlet_subdir >/dev/null
     vcmd "cd '$(virtlet_subdir)' && go build $*"
 }
 
@@ -163,6 +239,7 @@ case "${cmd}" in
         gotest "$@"
         ;;
     gobuild)
+        rsync_git=
         gobuild "$@"
         ;;
     build)

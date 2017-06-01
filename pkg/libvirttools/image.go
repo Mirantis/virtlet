@@ -25,12 +25,66 @@ import (
 	"strings"
 
 	"github.com/Mirantis/virtlet/pkg/utils"
-	libvirt "github.com/libvirt/libvirt-go"
+	"github.com/Mirantis/virtlet/pkg/virt"
 )
 
-const (
-	defaultDownloadProtocol = "https"
-)
+type ImageManager interface {
+	GetImageVolume(imageName string) (virt.VirtStorageVolume, error)
+}
+
+type ImageTool struct {
+	tool       *StorageTool
+	downloader utils.Downloader
+}
+
+var _ ImageManager = &ImageTool{}
+
+func NewImageTool(conn virt.VirtStorageConnection, downloader utils.Downloader, poolName string) (*ImageTool, error) {
+	storageTool, err := NewStorageTool(conn, poolName, "")
+	if err != nil {
+		return nil, err
+	}
+	return &ImageTool{tool: storageTool, downloader: downloader}, nil
+}
+
+func (i *ImageTool) ListVolumes() ([]virt.VirtStorageVolume, error) {
+	return i.tool.ListVolumes()
+}
+
+func (i *ImageTool) ImageAsVolume(volumeName string) (virt.VirtStorageVolume, error) {
+	return i.tool.LookupVolume(volumeName)
+}
+
+func (i *ImageTool) PullRemoteImageToVolume(imageName, volumeName string) (virt.VirtStorageVolume, error) {
+	// TODO(nhlfr): Handle AuthConfig from PullImageRequest.
+	path, err := i.downloader.DownloadFile(stripTagFromImageName(imageName))
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		os.Remove(path)
+	}()
+
+	return i.tool.FileToVolume(path, volumeName)
+}
+
+func (i *ImageTool) RemoveImage(volumeName string) error {
+	return i.tool.RemoveVolume(volumeName)
+}
+
+func (i *ImageTool) GetImageVolume(imageName string) (virt.VirtStorageVolume, error) {
+	imageVolumeName, err := ImageNameToVolumeName(imageName)
+	if err != nil {
+		return nil, err
+	}
+
+	return i.tool.LookupVolume(imageVolumeName)
+}
+
+func ImageNameFromVirtVolumeName(volumeName string) string {
+	parts := strings.SplitN(volumeName, "_", 2)
+	return parts[1]
+}
 
 func stripTagFromImageName(imageName string) string {
 	return strings.Split(imageName, ":")[0]
@@ -50,58 +104,4 @@ func ImageNameToVolumeName(imageName string) (string, error) {
 	volumeName := fmt.Sprintf("%x_%s", h.Sum(nil), segments[len(segments)-1])
 
 	return volumeName, nil
-}
-
-type ImageTool struct {
-	protocol string
-	tool     *StorageTool
-}
-
-func NewImageTool(conn *libvirt.Connect, poolName, protocol string) (*ImageTool, error) {
-	storageTool, err := NewStorageTool(conn, poolName, "")
-	if err != nil {
-		return nil, err
-	}
-	if protocol == "" {
-		protocol = defaultDownloadProtocol
-	}
-	return &ImageTool{tool: storageTool, protocol: protocol}, nil
-}
-
-func (i *ImageTool) ListLibvirtVolumesAsVolumeInfos() ([]*VolumeInfo, error) {
-	return i.tool.ListVolumes()
-}
-
-func (i *ImageTool) ImageAsVolumeInfo(volumeName string) (*VolumeInfo, error) {
-	vol, err := i.tool.LookupVolume(volumeName)
-	if err != nil {
-		return nil, err
-	}
-	return vol.Info()
-}
-
-func (i *ImageTool) PullRemoteImageToVolume(imageName, volumeName string) error {
-	// TODO(nhlfr): Handle AuthConfig from PullImageRequest.
-	path, err := utils.DownloadFile(i.protocol, stripTagFromImageName(imageName))
-	if err != nil {
-		return err
-	}
-	defer func() {
-		os.Remove(path)
-	}()
-
-	return i.tool.PullFileToVolume(path, volumeName)
-}
-
-func (i *ImageTool) RemoveImage(volumeName string) error {
-	return i.tool.RemoveVolume(volumeName)
-}
-
-func (i *ImageTool) GetStorageTool() *StorageTool {
-	return i.tool
-}
-
-func ImageNameFromLibvirtVolumeName(volumeName string) string {
-	parts := strings.SplitN(volumeName, "_", 2)
-	return parts[1]
 }

@@ -1,0 +1,320 @@
+[
+  {
+    "name": "storage: default: CreateStorageVol",
+    "data": {
+      "XMLName": {
+        "Space": "",
+        "Local": ""
+      },
+      "Type": "",
+      "Name": "0d24dac87b6d48c5c3de11956f1774ef9a57a004_image1",
+      "Key": "",
+      "Allocation": {
+        "Unit": "",
+        "Value": 0
+      },
+      "Capacity": {
+        "Unit": "b",
+        "Value": 11
+      },
+      "Physical": null,
+      "Target": {
+        "Path": "/var/lib/libvirt/images/0d24dac87b6d48c5c3de11956f1774ef9a57a004_image1",
+        "Format": null,
+        "Permissions": null,
+        "Timestamps": null,
+        "Compat": "",
+        "NoCOW": null,
+        "Features": null,
+        "Encryption": null
+      },
+      "BackingStore": null
+    }
+  },
+  {
+    "name": "storage: volumes: CreateStorageVolClone",
+    "data": {
+      "def": {
+        "XMLName": {
+          "Space": "",
+          "Local": ""
+        },
+        "Type": "file",
+        "Name": "root_231700d5-c9a6-5a49-738d-99a954c51550",
+        "Key": "",
+        "Allocation": null,
+        "Capacity": null,
+        "Physical": null,
+        "Target": {
+          "Path": "",
+          "Format": {
+            "Type": "qcow2"
+          },
+          "Permissions": null,
+          "Timestamps": null,
+          "Compat": "",
+          "NoCOW": null,
+          "Features": null,
+          "Encryption": null
+        },
+        "BackingStore": null
+      },
+      "from": "default.0d24dac87b6d48c5c3de11956f1774ef9a57a004_image1"
+    }
+  },
+  {
+    "name": "domain conn: DefineSecret",
+    "data": {
+      "def": {
+        "XMLName": {
+          "Space": "",
+          "Local": "secret"
+        },
+        "Ephemeral": "no",
+        "Private": "no",
+        "Description": "",
+        "UUID": "fa1f16d1-5bf7-412e-8d68-4f15c43f3771",
+        "Usage": {
+          "Type": "ceph",
+          "Volume": "",
+          "Name": "libvirt",
+          "Target": ""
+        }
+      },
+      "value": "66 6f 6f 62 61 72 0a"
+    }
+  },
+  {
+    "name": "domain conn: DefineDomain",
+    "data": {
+      "XMLName": {
+        "Space": "",
+        "Local": ""
+      },
+      "Type": "kvm",
+      "Name": "231700d5-c9a6-5a49-738d-99a954c51550-container1",
+      "UUID": "231700d5-c9a6-5a49-738d-99a954c51550",
+      "Memory": {
+        "Value": 1024,
+        "Unit": "MiB"
+      },
+      "CurrentMemory": null,
+      "MaximumMemory": null,
+      "MemoryBacking": {
+        "Locked": {}
+      },
+      "VCPU": {
+        "Placement": "",
+        "CPUSet": "",
+        "Current": "",
+        "Value": 1
+      },
+      "CPU": null,
+      "CPUTune": {
+        "Shares": {
+          "Value": 0
+        },
+        "Period": {
+          "Value": 0
+        },
+        "Quota": {
+          "Value": 0
+        }
+      },
+      "Resource": null,
+      "Devices": {
+        "Emulator": "/vmwrapper",
+        "Controllers": null,
+        "Disks": [
+          {
+            "Type": "file",
+            "Device": "disk",
+            "Snapshot": "",
+            "Driver": {
+              "Name": "qemu",
+              "Type": "qcow2"
+            },
+            "Auth": null,
+            "Source": {
+              "File": "/var/lib/virtlet/root_231700d5-c9a6-5a49-738d-99a954c51550",
+              "Device": "",
+              "Protocol": "",
+              "Name": "",
+              "Pool": "",
+              "Volume": "",
+              "Hosts": null,
+              "StartupPolicy": ""
+            },
+            "Target": {
+              "Dev": "vda",
+              "Bus": "virtio"
+            },
+            "ReadOnly": null
+          },
+          {
+            "Type": "network",
+            "Device": "disk",
+            "Snapshot": "",
+            "Driver": {
+              "Name": "qemu",
+              "Type": "raw"
+            },
+            "Auth": {
+              "Username": "libvirt",
+              "Secret": {
+                "Type": "ceph",
+                "Usage": "",
+                "UUID": "fa1f16d1-5bf7-412e-8d68-4f15c43f3771"
+              }
+            },
+            "Source": {
+              "File": "",
+              "Device": "",
+              "Protocol": "rbd",
+              "Name": "libvirt-pool/rbd-test-image",
+              "Pool": "",
+              "Volume": "",
+              "Hosts": [
+                {
+                  "Transport": "",
+                  "Name": "127.0.0.1",
+                  "Port": "6789",
+                  "Socket": ""
+                }
+              ],
+              "StartupPolicy": ""
+            },
+            "Target": {
+              "Dev": "vdb",
+              "Bus": "virtio"
+            },
+            "ReadOnly": null
+          }
+        ],
+        "Filesystems": null,
+        "Interfaces": null,
+        "Serials": [
+          {
+            "Type": "pty",
+            "TTY": "",
+            "Source": null,
+            "Target": {
+              "Type": "",
+              "Port": "0"
+            },
+            "Alias": null,
+            "Address": null
+          }
+        ],
+        "Consoles": [
+          {
+            "Type": "pty",
+            "TTY": "",
+            "Source": null,
+            "Target": {
+              "Type": "serial",
+              "Port": "0"
+            },
+            "Alias": null,
+            "Address": null
+          }
+        ],
+        "Inputs": [
+          {
+            "Type": "tablet",
+            "Bus": "usb"
+          }
+        ],
+        "Graphics": [
+          {
+            "Type": "vnc",
+            "AutoPort": "",
+            "Port": -1,
+            "TLSPort": 0,
+            "WebSocket": 0,
+            "Listen": "",
+            "Socket": "",
+            "Keymap": "",
+            "Passwd": "",
+            "PasswdValidTo": "",
+            "Connected": "",
+            "SharePolicy": "",
+            "DefaultMode": "",
+            "Display": "",
+            "XAuth": "",
+            "FullScreen": "",
+            "ReplaceUser": "",
+            "MultiUser": "",
+            "Listeners": null
+          }
+        ],
+        "Videos": [
+          {
+            "Model": {
+              "Type": "cirrus"
+            }
+          }
+        ],
+        "Channels": null
+      },
+      "OS": {
+        "Type": {
+          "Arch": "",
+          "Machine": "",
+          "Type": "hvm"
+        },
+        "Loader": null,
+        "NVRam": null,
+        "Kernel": "",
+        "Initrd": "",
+        "KernelArgs": "",
+        "BootDevices": [
+          {
+            "Dev": "hd"
+          }
+        ],
+        "BootMenu": null,
+        "SMBios": null,
+        "BIOS": null,
+        "Init": "",
+        "InitArgs": null
+      },
+      "SysInfo": null,
+      "OnPoweroff": "destroy",
+      "OnReboot": "restart",
+      "OnCrash": "restart",
+      "Features": {
+        "PAE": null,
+        "ACPI": {},
+        "APIC": null,
+        "HAP": null,
+        "Viridian": null,
+        "PrivNet": null,
+        "HyperV": null,
+        "KVM": null,
+        "PVSpinlock": null,
+        "PMU": null,
+        "VMPort": null,
+        "GIC": null,
+        "SMM": null
+      },
+      "CMDLine": {
+        "Args": null,
+        "Envs": [
+          {
+            "Name": "VIRTLET_EMULATOR",
+            "Value": "/usr/bin/kvm"
+          },
+          {
+            "Name": "VIRTLET_NS",
+            "Value": "/tmp/fakenetns"
+          },
+          {
+            "Name": "VIRTLET_CNI_CONFIG",
+            "Value": "{\"noCniForNow\":true}"
+          }
+        ]
+      }
+    }
+  }
+]

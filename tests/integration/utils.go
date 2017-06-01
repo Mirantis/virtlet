@@ -49,13 +49,8 @@ func defineDummyDomain() error {
 		return err
 	}
 
-	uuid, err := virtletutils.NewUuid()
-	if err != nil {
-		log.Panicf("NewUuid(): %v", err)
-	}
-
 	domain := &libvirtxml.Domain{
-		Name: "dummy-" + uuid,
+		Name: "dummy-" + virtletutils.NewUuid(),
 		Type: "qemu",
 		OS: &libvirtxml.DomainOS{
 			Type: &libvirtxml.DomainOSType{Type: "hvm"},

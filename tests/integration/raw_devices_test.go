@@ -73,7 +73,7 @@ func TestRawDevices(t *testing.T) {
 
 	// check for loop in container dom
 	cmd := fmt.Sprintf("virsh domblklist %s | grep '/dev/loop' | wc -l", container.ContainerId)
-	verifyUsingShell(t, cmd, "the number of loop devices atached", "1")
+	verifyUsingShell(t, cmd, "the number of loop devices attached", "1")
 
 	ct.stopContainer(container.ContainerId)
 	ct.removeContainer(container.ContainerId)

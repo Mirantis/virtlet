@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"syscall"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
@@ -33,18 +34,20 @@ import (
 	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
 	"github.com/Mirantis/virtlet/pkg/metadata"
+	"github.com/Mirantis/virtlet/pkg/utils"
+	"github.com/Mirantis/virtlet/pkg/virt"
 )
 
 const (
-	runtimeAPIVersion = "0.1.0"
-	runtimeName       = "virtlet"
-	runtimeVersion    = "0.1.0"
+	runtimeAPIVersion       = "0.1.0"
+	runtimeName             = "virtlet"
+	runtimeVersion          = "0.1.0"
+	defaultDownloadProtocol = "https"
 )
 
 type VirtletManager struct {
 	server *grpc.Server
 	// libvirt
-	libvirtConnTool           *libvirttools.ConnectionTool
 	libvirtImageTool          *libvirttools.ImageTool
 	libvirtVirtualizationTool *libvirttools.VirtualizationTool
 	// metadata
@@ -54,12 +57,17 @@ type VirtletManager struct {
 }
 
 func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, metadataPath, cniPluginsDir, cniConfigsDir, rawDevices string) (*VirtletManager, error) {
-	libvirtConnTool, err := libvirttools.NewConnectionTool(libvirtUri)
+	if downloadProtocol == "" {
+		downloadProtocol = defaultDownloadProtocol
+	}
+	downloader := utils.NewDownloader(downloadProtocol)
+
+	conn, err := libvirttools.NewConnection(libvirtUri)
 	if err != nil {
 		return nil, err
 	}
 
-	libvirtImageTool, err := libvirttools.NewImageTool(libvirtConnTool.Connection(), poolName, downloadProtocol)
+	libvirtImageTool, err := libvirttools.NewImageTool(conn, downloader, poolName)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +78,7 @@ func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, m
 	}
 
 	// TODO: pool name should be passed like for imageTool
-	libvirtVirtualizationTool, err := libvirttools.NewVirtualizationTool(libvirtConnTool.Connection(), "volumes", libvirtImageTool.GetStorageTool(), rawDevices, boltClient)
+	libvirtVirtualizationTool, err := libvirttools.NewVirtualizationTool(conn, conn, libvirtImageTool, boltClient, "volumes", rawDevices)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +90,6 @@ func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, m
 
 	virtletManager := &VirtletManager{
 		server:                    grpc.NewServer(),
-		libvirtConnTool:           libvirtConnTool,
 		libvirtImageTool:          libvirtImageTool,
 		libvirtVirtualizationTool: libvirtVirtualizationTool,
 		metadataStore:             boltClient,
@@ -181,7 +188,7 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 		glog.Errorf("Invalid pod config while creating pod sandbox for pod %s (%s): %v", podName, podId, err)
 		return nil, err
 	}
-	if err := v.metadataStore.SetPodSandbox(config, bytesNetConfig); err != nil {
+	if err := v.metadataStore.SetPodSandbox(config, bytesNetConfig, time.Now); err != nil {
 		glog.Errorf("Error when creating pod sandbox for pod %s (%s): %v", podName, podId, err)
 		return nil, err
 	}
@@ -318,7 +325,6 @@ func (v *VirtletManager) ListPodSandbox(ctx context.Context, in *kubeapi.ListPod
 func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.CreateContainerRequest) (*kubeapi.CreateContainerResponse, error) {
 	config := in.GetConfig()
 	podSandboxId := in.PodSandboxId
-	imageName := config.GetImage().Image
 	name := config.GetMetadata().Name
 
 	glog.V(2).Infof("CreateContainer called for name: %s", name)
@@ -339,12 +345,12 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 	}
 
 	netNSPath := cni.PodNetNSPath(podSandboxId)
-	glog.V(2).Infof("CreateContainer: imageName %s, ip %s, network namespace %s", imageName, netResult.IP4.IP.IP.String(), netNSPath)
+	glog.V(2).Infof("CreateContainer: imageName %s, ip %s, network namespace %s", config.GetImage().Image, netResult.IP4.IP.IP.String(), netNSPath)
 
 	// TODO: we should not pass whole "in" to CreateContainer - we should pass there only needed info for CreateContainer
 	// without whole data container
 	// TODO: use network configuration by CreateContainer
-	uuid, err := v.libvirtVirtualizationTool.CreateContainer(in, imageName, netNSPath, string(netAsBytes))
+	uuid, err := v.libvirtVirtualizationTool.CreateContainer(in, netNSPath, string(netAsBytes))
 	if err != nil {
 		glog.Errorf("Error when creating container %s: %v", name, err)
 		return nil, err
@@ -469,37 +475,42 @@ func (v *VirtletManager) Status(context.Context, *kubeapi.StatusRequest) (*kubea
 // Images
 //
 
-func (v *VirtletManager) imageFromVolumeInfo(volumeInfo *libvirttools.VolumeInfo) (*kubeapi.Image, error) {
-	libvirtVolumeName, err := v.metadataStore.GetImageName(volumeInfo.Name)
+func (v *VirtletManager) imageFromVolume(virtVolume virt.VirtStorageVolume) (*kubeapi.Image, error) {
+	imageName, err := v.metadataStore.GetImageName(virtVolume.Name())
 	if err != nil {
-		glog.Errorf("Error when checking for existing image with volume %q: %v", volumeInfo.Name, err)
+		glog.Errorf("Error when checking for existing image with volume %q: %v", virtVolume.Name(), err)
 		return nil, err
 	}
 
-	if libvirtVolumeName == "" {
+	if imageName == "" {
 		// the image doesn't exist
 		return nil, nil
 	}
 
+	size, err := virtVolume.Size()
+	if err != nil {
+		return nil, err
+	}
+
 	return &kubeapi.Image{
-		Id:       libvirttools.ImageNameFromLibvirtVolumeName(volumeInfo.Name),
-		RepoTags: []string{libvirtVolumeName},
-		Size_:    volumeInfo.Size,
+		Id:       libvirttools.ImageNameFromVirtVolumeName(virtVolume.Name()),
+		RepoTags: []string{imageName},
+		Size_:    size,
 	}, nil
 }
 
 func (v *VirtletManager) ListImages(ctx context.Context, in *kubeapi.ListImagesRequest) (*kubeapi.ListImagesResponse, error) {
-	volumeInfos, err := v.libvirtImageTool.ListLibvirtVolumesAsVolumeInfos()
+	virtVolumes, err := v.libvirtImageTool.ListVolumes()
 	if err != nil {
 		glog.Errorf("Error when listing images: %v", err)
 		return nil, err
 	}
 
-	images := make([]*kubeapi.Image, 0, len(volumeInfos))
-	for _, volumeInfo := range volumeInfos {
-		image, err := v.imageFromVolumeInfo(volumeInfo)
+	images := make([]*kubeapi.Image, 0, len(virtVolumes))
+	for _, virtVolume := range virtVolumes {
+		image, err := v.imageFromVolume(virtVolume)
 		if err != nil {
-			glog.Errorf("ListImages: error when getting image info for volume %q: %v", volumeInfo.Name, err)
+			glog.Errorf("ListImages: error when getting image info for volume %q: %v", virtVolume.Name(), err)
 			return nil, err
 		}
 		// skip images that aren't in virtlet db
@@ -543,13 +554,13 @@ func (v *VirtletManager) ImageStatus(ctx context.Context, in *kubeapi.ImageStatu
 		return &kubeapi.ImageStatusResponse{}, nil
 	}
 
-	volumeInfo, err := v.libvirtImageTool.ImageAsVolumeInfo(volumeName)
+	volume, err := v.libvirtImageTool.ImageAsVolume(volumeName)
 	if err != nil {
 		glog.Errorf("Error when getting info for image %q (volume %q): %v", imageName, volumeName, err)
 		return nil, err
 	}
 
-	image, err := v.imageFromVolumeInfo(volumeInfo)
+	image, err := v.imageFromVolume(volume)
 	if err != nil {
 		glog.Errorf("ImageStatus: error getting image info for %q (volume %q): %v", imageName, volumeName, err)
 		return nil, err
@@ -572,7 +583,7 @@ func (v *VirtletManager) PullImage(ctx context.Context, in *kubeapi.PullImageReq
 		return nil, err
 	}
 
-	if err = v.libvirtImageTool.PullRemoteImageToVolume(imageName, volumeName); err != nil {
+	if _, err = v.libvirtImageTool.PullRemoteImageToVolume(imageName, volumeName); err != nil {
 		glog.Errorf("Error when pulling image %q: %v", imageName, err)
 		return nil, err
 	}

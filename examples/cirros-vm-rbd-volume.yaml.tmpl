@@ -17,6 +17,10 @@ spec:
   containers:
   - name: cirros-vm-rbd
     image: virtlet/image-service.kube-system/cirros
+    resources:
+      limits:
+        # This memory limit is applied to the libvirt domain definition
+        memory: 128Mi
   volumes:
   - name: test
     flexVolume:

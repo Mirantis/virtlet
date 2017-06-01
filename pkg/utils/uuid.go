@@ -17,13 +17,27 @@ limitations under the License.
 package utils
 
 import (
+	"log"
+
 	uuid "github.com/nu7hatch/gouuid"
 )
 
-func NewUuid() (string, error) {
+func NewUuid() string {
 	u, err := uuid.NewV4()
 	if err != nil {
-		return "", err
+		log.Panicf("can't generate new uuid4: %v", err)
 	}
-	return u.String(), nil
+	return u.String()
+}
+
+func NewUuid5(nsUuid, s string) string {
+	ns, err := uuid.ParseHex(nsUuid)
+	if err != nil {
+		log.Panicf("can't parse namespace uuid: %v", err)
+	}
+	u, err := uuid.NewV5(ns, []byte(s))
+	if err != nil {
+		log.Panicf("can't generate new uuid5: %v", err)
+	}
+	return u.String()
 }

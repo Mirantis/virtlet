@@ -40,7 +40,7 @@ func (b *BoltClient) EnsureVirtualizationSchema() error {
 	return err
 }
 
-func (b *BoltClient) SetContainer(name, containerId, sandboxId, image, rootImageVolumeName string, labels, annotations map[string]string) error {
+func (b *BoltClient) SetContainer(name, containerId, sandboxId, image, rootImageVolumeName string, labels, annotations map[string]string, timeFunc func() time.Time) error {
 	strLabels, err := json.Marshal(labels)
 	if err != nil {
 		return err
@@ -66,7 +66,7 @@ func (b *BoltClient) SetContainer(name, containerId, sandboxId, image, rootImage
 			return err
 		}
 
-		if err := bucket.Put([]byte("createdAt"), []byte(strconv.FormatInt(time.Now().UnixNano(), 10))); err != nil {
+		if err := bucket.Put([]byte("createdAt"), []byte(strconv.FormatInt(timeFunc().UnixNano(), 10))); err != nil {
 			return err
 		}
 

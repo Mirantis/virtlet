@@ -20,9 +20,10 @@ import (
 	"os"
 
 	"github.com/Mirantis/virtlet/pkg/flexvolume"
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 func main() {
-	driver := flexvolume.NewFlexVolumeDriver(flexvolume.NewUuid, flexvolume.NewLinuxMounter())
+	driver := flexvolume.NewFlexVolumeDriver(utils.NewUuid, flexvolume.NewLinuxMounter())
 	os.Stdout.WriteString(driver.Run(os.Args[1:]))
 }

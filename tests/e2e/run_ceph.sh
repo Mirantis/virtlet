@@ -30,7 +30,7 @@ docker run -d --net=host -e MON_IP=${MON_IP} -e CEPH_PUBLIC_NETWORK=${CEPH_PUBLI
 
 # Check cluster is running
 set +e
-ntries=5
+ntries=20
 echo -e -n "\tWaiting for ceph cluster..."
 while ! docker exec ${container_name} ceph -s 2> /dev/null 1> /dev/null; do
   if [ $ntries -eq 0 ]; then
