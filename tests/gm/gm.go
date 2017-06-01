@@ -17,6 +17,7 @@ limitations under the License.
 package gm
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -28,7 +29,11 @@ import (
 // differs. In this case the target file is updated and the user
 // must stage or commit the changes to make the test pass.
 func VerifyNamed(t *testing.T, name string, data interface{}) {
-	testName := t.Name()
+	// XXX: in Go 1.8:
+	// testName := t.Name()
+	tv := reflect.ValueOf(*t)
+	testName := tv.FieldByName("name").String()
+
 	if name != "" {
 		testName += "__" + name
 	}
