@@ -61,7 +61,8 @@ Virtlet has no problems handling them on Kubernetes as demonstrated in this
 
 ## Need any help with Virtlet?
 
-If you will encounter any issue when using Virtlet please look into our [issue tracker](http://github.com/Mirantis/virtlet/issues) on github. If your case is not mentioned there - please fill new issue for it.
+If you will encounter any issue when using Virtlet please look into our [issue tracker](http://github.com/Mirantis/virtlet/issues) on github. If your case is not mentioned there - please fill new issue for it. In case of any questions you may also use [#virtlet](https://kubernetes.slack.com/messages/virtlet/) channel on
+[Kubernetes Slack](https://kubernetes.slack.com/messages).
 
 ## Contributing
 
