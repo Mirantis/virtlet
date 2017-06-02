@@ -10,6 +10,13 @@ metadata:
     # thus numeric values need to be quoted.
     # Defaults to "1".
     VirtletVCPUCount: "1"
+    # inject ssh keys via cloud-init
+    VirtletSSHKeys: |
+      ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCaJEcFDXEK2ZbX0ZLS1EIYFZRbDAcRfuVjpstSc0De8+sV1aiu+dePxdkuDRwqFtCyk6dEZkssjOkBXtri00MECLkir6FcH3kKOJtbJ6vy3uaJc9w1ERo+wyl6SkAh/+JTJkp7QRXj8oylW5E20LsbnA/dIwWzAF51PPwF7A7FtNg9DnwPqMkxFo1Th/buOMKbP5ZA1mmNNtmzbMpMfJATvVyiv3ccsSJKOiyQr6UG+j7sc/7jMVz5Xk34Vd0l8GwcB0334MchHckmqDB142h/NCWTr8oLakDNvkfC1YneAfAO41hDkUbxPtVBG5M/o7P4fxoqiHEX+ZLfRxDtHB53 me@localhost
+    # cloud-init user data
+    VirtletCloudInitUserDataScript: |
+      #!/bin/sh
+      echo "Hi there"
 spec:
   # This nodeAffinity specification tells Kubernetes to run this
   # pod only on the nodes that have extraRuntime=virtlet label.
@@ -34,23 +41,3 @@ spec:
       limits:
         # This memory limit is applied to the libvirt domain definition
         memory: 128Mi
-  volumes:
-  - name: nocloud
-    # here we define a nocloud flexVolume. This notation is temporary
-    # and will likely change in future.
-    flexVolume:
-      driver: "virtlet/flexvolume_driver"
-      options:
-        type: nocloud
-        # specify host name and inject a public key
-        metadata: |
-          {
-            "instance-id": "cirros-vm-001",
-            "local-hostname": "my-cirros-vm",
-            "public-keys": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCaJEcFDXEK2ZbX0ZLS1EIYFZRbDAcRfuVjpstSc0De8+sV1aiu+dePxdkuDRwqFtCyk6dEZkssjOkBXtri00MECLkir6FcH3kKOJtbJ6vy3uaJc9w1ERo+wyl6SkAh/+JTJkp7QRXj8oylW5E20LsbnA/dIwWzAF51PPwF7A7FtNg9DnwPqMkxFo1Th/buOMKbP5ZA1mmNNtmzbMpMfJATvVyiv3ccsSJKOiyQr6UG+j7sc/7jMVz5Xk34Vd0l8GwcB0334MchHckmqDB142h/NCWTr8oLakDNvkfC1YneAfAO41hDkUbxPtVBG5M/o7P4fxoqiHEX+ZLfRxDtHB53 me@localhost"
-          }
-
-        # cloud-init userdata
-        userdata: |
-          #!/bin/sh
-          echo "Hi there"
