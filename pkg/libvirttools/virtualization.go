@@ -30,7 +30,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	libvirt "github.com/libvirt/libvirt-go"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 	"k8s.io/apimachinery/pkg/fields"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
@@ -372,8 +371,7 @@ func (v *VirtualizationTool) addSerialDevicesToDomain(sandboxId string, containe
 
 func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest, netNSPath, cniConfig string) (string, error) {
 	var err error
-	var domainXML string
-	var domainPtr *libvirt.Domain
+	var domain virt.VirtDomain
 
 	if in.Config == nil || in.Config.Metadata == nil || in.Config.Image == nil || in.SandboxConfig == nil || in.SandboxConfig.Metadata == nil {
 		return "", errors.New("invalid input data")
@@ -402,18 +400,13 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 	if err != nil {
 		return "", err
 	}
+	settings.vcpuNum = annotations.VCPUCount
 
 	cloneName := "root_" + settings.domainUUID
 	settings.rootDiskFilepath, err = v.createBootImageClone(cloneName, config.Image.Image)
 	if err != nil {
 		return "", err
 	}
-
-	annotations, err := LoadAnnotations(sandboxAnnotations)
-	if err != nil {
-		return "", err
-	}
-	settings.vcpuNum = annotations.VCPUCount
 
 	if config.Linux != nil && config.Linux.Resources != nil {
 		settings.memory = int(config.Linux.Resources.MemoryLimitInBytes)
@@ -437,8 +430,7 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 		goto Cleanup
 	}
 
-	containerAttempt := in.Config.Metadata.Attempt
-	if err = v.addSerialDevicesToDomain(in.PodSandboxId, containerAttempt, domainConf, settings); err != nil {
+	if err = v.addSerialDevicesToDomain(in.PodSandboxId, in.Config.Metadata.Attempt, domainConf, settings); err != nil {
 		goto Cleanup
 	}
 
@@ -448,7 +440,7 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 		goto Cleanup
 	}
 
-	domain, err := v.domainConn.LookupDomainByUUIDString(settings.domainUUID)
+	domain, err = v.domainConn.LookupDomainByUUIDString(settings.domainUUID)
 	if err == nil {
 		// FIXME: do we really need this?
 		// (this causes an GetInfo() call on the domain in case of libvirt)
@@ -474,7 +466,7 @@ Cleanup:
 func (v *VirtualizationTool) StartContainer(containerId string) error {
 	domain, err := v.domainConn.LookupDomainByUUIDString(containerId)
 	if err == nil {
-		err = domain.Create(domain)
+		err = domain.Create()
 	}
 
 	if err != nil {

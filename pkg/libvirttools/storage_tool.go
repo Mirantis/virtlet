@@ -17,7 +17,6 @@ limitations under the License.
 package libvirttools
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -123,11 +122,7 @@ func (s *StorageTool) CleanAttachedQCOW2Volumes(volumes []*VirtletVolume, contai
 		volName := containerId + "-" + virtletVol.Name
 
 		err := s.RemoveVolume(volName)
-		lastLibvirtErr, ok := err.(libvirt.Error)
-		if !ok {
-			return errors.New("Failed to cast error to libvirt.Error type")
-		}
-		if lastLibvirtErr.Code != libvirt.ERR_NO_STORAGE_VOL {
+		if err != nil && err != virt.ErrStorageVolumeNotFound {
 			return fmt.Errorf("error during removal of volume '%s' for container %s: %v", volName, containerId, err)
 		}
 	}
