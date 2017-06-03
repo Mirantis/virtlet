@@ -31,32 +31,26 @@ import (
 )
 
 type CloudInitGenerator struct {
-	podName     string
-	podNs       string
-	annotations *VirtletAnnotations
+	config *VMConfig
 }
 
-func NewCloudInitGenerator(podName, podNs string, annotations *VirtletAnnotations) *CloudInitGenerator {
-	return &CloudInitGenerator{
-		podName:     podName,
-		podNs:       podNs,
-		annotations: annotations,
-	}
+func NewCloudInitGenerator(config *VMConfig) *CloudInitGenerator {
+	return &CloudInitGenerator{config}
 }
 
 func (g *CloudInitGenerator) generateMetaData() (string, error) {
 	m := map[string]interface{}{
-		"instance-id":    fmt.Sprintf("%s.%s", g.podName, g.podNs),
-		"local-hostname": g.podName,
+		"instance-id":    fmt.Sprintf("%s.%s", g.config.PodName, g.config.PodNamespace),
+		"local-hostname": g.config.PodName,
 	}
-	if len(g.annotations.SSHKeys) != 0 {
+	if len(g.config.ParsedAnnotations.SSHKeys) != 0 {
 		var keys []string
-		for _, key := range g.annotations.SSHKeys {
+		for _, key := range g.config.ParsedAnnotations.SSHKeys {
 			keys = append(keys, key)
 		}
 		m["public-keys"] = keys
 	}
-	for k, v := range g.annotations.MetaData {
+	for k, v := range g.config.ParsedAnnotations.MetaData {
 		m[k] = v
 	}
 	r, err := json.Marshal(m)
@@ -67,13 +61,13 @@ func (g *CloudInitGenerator) generateMetaData() (string, error) {
 }
 
 func (g *CloudInitGenerator) generateUserData() (string, error) {
-	if g.annotations.UserDataScript != "" {
-		return g.annotations.UserDataScript, nil
+	if g.config.ParsedAnnotations.UserDataScript != "" {
+		return g.config.ParsedAnnotations.UserDataScript, nil
 	}
 	r := []byte{}
-	if len(g.annotations.UserData) != 0 {
+	if len(g.config.ParsedAnnotations.UserData) != 0 {
 		var err error
-		r, err = yaml.Marshal(g.annotations.UserData)
+		r, err = yaml.Marshal(g.config.ParsedAnnotations.UserData)
 		if err != nil {
 			return "", fmt.Errorf("error marshalling user-data: %v", err)
 		}

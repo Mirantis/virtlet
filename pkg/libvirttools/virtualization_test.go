@@ -146,7 +146,7 @@ func TestContainerLifecycle(t *testing.T) {
 		t.Errorf("Unexpected containers when no containers are started: %#v", containers)
 	}
 
-	containerId, err := ct.virtTool.CreateContainer(&kubeapi.CreateContainerRequest{
+	req := &kubeapi.CreateContainerRequest{
 		PodSandboxId: sandbox.Metadata.Uid,
 		Config: &kubeapi.ContainerConfig{
 			Metadata: &kubeapi.ContainerMetadata{
@@ -157,9 +157,14 @@ func TestContainerLifecycle(t *testing.T) {
 			},
 		},
 		SandboxConfig: sandbox,
-	}, "/tmp/fakenetns", fakeCNIConfig)
+	}
+	vmConfig, err := GetVMConfig(req)
 	if err != nil {
-		t.Fatalf("CreateContainer: %v", err)
+		t.Fatalf("GetVMConfig(): %v", err)
+	}
+	containerId, err := ct.virtTool.CreateContainer(vmConfig, "/tmp/fakenetns", fakeCNIConfig)
+	if err != nil {
+		t.Fatalf("CreateContainer(): %v", err)
 	}
 
 	containers, err = ct.virtTool.ListContainers(nil)
@@ -307,7 +312,7 @@ func TestDomainDefinitions(t *testing.T) {
 				}
 			}
 
-			containerId, err := ct.virtTool.CreateContainer(&kubeapi.CreateContainerRequest{
+			req := &kubeapi.CreateContainerRequest{
 				PodSandboxId: sandbox.Metadata.Uid,
 				Config: &kubeapi.ContainerConfig{
 					Metadata: &kubeapi.ContainerMetadata{
@@ -318,7 +323,12 @@ func TestDomainDefinitions(t *testing.T) {
 					},
 				},
 				SandboxConfig: sandbox,
-			}, "/tmp/fakenetns", fakeCNIConfig)
+			}
+			vmConfig, err := GetVMConfig(req)
+			if err != nil {
+				t.Fatalf("GetVMConfig(): %v", err)
+			}
+			containerId, err := ct.virtTool.CreateContainer(vmConfig, "/tmp/fakenetns", fakeCNIConfig)
 			if err != nil {
 				t.Fatalf("CreateContainer: %v", err)
 			}

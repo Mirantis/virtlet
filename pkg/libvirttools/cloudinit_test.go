@@ -125,7 +125,11 @@ func TestCloudInitGenerator(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			g := NewCloudInitGenerator(tc.podName, tc.podNs, tc.annotations)
+			g := NewCloudInitGenerator(&VMConfig{
+				PodName:           tc.podName,
+				PodNamespace:      tc.podNs,
+				ParsedAnnotations: tc.annotations,
+			})
 
 			metaDataStr, err := g.generateMetaData()
 			if err != nil {
@@ -165,7 +169,11 @@ func TestCloudInitGenerator(t *testing.T) {
 }
 
 func TestGenerateDisk(t *testing.T) {
-	g := NewCloudInitGenerator("foo", "default", &VirtletAnnotations{})
+	g := NewCloudInitGenerator(&VMConfig{
+		PodName:           "foo",
+		PodNamespace:      "default",
+		ParsedAnnotations: &VirtletAnnotations{},
+	})
 	isoPath, diskDef, err := g.GenerateDisk()
 	if err != nil {
 		t.Fatalf("GenerateDisk(): %v", err)

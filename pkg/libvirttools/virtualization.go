@@ -19,7 +19,6 @@ package libvirttools
 import (
 	"encoding/base64"
 	"encoding/xml"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -67,7 +66,7 @@ type FlexVolumeInfo struct {
 	Key       string
 }
 
-type VirtletDomainSettings struct {
+type domainSettings struct {
 	useKvm           bool
 	domainName       string
 	domainUUID       string
@@ -91,7 +90,7 @@ func canUseKvm() bool {
 	return true
 }
 
-func (ds *VirtletDomainSettings) createDomain() *libvirtxml.Domain {
+func (ds *domainSettings) createDomain() *libvirtxml.Domain {
 	domainType := defaultDomainType
 	emulator := defaultEmulator
 	if !ds.useKvm {
@@ -128,7 +127,7 @@ func (ds *VirtletDomainSettings) createDomain() *libvirtxml.Domain {
 
 		Type: domainType,
 
-		Name:   ds.domainUUID + "-" + ds.domainName,
+		Name:   ds.domainName,
 		UUID:   ds.domainUUID,
 		Memory: &libvirtxml.DomainMemory{Value: ds.memory, Unit: ds.memoryUnit},
 		VCPU:   &libvirtxml.DomainVCPU{Value: ds.vcpuNum},
@@ -205,8 +204,8 @@ func (v *VirtualizationTool) createBootImageClone(cloneName, imageName string) (
 	return vol.Path()
 }
 
-func (v *VirtualizationTool) scanFlexVolumes(podId, podName string, letterInd int) ([]FlexVolumeInfo, error) {
-	dir := filepath.Join(v.kubeletRootDir, podId, flexVolumeSubdir)
+func (v *VirtualizationTool) scanFlexVolumes(config *VMConfig, letterInd int) ([]FlexVolumeInfo, error) {
+	dir := filepath.Join(v.kubeletRootDir, config.PodSandboxId, flexVolumeSubdir)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		return nil, nil
 	} else if err != nil {
@@ -268,8 +267,8 @@ func (v *VirtualizationTool) scanFlexVolumes(podId, podName string, letterInd in
 	return flexInfos, nil
 }
 
-func (v *VirtualizationTool) addVolumesToDomain(podId, podName, podNamespace string, domain *libvirtxml.Domain, annotations *VirtletAnnotations) (string, error) {
-	g := NewCloudInitGenerator(podName, podNamespace, annotations)
+func (v *VirtualizationTool) addVolumesToDomain(config *VMConfig, domain *libvirtxml.Domain) (string, error) {
+	g := NewCloudInitGenerator(config)
 	isoPath, nocloudDiskDef, err := g.GenerateDisk()
 	if err != nil {
 		return "", err
@@ -277,7 +276,7 @@ func (v *VirtualizationTool) addVolumesToDomain(podId, podName, podNamespace str
 	nocloudDiskDef.Target.Dev = "vd" + diskLetters[0]
 	domain.Devices.Disks = append(domain.Devices.Disks, *nocloudDiskDef)
 
-	flexVolumeInfos, err := v.scanFlexVolumes(podId, podName, 1)
+	flexVolumeInfos, err := v.scanFlexVolumes(config, 1)
 	if err != nil {
 		return "", err
 	}
@@ -300,7 +299,7 @@ func (v *VirtualizationTool) addVolumesToDomain(podId, podName, podNamespace str
 		domain.Devices.Disks = append(domain.Devices.Disks, *flexVolumeInfo.Disk)
 	}
 
-	volumes, err := v.volumeStorage.PrepareVolumesToBeAttached(annotations.Volumes, domain.UUID, len(flexVolumeInfos)+1)
+	volumes, err := v.volumeStorage.PrepareVolumesToBeAttached(config.ParsedAnnotations.Volumes, domain.UUID, len(flexVolumeInfos)+1)
 	if err != nil {
 		return "", err
 	}
@@ -326,7 +325,7 @@ func (v *VirtualizationTool) RemoveLibvirtSandboxLog(sandboxId string) error {
 	return os.RemoveAll(filepath.Join(logLocation, sandboxId))
 }
 
-func (v *VirtualizationTool) addSerialDevicesToDomain(sandboxId string, containerAttempt uint32, domain *libvirtxml.Domain, settings VirtletDomainSettings) error {
+func (v *VirtualizationTool) addSerialDevicesToDomain(sandboxId string, containerAttempt uint32, domain *libvirtxml.Domain, settings domainSettings) error {
 	if settings.vmLogLocation != vmLogLocationPty {
 		logDir := filepath.Join(settings.vmLogLocation, sandboxId)
 		logPath := filepath.Join(logDir, fmt.Sprintf("_%d.log", containerAttempt))
@@ -369,66 +368,50 @@ func (v *VirtualizationTool) addSerialDevicesToDomain(sandboxId string, containe
 	return nil
 }
 
-func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest, netNSPath, cniConfig string) (string, error) {
-	if in.Config == nil || in.Config.Metadata == nil || in.Config.Image == nil || in.SandboxConfig == nil || in.SandboxConfig.Metadata == nil {
-		return "", errors.New("invalid input data")
+func (v *VirtualizationTool) CreateContainer(config *VMConfig, netNSPath, cniConfig string) (string, error) {
+	if err := config.LoadAnnotations(); err != nil {
+		return "", err
 	}
 
-	settings := VirtletDomainSettings{
-		domainUUID:    utils.NewUuid5(containerNsUuid, in.PodSandboxId),
+	domainUUID := utils.NewUuid5(containerNsUuid, config.PodSandboxId)
+	settings := domainSettings{
+		domainUUID:    domainUUID,
+		domainName:    domainUUID + "-" + config.Name,
 		netNSPath:     netNSPath,
 		cniConfig:     cniConfig,
 		vmLogLocation: vmLogLocation(),
 	}
 
-	config := in.Config
-	settings.domainName = config.Metadata.Name
-	sandboxAnnotations, err := v.metadataStore.GetPodSandboxAnnotations(in.PodSandboxId)
-	if err != nil {
-		return "", err
-	}
-
-	if settings.domainName == "" {
-		settings.domainName = settings.domainUUID
-	} else {
-		// check whether the domain with such name already exists, and if so, return it's uuid
-		domainName := in.PodSandboxId + "-" + settings.domainName
-		domain, err := v.domainConn.LookupDomainByName(domainName)
-		if err != nil && err != virt.ErrDomainNotFound {
-			return "", fmt.Errorf("failed to look up domain %q: %v", domainName, err)
-		}
-		if err == nil {
-			if domainID, err := domain.UUIDString(); err == nil {
-				// FIXME: this is a temp workaround for an existing domain being returned on create container call
-				// (this causing SyncPod issues)
-				return domainID, nil
-			} else {
-				glog.Errorf("Failed to get UUID for domain with name: %s due to %v", domainName, err)
-				return "", fmt.Errorf("Failure in communication with libvirt: %v", err)
-			}
+	// check whether the domain with such name already exists, and if so, return it's uuid
+	domain, err := v.domainConn.LookupDomainByName(settings.domainName)
+	switch {
+	case err == virt.ErrDomainNotFound:
+		// ok, no such domain
+	case err != nil:
+		return "", fmt.Errorf("failed to look up domain %q: %v", settings.domainName, err)
+	default:
+		if domainID, err := domain.UUIDString(); err == nil {
+			// FIXME: this is a temp workaround for an existing domain being returned on create container call
+			// (this causing SyncPod issues)
+			return domainID, nil
+		} else {
+			glog.Errorf("Failed to get UUID for domain with name %q: %v", settings.domainName, err)
+			return "", fmt.Errorf("Error getting domain UUID for %q: %v", settings.domainName, err)
 		}
 	}
 
 	cloneName := "root_" + settings.domainUUID
-	settings.rootDiskFilepath, err = v.createBootImageClone(cloneName, config.Image.Image)
+	settings.rootDiskFilepath, err = v.createBootImageClone(cloneName, config.Image)
 	if err != nil {
 		return "", err
 	}
-
-	annotations, err := LoadAnnotations(sandboxAnnotations)
-	if err != nil {
-		return "", err
-	}
-	settings.vcpuNum = annotations.VCPUCount
-
-	if config.Linux != nil && config.Linux.Resources != nil {
-		settings.memory = int(config.Linux.Resources.MemoryLimitInBytes)
-		settings.cpuShares = uint(config.Linux.Resources.CpuShares)
-		settings.cpuPeriod = uint64(config.Linux.Resources.CpuPeriod)
-		// Specified cpu bandwidth limits for domains actually are set equal per each vCPU by libvirt
-		// Thus, to limit overall VM's cpu threads consumption by set value in pod definition need to perform division
-		settings.cpuQuota = config.Linux.Resources.CpuQuota / int64(settings.vcpuNum)
-	}
+	settings.vcpuNum = config.ParsedAnnotations.VCPUCount
+	settings.memory = int(config.MemoryLimitInBytes)
+	settings.cpuShares = uint(config.CpuShares)
+	settings.cpuPeriod = uint64(config.CpuPeriod)
+	// Specified cpu bandwidth limits for domains actually are set equal per each vCPU by libvirt
+	// Thus, to limit overall VM's cpu threads consumption by set value in pod definition need to perform division
+	settings.cpuQuota = config.CpuQuota / int64(settings.vcpuNum)
 	settings.memoryUnit = "b"
 	if settings.memory == 0 {
 		settings.memory = defaultMemory
@@ -438,23 +421,23 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 	settings.useKvm = v.forceKVM || canUseKvm()
 	domainConf := settings.createDomain()
 
-	nocloudFile, err := v.addVolumesToDomain(in.PodSandboxId, in.SandboxConfig.Metadata.Name, in.SandboxConfig.Metadata.Namespace, domainConf, annotations)
+	nocloudFile, err := v.addVolumesToDomain(config, domainConf)
 	if err != nil {
 		return "", err
 	}
 
-	containerAttempt := in.Config.Metadata.Attempt
-	if err = v.addSerialDevicesToDomain(in.PodSandboxId, containerAttempt, domainConf, settings); err != nil {
+	containerAttempt := config.Attempt
+	if err = v.addSerialDevicesToDomain(config.PodSandboxId, containerAttempt, domainConf, settings); err != nil {
 		return "", err
 	}
 
-	v.metadataStore.SetContainer(settings.domainName, settings.domainUUID, in.PodSandboxId, config.Image.Image, cloneName, config.Labels, config.Annotations, nocloudFile, v.timeFunc)
+	v.metadataStore.SetContainer(config.Name, settings.domainUUID, config.PodSandboxId, config.Image, cloneName, config.ContainerLabels, config.ContainerAnnotations, nocloudFile, v.timeFunc)
 
 	if _, err := v.domainConn.DefineDomain(domainConf); err != nil {
 		return "", err
 	}
 
-	domain, err := v.domainConn.LookupDomainByUUIDString(settings.domainUUID)
+	domain, err = v.domainConn.LookupDomainByUUIDString(settings.domainUUID)
 	if err == nil {
 		// FIXME: do we really need this?
 		// (this causes an GetInfo() call on the domain in case of libvirt)

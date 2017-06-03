@@ -350,9 +350,15 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 	// TODO: we should not pass whole "in" to CreateContainer - we should pass there only needed info for CreateContainer
 	// without whole data container
 	// TODO: use network configuration by CreateContainer
-	uuid, err := v.libvirtVirtualizationTool.CreateContainer(in, netNSPath, string(netAsBytes))
+	vmConfig, err := libvirttools.GetVMConfig(in)
 	if err != nil {
-		glog.Errorf("Error when creating container %s: %v", name, err)
+		glog.Errorf("Error getting vm config for container %s: %v", name, err)
+		return nil, err
+	}
+
+	uuid, err := v.libvirtVirtualizationTool.CreateContainer(vmConfig, netNSPath, string(netAsBytes))
+	if err != nil {
+		glog.Errorf("Error creating container %s: %v", name, err)
 		return nil, err
 	}
 
