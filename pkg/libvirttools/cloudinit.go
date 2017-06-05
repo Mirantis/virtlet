@@ -36,11 +36,12 @@ type CloudInitGenerator struct {
 	annotations *VirtletAnnotations
 }
 
-func NewCloudInitGenerator(podName, podNs string, annotations *VirtletAnnotations) *CloudInitGenerator {
+func NewCloudInitGenerator(podName, podNs string, annotations *VirtletAnnotations, envVarsFileContent string) *CloudInitGenerator {
 	return &CloudInitGenerator{
-		podName:     podName,
-		podNs:       podNs,
-		annotations: annotations,
+		podName:            podName,
+		podNs:              podNs,
+		annotations:        annotations,
+		envVarsFileContent: envVarsFileContent,
 	}
 }
 

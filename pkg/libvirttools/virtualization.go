@@ -17,6 +17,7 @@ limitations under the License.
 package libvirttools
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/xml"
 	"errors"
@@ -356,9 +357,21 @@ func (v *VirtualizationTool) addSerialDevicesToDomain(sandboxId string, containe
 	return nil
 }
 
+func getEnvVarsFileData(keyVals []*kubeapi.KeyValue) string {
+	if keyVals == nil {
+		return ""
+	}
+
+	var buffer bytes.Buffer
+	for _, entry := range keyVals {
+		buffer.WriteString(fmt.Sprintf("%s=%s\n", entry.Key, entry.Value))
+	}
+
+	return buffer.String()
+}
+
 func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest, netNSPath, cniConfig string) (id string, err error) {
 	var domain virt.VirtDomain
-
 	if in.Config == nil || in.Config.Metadata == nil || in.Config.Image == nil || in.SandboxConfig == nil || in.SandboxConfig.Metadata == nil {
 		return "", errors.New("invalid input data")
 	}
@@ -411,7 +424,8 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 	settings.useKvm = v.forceKVM || canUseKvm()
 	domainConf := settings.createDomain()
 
-	g := NewCloudInitGenerator(in.PodSandboxId, in.SandboxConfig.Metadata.Namespace, annotations)
+	g := NewCloudInitGenerator(in.SandboxConfig.Metadata.Name, in.SandboxConfig.Metadata.Namespace,
+		annotations, getEnvVarsFileData(in.Config.Envs))
 	nocloudFile, nocloudDiskDef, err := g.GenerateDisk()
 	if err != nil {
 		return "", err
