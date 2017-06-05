@@ -53,7 +53,7 @@ const (
 	domainDestroyTimeout        = 5 * time.Second
 	diskLetterStr               = "bcdefghijklmnopqrstu"
 
-	containerNsUuid       = "67b7fb47-7735-4b64-86d2-6d062d121966"
+	ContainerNsUuid       = "67b7fb47-7735-4b64-86d2-6d062d121966"
 	defaultKubeletRootDir = "/var/lib/kubelet/pods"
 	flexVolumeSubdir      = "volumes/virtlet~flexvolume_driver"
 	vmLogLocationPty      = "pty"
@@ -378,7 +378,7 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 	}
 
 	settings := VirtletDomainSettings{
-		domainUUID:    utils.NewUuid5(containerNsUuid, in.PodSandboxId),
+		domainUUID:    utils.NewUuid5(ContainerNsUuid, in.PodSandboxId),
 		netNSPath:     netNSPath,
 		cniConfig:     cniConfig,
 		vmLogLocation: vmLogLocation(),
@@ -434,9 +434,7 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 		goto Cleanup
 	}
 
-	v.metadataStore.SetContainer(settings.domainName, settings.domainUUID, in.PodSandboxId, config.Image.Image, cloneName, config.Labels, config.Annotations, nocloudFile, v.timeFunc)
-
-	if _, err := v.domainConn.DefineDomain(domainConf); err != nil {
+	if _, err = v.domainConn.DefineDomain(domainConf); err != nil {
 		goto Cleanup
 	}
 
@@ -446,11 +444,10 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 		// (this causes an GetInfo() call on the domain in case of libvirt)
 		_, err = domain.State()
 	}
-	if err != nil {
-		goto Cleanup
-	}
 
 Cleanup:
+	// Set container in bolt despite of failure to provide info for cleanup
+	v.metadataStore.SetContainer(settings.domainName, settings.domainUUID, in.PodSandboxId, config.Image.Image, cloneName, config.Labels, config.Annotations, nocloudFile, v.timeFunc)
 	if err != nil {
 		if rmErr := v.RemoveContainer(settings.domainUUID); rmErr != nil {
 			return "", fmt.Errorf("Container creation error: %v \n %v", err, rmErr)
