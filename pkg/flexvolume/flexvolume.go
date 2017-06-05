@@ -20,25 +20,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
-
-	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
-type volumeOpts struct {
-	Type string `json:"type"`
-	// ceph fields
-	Monitor  string `json:"monitor"`
-	Pool     string `json:"pool"`
-	Volume   string `json:"volume"`
-	Secret   string `json:"secret"`
-	User     string `json:"user"`
-	Protocol string `json:"protocol"`
-	// nocloud fields
-	MetaData string `json:"metadata"`
-	UserData string `json:"userdata"`
-}
+const (
+	flexvolumeDataFile = "virtlet-flexvolume.json"
+)
 
 // flexVolumeDebug indicates whether flexvolume debugging should be enabled
 var flexVolumeDebug = false
@@ -69,45 +59,22 @@ func (m *nullMounter) Unmount(target string) error {
 
 var NullMounter = &nullMounter{}
 
-type UuidGen func() string
-
-type volumeHandler func(uuidGen UuidGen, targetDir string, opts volumeOpts) (map[string][]byte, error)
-
-var volumeHandlers = map[string]volumeHandler{
-	"ceph": cephVolumeHandler,
-}
-
 type FlexVolumeDriver struct {
-	uuidGen UuidGen
 	mounter Mounter
 }
 
-func NewFlexVolumeDriver(uuidGen UuidGen, mounter Mounter) *FlexVolumeDriver {
-	return &FlexVolumeDriver{uuidGen: uuidGen, mounter: mounter}
+func NewFlexVolumeDriver(mounter Mounter) *FlexVolumeDriver {
+	return &FlexVolumeDriver{mounter: mounter}
 }
 
-func (d *FlexVolumeDriver) getVolumeHandler(opts volumeOpts) (volumeHandler, error) {
-	if opts.Type == "" {
-		return nil, errors.New("virtlet flexvolume type not set")
-	}
-	vt, ok := volumeHandlers[opts.Type]
-	if !ok {
-		return nil, fmt.Errorf("unknown volume type %q", opts.Type)
-	}
-	return vt, nil
-}
-
-func (d *FlexVolumeDriver) populateVolumeDir(targetDir string, opts volumeOpts) error {
-	handler, err := d.getVolumeHandler(opts)
+func (d *FlexVolumeDriver) populateVolumeDir(targetDir string, opts map[string]interface{}) error {
+	content, err := json.Marshal(opts)
 	if err != nil {
-		return err
+		return fmt.Errorf("couldn't marshal volume opts: %v", err)
 	}
-	files, err := handler(d.uuidGen, targetDir, opts)
-	if err != nil {
-		return err
-	}
-	if err := utils.WriteFiles(targetDir, files); err != nil {
-		return err
+	dataFile := filepath.Join(targetDir, flexvolumeDataFile)
+	if err := ioutil.WriteFile(dataFile, content, 0777); err != nil {
+		return fmt.Errorf("error writing flexvolume data file %q: %V", dataFile, err)
 	}
 	return nil
 }
@@ -142,7 +109,7 @@ func (d *FlexVolumeDriver) isAttached(jsonOptions, nodeName string) (map[string]
 
 //Invocation: <driver executable> mount <target mount dir> <mount device> <json options>
 func (d *FlexVolumeDriver) mount(targetMountDir, jsonOptions string) (map[string]interface{}, error) {
-	var opts volumeOpts
+	var opts map[string]interface{}
 	if err := json.Unmarshal([]byte(jsonOptions), &opts); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal json options: %v", err)
 	}

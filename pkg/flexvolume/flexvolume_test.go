@@ -31,25 +31,6 @@ import (
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 )
 
-const (
-	cephDisk = `<DomainDisk type="network" device="disk">
-  <driver name="qemu" type="raw"></driver>
-  <auth username="libvirt">
-    <secret type="ceph" uuid="abb67e3c-71b3-4ddd-5505-8c4215d5c4eb"></secret>
-  </auth>
-  <source protocol="rbd" name="libvirt-pool/rbd-test-image">
-    <host name="127.0.0.1" port="6789"></host>
-  </source>
-  <target bus="virtio"></target>
-</DomainDisk>`
-	cephSecret = `<secret ephemeral="no" private="no">
-  <uuid>abb67e3c-71b3-4ddd-5505-8c4215d5c4eb</uuid>
-  <usage type="ceph">
-    <name>libvirt</name>
-  </usage>
-</secret>`
-)
-
 type fakeMounter struct {
 	t       *testing.T
 	tmpDir  string
@@ -126,14 +107,14 @@ func TestFlexVolume(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	cephJsonOpts := utils.MapToJson(map[string]interface{}{
+	cephJsonOpts := map[string]interface{}{
 		"type":    "ceph",
 		"monitor": "127.0.0.1:6789",
 		"pool":    "libvirt-pool",
 		"volume":  "rbd-test-image",
 		"secret":  "foobar",
 		"user":    "libvirt",
-	})
+	}
 	cephDir := path.Join(tmpDir, "ceph")
 	for _, step := range []struct {
 		name         string
@@ -185,17 +166,13 @@ func TestFlexVolume(t *testing.T) {
 		},
 		{
 			name:   "mount-ceph",
-			args:   []string{"mount", cephDir, cephJsonOpts},
+			args:   []string{"mount", cephDir, utils.MapToJson(cephJsonOpts)},
 			status: "Success",
 			subdir: "ceph",
 			files: map[string]interface{}{
-				"disk.xml":   cephDisk,
-				"key":        "foobar",
-				"secret.xml": cephSecret,
+				"virtlet-flexvolume.json": utils.MapToJsonUnindented(cephJsonOpts),
 				".shadowed": map[string]interface{}{
-					"disk.xml":   cephDisk,
-					"key":        "foobar",
-					"secret.xml": cephSecret,
+					"virtlet-flexvolume.json": utils.MapToJsonUnindented(cephJsonOpts),
 				},
 			},
 			mountJournal: []string{
@@ -213,17 +190,13 @@ func TestFlexVolume(t *testing.T) {
 		},
 		{
 			name:   "mount-ceph-1",
-			args:   []string{"mount", cephDir, cephJsonOpts},
+			args:   []string{"mount", cephDir, utils.MapToJson(cephJsonOpts)},
 			status: "Success",
 			subdir: "ceph",
 			files: map[string]interface{}{
-				"disk.xml":   cephDisk,
-				"key":        "foobar",
-				"secret.xml": cephSecret,
+				"virtlet-flexvolume.json": utils.MapToJsonUnindented(cephJsonOpts),
 				".shadowed": map[string]interface{}{
-					"disk.xml":   cephDisk,
-					"key":        "foobar",
-					"secret.xml": cephSecret,
+					"virtlet-flexvolume.json": utils.MapToJsonUnindented(cephJsonOpts),
 				},
 			},
 			mountJournal: []string{
@@ -274,9 +247,7 @@ func TestFlexVolume(t *testing.T) {
 			var subdir string
 			args := step.args
 			mounter := newFakeMounter(t, tmpDir)
-			d := NewFlexVolumeDriver(func() string {
-				return "abb67e3c-71b3-4ddd-5505-8c4215d5c4eb"
-			}, mounter)
+			d := NewFlexVolumeDriver(mounter)
 			result := d.Run(args)
 			var m map[string]interface{}
 			if err := json.Unmarshal([]byte(result), &m); err != nil {

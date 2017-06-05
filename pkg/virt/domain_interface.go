@@ -44,9 +44,13 @@ const (
 // DomainState represents a state of a domain
 type DomainState int
 
-// ErrStoragePoolNotFound error is returned by VirtDomainConnection's
+// ErrDomainNotFound error is returned by VirtDomainConnection's
 // Lookup*() methods when the domain in question cannot be found
 var ErrDomainNotFound = errors.New("domain not found")
+
+// ErrSecretNotFound error is returned by VirtDomainConnection's
+// Lookup*() methods when the domain in question cannot be found
+var ErrSecretNotFound = errors.New("secret not found")
 
 // VirtDomainConnection provides operations on domains that correspond to VMs
 type VirtDomainConnection interface {
@@ -58,12 +62,24 @@ type VirtDomainConnection interface {
 	// domain cannot be found but no other error occurred, it returns
 	// ErrDomainNotFound
 	LookupDomainByName(name string) (VirtDomain, error)
-	// LookupByName tries to locate the domain by its UUID. In case if the
+	// LookupDomainByUUIDString tries to locate the domain by its UUID. In case if the
 	// domain cannot be found but no other error occurred, it returns
 	// ErrDomainNotFound
 	LookupDomainByUUIDString(uuid string) (VirtDomain, error)
 	// DefineSecret defines a Secret with the specified value
-	DefineSecret(def *libvirtxml.Secret, value []byte) error
+	DefineSecret(def *libvirtxml.Secret) (VirtSecret, error)
+	// LookupSecretByUUIDString tries to locate the secret by its UUID. In case if the
+	// secret cannot be found but no other error occurred, it returns
+	// ErrSecretNotFound
+	LookupSecretByUUIDString(uuid string) (VirtSecret, error)
+}
+
+// Secret represents a secret that's used by the domain
+type VirtSecret interface {
+	// SetValue sets the value of the secret
+	SetValue(value []byte) error
+	// Remove removes the secret
+	Remove() error
 }
 
 // VirtDomain represents a domain which corresponds to a VM

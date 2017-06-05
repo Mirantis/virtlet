@@ -89,17 +89,18 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 		t.Fatalf("Failed to create ImageTool: %v", err)
 	}
 
-	ct.virtTool, err = NewVirtualizationTool(domainConn, storageConn, imageTool, ct.boltClient, "volumes", "loop*")
+	volSrc := CombineVMVolumeSources(
+		GetRootVolume,
+		GetNocloudVolume,
+		GetVolumesFromAnnotations,
+		ScanFlexvolumes)
+	ct.virtTool, err = NewVirtualizationTool(domainConn, storageConn, imageTool, ct.boltClient, "volumes", "loop*", volSrc)
 	if err != nil {
 		t.Fatalf("failed to create VirtualizationTool: %v", err)
 	}
 	ct.virtTool.SetTimeFunc(ct.fakeTime)
 	// avoid unneeded difs in the golden master data
 	ct.virtTool.SetForceKVM(true)
-	ct.virtTool.volumeStorage.SetFormatDisk(func(path string) error {
-		ct.rec.Rec("FormatDisk", path)
-		return nil
-	})
 	ct.kubeletRootDir = filepath.Join(ct.tmpDir, "kubelet-root")
 	ct.virtTool.SetKubeletRootDir(ct.kubeletRootDir)
 
@@ -223,9 +224,7 @@ func TestContainerLifecycle(t *testing.T) {
 }
 
 func TestDomainDefinitions(t *testing.T) {
-	flexVolumeDriver := flexvolume.NewFlexVolumeDriver(func() string {
-		return "fa1f16d1-5bf7-412e-8d68-4f15c43f3771"
-	}, flexvolume.NullMounter)
+	flexVolumeDriver := flexvolume.NewFlexVolumeDriver(flexvolume.NullMounter)
 	for _, tc := range []struct {
 		name        string
 		annotations map[string]string
@@ -286,11 +285,13 @@ func TestDomainDefinitions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := fake.NewToplevelRecorder()
 			rec.AddFilter("DefineSecret")
-			rec.AddFilter("FormatDisk")
+			rec.AddFilter("SetValue")
+			rec.AddFilter("Format")
 			rec.AddFilter("DefineDomain")
 			rec.AddFilter("CreateStorageVol")
 			rec.AddFilter("CreateStorageVolClone")
 			rec.AddFilter("iso image")
+			// TODO: remove these filters (need to check vol teardown etc.)
 
 			ct := newContainerTester(t, rec)
 			defer ct.teardown()

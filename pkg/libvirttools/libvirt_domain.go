@@ -49,19 +49,6 @@ func (dc *LibvirtDomainConnection) DefineDomain(def *libvirtxml.Domain) (virt.Vi
 	return &LibvirtDomain{d}, nil
 }
 
-func (dc *LibvirtDomainConnection) DefineSecret(def *libvirtxml.Secret, value []byte) error {
-	xml, err := def.Marshal()
-	if err != nil {
-		return err
-	}
-	secret, err := dc.conn.SecretDefineXML(xml, 0)
-	if err != nil {
-		return err
-	}
-	secret.SetValue(value, 0)
-	return nil
-}
-
 func (dc *LibvirtDomainConnection) ListDomains() ([]virt.VirtDomain, error) {
 	domains, err := dc.conn.ListAllDomains(0)
 	if err != nil {
@@ -98,6 +85,30 @@ func (dc *LibvirtDomainConnection) LookupDomainByUUIDString(uuid string) (virt.V
 		return nil, err
 	}
 	return &LibvirtDomain{d}, nil
+}
+
+func (dc *LibvirtDomainConnection) DefineSecret(def *libvirtxml.Secret) (virt.VirtSecret, error) {
+	xml, err := def.Marshal()
+	if err != nil {
+		return nil, err
+	}
+	secret, err := dc.conn.SecretDefineXML(xml, 0)
+	if err != nil {
+		return nil, err
+	}
+	return &LibvirtSecret{secret}, nil
+}
+
+func (dc *LibvirtDomainConnection) LookupSecretByUUIDString(uuid string) (virt.VirtSecret, error) {
+	secret, err := dc.conn.LookupSecretByUUIDString(uuid)
+	if err != nil {
+		libvirtErr, ok := err.(libvirt.Error)
+		if ok && libvirtErr.Code == libvirt.ERR_NO_SECRET {
+			return nil, virt.ErrSecretNotFound
+		}
+		return nil, err
+	}
+	return &LibvirtSecret{secret}, nil
 }
 
 type LibvirtDomain struct {
@@ -151,4 +162,16 @@ func (domain *LibvirtDomain) State() (virt.DomainState, error) {
 
 func (domain *LibvirtDomain) UUIDString() (string, error) {
 	return domain.d.GetUUIDString()
+}
+
+type LibvirtSecret struct {
+	s *libvirt.Secret
+}
+
+func (secret *LibvirtSecret) SetValue(value []byte) error {
+	return secret.s.SetValue(value, 0)
+}
+
+func (secret *LibvirtSecret) Remove() error {
+	return secret.Remove()
 }

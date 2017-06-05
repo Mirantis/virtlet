@@ -17,6 +17,7 @@ limitations under the License.
 package libvirttools
 
 import (
+	"fmt"
 	"io"
 	"os"
 
@@ -24,6 +25,7 @@ import (
 	libvirt "github.com/libvirt/libvirt-go"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
+	"github.com/Mirantis/virtlet/pkg/diskimage"
 	"github.com/Mirantis/virtlet/pkg/virt"
 )
 
@@ -213,4 +215,12 @@ func (volume *LibvirtStorageVolume) Path() (string, error) {
 
 func (volume *LibvirtStorageVolume) Remove() error {
 	return volume.v.Delete(0)
+}
+
+func (volume *LibvirtStorageVolume) Format() error {
+	volPath, err := volume.Path()
+	if err != nil {
+		return fmt.Errorf("can't get volume path: %v", err)
+	}
+	return diskimage.FormatDisk(volPath)
 }

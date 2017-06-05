@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
@@ -38,7 +37,7 @@ func NewCloudInitGenerator(config *VMConfig) *CloudInitGenerator {
 	return &CloudInitGenerator{config}
 }
 
-func (g *CloudInitGenerator) generateMetaData() (string, error) {
+func (g *CloudInitGenerator) generateMetaData() ([]byte, error) {
 	m := map[string]interface{}{
 		"instance-id":    fmt.Sprintf("%s.%s", g.config.PodName, g.config.PodNamespace),
 		"local-hostname": g.config.PodName,
@@ -55,24 +54,24 @@ func (g *CloudInitGenerator) generateMetaData() (string, error) {
 	}
 	r, err := json.Marshal(m)
 	if err != nil {
-		return "", fmt.Errorf("error marshaling meta-data: %v", err)
+		return nil, fmt.Errorf("error marshaling meta-data: %v", err)
 	}
-	return string(r), nil
+	return r, nil
 }
 
-func (g *CloudInitGenerator) generateUserData() (string, error) {
+func (g *CloudInitGenerator) generateUserData() ([]byte, error) {
 	if g.config.ParsedAnnotations.UserDataScript != "" {
-		return g.config.ParsedAnnotations.UserDataScript, nil
+		return []byte(g.config.ParsedAnnotations.UserDataScript), nil
 	}
 	r := []byte{}
 	if len(g.config.ParsedAnnotations.UserData) != 0 {
 		var err error
 		r, err = yaml.Marshal(g.config.ParsedAnnotations.UserData)
 		if err != nil {
-			return "", fmt.Errorf("error marshalling user-data: %v", err)
+			return nil, fmt.Errorf("error marshalling user-data: %v", err)
 		}
 	}
-	return "#cloud-config\n" + string(r), nil
+	return []byte("#cloud-config\n" + string(r)), nil
 }
 
 func (g *CloudInitGenerator) GenerateDisk() (string, *libvirtxml.DomainDisk, error) {
@@ -82,19 +81,19 @@ func (g *CloudInitGenerator) GenerateDisk() (string, *libvirtxml.DomainDisk, err
 	}
 	defer os.RemoveAll(tmpDir)
 
-	metaDataStr, err := g.generateMetaData()
+	var metaData, userData []byte
+	metaData, err = g.generateMetaData()
+	if err == nil {
+		userData, err = g.generateUserData()
+	}
 	if err != nil {
 		return "", nil, err
-	}
-	if err := ioutil.WriteFile(filepath.Join(tmpDir, "meta-data"), []byte(metaDataStr), 0777); err != nil {
-		return "", nil, fmt.Errorf("can't write meta-data: %v", err)
 	}
 
-	userDataStr, err := g.generateUserData()
-	if err != nil {
-		return "", nil, err
-	}
-	if err := ioutil.WriteFile(filepath.Join(tmpDir, "user-data"), []byte(userDataStr), 0777); err != nil {
+	if err := utils.WriteFiles(tmpDir, map[string][]byte{
+		"user-data": userData,
+		"meta-data": metaData,
+	}); err != nil {
 		return "", nil, fmt.Errorf("can't write user-data: %v", err)
 	}
 
