@@ -73,4 +73,6 @@ type VirtStorageVolume interface {
 	Path() (string, error)
 	// Remove removes this storage volume
 	Remove() error
+	// Format formats the volume as ext4 filesystem
+	Format() error
 }

@@ -17,9 +17,9 @@ limitations under the License.
 package libvirttools
 
 import (
+	"bytes"
 	"encoding/json"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -131,37 +131,37 @@ func TestCloudInitGenerator(t *testing.T) {
 				ParsedAnnotations: tc.annotations,
 			})
 
-			metaDataStr, err := g.generateMetaData()
+			metaDataBytes, err := g.generateMetaData()
 			if err != nil {
 				t.Fatalf("GenerateMetaData(): %v", err)
 			}
 			var metaData map[string]interface{}
-			if err := json.Unmarshal([]byte(metaDataStr), &metaData); err != nil {
+			if err := json.Unmarshal(metaDataBytes, &metaData); err != nil {
 				t.Fatalf("Can't unmarshal meta-data: %v", err)
 			}
 
 			if !reflect.DeepEqual(tc.expectedMetaData, metaData) {
-				t.Errorf("Bad meta-data:\n%s\nUnmarshaled:\n%s", metaDataStr, spew.Sdump(metaData))
+				t.Errorf("Bad meta-data:\n%s\nUnmarshaled:\n%s", metaDataBytes, spew.Sdump(metaData))
 			}
-			userDataStr, err := g.generateUserData()
+			userDataBytes, err := g.generateUserData()
 			if err != nil {
 				t.Fatalf("GenerateUserData(): %v", err)
 			}
 			if tc.expectedUserDataStr != "" {
-				if userDataStr != tc.expectedUserDataStr {
-					t.Errorf("Bad user-data string:\n%s", userDataStr)
+				if string(userDataBytes) != tc.expectedUserDataStr {
+					t.Errorf("Bad user-data string:\n%s", userDataBytes)
 				}
 			} else {
-				if !strings.HasPrefix(userDataStr, "#cloud-config\n") {
+				if !bytes.HasPrefix(userDataBytes, []byte("#cloud-config\n")) {
 					t.Errorf("No #cloud-config header")
 				}
 				var userData map[string]interface{}
-				if err := yaml.Unmarshal([]byte(userDataStr), &userData); err != nil {
+				if err := yaml.Unmarshal(userDataBytes, &userData); err != nil {
 					t.Fatalf("Can't unmarshal user-data: %v", err)
 				}
 
 				if !reflect.DeepEqual(tc.expectedUserData, userData) {
-					t.Errorf("Bad user-data:\n%s\nUnmarshaled:\n%s", userDataStr, spew.Sdump(userData))
+					t.Errorf("Bad user-data:\n%s\nUnmarshaled:\n%s", userDataBytes, spew.Sdump(userData))
 				}
 			}
 		})

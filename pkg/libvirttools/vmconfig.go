@@ -17,6 +17,7 @@ limitations under the License.
 package libvirttools
 
 // VMConfig contains the information needed to start create a VM
+// TODO: use this struct to store VM metadata
 type VMConfig struct {
 	// Id of the containing pod sandbox
 	PodSandboxId string
@@ -46,6 +47,17 @@ type VMConfig struct {
 	ContainerLabels map[string]string
 	// Parsed representation of pod annotations. Populated by LoadAnnotations() call
 	ParsedAnnotations *VirtletAnnotations
+	// Domain UUID (set by the CreateContainer)
+	// TODO: this field should be moved to VMStatus
+	DomainUUID string
+	// A temporary file or directory associated with this domain.
+	// Currently used by nocloudVolume
+	// TODO: this field should be moved to VMStatus.
+	// Better, there should be a directory associated with each domain
+	// storing its metadata as json file and also containing nocloud
+	// iso image. This directory should be removed together with the
+	// domain
+	TempFile string
 }
 
 // LoadAnnotations parses pod annotations in the VM config an

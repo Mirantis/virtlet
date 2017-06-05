@@ -77,8 +77,14 @@ func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, m
 		return nil, err
 	}
 
+	// TODO: there should be easy-to-use VirtualizationTool (or at least VMVolumeSource) provider
+	volSrc := libvirttools.CombineVMVolumeSources(
+		libvirttools.GetRootVolume,
+		libvirttools.GetNocloudVolume,
+		libvirttools.GetVolumesFromAnnotations,
+		libvirttools.ScanFlexvolumes)
 	// TODO: pool name should be passed like for imageTool
-	libvirtVirtualizationTool, err := libvirttools.NewVirtualizationTool(conn, conn, libvirtImageTool, boltClient, "volumes", rawDevices)
+	libvirtVirtualizationTool, err := libvirttools.NewVirtualizationTool(conn, conn, libvirtImageTool, boltClient, "volumes", rawDevices, volSrc)
 	if err != nil {
 		return nil, err
 	}

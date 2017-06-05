@@ -21,10 +21,20 @@ import (
 	"log"
 )
 
-// MapToJson converts the specified map object to JSON.
+// MapToJson converts the specified map object to indented JSON.
 // It panics in case if the map connot be converted.
 func MapToJson(m map[string]interface{}) string {
 	bs, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		log.Panicf("error marshalling json: %v", err)
+	}
+	return string(bs)
+}
+
+// MapToJson converts the specified map object to unindented JSON.
+// It panics in case if the map connot be converted.
+func MapToJsonUnindented(m map[string]interface{}) string {
+	bs, err := json.Marshal(m)
 	if err != nil {
 		log.Panicf("error marshalling json: %v", err)
 	}
