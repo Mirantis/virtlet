@@ -20,10 +20,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 const (
@@ -68,15 +69,7 @@ func NewFlexVolumeDriver(mounter Mounter) *FlexVolumeDriver {
 }
 
 func (d *FlexVolumeDriver) populateVolumeDir(targetDir string, opts map[string]interface{}) error {
-	content, err := json.Marshal(opts)
-	if err != nil {
-		return fmt.Errorf("couldn't marshal volume opts: %v", err)
-	}
-	dataFile := filepath.Join(targetDir, flexvolumeDataFile)
-	if err := ioutil.WriteFile(dataFile, content, 0777); err != nil {
-		return fmt.Errorf("error writing flexvolume data file %q: %V", dataFile, err)
-	}
-	return nil
+	return utils.WriteJson(filepath.Join(targetDir, flexvolumeDataFile), opts, 0700)
 }
 
 // The following functions are not currently needed, but still

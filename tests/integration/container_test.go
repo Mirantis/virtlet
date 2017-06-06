@@ -17,7 +17,10 @@ limitations under the License.
 package integration
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -25,8 +28,15 @@ import (
 	"golang.org/x/net/context"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
+	"github.com/Mirantis/virtlet/pkg/flexvolume"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/Mirantis/virtlet/tests/criapi"
+)
+
+const (
+	// TODO: this is only ok inside the build container.
+	// Should use a temporary directory for fake pod dir
+	kubeletRootDir = "/var/lib/kubelet/pods"
 )
 
 type containerTester struct {
@@ -37,6 +47,9 @@ type containerTester struct {
 	sandboxes            []*kubeapi.PodSandboxConfig
 	containers           []*criapi.ContainerTestConfig
 	imageSpecs           []*kubeapi.ImageSpec
+	fv                   *flexvolume.FlexVolumeDriver
+	podDirs              []string
+	volumeDirs           []string
 }
 
 func newContainerTester(t *testing.T) *containerTester {
@@ -57,6 +70,7 @@ func newContainerTester(t *testing.T) *containerTester {
 			{Image: imageCirrosUrl},
 			{Image: imageCirrosUrl2},
 		},
+		fv: flexvolume.NewFlexVolumeDriver(flexvolume.NewLinuxMounter()),
 	}
 }
 
@@ -101,6 +115,19 @@ func (ct *containerTester) cleanupPods() {
 		})
 		if err != nil {
 			ct.t.Log("warning: couldn't remove container %q", pod.Id)
+		}
+	}
+}
+
+func (ct *containerTester) cleanupKubeletRoot() {
+	for _, volumeDir := range ct.volumeDirs {
+		if err := ct.runFlexvolumeDriver("unmount", volumeDir); err != nil {
+			ct.t.Error(err)
+		}
+	}
+	for _, podDir := range ct.podDirs {
+		if err := os.RemoveAll(podDir); err != nil {
+			ct.t.Errorf("warning: couldn't remove pod dir %q", podDir)
 		}
 	}
 }
@@ -229,5 +256,40 @@ func (ct *containerTester) removeContainer(containerId string) {
 func (ct *containerTester) verifyNoContainers(filter *kubeapi.ContainerFilter) {
 	if len(ct.listContainers(filter).Containers) != 0 {
 		ct.t.Errorf("expected no containers to be listed, filter: %s", spew.Sdump(filter))
+	}
+}
+
+func (ct *containerTester) runFlexvolumeDriver(args ...string) error {
+	r := ct.fv.Run(args)
+	var m map[string]interface{}
+	if err := json.Unmarshal([]byte(r), &m); err != nil {
+		return fmt.Errorf("failed to unmarshal flexvolume result (args %#v): %v", args, err)
+	}
+	if m["status"] != "Success" {
+		return fmt.Errorf("flexvolume driver failed, args %#v, result: %s", args, r)
+	}
+	return nil
+}
+
+func (ct *containerTester) mountFlexvolume(podId, name string, opts map[string]interface{}) {
+	podDir := fmt.Sprintf("/var/lib/kubelet/pods/%s", podId)
+	volumeDir := filepath.Join(podDir, "volumes/virtlet~flexvolume_driver/"+name)
+	if err := os.MkdirAll(volumeDir, 0755); err != nil {
+		ct.t.Fatalf("can't create volume dir: %v", err)
+	}
+	ct.podDirs = append(ct.podDirs, podDir)
+	ct.volumeDirs = append(ct.volumeDirs, volumeDir)
+
+	// Here we simulate what kubelet is doing by invoking our flexvolume
+	// driver directly.
+	// XXX: there's a subtle difference between what we do here and
+	// what happens on the real system though. In the latter case
+	// virtlet pod doesn't see the contents of tmpfs because hostPath volumes
+	// are mounted privately into the virtlet pod mount ns. Here we
+	// let Virtlet process tmpfs contents. Currently the contents
+	// of flexvolume's tmpfs and the shadowed directory should be the
+	// same though.
+	if err := ct.runFlexvolumeDriver("mount", volumeDir, utils.MapToJson(opts)); err != nil {
+		ct.t.Fatal(err)
 	}
 }

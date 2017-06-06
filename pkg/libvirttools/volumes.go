@@ -17,8 +17,6 @@ limitations under the License.
 package libvirttools
 
 import (
-	"fmt"
-
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
 	"github.com/Mirantis/virtlet/pkg/virt"
@@ -40,6 +38,7 @@ type VolumeOwner interface {
 	KubeletRootDir() string
 }
 
+// VMVolumeSource is a function that provides `VMVolume`s for VMs
 type VMVolumeSource func(config *VMConfig, owner VolumeOwner) ([]VMVolume, error)
 
 type VMVolume interface {
@@ -50,22 +49,6 @@ type VMVolume interface {
 type volumeBase struct {
 	config *VMConfig
 	owner  VolumeOwner
-}
-
-// TODO: this should be converted to flexvolumes
-func GetVolumesFromAnnotations(config *VMConfig, owner VolumeOwner) ([]VMVolume, error) {
-	var vs []VMVolume
-	for _, vv := range config.ParsedAnnotations.Volumes {
-		switch vv.Format {
-		case "qcow2":
-			vs = append(vs, newQCOW2Volume(vv, config, owner))
-		case "rawDevice":
-			vs = append(vs, newRawDeviceVolume(vv.Path, config, owner))
-		default:
-			return nil, fmt.Errorf("bad volume format %q", vv.Format)
-		}
-	}
-	return vs, nil
 }
 
 func CombineVMVolumeSources(srcs ...VMVolumeSource) VMVolumeSource {
