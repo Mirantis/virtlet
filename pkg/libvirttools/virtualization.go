@@ -433,6 +433,19 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 	nocloudDiskDef.Target.Dev = "vd" + diskLetters[0]
 	domainConf.Devices.Disks = append(domainConf.Devices.Disks, *nocloudDiskDef)
 
+	defer func() {
+		// Set container in bolt despite of failure to provide info for cleanup
+		v.metadataStore.SetContainer(settings.domainName, settings.domainUUID,
+			in.PodSandboxId, config.Image.Image, cloneName, config.Labels,
+			config.Annotations, nocloudFile, v.timeFunc)
+		if err != nil {
+			if rmErr := v.RemoveContainer(settings.domainUUID); rmErr != nil {
+				err = fmt.Errorf("Container creation error: %v \n %v", err, rmErr)
+			}
+		}
+
+	}()
+
 	flexVolumeInfos, err := v.scanFlexVolumes(in.PodSandboxId, in.SandboxConfig.Metadata.Name, 1)
 	if err != nil {
 		return "", err
@@ -442,27 +455,22 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 		return "", err
 	}
 
-	if err = v.addSerialDevicesToDomain(in.PodSandboxId, in.Config.Metadata.Attempt, domainConf, settings); err == nil {
-		if _, err = v.domainConn.DefineDomain(domainConf); err == nil {
-			domain, err = v.domainConn.LookupDomainByUUIDString(settings.domainUUID)
-			if err == nil {
-				// FIXME: do we really need this?
-				// (this causes an GetInfo() call on the domain in case of libvirt)
-				_, err = domain.State()
-			}
-		}
+	if err := v.addSerialDevicesToDomain(in.PodSandboxId, in.Config.Metadata.Attempt, domainConf, settings); err != nil {
+		return "", err
 	}
 
-	defer func() {
-		// Set container in bolt despite of failure to provide info for cleanup
-		v.metadataStore.SetContainer(settings.domainName, settings.domainUUID, in.PodSandboxId, config.Image.Image, cloneName, config.Labels, config.Annotations, nocloudFile, v.timeFunc)
-		if err != nil {
-			if rmErr := v.RemoveContainer(settings.domainUUID); rmErr != nil {
-				err = fmt.Errorf("Container creation error: %v \n %v", err, rmErr)
-			}
-		}
+	if _, err = v.domainConn.DefineDomain(domainConf); err != nil {
+		return "", err
+	}
 
-	}()
+	domain, err = v.domainConn.LookupDomainByUUIDString(settings.domainUUID)
+	if err != nil {
+		return "", err
+	}
+
+	// FIXME: do we really need this?
+	// (this causes an GetInfo() call on the domain in case of libvirt)
+	_, err = domain.State()
 
 	if err != nil {
 		return "", err
