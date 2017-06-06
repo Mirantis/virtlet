@@ -3,17 +3,6 @@ kind: Pod
 metadata:
   name: cirros-vm
   annotations:
-    # this assumes that on node prepared for runnig virtlet pods there is some file attached
-    # to /dev/loop0, which can be used by VM as additional disk
-    VirtletVolumes: >
-      [
-        {
-          "Name": "vol1",
-          "Format": "rawDevice",
-          "Path": "/dev/loop0"
-        },
-      ]
-  annotations:
     kubernetes.io/target-runtime: virtlet
 spec:
   affinity:
@@ -28,3 +17,12 @@ spec:
   containers:
     - name: cirros-vm
       image: virtlet/image-service/cirros
+  volumes:
+  - name: raw
+    flexVolume:
+      driver: "virtlet/flexvolume_driver"
+      options:
+        type: raw
+        # this assumes that some file is associated with /dev/loop0 on
+        # the virtlet node using losetup
+        path: /dev/loop0

@@ -46,18 +46,17 @@ From [Libvirt spec](http://libvirt.org/formatdomain.html#elementsDisks):
 
 ## Ephemeral Local Storage
 
-**Volume naming:** `<domain-uuid>-<vol-name-specified-in-annotation>`
+**Volume naming:** `<domain-uuid>-<vol-name-specified-in-the-flexvolume>`
 **Defaults**:
 ```
-          "Format": "qcow2"
-          "Capacity": "1024"
-          "CapacityUnit": "MB"
+          capacity: "1024"
+          capacityUnit: MB
 ```
 
 All ephemeral volumes created by request as well as clones of boot images are stored
 at local storage libvirt pool "**volumes**" under `/var/lib/virtlet/volumes`.
 
-Volume settings for ephemeral local storage volumes are passed via pod's metadata Annotations.
+Volume settings for ephemeral local storage volumes are passed via flexvolumes.
 
 See the following example:
 
@@ -67,18 +66,6 @@ kind: Pod
 metadata:
   name: test-vm-pod
   annotations:
-    VirtletVolumes: >
-      [
-        {
-          "Name": "vol1",
-          "Format": "qcow2",
-          "Capacity": "1024",
-          "CapacityUnit": "MB"
-        },
-        {
-          "Name": "vol2"
-        }
-      ]
     kubernetes.io/target-runtime: virtlet
 spec:
   affinity:
@@ -93,6 +80,19 @@ spec:
   containers:
     - name: test-vm
       image: download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img
+  volumes:
+  - name: vol1
+    flexVolume:
+      driver: "virtlet/flexvolume_driver"
+      options:
+        type: qcow2
+        capacity: "1024"
+        capacityUnit: MB
+  - name: vol2
+    flexVolume:
+      driver: "virtlet/flexvolume_driver"
+      options:
+        type: qcow2
 ```
 
 According to this definition will be created VM-POD with VM with 2 equal volumes, attached, which can be found in "volumes" pool under `<domain-uuid>-vol1` and `<domain-uuid>-vol2`
@@ -213,7 +213,7 @@ vdb        libvirt-pool/rbd-test-image
 
 ### Raw devices
 
-Volume settings for locally accessible raw devices are passed via pod's metadata Annotations, like for [ephemeral volumes](## Ephemeral Local Storage).
+Volume settings for locally accessible raw devices are passed by adding `raw` flexvolume to a pod, like for [ephemeral volumes](## Ephemeral Local Storage).
 
 See the following example:
 ```yaml
@@ -222,14 +222,6 @@ kind: Pod
 metadata:
   name: test-vm-pod
   annotations:
-    VirtletVolumes: >
-      [
-        {
-          "Name": "vol1",
-          "Format": "rawDevice",
-          "Path": "/dev/loop0"
-        },
-      ]
     kubernetes.io/target-runtime: virtlet
 spec:
   affinity:
@@ -244,6 +236,15 @@ spec:
   containers:
     - name: test-vm
       image: download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img
+  volumes:
+  - name: raw
+    flexVolume:
+      driver: "virtlet/flexvolume_driver"
+      options:
+        type: raw
+        # this assumes that some file is associated with /dev/loop0 on
+        # the virtlet node using losetup
+        path: /dev/loop0
 ```
 
 As always, boot image is exposed to the guest OS under **vda** device.
