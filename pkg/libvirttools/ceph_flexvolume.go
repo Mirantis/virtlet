@@ -18,9 +18,7 @@ package libvirttools
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"strings"
 
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
@@ -30,6 +28,9 @@ import (
 )
 
 type cephFlexvolumeOptions struct {
+	// Type field is needed here so it gets written during
+	// remarshalling after removing the contents of 'Secret' field
+	Type     string `json:"type"`
 	Monitor  string `json:"monitor"`
 	Pool     string `json:"pool"`
 	Volume   string `json:"volume"`
@@ -44,19 +45,21 @@ type cephVolume struct {
 	opts *cephFlexvolumeOptions
 }
 
-func newCephVolume(configPath string, config *VMConfig, owner VolumeOwner) (VMVolume, error) {
-	configContent, err := ioutil.ReadFile(configPath)
-	if err != nil {
-		return nil, fmt.Errorf("error reading config file %q: %v", configPath, err)
-	}
-
+func newCephVolume(volumeName, configPath string, config *VMConfig, owner VolumeOwner) (VMVolume, error) {
 	v := &cephVolume{
 		volumeBase: volumeBase{config, owner},
 	}
-	if err := json.Unmarshal(configContent, &v.opts); err != nil {
+	if err := utils.ReadJson(configPath, &v.opts); err != nil {
 		return nil, fmt.Errorf("failed to parse ceph flexvolume config %q: %v", configPath, err)
 	}
-	// TODO: wipe secret from the def file here
+	// Remove the key from flexvolume options to limit exposure.
+	// The file itself will be needed to recreate cephVolume during the teardown,
+	// but we don't need secret content at that time anymore
+	safeOpts := *v.opts
+	safeOpts.Secret = ""
+	if err := utils.WriteJson(configPath, safeOpts, 0700); err != nil {
+		return nil, fmt.Errorf("failed to overwrite ceph flexvolume config %q: %v", configPath, err)
+	}
 	return v, nil
 }
 

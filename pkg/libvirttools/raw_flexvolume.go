@@ -19,9 +19,34 @@ package libvirttools
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
+
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
+
+const (
+	defaultVolumeCapacity     = 1024
+	defaultVolumeCapacityUnit = "MB"
+)
+
+var capacityUnits []string = []string{
+	// https://libvirt.org/formatstorage.html#StorageVolFirst
+	"B", "bytes", "KB", "K", "KiB", "MB", "M", "MiB", "GB", "G",
+	"GiB", "TB", "T", "TiB", "PB", "P", "PiB", "EB", "E", "EiB",
+}
+
+type rawVolumeOptions struct {
+	Path string `json:"path"`
+}
+
+func (vo *rawVolumeOptions) validate() error {
+	if !strings.HasPrefix(vo.Path, "/dev/") {
+		return fmt.Errorf("raw volume path needs to be prefixed by '/dev/', but it's whole value is: ", vo.Path)
+	}
+	return nil
+}
 
 // rawDeviceVolume denotes a raw device that's made accessible for a VM
 type rawDeviceVolume struct {
@@ -29,11 +54,18 @@ type rawDeviceVolume struct {
 	devPath string
 }
 
-func newRawDeviceVolume(devPath string, config *VMConfig, owner VolumeOwner) VMVolume {
+func newRawDeviceVolume(volumeName, configPath string, config *VMConfig, owner VolumeOwner) (VMVolume, error) {
+	var opts rawVolumeOptions
+	if err := utils.ReadJson(configPath, &opts); err != nil {
+		return nil, fmt.Errorf("failed to parse raw volume config %q: %v", configPath, err)
+	}
+	if err := opts.validate(); err != nil {
+		return nil, err
+	}
 	return &rawDeviceVolume{
 		volumeBase: volumeBase{config, owner},
-		devPath:    devPath,
-	}
+		devPath:    opts.Path,
+	}, nil
 }
 
 func (v *rawDeviceVolume) verifyRawDeviceWhitelisted(path string) error {
@@ -69,5 +101,9 @@ func (v *rawDeviceVolume) Setup(virtDev string) (*libvirtxml.DomainDisk, error) 
 }
 
 func (v *rawDeviceVolume) Teardown() error { return nil }
+
+func init() {
+	AddFlexvolumeSource("raw", newRawDeviceVolume)
+}
 
 // TODO: this file needs a test

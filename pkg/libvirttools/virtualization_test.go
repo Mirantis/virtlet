@@ -92,7 +92,6 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 	volSrc := CombineVMVolumeSources(
 		GetRootVolume,
 		GetNocloudVolume,
-		GetVolumesFromAnnotations,
 		ScanFlexvolumes)
 	ct.virtTool, err = NewVirtualizationTool(domainConn, storageConn, imageTool, ct.boltClient, "volumes", "loop*", volSrc)
 	if err != nil {
@@ -235,16 +234,29 @@ func TestDomainDefinitions(t *testing.T) {
 		},
 		{
 			name: "raw devices",
-			annotations: map[string]string{
-				// FIXME: here we depend upon the fact that /dev/loop0
-				// indeed exists in the build container. But we shouldn't.
-				"VirtletVolumes": `[{"Name": "vol", "Format": "rawDevice", "Path": "/dev/loop0"}]`,
+			flexVolumes: map[string]map[string]interface{}{
+				"raw": map[string]interface{}{
+					"type": "raw",
+					// FIXME: here we depend upon the fact that /dev/loop0
+					// indeed exists in the build container. But we shouldn't.
+					"path": "/dev/loop0",
+				},
 			},
 		},
 		{
 			name: "volumes",
-			annotations: map[string]string{
-				"VirtletVolumes": `[{"Name": "vol1"}, {"Name": "vol2", "Format": "qcow2", "Capacity": "2", "CapacityUnit": "MB"}, {"Name": "vol3"}]`,
+			flexVolumes: map[string]map[string]interface{}{
+				"vol1": map[string]interface{}{
+					"type": "qcow2",
+				},
+				"vol2": map[string]interface{}{
+					"type":         "qcow2",
+					"capacity":     "2",
+					"capacityUnit": "MB",
+				},
+				"vol3": map[string]interface{}{
+					"type": "qcow2",
+				},
 			},
 		},
 		{

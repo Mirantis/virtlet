@@ -31,7 +31,7 @@ const (
 	flexvolumeDataFile = "virtlet-flexvolume.json"
 )
 
-type FlexvolumeSource func(configPath string, config *VMConfig, owner VolumeOwner) (VMVolume, error)
+type FlexvolumeSource func(volumeName, configPath string, config *VMConfig, owner VolumeOwner) (VMVolume, error)
 
 var flexvolumeTypeMap = map[string]FlexvolumeSource{}
 
@@ -76,7 +76,7 @@ func ScanFlexvolumes(config *VMConfig, owner VolumeOwner) ([]VMVolume, error) {
 		if !found {
 			return nil, fmt.Errorf("bad flexvolume config %q: bad type %q", dataFilePath, fvType)
 		}
-		vol, err := fvSource(dataFilePath, config, owner)
+		vol, err := fvSource(fi.Name(), dataFilePath, config, owner)
 		if err != nil {
 			return nil, err
 		}

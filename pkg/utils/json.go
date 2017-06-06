@@ -18,7 +18,10 @@ package utils
 
 import (
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"log"
+	"os"
 )
 
 // MapToJson converts the specified map object to indented JSON.
@@ -39,4 +42,28 @@ func MapToJsonUnindented(m map[string]interface{}) string {
 		log.Panicf("error marshalling json: %v", err)
 	}
 	return string(bs)
+}
+
+func ReadJson(filename string, v interface{}) error {
+	content, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return fmt.Errorf("error reading json file %q: %v", filename, err)
+	}
+
+	if err := json.Unmarshal(content, v); err != nil {
+		return fmt.Errorf("failed to parse json file %q: %v", filename, err)
+	}
+
+	return nil
+}
+
+func WriteJson(filename string, v interface{}, perm os.FileMode) error {
+	content, err := json.Marshal(v)
+	if err != nil {
+		return fmt.Errorf("couldn't marshal the data to JSON for %q: %v", filename, err)
+	}
+	if err := ioutil.WriteFile(filename, content, perm); err != nil {
+		return fmt.Errorf("error writing JSON data file %q: %V", filename, err)
+	}
+	return nil
 }

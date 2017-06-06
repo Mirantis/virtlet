@@ -18,27 +18,62 @@ package libvirttools
 
 import (
 	"fmt"
+	"strconv"
 
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
+	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/Mirantis/virtlet/pkg/virt"
 )
+
+type qcow2VolumeOptions struct {
+	Capacity     string `json:"capacity,omitempty"`
+	CapacityUnit string `json:"capacityUnit,omitempty"`
+}
 
 // qcow2Volume denotes a volume in QCOW2 format
 type qcow2Volume struct {
 	volumeBase
-	spec *VirtletVolume
+	capacity     int
+	capacityUnit string
+	name         string
 }
 
-func newQCOW2Volume(spec *VirtletVolume, config *VMConfig, owner VolumeOwner) VMVolume {
-	return &qcow2Volume{
+func newQCOW2Volume(volumeName, configPath string, config *VMConfig, owner VolumeOwner) (VMVolume, error) {
+	v := &qcow2Volume{
 		volumeBase: volumeBase{config, owner},
-		spec:       spec,
+		name:       volumeName,
 	}
+	var err error
+	var opts qcow2VolumeOptions
+	if err = utils.ReadJson(configPath, &opts); err != nil {
+		return nil, fmt.Errorf("failed to parse qcow2 volume config %q: %v", configPath, err)
+	}
+
+	if opts.Capacity == "" {
+		v.capacity = defaultVolumeCapacity
+	} else {
+		if v.capacity, err = strconv.Atoi(opts.Capacity); err != nil {
+			return nil, fmt.Errorf("qcow2 volume has bad capacity: %v", opts.Capacity)
+		}
+		if v.capacity < 0 {
+			return nil, fmt.Errorf("qcow2 volume has negative capacity %d", v.capacity)
+		}
+	}
+
+	switch {
+	case opts.CapacityUnit == "":
+		v.capacityUnit = defaultVolumeCapacityUnit
+	case !validCapacityUnit(opts.CapacityUnit):
+		return nil, fmt.Errorf("qcow2 has invalid capacity units %q", opts.CapacityUnit)
+	default:
+		v.capacityUnit = opts.CapacityUnit
+	}
+	return v, nil
 }
 
 func (v *qcow2Volume) volumeName() string {
-	return v.config.DomainUUID + "-" + v.spec.Name
+	return v.config.DomainUUID + "-" + v.name
 }
 
 func (v *qcow2Volume) createQCOW2Volume(name string, capacity uint64, capacityUnit string) (virt.VirtStorageVolume, error) {
@@ -51,9 +86,9 @@ func (v *qcow2Volume) createQCOW2Volume(name string, capacity uint64, capacityUn
 }
 
 func (v *qcow2Volume) Setup(virtDev string) (*libvirtxml.DomainDisk, error) {
-	vol, err := v.createQCOW2Volume(v.volumeName(), uint64(v.spec.Capacity), v.spec.CapacityUnit)
+	vol, err := v.createQCOW2Volume(v.volumeName(), uint64(v.capacity), v.capacityUnit)
 	if err != nil {
-		return nil, fmt.Errorf("error during creation of volume '%s' with virtlet description %s: %v", v.volumeName(), v.spec.Name, err)
+		return nil, fmt.Errorf("error during creation of volume '%s' with virtlet description %s: %v", v.volumeName(), v.name, err)
 	}
 
 	path, err := vol.Path()
@@ -77,6 +112,19 @@ func (v *qcow2Volume) Setup(virtDev string) (*libvirtxml.DomainDisk, error) {
 
 func (v *qcow2Volume) Teardown() error {
 	return v.owner.StoragePool().RemoveVolumeByName(v.volumeName())
+}
+
+func validCapacityUnit(unit string) bool {
+	for _, item := range capacityUnits {
+		if item == unit {
+			return true
+		}
+	}
+	return false
+}
+
+func init() {
+	AddFlexvolumeSource("qcow2", newQCOW2Volume)
 }
 
 // TODO: this file needs a test

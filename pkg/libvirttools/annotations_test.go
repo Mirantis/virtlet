@@ -54,52 +54,6 @@ func TestVirtletAnnotations(t *testing.T) {
 			va:          &VirtletAnnotations{VCPUCount: 4},
 		},
 		{
-			name: "vcpu count and volumes",
-			annotations: map[string]string{
-				"VirtletVCPUCount": "4",
-				"VirtletVolumes":   `[{"Name": "vol1"}, {"Name": "vol2", "Format": "qcow2", "Capacity": "2", "CapacityUnit": "MB"}, {"Name": "vol3"}]`,
-			},
-			va: &VirtletAnnotations{
-				VCPUCount: 4,
-				Volumes: []*VirtletVolume{
-					{
-						Name:         "vol1",
-						Format:       "qcow2",
-						Capacity:     1024,
-						CapacityUnit: "MB",
-					},
-					{
-						Name:         "vol2",
-						Format:       "qcow2",
-						Capacity:     2,
-						CapacityUnit: "MB",
-					},
-					{
-						Name:         "vol3",
-						Format:       "qcow2",
-						Capacity:     1024,
-						CapacityUnit: "MB",
-					},
-				},
-			},
-		},
-		{
-			name: "raw volumes",
-			annotations: map[string]string{
-				"VirtletVolumes": `[{"Name": "rawVol", "Format": "rawDevice", "Path": "/dev/sdb"}]`,
-			},
-			va: &VirtletAnnotations{
-				VCPUCount: 1,
-				Volumes: []*VirtletVolume{
-					{
-						Name:   "rawVol",
-						Format: "rawDevice",
-						Path:   "/dev/sdb",
-					},
-				},
-			},
-		},
-		{
 			name: "cloud-init yaml and ssh keys",
 			annotations: map[string]string{
 				"VirtletCloudInitMetaData": `
@@ -149,60 +103,6 @@ func TestVirtletAnnotations(t *testing.T) {
 		{
 			name:        "bad vcpu count",
 			annotations: map[string]string{"VirtletVCPUCount": "256"},
-		},
-		{
-			name: "bad volume json",
-			annotations: map[string]string{
-				"VirtletVolumes": `[{`,
-			},
-		},
-		{
-			name: "volume without name",
-			annotations: map[string]string{
-				"VirtletVolumes": `[{}]`,
-			},
-		},
-		{
-			name: "bad volume - unknown format",
-			annotations: map[string]string{
-				"VirtletVolumes": `[{"Name": "badvol", "Format": "bad"}]`,
-			},
-		},
-		{
-			name: "bad volume - path for qcow2",
-			annotations: map[string]string{
-				"VirtletVolumes": `[{"Name": "badvol", "Path": "/dev/whatever"}]`,
-			},
-		},
-		{
-			name: "bad volume - capacity specified for a raw device",
-			annotations: map[string]string{
-				"VirtletVolumes": `[{"Name": "rawVol", "Format": "rawDevice", "Capacity": "1024", "Path": "/dev/sdb"}]`,
-			},
-		},
-		{
-			name: "bad volume - capacity unit specified for a raw device",
-			annotations: map[string]string{
-				"VirtletVolumes": `[{"Name": "rawVol", "Format": "rawDevice", "CapacityUnit": "B", "Path": "/dev/sdb"}]`,
-			},
-		},
-		{
-			name: "bad volume - raw volume path doesn't start with /dev/",
-			annotations: map[string]string{
-				"VirtletVolumes": `[{"Name": "rawVol", "Format": "rawDevice", "Path": "/tmp/foobar"}]`,
-			},
-		},
-		{
-			name: "bad volume - bad capacity units",
-			annotations: map[string]string{
-				"VirtletVolumes": `[{"Name": "badvol", "CapacityUnit": "cm"}]`,
-			},
-		},
-		{
-			name: "bad volume - negative capacity",
-			annotations: map[string]string{
-				"VirtletVolumes": `[{"Name": "badvol", "Capacity": "-1024"}]`,
-			},
 		},
 		{
 			name: "bad cloud-init meta-data",

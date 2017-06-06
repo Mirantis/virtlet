@@ -78,10 +78,28 @@ func verifyUsingShell(t *testing.T, cmd, what, expected string) {
 func TestContainerVolumes(t *testing.T) {
 	ct := newContainerTester(t)
 	defer ct.teardown()
-	ct.sandboxes[0].Annotations["VirtletVolumes"] = `[{"Name": "vol1"}, {"Name": "vol2", "Format": "qcow2", "Capacity": "2", "CapacityUnit": "MB"}, {"Name": "vol3"}]`
-	ct.sandboxes[1].Annotations["VirtletVolumes"] = `[{"Name": "vol1", "Format": "qcow2", "CapacityUnit": "KB"}, {"Name": "vol2", "Capacity": "2"}]`
+	ct.mountFlexvolume(ct.sandboxes[0].Metadata.Uid, "vol1", map[string]interface{}{
+		"type": "qcow2",
+	})
+	ct.mountFlexvolume(ct.sandboxes[0].Metadata.Uid, "vol2", map[string]interface{}{
+		"type":         "qcow2",
+		"capacity":     "2",
+		"capacityUnit": "MB",
+	})
+	ct.mountFlexvolume(ct.sandboxes[0].Metadata.Uid, "vol3", map[string]interface{}{
+		"type": "qcow2",
+	})
+	ct.mountFlexvolume(ct.sandboxes[1].Metadata.Uid, "vol1", map[string]interface{}{
+		"type":         "qcow2",
+		"capacityUnit": "KB",
+	})
+	ct.mountFlexvolume(ct.sandboxes[1].Metadata.Uid, "vol2", map[string]interface{}{
+		"type":     "qcow2",
+		"capacity": "2",
+	})
 	ct.pullAllImages()
 
+	volumeCounts := []int{3, 2}
 	for idx, sandbox := range ct.sandboxes {
 		ct.runPodSandbox(sandbox)
 		mounts := []*kubeapi.Mount{
@@ -94,11 +112,7 @@ func TestContainerVolumes(t *testing.T) {
 
 		vmName := createResp.ContainerId + "-" + ct.containers[idx].Name
 		cmd := fmt.Sprintf("virsh domblklist '%s' | grep '%s-vol.*' | wc -l", vmName, createResp.ContainerId)
-		count := 0
-		if _, exists := sandbox.Annotations["VirtletVolumes"]; exists {
-			count = len(strings.Split(sandbox.Annotations["VirtletVolumes"], "Name")) - 1
-		}
-		verifyUsingShell(t, cmd, "attached ephemeral volumes", strconv.Itoa(count))
+		verifyUsingShell(t, cmd, "attached ephemeral volumes", strconv.Itoa(volumeCounts[idx]))
 	}
 
 	if len(ct.listContainers(nil).Containers) != 2 {

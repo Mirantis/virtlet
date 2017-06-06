@@ -81,7 +81,6 @@ func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, m
 	volSrc := libvirttools.CombineVMVolumeSources(
 		libvirttools.GetRootVolume,
 		libvirttools.GetNocloudVolume,
-		libvirttools.GetVolumesFromAnnotations,
 		libvirttools.ScanFlexvolumes)
 	// TODO: pool name should be passed like for imageTool
 	libvirtVirtualizationTool, err := libvirttools.NewVirtualizationTool(conn, conn, libvirtImageTool, boltClient, "volumes", rawDevices, volSrc)
