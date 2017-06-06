@@ -203,6 +203,7 @@ function gotest {
     subdir="$(virtlet_subdir)"
     if ! vcmd "${start_libvirt}cd '${subdir}' && go test $*"; then
         vcmd_simple "find . -name 'Test*.json' | xargs tar -c -T -" | tar -C "${project_dir}" -x
+        exit 1
     fi
 }
 
