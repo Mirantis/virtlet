@@ -284,14 +284,6 @@ func TestDomainDefinitions(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := fake.NewToplevelRecorder()
-			rec.AddFilter("DefineSecret")
-			rec.AddFilter("SetValue")
-			rec.AddFilter("Format")
-			rec.AddFilter("DefineDomain")
-			rec.AddFilter("CreateStorageVol")
-			rec.AddFilter("CreateStorageVolClone")
-			rec.AddFilter("iso image")
-			// TODO: remove these filters (need to check vol teardown etc.)
 
 			ct := newContainerTester(t, rec)
 			defer ct.teardown()
