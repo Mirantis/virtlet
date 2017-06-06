@@ -53,7 +53,7 @@ const (
 	domainDestroyTimeout        = 5 * time.Second
 	diskLetterStr               = "bcdefghijklmnopqrstu"
 
-	containerNsUuid       = "67b7fb47-7735-4b64-86d2-6d062d121966"
+	ContainerNsUuid       = "67b7fb47-7735-4b64-86d2-6d062d121966"
 	defaultKubeletRootDir = "/var/lib/kubelet/pods"
 	flexVolumeSubdir      = "volumes/virtlet~flexvolume_driver"
 	vmLogLocationPty      = "pty"
@@ -369,13 +369,15 @@ func (v *VirtualizationTool) addSerialDevicesToDomain(sandboxId string, containe
 	return nil
 }
 
-func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest, netNSPath, cniConfig string) (string, error) {
+func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest, netNSPath, cniConfig string) (id string, err error) {
+	var domain virt.VirtDomain
+
 	if in.Config == nil || in.Config.Metadata == nil || in.Config.Image == nil || in.SandboxConfig == nil || in.SandboxConfig.Metadata == nil {
 		return "", errors.New("invalid input data")
 	}
 
 	settings := VirtletDomainSettings{
-		domainUUID:    utils.NewUuid5(containerNsUuid, in.PodSandboxId),
+		domainUUID:    utils.NewUuid5(ContainerNsUuid, in.PodSandboxId),
 		netNSPath:     netNSPath,
 		cniConfig:     cniConfig,
 		vmLogLocation: vmLogLocation(),
@@ -390,36 +392,20 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 
 	if settings.domainName == "" {
 		settings.domainName = settings.domainUUID
-	} else {
-		// check whether the domain with such name already exists, and if so, return it's uuid
-		domainName := in.PodSandboxId + "-" + settings.domainName
-		domain, err := v.domainConn.LookupDomainByName(domainName)
-		if err != nil && err != virt.ErrDomainNotFound {
-			return "", fmt.Errorf("failed to look up domain %q: %v", domainName, err)
-		}
-		if err == nil {
-			if domainID, err := domain.UUIDString(); err == nil {
-				// FIXME: this is a temp workaround for an existing domain being returned on create container call
-				// (this causing SyncPod issues)
-				return domainID, nil
-			} else {
-				glog.Errorf("Failed to get UUID for domain with name: %s due to %v", domainName, err)
-				return "", fmt.Errorf("Failure in communication with libvirt: %v", err)
-			}
-		}
 	}
+
+	// Check annotations before creating/defining anything for domain
+	annotations, err := LoadAnnotations(sandboxAnnotations)
+	if err != nil {
+		return "", err
+	}
+	settings.vcpuNum = annotations.VCPUCount
 
 	cloneName := "root_" + settings.domainUUID
 	settings.rootDiskFilepath, err = v.createBootImageClone(cloneName, config.Image.Image)
 	if err != nil {
 		return "", err
 	}
-
-	annotations, err := LoadAnnotations(sandboxAnnotations)
-	if err != nil {
-		return "", err
-	}
-	settings.vcpuNum = annotations.VCPUCount
 
 	if config.Linux != nil && config.Linux.Resources != nil {
 		settings.memory = int(config.Linux.Resources.MemoryLimitInBytes)
@@ -439,41 +425,52 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 	domainConf := settings.createDomain()
 
 	nocloudFile, err := v.addVolumesToDomain(in.PodSandboxId, in.SandboxConfig.Metadata.Name, in.SandboxConfig.Metadata.Namespace, domainConf, annotations)
-	if err != nil {
-		return "", err
-	}
-
-	containerAttempt := in.Config.Metadata.Attempt
-	if err = v.addSerialDevicesToDomain(in.PodSandboxId, containerAttempt, domainConf, settings); err != nil {
-		return "", err
-	}
-
-	v.metadataStore.SetContainer(settings.domainName, settings.domainUUID, in.PodSandboxId, config.Image.Image, cloneName, config.Labels, config.Annotations, nocloudFile, v.timeFunc)
-
-	if _, err := v.domainConn.DefineDomain(domainConf); err != nil {
-		return "", err
-	}
-
-	domain, err := v.domainConn.LookupDomainByUUIDString(settings.domainUUID)
 	if err == nil {
-		// FIXME: do we really need this?
-		// (this causes an GetInfo() call on the domain in case of libvirt)
-		_, err = domain.State()
-	}
-	if err != nil {
-		return "", err
+		if err = v.addSerialDevicesToDomain(in.PodSandboxId, in.Config.Metadata.Attempt, domainConf, settings); err == nil {
+			if _, err = v.domainConn.DefineDomain(domainConf); err == nil {
+				domain, err = v.domainConn.LookupDomainByUUIDString(settings.domainUUID)
+				if err == nil {
+					// FIXME: do we really need this?
+					// (this causes an GetInfo() call on the domain in case of libvirt)
+					_, err = domain.State()
+				}
+			}
+		}
 	}
 
-	return settings.domainUUID, nil
+	defer func() {
+		// Set container in bolt despite of failure to provide info for cleanup
+		v.metadataStore.SetContainer(settings.domainName, settings.domainUUID, in.PodSandboxId, config.Image.Image, cloneName, config.Labels, config.Annotations, nocloudFile, v.timeFunc)
+		if err != nil {
+			if rmErr := v.RemoveContainer(settings.domainUUID); rmErr != nil {
+				err = fmt.Errorf("Container creation error: %v \n %v", err, rmErr)
+			}
+		}
+
+	}()
+
+	if err != nil {
+		return "", err
+	} else {
+		return settings.domainUUID, nil
+	}
 }
 
 func (v *VirtualizationTool) StartContainer(containerId string) error {
 	domain, err := v.domainConn.LookupDomainByUUIDString(containerId)
-	if err != nil {
-		return err
+	if err == nil {
+		err = domain.Create()
 	}
 
-	return domain.Create()
+	if err != nil {
+		if rmErr := v.RemoveContainer(containerId); rmErr != nil {
+			return fmt.Errorf("Container start error: %v \n %v", err, rmErr)
+		} else {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (v *VirtualizationTool) StopContainer(containerId string) error {
@@ -504,27 +501,24 @@ func (v *VirtualizationTool) StopContainer(containerId string) error {
 // even if it's still running
 // it waits up to 5 sec for doing the job by libvirt
 func (v *VirtualizationTool) RemoveContainer(containerId string) error {
-	containerInfo, err := v.metadataStore.GetContainerInfo(containerId)
-	if err != nil {
-		glog.Errorf("Error when retrieving container '%s' info from metadata store: %v", containerId, err)
-		return err
-	}
 
 	// Give a chance to gracefully stop domain
 	// TODO: handle errors - there could be e.x. connection errori
 	domain, err := v.domainConn.LookupDomainByUUIDString(containerId)
-	if err != nil {
+	if err != nil && err != virt.ErrDomainNotFound {
 		return err
 	}
 
-	if err := v.StopContainer(containerId); err != nil {
-		if err := domain.Destroy(); err != nil {
+	if domain != nil {
+		if err := v.StopContainer(containerId); err != nil {
+			if err := domain.Destroy(); err != nil {
+				return err
+			}
+		}
+
+		if err := domain.Undefine(); err != nil {
 			return err
 		}
-	}
-
-	if err := domain.Undefine(); err != nil {
-		return err
 	}
 
 	// Wait until domain is really removed or timeout after 5 sec.
@@ -540,29 +534,37 @@ func (v *VirtualizationTool) RemoveContainer(containerId string) error {
 		return err
 	}
 
-	if containerInfo.NocloudFile != "" {
-		if err := os.Remove(containerInfo.NocloudFile); err != nil {
-			glog.Warning("Error removing nocloud file %q: %v", containerInfo.NocloudFile, err)
-		}
-	}
-
-	if err := v.metadataStore.RemoveContainer(containerId); err != nil {
-		glog.Errorf("Error when removing container '%s' from metadata store: %v", containerId, err)
-		return err
-	}
-
-	if err := v.RemoveVolume(containerInfo.RootImageVolumeName); err != nil {
-		glog.Errorf("Error when removing image snapshot with name '%s': %v", containerInfo.RootImageVolumeName, err)
-		return err
-	}
-
-	annotations, err := LoadAnnotations(containerInfo.SandBoxAnnotations)
+	containerInfo, err := v.metadataStore.GetContainerInfo(containerId)
 	if err != nil {
+		glog.Errorf("Error when retrieving container '%s' info from metadata store: %v", containerId, err)
 		return err
 	}
-	if len(annotations.Volumes) > 0 {
-		if err := v.volumeStorage.CleanAttachedQCOW2Volumes(annotations.Volumes, containerId); err != nil {
+
+	if containerInfo != nil {
+		if containerInfo.NocloudFile != "" {
+			if err := os.Remove(containerInfo.NocloudFile); err != nil {
+				glog.Warning("Error removing nocloud file %q: %v", containerInfo.NocloudFile, err)
+			}
+		}
+
+		if err := v.metadataStore.RemoveContainer(containerId); err != nil {
+			glog.Errorf("Error when removing container '%s' from metadata store: %v", containerId, err)
 			return err
+		}
+
+		if err := v.RemoveVolume(containerInfo.RootImageVolumeName); err != nil {
+			glog.Errorf("Error when removing image snapshot with name '%s': %v", containerInfo.RootImageVolumeName, err)
+			return err
+		}
+
+		annotations, err := LoadAnnotations(containerInfo.SandBoxAnnotations)
+		if err != nil {
+			return err
+		}
+		if len(annotations.Volumes) > 0 {
+			if err := v.volumeStorage.CleanAttachedQCOW2Volumes(annotations.Volumes, containerId); err != nil {
+				return err
+			}
 		}
 	}
 

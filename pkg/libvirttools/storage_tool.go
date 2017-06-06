@@ -120,7 +120,8 @@ func (s *StorageTool) CleanAttachedQCOW2Volumes(volumes []*VirtletVolume, contai
 			continue
 		}
 		volName := containerId + "-" + virtletVol.Name
-		if err := s.RemoveVolume(volName); err != nil {
+
+		if err := s.RemoveVolume(volName); err != nil && err != virt.ErrStorageVolumeNotFound {
 			return fmt.Errorf("error during removal of volume '%s' for container %s: %v", volName, containerId, err)
 		}
 	}

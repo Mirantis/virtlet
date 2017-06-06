@@ -22,6 +22,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/Mirantis/virtlet/pkg/libvirttools"
 	virtletutils "github.com/Mirantis/virtlet/pkg/utils"
 	libvirt "github.com/libvirt/libvirt-go"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
@@ -43,14 +44,66 @@ func waitForSocket(filepath string) error {
 	return fmt.Errorf("Socket %s doesn't exist", filepath)
 }
 
+func getDomainUUID(podID string) string {
+	return virtletutils.NewUuid5(libvirttools.ContainerNsUuid, podID)
+}
+
+func defineDummyVolume(poolName, volName string) error {
+	conn, err := libvirt.NewConnect(libvirtUri)
+	if err != nil {
+		return err
+	}
+
+	pool, err := conn.LookupStoragePoolByName(poolName)
+	if err != nil {
+		return fmt.Errorf("failed to lookup pool '%s': %v", poolName, err)
+	}
+
+	volume := &libvirtxml.StorageVolume{
+		Name:     volName,
+		Capacity: &libvirtxml.StorageVolumeSize{Unit: "bytes", Value: 1},
+	}
+
+	volXML, err := volume.Marshal()
+	if err != nil {
+		log.Panicf("XML marshaling: %v", err)
+	}
+
+	_, err = pool.StorageVolCreateXML(volXML, 0)
+	return err
+}
+
+func undefDomain(domainName string) error {
+	conn, err := libvirt.NewConnect(libvirtUri)
+	if err != nil {
+		return err
+	}
+	domain, err := conn.LookupDomainByName(domainName)
+	if err != nil {
+		return fmt.Errorf("failed to lookup domain by name '%s': %v", domainName, err)
+	}
+	if err := domain.Undefine(); err != nil {
+		return fmt.Errorf("failed to lookup domain by name '%s': %v", domainName, err)
+	}
+	return nil
+}
+
 func defineDummyDomain() error {
+	return defineDummyDomainWithName("")
+}
+
+func defineDummyDomainWithName(domainName string) error {
+	if domainName == "" {
+		domainName = "dummy-" + virtletutils.NewUuid()
+	}
+
 	conn, err := libvirt.NewConnect(libvirtUri)
 	if err != nil {
 		return err
 	}
 
 	domain := &libvirtxml.Domain{
-		Name: "dummy-" + virtletutils.NewUuid(),
+		Name: domainName,
 		Type: "qemu",
 		OS: &libvirtxml.DomainOS{
 			Type: &libvirtxml.DomainOSType{Type: "hvm"},
