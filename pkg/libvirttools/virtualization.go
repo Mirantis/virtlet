@@ -369,8 +369,7 @@ func (v *VirtualizationTool) addSerialDevicesToDomain(sandboxId string, containe
 	return nil
 }
 
-func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest, netNSPath, cniConfig string) (string, error) {
-	var err error
+func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest, netNSPath, cniConfig string) (id string, err error) {
 	var domain virt.VirtDomain
 
 	if in.Config == nil || in.Config.Metadata == nil || in.Config.Image == nil || in.SandboxConfig == nil || in.SandboxConfig.Metadata == nil {
@@ -426,36 +425,33 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 	domainConf := settings.createDomain()
 
 	nocloudFile, err := v.addVolumesToDomain(in.PodSandboxId, in.SandboxConfig.Metadata.Name, in.SandboxConfig.Metadata.Namespace, domainConf, annotations)
-	if err != nil {
-		goto Cleanup
-	}
-
-	if err = v.addSerialDevicesToDomain(in.PodSandboxId, in.Config.Metadata.Attempt, domainConf, settings); err != nil {
-		goto Cleanup
-	}
-
-	if _, err = v.domainConn.DefineDomain(domainConf); err != nil {
-		goto Cleanup
-	}
-
-	domain, err = v.domainConn.LookupDomainByUUIDString(settings.domainUUID)
 	if err == nil {
-		// FIXME: do we really need this?
-		// (this causes an GetInfo() call on the domain in case of libvirt)
-		_, err = domain.State()
+		if err = v.addSerialDevicesToDomain(in.PodSandboxId, in.Config.Metadata.Attempt, domainConf, settings); err == nil {
+			if _, err = v.domainConn.DefineDomain(domainConf); err == nil {
+				domain, err = v.domainConn.LookupDomainByUUIDString(settings.domainUUID)
+				if err == nil {
+					// FIXME: do we really need this?
+					// (this causes an GetInfo() call on the domain in case of libvirt)
+					_, err = domain.State()
+				}
+			}
+		}
 	}
 
-Cleanup:
-	// Set container in bolt despite of failure to provide info for cleanup
-	v.metadataStore.SetContainer(settings.domainName, settings.domainUUID, in.PodSandboxId, config.Image.Image, cloneName, config.Labels, config.Annotations, nocloudFile, v.timeFunc)
-	if err != nil {
-		if rmErr := v.RemoveContainer(settings.domainUUID); rmErr != nil {
-			return "", fmt.Errorf("Container creation error: %v \n %v", err, rmErr)
-		} else {
-			return "", err
+	defer func() {
+		// Set container in bolt despite of failure to provide info for cleanup
+		v.metadataStore.SetContainer(settings.domainName, settings.domainUUID, in.PodSandboxId, config.Image.Image, cloneName, config.Labels, config.Annotations, nocloudFile, v.timeFunc)
+		if err != nil {
+			if rmErr := v.RemoveContainer(settings.domainUUID); rmErr != nil {
+				err = fmt.Errorf("Container creation error: %v \n %v", err, rmErr)
+			}
 		}
-	} else {
 
+	}()
+
+	if err != nil {
+		return "", err
+	} else {
 		return settings.domainUUID, nil
 	}
 }
