@@ -17,6 +17,7 @@ limitations under the License.
 package libvirttools
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/xml"
 	"errors"
@@ -268,46 +269,33 @@ func (v *VirtualizationTool) scanFlexVolumes(podId, podName string, letterInd in
 	return flexInfos, nil
 }
 
-func (v *VirtualizationTool) addVolumesToDomain(podId, podName, podNamespace string, domain *libvirtxml.Domain, annotations *VirtletAnnotations) (string, error) {
-	g := NewCloudInitGenerator(podName, podNamespace, annotations)
-	isoPath, nocloudDiskDef, err := g.GenerateDisk()
-	if err != nil {
-		return "", err
-	}
-	nocloudDiskDef.Target.Dev = "vd" + diskLetters[0]
-	domain.Devices.Disks = append(domain.Devices.Disks, *nocloudDiskDef)
-
-	flexVolumeInfos, err := v.scanFlexVolumes(podId, podName, 1)
-	if err != nil {
-		return "", err
-	}
-
+func (v *VirtualizationTool) addVolumesToDomain(flexVolumeInfos []FlexVolumeInfo, domain *libvirtxml.Domain, volumes []*VirtletVolume) error {
 	glog.V(2).Infof("FlexVolume to process: %v", flexVolumeInfos)
 	for _, flexVolumeInfo := range flexVolumeInfos {
 		if flexVolumeInfo.SecretXML != "" {
 			var secretDef libvirtxml.Secret
 			if err := secretDef.Unmarshal(flexVolumeInfo.SecretXML); err != nil {
-				return "", err
+				return err
 			}
 			key, err := base64.StdEncoding.DecodeString(flexVolumeInfo.Key)
 			if err != nil {
-				return "", err
+				return err
 			}
 			if err := v.domainConn.DefineSecret(&secretDef, key); err != nil {
-				return "", err
+				return err
 			}
 		}
 		domain.Devices.Disks = append(domain.Devices.Disks, *flexVolumeInfo.Disk)
 	}
 
-	volumes, err := v.volumeStorage.PrepareVolumesToBeAttached(annotations.Volumes, domain.UUID, len(flexVolumeInfos)+1)
+	restOfVolumes, err := v.volumeStorage.PrepareVolumesToBeAttached(volumes, domain.UUID, len(flexVolumeInfos)+1)
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	domain.Devices.Disks = append(domain.Devices.Disks, volumes...)
+	domain.Devices.Disks = append(domain.Devices.Disks, restOfVolumes...)
 
-	return isoPath, nil
+	return nil
 }
 
 func vmLogLocation() string {
@@ -369,9 +357,21 @@ func (v *VirtualizationTool) addSerialDevicesToDomain(sandboxId string, containe
 	return nil
 }
 
+func getEnvVarsFileData(keyVals []*kubeapi.KeyValue) string {
+	if keyVals == nil {
+		return ""
+	}
+
+	var buffer bytes.Buffer
+	for _, entry := range keyVals {
+		buffer.WriteString(fmt.Sprintf("%s=%s\n", entry.Key, entry.Value))
+	}
+
+	return buffer.String()
+}
+
 func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest, netNSPath, cniConfig string) (id string, err error) {
 	var domain virt.VirtDomain
-
 	if in.Config == nil || in.Config.Metadata == nil || in.Config.Image == nil || in.SandboxConfig == nil || in.SandboxConfig.Metadata == nil {
 		return "", errors.New("invalid input data")
 	}
@@ -424,23 +424,20 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 	settings.useKvm = v.forceKVM || canUseKvm()
 	domainConf := settings.createDomain()
 
-	nocloudFile, err := v.addVolumesToDomain(in.PodSandboxId, in.SandboxConfig.Metadata.Name, in.SandboxConfig.Metadata.Namespace, domainConf, annotations)
-	if err == nil {
-		if err = v.addSerialDevicesToDomain(in.PodSandboxId, in.Config.Metadata.Attempt, domainConf, settings); err == nil {
-			if _, err = v.domainConn.DefineDomain(domainConf); err == nil {
-				domain, err = v.domainConn.LookupDomainByUUIDString(settings.domainUUID)
-				if err == nil {
-					// FIXME: do we really need this?
-					// (this causes an GetInfo() call on the domain in case of libvirt)
-					_, err = domain.State()
-				}
-			}
-		}
+	g := NewCloudInitGenerator(in.SandboxConfig.Metadata.Name, in.SandboxConfig.Metadata.Namespace,
+		annotations, getEnvVarsFileData(in.Config.Envs))
+	nocloudFile, nocloudDiskDef, err := g.GenerateDisk()
+	if err != nil {
+		return "", err
 	}
+	nocloudDiskDef.Target.Dev = "vd" + diskLetters[0]
+	domainConf.Devices.Disks = append(domainConf.Devices.Disks, *nocloudDiskDef)
 
 	defer func() {
 		// Set container in bolt despite of failure to provide info for cleanup
-		v.metadataStore.SetContainer(settings.domainName, settings.domainUUID, in.PodSandboxId, config.Image.Image, cloneName, config.Labels, config.Annotations, nocloudFile, v.timeFunc)
+		v.metadataStore.SetContainer(settings.domainName, settings.domainUUID,
+			in.PodSandboxId, config.Image.Image, cloneName, config.Labels,
+			config.Annotations, nocloudFile, v.timeFunc)
 		if err != nil {
 			if rmErr := v.RemoveContainer(settings.domainUUID); rmErr != nil {
 				err = fmt.Errorf("Container creation error: %v \n %v", err, rmErr)
@@ -448,6 +445,32 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 		}
 
 	}()
+
+	flexVolumeInfos, err := v.scanFlexVolumes(in.PodSandboxId, in.SandboxConfig.Metadata.Name, 1)
+	if err != nil {
+		return "", err
+	}
+
+	if err := v.addVolumesToDomain(flexVolumeInfos, domainConf, annotations.Volumes); err != nil {
+		return "", err
+	}
+
+	if err := v.addSerialDevicesToDomain(in.PodSandboxId, in.Config.Metadata.Attempt, domainConf, settings); err != nil {
+		return "", err
+	}
+
+	if _, err = v.domainConn.DefineDomain(domainConf); err != nil {
+		return "", err
+	}
+
+	domain, err = v.domainConn.LookupDomainByUUIDString(settings.domainUUID)
+	if err != nil {
+		return "", err
+	}
+
+	// FIXME: do we really need this?
+	// (this causes an GetInfo() call on the domain in case of libvirt)
+	_, err = domain.State()
 
 	if err != nil {
 		return "", err

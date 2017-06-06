@@ -30,17 +30,23 @@ import (
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
+const (
+	EnvFileLocation = "/etc/cloud/environment"
+)
+
 type CloudInitGenerator struct {
-	podName     string
-	podNs       string
-	annotations *VirtletAnnotations
+	podName            string
+	podNs              string
+	annotations        *VirtletAnnotations
+	envVarsFileContent string
 }
 
-func NewCloudInitGenerator(podName, podNs string, annotations *VirtletAnnotations) *CloudInitGenerator {
+func NewCloudInitGenerator(podName, podNs string, annotations *VirtletAnnotations, envVarsFileContent string) *CloudInitGenerator {
 	return &CloudInitGenerator{
-		podName:     podName,
-		podNs:       podNs,
-		annotations: annotations,
+		podName:            podName,
+		podNs:              podNs,
+		annotations:        annotations,
+		envVarsFileContent: envVarsFileContent,
 	}
 }
 
@@ -70,6 +76,11 @@ func (g *CloudInitGenerator) generateUserData() (string, error) {
 	if g.annotations.UserDataScript != "" {
 		return g.annotations.UserDataScript, nil
 	}
+
+	if err := g.addEnvVarsFileToWriteFiles(); err != nil {
+		return "", fmt.Errorf("error marshalling environment variables: %v", err)
+	}
+
 	r := []byte{}
 	if len(g.annotations.UserData) != 0 {
 		var err error
@@ -126,4 +137,41 @@ func (g *CloudInitGenerator) GenerateDisk() (string, *libvirtxml.DomainDisk, err
 		ReadOnly: &libvirtxml.DomainDiskReadOnly{},
 	}
 	return isoFile.Name(), diskDef, nil
+}
+
+type WriteFilesEntry struct {
+	Content     string `json:"content" yaml:"content"`
+	Path        string `json:"path" yaml:"path"`
+	Encoding    string `json:"encoding" yaml:"encoding"`
+	Owner       string `json:"owner" yaml:"owner"`
+	Permissions string `json:"permissions", yaml:"permissions"`
+}
+
+func (g *CloudInitGenerator) addEnvVarsFileToWriteFiles() error {
+	if g.envVarsFileContent == "" {
+		return nil
+	}
+
+	envVarsFileAsWriteFilesEntry := WriteFilesEntry{
+		Content: g.envVarsFileContent,
+		Path:    EnvFileLocation,
+	}
+
+	if g.annotations.UserData == nil {
+		g.annotations.UserData = make(map[string]interface{})
+	}
+
+	entries := []WriteFilesEntry{}
+
+	writeFilesContentAsInterface, ok := g.annotations.UserData["write_files"]
+	if ok {
+		if err := yaml.Unmarshal(writeFilesContentAsInterface.([]byte), entries); err != nil {
+			return fmt.Errorf("error when unmarshalling 'write_files' in UserData defined for VM: %v", err)
+		}
+	}
+
+	entries = append(entries, envVarsFileAsWriteFilesEntry)
+	g.annotations.UserData["write_files"] = entries
+
+	return nil
 }
