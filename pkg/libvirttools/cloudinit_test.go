@@ -17,9 +17,9 @@ limitations under the License.
 package libvirttools
 
 import (
+	"bytes"
 	"encoding/json"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -35,6 +35,7 @@ func TestCloudInitGenerator(t *testing.T) {
 		podName             string
 		podNs               string
 		annotations         *VirtletAnnotations
+		environment         []*VMKeyValue
 		expectedMetaData    map[string]interface{}
 		expectedUserData    map[string]interface{}
 		expectedUserDataStr string
@@ -109,6 +110,73 @@ func TestCloudInitGenerator(t *testing.T) {
 			},
 		},
 		{
+			name:        "pod with env variables",
+			podName:     "foo",
+			podNs:       "default",
+			annotations: &VirtletAnnotations{},
+			environment: []*VMKeyValue{
+				{"foo", "bar"},
+				{"baz", "abc"},
+			},
+			expectedMetaData: map[string]interface{}{
+				"instance-id":    "foo.default",
+				"local-hostname": "foo",
+			},
+			expectedUserData: map[string]interface{}{
+				"write_files": []interface{}{
+					map[string]interface{}{
+						"path":    "/etc/cloud/environment",
+						"content": "foo=bar\nbaz=abc\n",
+					},
+				},
+			},
+		},
+		{
+			name:    "pod with env variables and user data",
+			podName: "foo",
+			podNs:   "default",
+			annotations: &VirtletAnnotations{
+				UserData: map[string]interface{}{
+					"users": []interface{}{
+						map[string]interface{}{
+							"name": "cloudy",
+						},
+					},
+					"write_files": []interface{}{
+						map[string]interface{}{
+							"path":    "/etc/foobar",
+							"content": "whatever",
+						},
+					},
+				},
+			},
+			environment: []*VMKeyValue{
+				{"foo", "bar"},
+				{"baz", "abc"},
+			},
+			expectedMetaData: map[string]interface{}{
+				"instance-id":    "foo.default",
+				"local-hostname": "foo",
+			},
+			expectedUserData: map[string]interface{}{
+				"users": []interface{}{
+					map[string]interface{}{
+						"name": "cloudy",
+					},
+				},
+				"write_files": []interface{}{
+					map[string]interface{}{
+						"path":    "/etc/foobar",
+						"content": "whatever",
+					},
+					map[string]interface{}{
+						"path":    "/etc/cloud/environment",
+						"content": "foo=bar\nbaz=abc\n",
+					},
+				},
+			},
+		},
+		{
 			name:    "pod with user data script",
 			podName: "foo",
 			podNs:   "default",
@@ -125,39 +193,44 @@ func TestCloudInitGenerator(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			g := NewCloudInitGenerator(tc.podName, tc.podNs, tc.annotations, "")
+			g := NewCloudInitGenerator(&VMConfig{
+				PodName:           tc.podName,
+				PodNamespace:      tc.podNs,
+				ParsedAnnotations: tc.annotations,
+				Environment:       tc.environment,
+			})
 
-			metaDataStr, err := g.generateMetaData()
+			metaDataBytes, err := g.generateMetaData()
 			if err != nil {
 				t.Fatalf("GenerateMetaData(): %v", err)
 			}
 			var metaData map[string]interface{}
-			if err := json.Unmarshal([]byte(metaDataStr), &metaData); err != nil {
+			if err := json.Unmarshal(metaDataBytes, &metaData); err != nil {
 				t.Fatalf("Can't unmarshal meta-data: %v", err)
 			}
 
 			if !reflect.DeepEqual(tc.expectedMetaData, metaData) {
-				t.Errorf("Bad meta-data:\n%s\nUnmarshaled:\n%s", metaDataStr, spew.Sdump(metaData))
+				t.Errorf("Bad meta-data:\n%s\nUnmarshaled:\n%s", metaDataBytes, spew.Sdump(metaData))
 			}
-			userDataStr, err := g.generateUserData()
+			userDataBytes, err := g.generateUserData()
 			if err != nil {
 				t.Fatalf("GenerateUserData(): %v", err)
 			}
 			if tc.expectedUserDataStr != "" {
-				if userDataStr != tc.expectedUserDataStr {
-					t.Errorf("Bad user-data string:\n%s", userDataStr)
+				if string(userDataBytes) != tc.expectedUserDataStr {
+					t.Errorf("Bad user-data string:\n%s", userDataBytes)
 				}
 			} else {
-				if !strings.HasPrefix(userDataStr, "#cloud-config\n") {
+				if !bytes.HasPrefix(userDataBytes, []byte("#cloud-config\n")) {
 					t.Errorf("No #cloud-config header")
 				}
 				var userData map[string]interface{}
-				if err := yaml.Unmarshal([]byte(userDataStr), &userData); err != nil {
+				if err := yaml.Unmarshal(userDataBytes, &userData); err != nil {
 					t.Fatalf("Can't unmarshal user-data: %v", err)
 				}
 
 				if !reflect.DeepEqual(tc.expectedUserData, userData) {
-					t.Errorf("Bad user-data:\n%s\nUnmarshaled:\n%s", userDataStr, spew.Sdump(userData))
+					t.Errorf("Bad user-data:\n%s\nUnmarshaled:\n%s", userDataBytes, spew.Sdump(userData))
 				}
 			}
 		})
@@ -165,7 +238,11 @@ func TestCloudInitGenerator(t *testing.T) {
 }
 
 func TestGenerateDisk(t *testing.T) {
-	g := NewCloudInitGenerator("foo", "default", &VirtletAnnotations{}, "")
+	g := NewCloudInitGenerator(&VMConfig{
+		PodName:           "foo",
+		PodNamespace:      "default",
+		ParsedAnnotations: &VirtletAnnotations{},
+	})
 	isoPath, diskDef, err := g.GenerateDisk()
 	if err != nil {
 		t.Fatalf("GenerateDisk(): %v", err)

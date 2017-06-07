@@ -26,15 +26,6 @@ spec:
         app: inner-k8s
       annotations:
         kubernetes.io/target-runtime: virtlet
-        VirtletVolumes: >
-          [
-            {
-              "Name": "docker",
-              "Format": "qcow2",
-              "Capacity": "2048",
-              "CapacityUnit": "MB"
-            }
-          ]
         VirtletCloudInitUserData: |
           mounts:
           - [ /dev/vdc1, /var/lib/docker ]
@@ -106,3 +97,10 @@ spec:
       containers:
       - name: ubuntu-vm
         image: virtlet/cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img
+      volumes:
+      - name: docker
+        flexVolume:
+          driver: "virtlet/flexvolume_driver"
+          options:
+            type: qcow2
+            capacity: 2048MB

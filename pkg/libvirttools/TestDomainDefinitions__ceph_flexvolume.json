@@ -1,5 +1,49 @@
 [
   {
+    "name": "storage: CreateStoragePool",
+    "data": {
+      "XMLName": {
+        "Space": "",
+        "Local": ""
+      },
+      "Type": "dir",
+      "Name": "default",
+      "UUID": "",
+      "Allocation": null,
+      "Capacity": null,
+      "Available": null,
+      "Target": {
+        "Path": "/var/lib/libvirt/images",
+        "Permissions": null,
+        "Timestamps": null,
+        "Encryption": null
+      },
+      "Source": null
+    }
+  },
+  {
+    "name": "storage: CreateStoragePool",
+    "data": {
+      "XMLName": {
+        "Space": "",
+        "Local": ""
+      },
+      "Type": "dir",
+      "Name": "volumes",
+      "UUID": "",
+      "Allocation": null,
+      "Capacity": null,
+      "Available": null,
+      "Target": {
+        "Path": "/var/lib/virtlet",
+        "Permissions": null,
+        "Timestamps": null,
+        "Encryption": null
+      },
+      "Source": null
+    }
+  },
+  {
     "name": "storage: default: CreateStorageVol",
     "data": {
       "XMLName": {
@@ -65,24 +109,25 @@
   {
     "name": "domain conn: DefineSecret",
     "data": {
-      "def": {
-        "XMLName": {
-          "Space": "",
-          "Local": "secret"
-        },
-        "Ephemeral": "no",
-        "Private": "no",
-        "Description": "",
-        "UUID": "fa1f16d1-5bf7-412e-8d68-4f15c43f3771",
-        "Usage": {
-          "Type": "ceph",
-          "Volume": "",
-          "Name": "libvirt",
-          "Target": ""
-        }
+      "XMLName": {
+        "Space": "",
+        "Local": ""
       },
-      "value": "66 6f 6f 62 61 72 0a"
+      "Ephemeral": "no",
+      "Private": "no",
+      "Description": "",
+      "UUID": "231700d5-c9a6-5a49-738d-99a954c51550",
+      "Usage": {
+        "Type": "ceph",
+        "Volume": "",
+        "Name": "libvirt",
+        "Target": ""
+      }
     }
+  },
+  {
+    "name": "domain conn: secret 231700d5-c9a6-5a49-738d-99a954c51550: SetValue",
+    "data": "66 6f 6f 62 61 72 0a"
   },
   {
     "name": "domain conn: iso image",
@@ -196,7 +241,7 @@
               "Secret": {
                 "Type": "ceph",
                 "Usage": "",
-                "UUID": "fa1f16d1-5bf7-412e-8d68-4f15c43f3771"
+                "UUID": "231700d5-c9a6-5a49-738d-99a954c51550"
               }
             },
             "Source": {
@@ -348,5 +393,18 @@
         ]
       }
     }
+  },
+  {
+    "name": "domain conn: 231700d5-c9a6-5a49-738d-99a954c51550-container1: Shutdown"
+  },
+  {
+    "name": "domain conn: 231700d5-c9a6-5a49-738d-99a954c51550-container1: Undefine"
+  },
+  {
+    "name": "storage: volumes: RemoveVolumeByName",
+    "data": "root_231700d5-c9a6-5a49-738d-99a954c51550"
+  },
+  {
+    "name": "domain conn: secret 231700d5-c9a6-5a49-738d-99a954c51550: Remove"
   }
 ]

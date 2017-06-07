@@ -1,5 +1,49 @@
 [
   {
+    "name": "storage: CreateStoragePool",
+    "data": {
+      "XMLName": {
+        "Space": "",
+        "Local": ""
+      },
+      "Type": "dir",
+      "Name": "default",
+      "UUID": "",
+      "Allocation": null,
+      "Capacity": null,
+      "Available": null,
+      "Target": {
+        "Path": "/var/lib/libvirt/images",
+        "Permissions": null,
+        "Timestamps": null,
+        "Encryption": null
+      },
+      "Source": null
+    }
+  },
+  {
+    "name": "storage: CreateStoragePool",
+    "data": {
+      "XMLName": {
+        "Space": "",
+        "Local": ""
+      },
+      "Type": "dir",
+      "Name": "volumes",
+      "UUID": "",
+      "Allocation": null,
+      "Capacity": null,
+      "Available": null,
+      "Target": {
+        "Path": "/var/lib/virtlet",
+        "Permissions": null,
+        "Timestamps": null,
+        "Encryption": null
+      },
+      "Source": null
+    }
+  },
+  {
     "name": "storage: default: CreateStorageVol",
     "data": {
       "XMLName": {
@@ -97,8 +141,7 @@
     }
   },
   {
-    "name": "FormatDisk",
-    "data": "/var/lib/virtlet/231700d5-c9a6-5a49-738d-99a954c51550-vol1"
+    "name": "storage: volumes: 231700d5-c9a6-5a49-738d-99a954c51550-vol1: Format"
   },
   {
     "name": "storage: volumes: CreateStorageVol",
@@ -135,8 +178,7 @@
     }
   },
   {
-    "name": "FormatDisk",
-    "data": "/var/lib/virtlet/231700d5-c9a6-5a49-738d-99a954c51550-vol2"
+    "name": "storage: volumes: 231700d5-c9a6-5a49-738d-99a954c51550-vol2: Format"
   },
   {
     "name": "storage: volumes: CreateStorageVol",
@@ -173,8 +215,7 @@
     }
   },
   {
-    "name": "FormatDisk",
-    "data": "/var/lib/virtlet/231700d5-c9a6-5a49-738d-99a954c51550-vol3"
+    "name": "storage: volumes: 231700d5-c9a6-5a49-738d-99a954c51550-vol3: Format"
   },
   {
     "name": "domain conn: iso image",
@@ -476,5 +517,27 @@
         ]
       }
     }
+  },
+  {
+    "name": "domain conn: 231700d5-c9a6-5a49-738d-99a954c51550-container1: Shutdown"
+  },
+  {
+    "name": "domain conn: 231700d5-c9a6-5a49-738d-99a954c51550-container1: Undefine"
+  },
+  {
+    "name": "storage: volumes: RemoveVolumeByName",
+    "data": "root_231700d5-c9a6-5a49-738d-99a954c51550"
+  },
+  {
+    "name": "storage: volumes: RemoveVolumeByName",
+    "data": "231700d5-c9a6-5a49-738d-99a954c51550-vol1"
+  },
+  {
+    "name": "storage: volumes: RemoveVolumeByName",
+    "data": "231700d5-c9a6-5a49-738d-99a954c51550-vol2"
+  },
+  {
+    "name": "storage: volumes: RemoveVolumeByName",
+    "data": "231700d5-c9a6-5a49-738d-99a954c51550-vol3"
   }
 ]

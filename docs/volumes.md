@@ -35,7 +35,7 @@
 ...
 </domain>
 ```
-Despite of this you must not expect corresponce between name of device within OS and the one which was set in domain's definition, it's up to Oses, so don't rely on that.
+Despite of this you must not expect correspondence between the name of device within OS and the one which was set in domain definition, as this part is up to the guest OS.
 
 From [Libvirt spec](http://libvirt.org/formatdomain.html#elementsDisks):
 
@@ -44,20 +44,30 @@ From [Libvirt spec](http://libvirt.org/formatdomain.html#elementsDisks):
 
 4. Attached disks are visible by the OS inside VM as hard disk devices `/dev/vdb`, `/dev/vdc` and so on. As said above there is no fixed behaviour for device names and their order on the PCI bus.
 
+## Flexvolume driver
+
+Virtlet uses custom [FlexVolume](https://github.com/kubernetes/community/blob/master/contributors/devel/flexvolume.md) driver (`virtlet/flexvolume_driver`) to specify block devices for the VMs.
+Flexvolume options must include `type` field with one of the following values:
+* `qcow2` - ephemeral volume
+* `raw` - raw device
+* `ceph` - Ceph RBD
+
+See the following sections for more info on these.
+
+The plan is also to provide examples of using the flexvolume driver for [PVs and PVCs](https://kubernetes.io/docs/concepts/storage/persistent-volumes/).
+
 ## Ephemeral Local Storage
 
-**Volume naming:** `<domain-uuid>-<vol-name-specified-in-annotation>`
+**Volume naming:** `<domain-uuid>-<vol-name-specified-in-the-flexvolume>`
 **Defaults**:
 ```
-          "Format": "qcow2"
-          "Capacity": "1024"
-          "CapacityUnit": "MB"
+          capacity: 1024MB
 ```
 
 All ephemeral volumes created by request as well as clones of boot images are stored
 at local storage libvirt pool "**volumes**" under `/var/lib/virtlet/volumes`.
 
-Volume settings for ephemeral local storage volumes are passed via pod's metadata Annotations.
+Volume settings for ephemeral local storage volumes are passed via flexvolume options.
 
 See the following example:
 
@@ -67,18 +77,6 @@ kind: Pod
 metadata:
   name: test-vm-pod
   annotations:
-    VirtletVolumes: >
-      [
-        {
-          "Name": "vol1",
-          "Format": "qcow2",
-          "Capacity": "1024",
-          "CapacityUnit": "MB"
-        },
-        {
-          "Name": "vol2"
-        }
-      ]
     kubernetes.io/target-runtime: virtlet
 spec:
   affinity:
@@ -93,6 +91,18 @@ spec:
   containers:
     - name: test-vm
       image: download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img
+  volumes:
+  - name: vol1
+    flexVolume:
+      driver: "virtlet/flexvolume_driver"
+      options:
+        type: qcow2
+        capacity: 1024MB
+  - name: vol2
+    flexVolume:
+      driver: "virtlet/flexvolume_driver"
+      options:
+        type: qcow2
 ```
 
 According to this definition will be created VM-POD with VM with 2 equal volumes, attached, which can be found in "volumes" pool under `<domain-uuid>-vol1` and `<domain-uuid>-vol2`
@@ -103,14 +113,10 @@ When a pod is removed, all the volumes related to it are removed too. This inclu
 
 ## Persistent Storage
 
-### Flexvolume driver
-
-FlexVolume virtlet driver currently supports attaching Ceph RBDs (RADOS Block Devices) to the VMs.
+Virtlet currently supports attaching Ceph RBDs (RADOS Block Devices) to the VMs.
 Cephx authentication can be enabled for the Ceph clusters that are used with this driver.
 
-Virtlet uses [FlexVolume](https://github.com/kubernetes/community/blob/master/contributors/devel/flexvolume.md) mechanism for the volumes to make volume definitions more consistent with volume definitions of non-VM pods and to make it possible to use [PVs and PVCs](https://kubernetes.io/docs/concepts/storage/persistent-volumes/).
-
-As of now, there's no need to mount volumes inside the container, it's enough to define them for the pod, but this may change in future.
+As of now, there's no need to mount volumes into the container, it's enough to define them for the pod, but this may change in future.
 
 #### Supported features of RBD Volume definition
 
@@ -124,50 +130,13 @@ As of now, there's no need to mount volumes inside the container, it's enough to
 - pool: <pool-name>
 ```
 
-#### Driver implemetation details
+## Flexvolume driver implemetation details
 1. It's expected that the driver's binary resides at `/usr/libexec/kubernetes/kubelet-plugins/volume/exec/virtlet~flexvolume_driver/flexvolume_driver` before kubelet is started. Note that if you're using DaemonSet for virtlet deployment, you don't need to bother about that because in that case it's done automatically.
 1. Kubelet calls the virtlet flexvolume driver and passes volume info to it
-1. Virtlet flexvolume driver uses standard kubelet's dir `/var/lib/kubelet/pods/<pod-id>/volumes/virtlet~flexvolume_driver/<volume-name>` to store the xml definitions to be used by virtlet. Virtlet looks for  `disk.xml`, `secret.xml` and `key` files (`secret.xml` and `key` files are used only if you have cephx auth).
+1. Virtlet flexvolume driver uses standard kubelet's dir `/var/lib/kubelet/pods/<pod-id>/volumes/virtlet~flexvolume_driver/<volume-name>` to store a json file with flexvolume configuration.
+4. Virtlet checks whether there are dirs with volume info under `/var/lib/kubelet/pods/<pod-id>/volumes/virtlet~flexvolume_driver`. If yes, virtlet parses the json configuration file and updates the domain definition accordingly.
 
-See below an example with some details:
-```
-# ls -l /var/lib/kubelet/pods/d46318cc-1a80-11e7-ac74-02420ac00002/volumes/virtlet~flexvolume_driver/test/
-total 12
--rw-r--r-- 1 root root 337 Apr  6 04:23 disk.xml
--rw-r--r-- 1 root root  40 Apr  6 04:23 key
--rw-r--r-- 1 root root 158 Apr  6 04:23 secret.xml
-
-# cd /var/lib/kubelet/pods/d46318cc-1a80-11e7-ac74-02420ac00002/volumes/virtlet~flexvolume_driver/test/
-# cat disk.xml
-
-<disk type="network" device="disk">
-  <driver name="qemu" type="raw"/>
-  <auth username="libvirt">
-    <secret type="ceph" uuid="224355aa-eb5f-4356-64fb-7d2d16a6baad"/>
-  </auth>
-  <source protocol="rbd" name="libvirt-pool/rbd-test-image">
-    <host name="10.192.0.1" port="6789"/>
-  </source>
-  <target dev="%s" bus="virtio"/>
-</disk>
-#
-#
-# cat secret.xml
-
-<secret ephemeral='no' private='no'>
-  <uuid>224355aa-eb5f-4356-64fb-7d2d16a6baad</uuid>
-  <usage type='ceph'>
-    <name>libvirt</name>
-  </usage>
-</secret>
-#
-#
-# cat key
-AQDTwuVY8rA8HxAAthwOKaQPr0hRc7kCmR/9Qg==
-```
-4. Virtlet checks whether there are dirs with volume info under `/var/lib/kubelet/pods/<pod-id>/volumes/virtlet~flexvolume_driver`. If yes, virtlet includes `disk.xml` content inside domain definition and creates a secret entity in libvirt for cephx auth based on provided `secret.xml` and `key` files.
-
-#### Example of VM-pod definition with specidied rbd device to attach:
+#### Example of VM-pod definition with a ceph volume:
 ```yaml
 apiVersion: v1
 kind: Pod
@@ -213,7 +182,7 @@ vdb        libvirt-pool/rbd-test-image
 
 ### Raw devices
 
-Volume settings for locally accessible raw devices are passed via pod's metadata Annotations, like for [ephemeral volumes](## Ephemeral Local Storage).
+Volume settings for locally accessible raw devices are passed by adding `raw` flexvolume to a pod.
 
 See the following example:
 ```yaml
@@ -222,14 +191,6 @@ kind: Pod
 metadata:
   name: test-vm-pod
   annotations:
-    VirtletVolumes: >
-      [
-        {
-          "Name": "vol1",
-          "Format": "rawDevice",
-          "Path": "/dev/loop0"
-        },
-      ]
     kubernetes.io/target-runtime: virtlet
 spec:
   affinity:
@@ -244,9 +205,18 @@ spec:
   containers:
     - name: test-vm
       image: download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img
+  volumes:
+  - name: raw
+    flexVolume:
+      driver: "virtlet/flexvolume_driver"
+      options:
+        type: raw
+        # this assumes that some file is associated with /dev/loop0 on
+        # the virtlet node using losetup
+        path: /dev/loop0
 ```
 
-As always, boot image is exposed to the guest OS under **vda** device.
+As always, the boot image is exposed to the guest OS under **vda** device.
 This pod definition exposes a single raw device to the VM (/dev/loop0).
 As devices/volumes are exposed in the alphabet order starting from `b`, `vol1` will be visible on typical linux VM as `vdb`, but please reffer to third caveats of listed at the top of this document.
 

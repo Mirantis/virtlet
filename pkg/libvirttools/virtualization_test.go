@@ -89,17 +89,17 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 		t.Fatalf("Failed to create ImageTool: %v", err)
 	}
 
-	ct.virtTool, err = NewVirtualizationTool(domainConn, storageConn, imageTool, ct.boltClient, "volumes", "loop*")
+	volSrc := CombineVMVolumeSources(
+		GetRootVolume,
+		GetNocloudVolume,
+		ScanFlexvolumes)
+	ct.virtTool, err = NewVirtualizationTool(domainConn, storageConn, imageTool, ct.boltClient, "volumes", "loop*", volSrc)
 	if err != nil {
 		t.Fatalf("failed to create VirtualizationTool: %v", err)
 	}
 	ct.virtTool.SetTimeFunc(ct.fakeTime)
 	// avoid unneeded difs in the golden master data
 	ct.virtTool.SetForceKVM(true)
-	ct.virtTool.volumeStorage.SetFormatDisk(func(path string) error {
-		ct.rec.Rec("FormatDisk", path)
-		return nil
-	})
 	ct.kubeletRootDir = filepath.Join(ct.tmpDir, "kubelet-root")
 	ct.virtTool.SetKubeletRootDir(ct.kubeletRootDir)
 
@@ -146,7 +146,7 @@ func TestContainerLifecycle(t *testing.T) {
 		t.Errorf("Unexpected containers when no containers are started: %#v", containers)
 	}
 
-	containerId, err := ct.virtTool.CreateContainer(&kubeapi.CreateContainerRequest{
+	req := &kubeapi.CreateContainerRequest{
 		PodSandboxId: sandbox.Metadata.Uid,
 		Config: &kubeapi.ContainerConfig{
 			Metadata: &kubeapi.ContainerMetadata{
@@ -157,9 +157,14 @@ func TestContainerLifecycle(t *testing.T) {
 			},
 		},
 		SandboxConfig: sandbox,
-	}, "/tmp/fakenetns", fakeCNIConfig)
+	}
+	vmConfig, err := GetVMConfig(req)
 	if err != nil {
-		t.Fatalf("CreateContainer: %v", err)
+		t.Fatalf("GetVMConfig(): %v", err)
+	}
+	containerId, err := ct.virtTool.CreateContainer(vmConfig, "/tmp/fakenetns", fakeCNIConfig)
+	if err != nil {
+		t.Fatalf("CreateContainer(): %v", err)
 	}
 
 	containers, err = ct.virtTool.ListContainers(nil)
@@ -218,9 +223,7 @@ func TestContainerLifecycle(t *testing.T) {
 }
 
 func TestDomainDefinitions(t *testing.T) {
-	flexVolumeDriver := flexvolume.NewFlexVolumeDriver(func() string {
-		return "fa1f16d1-5bf7-412e-8d68-4f15c43f3771"
-	}, flexvolume.NullMounter)
+	flexVolumeDriver := flexvolume.NewFlexVolumeDriver(flexvolume.NullMounter)
 	for _, tc := range []struct {
 		name        string
 		annotations map[string]string
@@ -231,16 +234,28 @@ func TestDomainDefinitions(t *testing.T) {
 		},
 		{
 			name: "raw devices",
-			annotations: map[string]string{
-				// FIXME: here we depend upon the fact that /dev/loop0
-				// indeed exists in the build container. But we shouldn't.
-				"VirtletVolumes": `[{"Name": "vol", "Format": "rawDevice", "Path": "/dev/loop0"}]`,
+			flexVolumes: map[string]map[string]interface{}{
+				"raw": map[string]interface{}{
+					"type": "raw",
+					// FIXME: here we depend upon the fact that /dev/loop0
+					// indeed exists in the build container. But we shouldn't.
+					"path": "/dev/loop0",
+				},
 			},
 		},
 		{
 			name: "volumes",
-			annotations: map[string]string{
-				"VirtletVolumes": `[{"Name": "vol1"}, {"Name": "vol2", "Format": "qcow2", "Capacity": "2", "CapacityUnit": "MB"}, {"Name": "vol3"}]`,
+			flexVolumes: map[string]map[string]interface{}{
+				"vol1": map[string]interface{}{
+					"type": "qcow2",
+				},
+				"vol2": map[string]interface{}{
+					"type":     "qcow2",
+					"capacity": "2MB",
+				},
+				"vol3": map[string]interface{}{
+					"type": "qcow2",
+				},
 			},
 		},
 		{
@@ -280,12 +295,6 @@ func TestDomainDefinitions(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := fake.NewToplevelRecorder()
-			rec.AddFilter("DefineSecret")
-			rec.AddFilter("FormatDisk")
-			rec.AddFilter("DefineDomain")
-			rec.AddFilter("CreateStorageVol")
-			rec.AddFilter("CreateStorageVolClone")
-			rec.AddFilter("iso image")
 
 			ct := newContainerTester(t, rec)
 			defer ct.teardown()
@@ -307,7 +316,7 @@ func TestDomainDefinitions(t *testing.T) {
 				}
 			}
 
-			containerId, err := ct.virtTool.CreateContainer(&kubeapi.CreateContainerRequest{
+			req := &kubeapi.CreateContainerRequest{
 				PodSandboxId: sandbox.Metadata.Uid,
 				Config: &kubeapi.ContainerConfig{
 					Metadata: &kubeapi.ContainerMetadata{
@@ -318,7 +327,12 @@ func TestDomainDefinitions(t *testing.T) {
 					},
 				},
 				SandboxConfig: sandbox,
-			}, "/tmp/fakenetns", fakeCNIConfig)
+			}
+			vmConfig, err := GetVMConfig(req)
+			if err != nil {
+				t.Fatalf("GetVMConfig(): %v", err)
+			}
+			containerId, err := ct.virtTool.CreateContainer(vmConfig, "/tmp/fakenetns", fakeCNIConfig)
 			if err != nil {
 				t.Fatalf("CreateContainer: %v", err)
 			}

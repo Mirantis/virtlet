@@ -33,6 +33,7 @@ type FakeDomainConnection struct {
 	rec           Recorder
 	domains       map[string]*FakeDomain
 	domainsByUuid map[string]*FakeDomain
+	secretsByUuid map[string]*FakeSecret
 }
 
 var _ virt.VirtDomainConnection = &FakeDomainConnection{}
@@ -45,10 +46,10 @@ func NewFakeDomainConnection(rec Recorder) *FakeDomainConnection {
 		rec:           rec,
 		domains:       make(map[string]*FakeDomain),
 		domainsByUuid: make(map[string]*FakeDomain),
+		secretsByUuid: make(map[string]*FakeSecret),
 	}
 }
 
-// func (dc *FakeDomainConnection) rec(name string, v interface{})
 func (dc *FakeDomainConnection) removeDomain(d *FakeDomain) {
 	if _, found := dc.domains[d.name]; !found {
 		log.Panicf("domain %q not found", d.name)
@@ -58,6 +59,13 @@ func (dc *FakeDomainConnection) removeDomain(d *FakeDomain) {
 		log.Panicf("domain uuid %q not found (name %q)", d.uuid, d.name)
 	}
 	delete(dc.domainsByUuid, d.uuid)
+}
+
+func (dc *FakeDomainConnection) removeSecret(s *FakeSecret) {
+	if _, found := dc.secretsByUuid[s.uuid]; !found {
+		log.Panicf("secret %q not found", s.uuid)
+	}
+	delete(dc.secretsByUuid, s.uuid)
 }
 
 func (dc *FakeDomainConnection) DefineDomain(def *libvirtxml.Domain) (virt.VirtDomain, error) {
@@ -123,12 +131,21 @@ func (dc *FakeDomainConnection) LookupDomainByUUIDString(uuid string) (virt.Virt
 	return nil, virt.ErrDomainNotFound
 }
 
-func (dc *FakeDomainConnection) DefineSecret(def *libvirtxml.Secret, value []byte) error {
-	dc.rec.Rec("DefineSecret", map[string]interface{}{
-		"def":   def,
-		"value": fmt.Sprintf("% x", value),
-	})
-	return nil
+func (dc *FakeDomainConnection) DefineSecret(def *libvirtxml.Secret) (virt.VirtSecret, error) {
+	dc.rec.Rec("DefineSecret", def)
+	if def.UUID == "" {
+		return nil, fmt.Errorf("the secret has empty uuid")
+	}
+	s := newFakeSecret(dc, def.UUID)
+	dc.secretsByUuid[def.UUID] = s
+	return s, nil
+}
+
+func (dc *FakeDomainConnection) LookupSecretByUUIDString(uuid string) (virt.VirtSecret, error) {
+	if d, found := dc.secretsByUuid[uuid]; found {
+		return d, nil
+	}
+	return nil, virt.ErrSecretNotFound
 }
 
 type FakeDomain struct {
@@ -208,4 +225,29 @@ func (d *FakeDomain) UUIDString() (string, error) {
 		return "", fmt.Errorf("UUIDString() called on a removed (undefined) domain %q", d.name)
 	}
 	return d.uuid, nil
+}
+
+type FakeSecret struct {
+	rec  Recorder
+	dc   *FakeDomainConnection
+	uuid string
+}
+
+func newFakeSecret(dc *FakeDomainConnection, uuid string) *FakeSecret {
+	return &FakeSecret{
+		rec:  NewChildRecorder(dc.rec, "secret "+uuid),
+		dc:   dc,
+		uuid: uuid,
+	}
+}
+
+func (s *FakeSecret) SetValue(value []byte) error {
+	s.rec.Rec("SetValue", fmt.Sprintf("% x", value))
+	return nil
+}
+
+func (s *FakeSecret) Remove() error {
+	s.rec.Rec("Remove", nil)
+	s.dc.removeSecret(s)
+	return nil
 }

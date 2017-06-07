@@ -203,13 +203,16 @@ function gotest {
     subdir="$(virtlet_subdir)"
     if ! vcmd "${start_libvirt}cd '${subdir}' && go test $*"; then
         vcmd_simple "find . -name 'Test*.json' | xargs tar -c -T -" | tar -C "${project_dir}" -x
+        exit 1
     fi
 }
 
 function gobuild {
     # FIXME: exit 1 in $(virtlet_subdir) doesn't cause the script to exit
     virtlet_subdir >/dev/null
-    vcmd "cd '$(virtlet_subdir)' && go build $*"
+    # -gcflags -e removes the limit on error message count, which helps
+    # with using it for syntax checking
+    vcmd "cd '$(virtlet_subdir)' && go build -gcflags -e $*"
 }
 
 function usage {

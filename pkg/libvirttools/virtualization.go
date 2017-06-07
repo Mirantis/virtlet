@@ -17,14 +17,8 @@ limitations under the License.
 package libvirttools
 
 import (
-	"bytes"
-	"encoding/base64"
-	"encoding/xml"
-	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -52,23 +46,18 @@ const (
 	domainShutdownTimeout       = 60 * time.Second
 	domainDestroyCheckInterval  = 500 * time.Millisecond
 	domainDestroyTimeout        = 5 * time.Second
-	diskLetterStr               = "bcdefghijklmnopqrstu"
+	minVirtioBlockDevChar       = 'a'
+	// https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/5/html/Virtualization/sect-Virtualization-Virtualization_limitations-KVM_limitations.html
+	// Actually there can be more than 21 block devices (including
+	// the root volume), but we want to be on the safe side here
+	maxVirtioBlockDevChar = 'u'
 
 	ContainerNsUuid       = "67b7fb47-7735-4b64-86d2-6d062d121966"
 	defaultKubeletRootDir = "/var/lib/kubelet/pods"
-	flexVolumeSubdir      = "volumes/virtlet~flexvolume_driver"
 	vmLogLocationPty      = "pty"
 )
 
-var diskLetters = strings.Split(diskLetterStr, "")
-
-type FlexVolumeInfo struct {
-	Disk      *libvirtxml.DomainDisk
-	SecretXML string
-	Key       string
-}
-
-type VirtletDomainSettings struct {
+type domainSettings struct {
 	useKvm           bool
 	domainName       string
 	domainUUID       string
@@ -84,15 +73,7 @@ type VirtletDomainSettings struct {
 	vmLogLocation    string
 }
 
-func canUseKvm() bool {
-	if os.Getenv("VIRTLET_DISABLE_KVM") != "" {
-		glog.V(0).Infof("VIRTLET_DISABLE_KVM env var not empty, using plain qemu")
-		return false
-	}
-	return true
-}
-
-func (ds *VirtletDomainSettings) createDomain() *libvirtxml.Domain {
+func (ds *domainSettings) createDomain() *libvirtxml.Domain {
 	domainType := defaultDomainType
 	emulator := defaultEmulator
 	if !ds.useKvm {
@@ -101,19 +82,11 @@ func (ds *VirtletDomainSettings) createDomain() *libvirtxml.Domain {
 	}
 
 	return &libvirtxml.Domain{
-
 		Devices: &libvirtxml.DomainDeviceList{
 			Emulator: "/vmwrapper",
 			Inputs:   []libvirtxml.DomainInput{libvirtxml.DomainInput{Type: "tablet", Bus: "usb"}},
 			Graphics: []libvirtxml.DomainGraphic{libvirtxml.DomainGraphic{Type: "vnc", Port: -1}},
 			Videos:   []libvirtxml.DomainVideo{libvirtxml.DomainVideo{Model: libvirtxml.DomainVideoModel{Type: "cirrus"}}},
-			Disks: []libvirtxml.DomainDisk{libvirtxml.DomainDisk{
-				Type:   "file",
-				Device: "disk",
-				Driver: &libvirtxml.DomainDiskDriver{Name: "qemu", Type: "qcow2"},
-				Source: &libvirtxml.DomainDiskSource{File: ds.rootDiskFilepath},
-				Target: &libvirtxml.DomainDiskTarget{Dev: "vda", Bus: "virtio"},
-			}},
 		},
 
 		OS: &libvirtxml.DomainOS{
@@ -129,7 +102,7 @@ func (ds *VirtletDomainSettings) createDomain() *libvirtxml.Domain {
 
 		Type: domainType,
 
-		Name:   ds.domainUUID + "-" + ds.domainName,
+		Name:   ds.domainName,
 		UUID:   ds.domainUUID,
 		Memory: &libvirtxml.DomainMemory{Value: ds.memory, Unit: ds.memoryUnit},
 		VCPU:   &libvirtxml.DomainVCPU{Value: ds.vcpuNum},
@@ -150,25 +123,36 @@ func (ds *VirtletDomainSettings) createDomain() *libvirtxml.Domain {
 	}
 }
 
+func canUseKvm() bool {
+	if os.Getenv("VIRTLET_DISABLE_KVM") != "" {
+		glog.V(0).Infof("VIRTLET_DISABLE_KVM env var not empty, using plain qemu")
+		return false
+	}
+	return true
+}
+
 type VirtualizationTool struct {
 	domainConn     virt.VirtDomainConnection
-	volumeStorage  *StorageTool
+	volumePool     virt.VirtStoragePool
 	imageManager   ImageManager
-	volumePoolName string
 	metadataStore  metadata.MetadataStore
 	timeFunc       func() time.Time
 	forceKVM       bool
 	kubeletRootDir string
+	rawDevices     []string
+	volumeSource   VMVolumeSource
 }
 
-func NewVirtualizationTool(domainConn virt.VirtDomainConnection, storageConn virt.VirtStorageConnection, imageManager ImageManager, metadataStore metadata.MetadataStore, volumesPoolName, rawDevices string) (*VirtualizationTool, error) {
-	storageTool, err := NewStorageTool(storageConn, volumesPoolName, rawDevices)
+var _ VolumeOwner = &VirtualizationTool{}
+
+func NewVirtualizationTool(domainConn virt.VirtDomainConnection, storageConn virt.VirtStorageConnection, imageManager ImageManager, metadataStore metadata.MetadataStore, volumePoolName, rawDevices string, volumeSource VMVolumeSource) (*VirtualizationTool, error) {
+	volumePool, err := ensureStoragePool(storageConn, volumePoolName)
 	if err != nil {
 		return nil, err
 	}
 	return &VirtualizationTool{
 		domainConn:    domainConn,
-		volumeStorage: storageTool,
+		volumePool:    volumePool,
 		imageManager:  imageManager,
 		metadataStore: metadataStore,
 		timeFunc:      time.Now,
@@ -177,6 +161,8 @@ func NewVirtualizationTool(domainConn virt.VirtDomainConnection, storageConn vir
 		// Use 'nsenter -t 1 -m -- tar ...' or something to grab the path
 		// from root namespace
 		kubeletRootDir: defaultKubeletRootDir,
+		rawDevices:     strings.Split(rawDevices, ","),
+		volumeSource:   volumeSource,
 	}, nil
 }
 
@@ -192,109 +178,50 @@ func (v *VirtualizationTool) SetKubeletRootDir(kubeletRootDir string) {
 	v.kubeletRootDir = kubeletRootDir
 }
 
-func (v *VirtualizationTool) createBootImageClone(cloneName, imageName string) (string, error) {
-	imageVolume, err := v.imageManager.GetImageVolume(imageName)
-	if err != nil {
-		return "", err
-	}
-
-	vol, err := v.volumeStorage.CloneVolume(cloneName, imageVolume)
-	if err != nil {
-		return "", err
-	}
-
-	return vol.Path()
+func (v *VirtualizationTool) getVMVolumes(config *VMConfig) ([]VMVolume, error) {
+	return v.volumeSource(config, v)
 }
 
-func (v *VirtualizationTool) scanFlexVolumes(podId, podName string, letterInd int) ([]FlexVolumeInfo, error) {
-	dir := filepath.Join(v.kubeletRootDir, podId, flexVolumeSubdir)
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
-	}
-
-	glog.V(2).Info("Processing FlexVolumes for flexvolume_driver")
-	vols, err := ioutil.ReadDir(dir)
-	if err != nil {
-		return nil, err
-	}
-
-	glog.V(2).Infof("Found FlexVolumes definitions at %s:\n%v", dir, vols)
-	var flexInfos []FlexVolumeInfo
-	for _, vol := range vols {
-		fileInfo, err := os.Stat(path.Join(dir, vol.Name()))
-		if err != nil {
-			return nil, err
-		}
-		if !fileInfo.IsDir() {
-			continue
-		}
-		if letterInd == len(diskLetters) {
-			glog.Errorf("Had to omit attaching of one ore more flex volumes. Limit on number is: %d", letterInd)
-			return flexInfos, nil
-		}
-		fileInfos, err := ioutil.ReadDir(path.Join(dir, vol.Name()))
-		glog.V(2).Infof("Found FlexVolume definition parts in nested dir %s:\n %v", vol.Name(), fileInfos)
-		if err != nil {
-			return nil, err
-		}
-		var flexvol FlexVolumeInfo
-		for _, fileInfo := range fileInfos {
-			curPath := path.Join(dir, vol.Name(), fileInfo.Name())
-			if fileInfo.IsDir() {
-				continue
-			}
-			content, err := ioutil.ReadFile(curPath)
-			if err != nil {
-				return nil, err
-			}
-			switch fileInfo.Name() {
-			case "disk.xml":
-				var disk libvirtxml.DomainDisk
-				if err := xml.Unmarshal(content, &disk); err != nil {
-					return nil, err
-				}
-				flexvol.Disk = &disk
-			case "secret.xml":
-				flexvol.SecretXML = string(content)
-			case "key":
-				flexvol.Key = string(content)
-			}
-		}
-		flexvol.Disk.Target.Dev = "vd" + diskLetters[letterInd]
-		letterInd++
-		flexInfos = append(flexInfos, flexvol)
-	}
-	return flexInfos, nil
-}
-
-func (v *VirtualizationTool) addVolumesToDomain(flexVolumeInfos []FlexVolumeInfo, domain *libvirtxml.Domain, volumes []*VirtletVolume) error {
-	glog.V(2).Infof("FlexVolume to process: %v", flexVolumeInfos)
-	for _, flexVolumeInfo := range flexVolumeInfos {
-		if flexVolumeInfo.SecretXML != "" {
-			var secretDef libvirtxml.Secret
-			if err := secretDef.Unmarshal(flexVolumeInfo.SecretXML); err != nil {
-				return err
-			}
-			key, err := base64.StdEncoding.DecodeString(flexVolumeInfo.Key)
-			if err != nil {
-				return err
-			}
-			if err := v.domainConn.DefineSecret(&secretDef, key); err != nil {
-				return err
-			}
-		}
-		domain.Devices.Disks = append(domain.Devices.Disks, *flexVolumeInfo.Disk)
-	}
-
-	restOfVolumes, err := v.volumeStorage.PrepareVolumesToBeAttached(volumes, domain.UUID, len(flexVolumeInfos)+1)
+func (v *VirtualizationTool) setupVolumes(config *VMConfig, domainDef *libvirtxml.Domain) error {
+	vmVols, err := v.getVMVolumes(config)
 	if err != nil {
 		return err
 	}
+	for n, vmVol := range vmVols {
+		diskChar := minVirtioBlockDevChar + n
+		if diskChar > maxVirtioBlockDevChar {
+			return fmt.Errorf("too many block devices")
+		}
+		virtDev := fmt.Sprintf("vd%c", diskChar)
+		diskDef, err := vmVol.Setup(virtDev)
+		if err != nil {
+			// try to tear down volumes that were already set up
+			for _, vmVol := range vmVols[:n] {
+				if err := vmVol.Teardown(); err != nil {
+					glog.Warning("failed to tear down a volume on error: %v", err)
+				}
+			}
+			return err
+		}
+		domainDef.Devices.Disks = append(domainDef.Devices.Disks, *diskDef)
+	}
+	return nil
+}
 
-	domain.Devices.Disks = append(domain.Devices.Disks, restOfVolumes...)
-
+func (v *VirtualizationTool) teardownVolumes(config *VMConfig) error {
+	vmVols, err := v.getVMVolumes(config)
+	if err != nil {
+		return err
+	}
+	var errs []string
+	for _, vmVol := range vmVols {
+		if err := vmVol.Teardown(); err != nil {
+			errs = append(errs, err.Error())
+		}
+	}
+	if errs != nil {
+		return fmt.Errorf("failed to tear down some of the volumes:\n%s", strings.Join(errs, "\n"))
+	}
 	return nil
 }
 
@@ -314,7 +241,7 @@ func (v *VirtualizationTool) RemoveLibvirtSandboxLog(sandboxId string) error {
 	return os.RemoveAll(filepath.Join(logLocation, sandboxId))
 }
 
-func (v *VirtualizationTool) addSerialDevicesToDomain(sandboxId string, containerAttempt uint32, domain *libvirtxml.Domain, settings VirtletDomainSettings) error {
+func (v *VirtualizationTool) addSerialDevicesToDomain(sandboxId string, containerAttempt uint32, domain *libvirtxml.Domain, settings domainSettings) error {
 	if settings.vmLogLocation != vmLogLocationPty {
 		logDir := filepath.Join(settings.vmLogLocation, sandboxId)
 		logPath := filepath.Join(logDir, fmt.Sprintf("_%d.log", containerAttempt))
@@ -357,64 +284,30 @@ func (v *VirtualizationTool) addSerialDevicesToDomain(sandboxId string, containe
 	return nil
 }
 
-func getEnvVarsFileData(keyVals []*kubeapi.KeyValue) string {
-	if keyVals == nil {
-		return ""
+func (v *VirtualizationTool) CreateContainer(config *VMConfig, netNSPath, cniConfig string) (string, error) {
+	if err := config.LoadAnnotations(); err != nil {
+		return "", err
 	}
 
-	var buffer bytes.Buffer
-	for _, entry := range keyVals {
-		buffer.WriteString(fmt.Sprintf("%s=%s\n", entry.Key, entry.Value))
-	}
-
-	return buffer.String()
-}
-
-func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest, netNSPath, cniConfig string) (id string, err error) {
-	var domain virt.VirtDomain
-	if in.Config == nil || in.Config.Metadata == nil || in.Config.Image == nil || in.SandboxConfig == nil || in.SandboxConfig.Metadata == nil {
-		return "", errors.New("invalid input data")
-	}
-
-	settings := VirtletDomainSettings{
-		domainUUID:    utils.NewUuid5(ContainerNsUuid, in.PodSandboxId),
+	domainUUID := utils.NewUuid5(ContainerNsUuid, config.PodSandboxId)
+	// FIXME: this field should be moved to VMStatus struct (to be added)
+	config.DomainUUID = domainUUID
+	settings := domainSettings{
+		domainUUID:    domainUUID,
+		domainName:    domainUUID + "-" + config.Name,
 		netNSPath:     netNSPath,
 		cniConfig:     cniConfig,
 		vmLogLocation: vmLogLocation(),
 	}
 
-	config := in.Config
-	settings.domainName = config.Metadata.Name
-	sandboxAnnotations, err := v.metadataStore.GetPodSandboxAnnotations(in.PodSandboxId)
-	if err != nil {
-		return "", err
-	}
-
-	if settings.domainName == "" {
-		settings.domainName = settings.domainUUID
-	}
-
-	// Check annotations before creating/defining anything for domain
-	annotations, err := LoadAnnotations(sandboxAnnotations)
-	if err != nil {
-		return "", err
-	}
-	settings.vcpuNum = annotations.VCPUCount
-
 	cloneName := "root_" + settings.domainUUID
-	settings.rootDiskFilepath, err = v.createBootImageClone(cloneName, config.Image.Image)
-	if err != nil {
-		return "", err
-	}
-
-	if config.Linux != nil && config.Linux.Resources != nil {
-		settings.memory = int(config.Linux.Resources.MemoryLimitInBytes)
-		settings.cpuShares = uint(config.Linux.Resources.CpuShares)
-		settings.cpuPeriod = uint64(config.Linux.Resources.CpuPeriod)
-		// Specified cpu bandwidth limits for domains actually are set equal per each vCPU by libvirt
-		// Thus, to limit overall VM's cpu threads consumption by set value in pod definition need to perform division
-		settings.cpuQuota = config.Linux.Resources.CpuQuota / int64(settings.vcpuNum)
-	}
+	settings.vcpuNum = config.ParsedAnnotations.VCPUCount
+	settings.memory = int(config.MemoryLimitInBytes)
+	settings.cpuShares = uint(config.CpuShares)
+	settings.cpuPeriod = uint64(config.CpuPeriod)
+	// Specified cpu bandwidth limits for domains actually are set equal per each vCPU by libvirt
+	// Thus, to limit overall VM's cpu threads consumption by set value in pod definition need to perform division
+	settings.cpuQuota = config.CpuQuota / int64(settings.vcpuNum)
 	settings.memoryUnit = "b"
 	if settings.memory == 0 {
 		settings.memory = defaultMemory
@@ -424,59 +317,47 @@ func (v *VirtualizationTool) CreateContainer(in *kubeapi.CreateContainerRequest,
 	settings.useKvm = v.forceKVM || canUseKvm()
 	domainConf := settings.createDomain()
 
-	g := NewCloudInitGenerator(in.SandboxConfig.Metadata.Name, in.SandboxConfig.Metadata.Namespace,
-		annotations, getEnvVarsFileData(in.Config.Envs))
-	nocloudFile, nocloudDiskDef, err := g.GenerateDisk()
-	if err != nil {
+	if err := v.setupVolumes(config, domainConf); err != nil {
 		return "", err
 	}
-	nocloudDiskDef.Target.Dev = "vd" + diskLetters[0]
-	domainConf.Devices.Disks = append(domainConf.Devices.Disks, *nocloudDiskDef)
 
+	ok := false
 	defer func() {
-		// Set container in bolt despite of failure to provide info for cleanup
-		v.metadataStore.SetContainer(settings.domainName, settings.domainUUID,
-			in.PodSandboxId, config.Image.Image, cloneName, config.Labels,
-			config.Annotations, nocloudFile, v.timeFunc)
-		if err != nil {
-			if rmErr := v.RemoveContainer(settings.domainUUID); rmErr != nil {
-				err = fmt.Errorf("Container creation error: %v \n %v", err, rmErr)
-			}
+		if ok {
+			return
 		}
-
+		if err := v.removeDomain(settings.domainUUID, config); err != nil {
+			glog.Warning("failed to remove domain: %v", err)
+		}
 	}()
 
-	flexVolumeInfos, err := v.scanFlexVolumes(in.PodSandboxId, in.SandboxConfig.Metadata.Name, 1)
+	containerAttempt := config.Attempt
+	if err := v.addSerialDevicesToDomain(config.PodSandboxId, containerAttempt, domainConf, settings); err != nil {
+		return "", err
+	}
+
+	if _, err := v.domainConn.DefineDomain(domainConf); err != nil {
+		return "", err
+	}
+
+	domain, err := v.domainConn.LookupDomainByUUIDString(settings.domainUUID)
+	if err == nil {
+		// FIXME: do we really need this?
+		// (this causes an GetInfo() call on the domain in case of libvirt)
+		_, err = domain.State()
+	}
+
+	if err == nil {
+		// FIXME: store VMConfig + VMStatus (to be added)
+		nocloudFile := config.TempFile
+		err = v.metadataStore.SetContainer(config.Name, settings.domainUUID, config.PodSandboxId, config.Image, cloneName, config.ContainerLabels, config.ContainerAnnotations, nocloudFile, v.timeFunc)
+	}
 	if err != nil {
 		return "", err
 	}
 
-	if err := v.addVolumesToDomain(flexVolumeInfos, domainConf, annotations.Volumes); err != nil {
-		return "", err
-	}
-
-	if err := v.addSerialDevicesToDomain(in.PodSandboxId, in.Config.Metadata.Attempt, domainConf, settings); err != nil {
-		return "", err
-	}
-
-	if _, err = v.domainConn.DefineDomain(domainConf); err != nil {
-		return "", err
-	}
-
-	domain, err = v.domainConn.LookupDomainByUUIDString(settings.domainUUID)
-	if err != nil {
-		return "", err
-	}
-
-	// FIXME: do we really need this?
-	// (this causes an GetInfo() call on the domain in case of libvirt)
-	_, err = domain.State()
-
-	if err != nil {
-		return "", err
-	} else {
-		return settings.domainUUID, nil
-	}
+	ok = true
+	return settings.domainUUID, nil
 }
 
 func (v *VirtualizationTool) StartContainer(containerId string) error {
@@ -520,11 +401,7 @@ func (v *VirtualizationTool) StopContainer(containerId string) error {
 	}, domainShutdownRetryInterval, domainShutdownTimeout)
 }
 
-// RemoveContainer tries to gracefully stop domain, then forcibly removes it
-// even if it's still running
-// it waits up to 5 sec for doing the job by libvirt
-func (v *VirtualizationTool) RemoveContainer(containerId string) error {
-
+func (v *VirtualizationTool) removeDomain(containerId string, config *VMConfig) error {
 	// Give a chance to gracefully stop domain
 	// TODO: handle errors - there could be e.x. connection errori
 	domain, err := v.domainConn.LookupDomainByUUIDString(containerId)
@@ -557,38 +434,50 @@ func (v *VirtualizationTool) RemoveContainer(containerId string) error {
 		return err
 	}
 
+	if err := v.teardownVolumes(config); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// RemoveContainer tries to gracefully stop domain, then forcibly removes it
+// even if it's still running
+// it waits up to 5 sec for doing the job by libvirt
+func (v *VirtualizationTool) RemoveContainer(containerId string) error {
 	containerInfo, err := v.metadataStore.GetContainerInfo(containerId)
 	if err != nil {
 		glog.Errorf("Error when retrieving container '%s' info from metadata store: %v", containerId, err)
 		return err
 	}
+	if containerInfo == nil {
+		// the vm is already removed
+		return nil
+	}
 
-	if containerInfo != nil {
-		if containerInfo.NocloudFile != "" {
-			if err := os.Remove(containerInfo.NocloudFile); err != nil {
-				glog.Warning("Error removing nocloud file %q: %v", containerInfo.NocloudFile, err)
-			}
-		}
+	// TODO: here we're using incomplete VMConfig to tear down the volumes
+	// What actually needs to be done is storing VMConfig and VMStatus (to be added)
+	config := &VMConfig{
+		PodSandboxId:         containerInfo.SandboxId,
+		Name:                 containerInfo.Name,
+		Image:                containerInfo.Image,
+		DomainUUID:           containerId,
+		PodAnnotations:       containerInfo.SandBoxAnnotations,
+		ContainerAnnotations: containerInfo.Annotations,
+		ContainerLabels:      containerInfo.Labels,
+		TempFile:             containerInfo.NocloudFile,
+	}
+	if err := config.LoadAnnotations(); err != nil {
+		return err
+	}
 
-		if err := v.metadataStore.RemoveContainer(containerId); err != nil {
-			glog.Errorf("Error when removing container '%s' from metadata store: %v", containerId, err)
-			return err
-		}
+	if err := v.removeDomain(containerId, config); err != nil {
+		return err
+	}
 
-		if err := v.RemoveVolume(containerInfo.RootImageVolumeName); err != nil {
-			glog.Errorf("Error when removing image snapshot with name '%s': %v", containerInfo.RootImageVolumeName, err)
-			return err
-		}
-
-		annotations, err := LoadAnnotations(containerInfo.SandBoxAnnotations)
-		if err != nil {
-			return err
-		}
-		if len(annotations.Volumes) > 0 {
-			if err := v.volumeStorage.CleanAttachedQCOW2Volumes(annotations.Volumes, containerId); err != nil {
-				return err
-			}
-		}
+	if v.metadataStore.RemoveContainer(containerId); err != nil {
+		glog.Errorf("Error when removing container '%s' from metadata store: %v", containerId, err)
+		return err
 	}
 
 	return nil
@@ -844,10 +733,10 @@ func (v *VirtualizationTool) ContainerStatus(containerId string) (*kubeapi.Conta
 	}, nil
 }
 
-func (v *VirtualizationTool) RemoveVolume(name string) error {
-	return v.volumeStorage.RemoveVolume(name)
-}
+// VolumeOwner implementation follows
 
-func (v *VirtualizationTool) GetStoragePool() *StorageTool {
-	return v.volumeStorage
-}
+func (v *VirtualizationTool) StoragePool() virt.VirtStoragePool           { return v.volumePool }
+func (v *VirtualizationTool) DomainConnection() virt.VirtDomainConnection { return v.domainConn }
+func (v *VirtualizationTool) ImageManager() ImageManager                  { return v.imageManager }
+func (v *VirtualizationTool) RawDevices() []string                        { return v.rawDevices }
+func (v *VirtualizationTool) KubeletRootDir() string                      { return v.kubeletRootDir }

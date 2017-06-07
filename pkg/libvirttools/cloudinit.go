@@ -17,11 +17,11 @@ limitations under the License.
 package libvirttools
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
@@ -35,61 +35,57 @@ const (
 )
 
 type CloudInitGenerator struct {
-	podName            string
-	podNs              string
-	annotations        *VirtletAnnotations
-	envVarsFileContent string
+	config *VMConfig
 }
 
-func NewCloudInitGenerator(podName, podNs string, annotations *VirtletAnnotations, envVarsFileContent string) *CloudInitGenerator {
-	return &CloudInitGenerator{
-		podName:            podName,
-		podNs:              podNs,
-		annotations:        annotations,
-		envVarsFileContent: envVarsFileContent,
-	}
+func NewCloudInitGenerator(config *VMConfig) *CloudInitGenerator {
+	return &CloudInitGenerator{config}
 }
 
-func (g *CloudInitGenerator) generateMetaData() (string, error) {
+func (g *CloudInitGenerator) generateMetaData() ([]byte, error) {
 	m := map[string]interface{}{
-		"instance-id":    fmt.Sprintf("%s.%s", g.podName, g.podNs),
-		"local-hostname": g.podName,
+		"instance-id":    fmt.Sprintf("%s.%s", g.config.PodName, g.config.PodNamespace),
+		"local-hostname": g.config.PodName,
 	}
-	if len(g.annotations.SSHKeys) != 0 {
+	if len(g.config.ParsedAnnotations.SSHKeys) != 0 {
 		var keys []string
-		for _, key := range g.annotations.SSHKeys {
+		for _, key := range g.config.ParsedAnnotations.SSHKeys {
 			keys = append(keys, key)
 		}
 		m["public-keys"] = keys
 	}
-	for k, v := range g.annotations.MetaData {
+	for k, v := range g.config.ParsedAnnotations.MetaData {
 		m[k] = v
 	}
 	r, err := json.Marshal(m)
 	if err != nil {
-		return "", fmt.Errorf("error marshaling meta-data: %v", err)
+		return nil, fmt.Errorf("error marshaling meta-data: %v", err)
 	}
-	return string(r), nil
+	return r, nil
 }
 
-func (g *CloudInitGenerator) generateUserData() (string, error) {
-	if g.annotations.UserDataScript != "" {
-		return g.annotations.UserDataScript, nil
+func (g *CloudInitGenerator) generateUserData() ([]byte, error) {
+	if g.config.ParsedAnnotations.UserDataScript != "" {
+		return []byte(g.config.ParsedAnnotations.UserDataScript), nil
 	}
 
-	if err := g.addEnvVarsFileToWriteFiles(); err != nil {
-		return "", fmt.Errorf("error marshalling environment variables: %v", err)
+	userData := make(map[string]interface{})
+	for k, v := range g.config.ParsedAnnotations.UserData {
+		userData[k] = v
 	}
+
+	// TODO: use merge algorithm
+	g.addEnvVarsFileToWriteFiles(userData)
 
 	r := []byte{}
-	if len(g.annotations.UserData) != 0 {
+	if len(userData) != 0 {
 		var err error
-		r, err = yaml.Marshal(g.annotations.UserData)
+		r, err = yaml.Marshal(userData)
 		if err != nil {
-			return "", fmt.Errorf("error marshalling user-data: %v", err)
+			return nil, fmt.Errorf("error marshalling user-data: %v", err)
 		}
 	}
-	return "#cloud-config\n" + string(r), nil
+	return []byte("#cloud-config\n" + string(r)), nil
 }
 
 func (g *CloudInitGenerator) GenerateDisk() (string, *libvirtxml.DomainDisk, error) {
@@ -99,19 +95,19 @@ func (g *CloudInitGenerator) GenerateDisk() (string, *libvirtxml.DomainDisk, err
 	}
 	defer os.RemoveAll(tmpDir)
 
-	metaDataStr, err := g.generateMetaData()
+	var metaData, userData []byte
+	metaData, err = g.generateMetaData()
+	if err == nil {
+		userData, err = g.generateUserData()
+	}
 	if err != nil {
 		return "", nil, err
-	}
-	if err := ioutil.WriteFile(filepath.Join(tmpDir, "meta-data"), []byte(metaDataStr), 0777); err != nil {
-		return "", nil, fmt.Errorf("can't write meta-data: %v", err)
 	}
 
-	userDataStr, err := g.generateUserData()
-	if err != nil {
-		return "", nil, err
-	}
-	if err := ioutil.WriteFile(filepath.Join(tmpDir, "user-data"), []byte(userDataStr), 0777); err != nil {
+	if err := utils.WriteFiles(tmpDir, map[string][]byte{
+		"user-data": userData,
+		"meta-data": metaData,
+	}); err != nil {
 		return "", nil, fmt.Errorf("can't write user-data: %v", err)
 	}
 
@@ -139,39 +135,35 @@ func (g *CloudInitGenerator) GenerateDisk() (string, *libvirtxml.DomainDisk, err
 	return isoFile.Name(), diskDef, nil
 }
 
-type WriteFilesEntry struct {
-	Content     string `json:"content" yaml:"content"`
-	Path        string `json:"path" yaml:"path"`
-	Encoding    string `json:"encoding" yaml:"encoding"`
-	Owner       string `json:"owner" yaml:"owner"`
-	Permissions string `json:"permissions", yaml:"permissions"`
+func (g *CloudInitGenerator) generateEnvVarsContent() string {
+	var buffer bytes.Buffer
+	for _, entry := range g.config.Environment {
+		buffer.WriteString(fmt.Sprintf("%s=%s\n", entry.Key, entry.Value))
+	}
+
+	return buffer.String()
 }
 
-func (g *CloudInitGenerator) addEnvVarsFileToWriteFiles() error {
-	if g.envVarsFileContent == "" {
-		return nil
+func (g *CloudInitGenerator) addEnvVarsFileToWriteFiles(userData map[string]interface{}) {
+	content := g.generateEnvVarsContent()
+	if content == "" {
+		return
 	}
 
-	envVarsFileAsWriteFilesEntry := WriteFilesEntry{
-		Content: g.envVarsFileContent,
-		Path:    EnvFileLocation,
-	}
-
-	if g.annotations.UserData == nil {
-		g.annotations.UserData = make(map[string]interface{})
-	}
-
-	entries := []WriteFilesEntry{}
-
-	writeFilesContentAsInterface, ok := g.annotations.UserData["write_files"]
-	if ok {
-		if err := yaml.Unmarshal(writeFilesContentAsInterface.([]byte), entries); err != nil {
-			return fmt.Errorf("error when unmarshalling 'write_files' in UserData defined for VM: %v", err)
+	// TODO: use merge algorithm instead
+	var oldWriteFiles []interface{}
+	oldWriteFilesRaw, _ := userData["write_files"]
+	if oldWriteFilesRaw != nil {
+		var ok bool
+		oldWriteFiles, ok = oldWriteFilesRaw.([]interface{})
+		if !ok {
+			glog.Warning("malformed write_files entry in user-data, can't add env vars")
+			return
 		}
 	}
 
-	entries = append(entries, envVarsFileAsWriteFilesEntry)
-	g.annotations.UserData["write_files"] = entries
-
-	return nil
+	userData["write_files"] = append(oldWriteFiles, map[string]interface{}{
+		"path":    EnvFileLocation,
+		"content": content,
+	})
 }

@@ -24,35 +24,47 @@ import (
 	"os"
 	"strings"
 
+	libvirtxml "github.com/libvirt/libvirt-go-xml"
+
 	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/Mirantis/virtlet/pkg/virt"
 )
 
-type ImageManager interface {
-	GetImageVolume(imageName string) (virt.VirtStorageVolume, error)
-}
-
 type ImageTool struct {
-	tool       *StorageTool
+	pool       virt.VirtStoragePool
 	downloader utils.Downloader
 }
 
 var _ ImageManager = &ImageTool{}
 
 func NewImageTool(conn virt.VirtStorageConnection, downloader utils.Downloader, poolName string) (*ImageTool, error) {
-	storageTool, err := NewStorageTool(conn, poolName, "")
+	pool, err := ensureStoragePool(conn, poolName)
 	if err != nil {
 		return nil, err
 	}
-	return &ImageTool{tool: storageTool, downloader: downloader}, nil
+	return &ImageTool{pool: pool, downloader: downloader}, nil
 }
 
 func (i *ImageTool) ListVolumes() ([]virt.VirtStorageVolume, error) {
-	return i.tool.ListVolumes()
+	return i.pool.ListAllVolumes()
 }
 
 func (i *ImageTool) ImageAsVolume(volumeName string) (virt.VirtStorageVolume, error) {
-	return i.tool.LookupVolume(volumeName)
+	return i.pool.LookupVolumeByName(volumeName)
+}
+
+func (i *ImageTool) fileToVolume(path, volumeName string) (virt.VirtStorageVolume, error) {
+	imageSize, err := getFileSize(path)
+	if err != nil {
+		return nil, err
+	}
+	libvirtFilePath := fmt.Sprintf("/var/lib/libvirt/images/%s", volumeName)
+	return i.pool.ImageToVolume(&libvirtxml.StorageVolume{
+		Name:       volumeName,
+		Allocation: &libvirtxml.StorageVolumeSize{Value: 0},
+		Capacity:   &libvirtxml.StorageVolumeSize{Unit: "b", Value: imageSize},
+		Target:     &libvirtxml.StorageVolumeTarget{Path: libvirtFilePath},
+	}, path)
 }
 
 func (i *ImageTool) PullRemoteImageToVolume(imageName, volumeName string) (virt.VirtStorageVolume, error) {
@@ -65,11 +77,11 @@ func (i *ImageTool) PullRemoteImageToVolume(imageName, volumeName string) (virt.
 		os.Remove(path)
 	}()
 
-	return i.tool.FileToVolume(path, volumeName)
+	return i.fileToVolume(path, volumeName)
 }
 
 func (i *ImageTool) RemoveImage(volumeName string) error {
-	return i.tool.RemoveVolume(volumeName)
+	return i.pool.RemoveVolumeByName(volumeName)
 }
 
 func (i *ImageTool) GetImageVolume(imageName string) (virt.VirtStorageVolume, error) {
@@ -78,7 +90,7 @@ func (i *ImageTool) GetImageVolume(imageName string) (virt.VirtStorageVolume, er
 		return nil, err
 	}
 
-	return i.tool.LookupVolume(imageVolumeName)
+	return i.pool.LookupVolumeByName(imageVolumeName)
 }
 
 func ImageNameFromVirtVolumeName(volumeName string) string {
@@ -104,4 +116,12 @@ func ImageNameToVolumeName(imageName string) (string, error) {
 	volumeName := fmt.Sprintf("%x_%s", h.Sum(nil), segments[len(segments)-1])
 
 	return volumeName, nil
+}
+
+func getFileSize(path string) (uint64, error) {
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		return 0, err
+	}
+	return uint64(fileInfo.Size()), nil
 }

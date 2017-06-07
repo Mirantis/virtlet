@@ -220,3 +220,8 @@ func (v *FakeStorageVolume) Remove() error {
 	v.rec.Rec("Remove", nil)
 	return v.pool.removeVolumeByName(v.name)
 }
+
+func (v *FakeStorageVolume) Format() error {
+	v.rec.Rec("Format", nil)
+	return nil
+}
