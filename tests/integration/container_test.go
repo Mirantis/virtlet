@@ -164,7 +164,7 @@ func (ct *containerTester) runPodSandbox(sandbox *kubeapi.PodSandboxConfig) *kub
 	return resp
 }
 
-func (ct *containerTester) createContainer(sandbox *kubeapi.PodSandboxConfig, container *criapi.ContainerTestConfig, imageSpec *kubeapi.ImageSpec, mounts []*kubeapi.Mount) *kubeapi.CreateContainerResponse {
+func (ct *containerTester) callCreateContainer(sandbox *kubeapi.PodSandboxConfig, container *criapi.ContainerTestConfig, imageSpec *kubeapi.ImageSpec, mounts []*kubeapi.Mount) (*kubeapi.CreateContainerResponse, error) {
 	// Container request
 	config := &kubeapi.ContainerConfig{
 		Image:  imageSpec,
@@ -180,7 +180,11 @@ func (ct *containerTester) createContainer(sandbox *kubeapi.PodSandboxConfig, co
 		SandboxConfig: sandbox,
 	}
 
-	resp, err := ct.runtimeServiceClient.CreateContainer(context.Background(), containerIn)
+	return ct.runtimeServiceClient.CreateContainer(context.Background(), containerIn)
+}
+
+func (ct *containerTester) createContainer(sandbox *kubeapi.PodSandboxConfig, container *criapi.ContainerTestConfig, imageSpec *kubeapi.ImageSpec, mounts []*kubeapi.Mount) *kubeapi.CreateContainerResponse {
+	resp, err := ct.callCreateContainer(sandbox, container, imageSpec, mounts)
 	if err != nil {
 		ct.t.Fatalf("Creating container %s failure: %v", sandbox.Metadata.Name, err)
 	}
@@ -189,11 +193,15 @@ func (ct *containerTester) createContainer(sandbox *kubeapi.PodSandboxConfig, co
 	return resp
 }
 
-func (ct *containerTester) startContainer(containerId string) {
+func (ct *containerTester) callStartContainer(containerId string) error {
 	_, err := ct.runtimeServiceClient.StartContainer(context.Background(), &kubeapi.StartContainerRequest{
 		ContainerId: containerId,
 	})
-	if err != nil {
+	return err
+}
+
+func (ct *containerTester) startContainer(containerId string) {
+	if err := ct.callStartContainer(containerId); err != nil {
 		ct.t.Fatalf("Error starting container %s: %v", containerId, err)
 	}
 }

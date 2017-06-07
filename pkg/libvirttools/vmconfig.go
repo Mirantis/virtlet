@@ -16,6 +16,12 @@ limitations under the License.
 
 package libvirttools
 
+// VMKeyValue denotes a key-value pair
+type VMKeyValue struct {
+	Key   string
+	Value string
+}
+
 // VMConfig contains the information needed to start create a VM
 // TODO: use this struct to store VM metadata
 type VMConfig struct {
@@ -50,6 +56,8 @@ type VMConfig struct {
 	// Domain UUID (set by the CreateContainer)
 	// TODO: this field should be moved to VMStatus
 	DomainUUID string
+	// Environment variables to set in the VM
+	Environment []*VMKeyValue
 	// A temporary file or directory associated with this domain.
 	// Currently used by nocloudVolume
 	// TODO: this field should be moved to VMStatus.

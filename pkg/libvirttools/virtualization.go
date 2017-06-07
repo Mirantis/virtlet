@@ -52,7 +52,7 @@ const (
 	// the root volume), but we want to be on the safe side here
 	maxVirtioBlockDevChar = 'u'
 
-	containerNsUuid       = "67b7fb47-7735-4b64-86d2-6d062d121966"
+	ContainerNsUuid       = "67b7fb47-7735-4b64-86d2-6d062d121966"
 	defaultKubeletRootDir = "/var/lib/kubelet/pods"
 	vmLogLocationPty      = "pty"
 )
@@ -289,7 +289,7 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netNSPath, cniCon
 		return "", err
 	}
 
-	domainUUID := utils.NewUuid5(containerNsUuid, config.PodSandboxId)
+	domainUUID := utils.NewUuid5(ContainerNsUuid, config.PodSandboxId)
 	// FIXME: this field should be moved to VMStatus struct (to be added)
 	config.DomainUUID = domainUUID
 	settings := domainSettings{
@@ -298,24 +298,6 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netNSPath, cniCon
 		netNSPath:     netNSPath,
 		cniConfig:     cniConfig,
 		vmLogLocation: vmLogLocation(),
-	}
-
-	// check whether the domain with such name already exists, and if so, return it's uuid
-	domain, err := v.domainConn.LookupDomainByName(settings.domainName)
-	switch {
-	case err == virt.ErrDomainNotFound:
-		// ok, no such domain
-	case err != nil:
-		return "", fmt.Errorf("failed to look up domain %q: %v", settings.domainName, err)
-	default:
-		if domainID, err := domain.UUIDString(); err == nil {
-			// FIXME: this is a temp workaround for an existing domain being returned on create container call
-			// (this causing SyncPod issues)
-			return domainID, nil
-		} else {
-			glog.Errorf("Failed to get UUID for domain with name %q: %v", settings.domainName, err)
-			return "", fmt.Errorf("Error getting domain UUID for %q: %v", settings.domainName, err)
-		}
 	}
 
 	cloneName := "root_" + settings.domainUUID
@@ -344,19 +326,13 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netNSPath, cniCon
 		if ok {
 			return
 		}
-		if err := v.teardownVolumes(config); err != nil {
-			glog.Warning("failed to tear down volumes: %v", err)
+		if err := v.removeDomain(settings.domainUUID, config); err != nil {
+			glog.Warning("failed to remove domain: %v", err)
 		}
 	}()
 
 	containerAttempt := config.Attempt
-	if err = v.addSerialDevicesToDomain(config.PodSandboxId, containerAttempt, domainConf, settings); err != nil {
-		return "", err
-	}
-
-	// FIXME: store VMConfig + VMStatus (to be added)
-	nocloudFile := config.TempFile
-	if err := v.metadataStore.SetContainer(config.Name, settings.domainUUID, config.PodSandboxId, config.Image, cloneName, config.ContainerLabels, config.ContainerAnnotations, nocloudFile, v.timeFunc); err != nil {
+	if err := v.addSerialDevicesToDomain(config.PodSandboxId, containerAttempt, domainConf, settings); err != nil {
 		return "", err
 	}
 
@@ -364,11 +340,17 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netNSPath, cniCon
 		return "", err
 	}
 
-	domain, err = v.domainConn.LookupDomainByUUIDString(settings.domainUUID)
+	domain, err := v.domainConn.LookupDomainByUUIDString(settings.domainUUID)
 	if err == nil {
 		// FIXME: do we really need this?
 		// (this causes an GetInfo() call on the domain in case of libvirt)
 		_, err = domain.State()
+	}
+
+	if err == nil {
+		// FIXME: store VMConfig + VMStatus (to be added)
+		nocloudFile := config.TempFile
+		err = v.metadataStore.SetContainer(config.Name, settings.domainUUID, config.PodSandboxId, config.Image, cloneName, config.ContainerLabels, config.ContainerAnnotations, nocloudFile, v.timeFunc)
 	}
 	if err != nil {
 		return "", err
@@ -380,11 +362,19 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netNSPath, cniCon
 
 func (v *VirtualizationTool) StartContainer(containerId string) error {
 	domain, err := v.domainConn.LookupDomainByUUIDString(containerId)
-	if err != nil {
-		return err
+	if err == nil {
+		err = domain.Create()
 	}
 
-	return domain.Create()
+	if err != nil {
+		if rmErr := v.RemoveContainer(containerId); rmErr != nil {
+			return fmt.Errorf("Container start error: %v \n %v", err, rmErr)
+		} else {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (v *VirtualizationTool) StopContainer(containerId string) error {
@@ -411,31 +401,24 @@ func (v *VirtualizationTool) StopContainer(containerId string) error {
 	}, domainShutdownRetryInterval, domainShutdownTimeout)
 }
 
-// RemoveContainer tries to gracefully stop domain, then forcibly removes it
-// even if it's still running
-// it waits up to 5 sec for doing the job by libvirt
-func (v *VirtualizationTool) RemoveContainer(containerId string) error {
-	containerInfo, err := v.metadataStore.GetContainerInfo(containerId)
-	if err != nil {
-		glog.Errorf("Error when retrieving container '%s' info from metadata store: %v", containerId, err)
-		return err
-	}
-
+func (v *VirtualizationTool) removeDomain(containerId string, config *VMConfig) error {
 	// Give a chance to gracefully stop domain
 	// TODO: handle errors - there could be e.x. connection errori
 	domain, err := v.domainConn.LookupDomainByUUIDString(containerId)
-	if err != nil {
+	if err != nil && err != virt.ErrDomainNotFound {
 		return err
 	}
 
-	if err := v.StopContainer(containerId); err != nil {
-		if err := domain.Destroy(); err != nil {
+	if domain != nil {
+		if err := v.StopContainer(containerId); err != nil {
+			if err := domain.Destroy(); err != nil {
+				return err
+			}
+		}
+
+		if err := domain.Undefine(); err != nil {
 			return err
 		}
-	}
-
-	if err := domain.Undefine(); err != nil {
-		return err
 	}
 
 	// Wait until domain is really removed or timeout after 5 sec.
@@ -451,9 +434,25 @@ func (v *VirtualizationTool) RemoveContainer(containerId string) error {
 		return err
 	}
 
-	if err := v.metadataStore.RemoveContainer(containerId); err != nil {
-		glog.Errorf("Error when removing container '%s' from metadata store: %v", containerId, err)
+	if err := v.teardownVolumes(config); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+// RemoveContainer tries to gracefully stop domain, then forcibly removes it
+// even if it's still running
+// it waits up to 5 sec for doing the job by libvirt
+func (v *VirtualizationTool) RemoveContainer(containerId string) error {
+	containerInfo, err := v.metadataStore.GetContainerInfo(containerId)
+	if err != nil {
+		glog.Errorf("Error when retrieving container '%s' info from metadata store: %v", containerId, err)
+		return err
+	}
+	if containerInfo == nil {
+		// the vm is already removed
+		return nil
 	}
 
 	// TODO: here we're using incomplete VMConfig to tear down the volumes
@@ -471,9 +470,16 @@ func (v *VirtualizationTool) RemoveContainer(containerId string) error {
 	if err := config.LoadAnnotations(); err != nil {
 		return err
 	}
-	if err := v.teardownVolumes(config); err != nil {
+
+	if err := v.removeDomain(containerId, config); err != nil {
 		return err
 	}
+
+	if v.metadataStore.RemoveContainer(containerId); err != nil {
+		glog.Errorf("Error when removing container '%s' from metadata store: %v", containerId, err)
+		return err
+	}
+
 	return nil
 }
 

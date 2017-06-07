@@ -9,3 +9,4 @@ This directory holds files containing documentation.
     * [Description of SyncPod workflow](sync-pod-workflow.md)
     * [Volume handling](volumes.md)
     * [CRI proxy](criproxy.md) overview
+    * [Environment variables](environment-variables.md) support

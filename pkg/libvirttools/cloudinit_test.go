@@ -35,6 +35,7 @@ func TestCloudInitGenerator(t *testing.T) {
 		podName             string
 		podNs               string
 		annotations         *VirtletAnnotations
+		environment         []*VMKeyValue
 		expectedMetaData    map[string]interface{}
 		expectedUserData    map[string]interface{}
 		expectedUserDataStr string
@@ -109,6 +110,73 @@ func TestCloudInitGenerator(t *testing.T) {
 			},
 		},
 		{
+			name:        "pod with env variables",
+			podName:     "foo",
+			podNs:       "default",
+			annotations: &VirtletAnnotations{},
+			environment: []*VMKeyValue{
+				{"foo", "bar"},
+				{"baz", "abc"},
+			},
+			expectedMetaData: map[string]interface{}{
+				"instance-id":    "foo.default",
+				"local-hostname": "foo",
+			},
+			expectedUserData: map[string]interface{}{
+				"write_files": []interface{}{
+					map[string]interface{}{
+						"path":    "/etc/cloud/environment",
+						"content": "foo=bar\nbaz=abc\n",
+					},
+				},
+			},
+		},
+		{
+			name:    "pod with env variables and user data",
+			podName: "foo",
+			podNs:   "default",
+			annotations: &VirtletAnnotations{
+				UserData: map[string]interface{}{
+					"users": []interface{}{
+						map[string]interface{}{
+							"name": "cloudy",
+						},
+					},
+					"write_files": []interface{}{
+						map[string]interface{}{
+							"path":    "/etc/foobar",
+							"content": "whatever",
+						},
+					},
+				},
+			},
+			environment: []*VMKeyValue{
+				{"foo", "bar"},
+				{"baz", "abc"},
+			},
+			expectedMetaData: map[string]interface{}{
+				"instance-id":    "foo.default",
+				"local-hostname": "foo",
+			},
+			expectedUserData: map[string]interface{}{
+				"users": []interface{}{
+					map[string]interface{}{
+						"name": "cloudy",
+					},
+				},
+				"write_files": []interface{}{
+					map[string]interface{}{
+						"path":    "/etc/foobar",
+						"content": "whatever",
+					},
+					map[string]interface{}{
+						"path":    "/etc/cloud/environment",
+						"content": "foo=bar\nbaz=abc\n",
+					},
+				},
+			},
+		},
+		{
 			name:    "pod with user data script",
 			podName: "foo",
 			podNs:   "default",
@@ -129,6 +197,7 @@ func TestCloudInitGenerator(t *testing.T) {
 				PodName:           tc.podName,
 				PodNamespace:      tc.podNs,
 				ParsedAnnotations: tc.annotations,
+				Environment:       tc.environment,
 			})
 
 			metaDataBytes, err := g.generateMetaData()

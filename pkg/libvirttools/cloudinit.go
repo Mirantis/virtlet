@@ -17,6 +17,7 @@ limitations under the License.
 package libvirttools
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -27,6 +28,10 @@ import (
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
 	"github.com/Mirantis/virtlet/pkg/utils"
+)
+
+const (
+	EnvFileLocation = "/etc/cloud/environment"
 )
 
 type CloudInitGenerator struct {
@@ -63,10 +68,19 @@ func (g *CloudInitGenerator) generateUserData() ([]byte, error) {
 	if g.config.ParsedAnnotations.UserDataScript != "" {
 		return []byte(g.config.ParsedAnnotations.UserDataScript), nil
 	}
+
+	userData := make(map[string]interface{})
+	for k, v := range g.config.ParsedAnnotations.UserData {
+		userData[k] = v
+	}
+
+	// TODO: use merge algorithm
+	g.addEnvVarsFileToWriteFiles(userData)
+
 	r := []byte{}
-	if len(g.config.ParsedAnnotations.UserData) != 0 {
+	if len(userData) != 0 {
 		var err error
-		r, err = yaml.Marshal(g.config.ParsedAnnotations.UserData)
+		r, err = yaml.Marshal(userData)
 		if err != nil {
 			return nil, fmt.Errorf("error marshalling user-data: %v", err)
 		}
@@ -119,4 +133,37 @@ func (g *CloudInitGenerator) GenerateDisk() (string, *libvirtxml.DomainDisk, err
 		ReadOnly: &libvirtxml.DomainDiskReadOnly{},
 	}
 	return isoFile.Name(), diskDef, nil
+}
+
+func (g *CloudInitGenerator) generateEnvVarsContent() string {
+	var buffer bytes.Buffer
+	for _, entry := range g.config.Environment {
+		buffer.WriteString(fmt.Sprintf("%s=%s\n", entry.Key, entry.Value))
+	}
+
+	return buffer.String()
+}
+
+func (g *CloudInitGenerator) addEnvVarsFileToWriteFiles(userData map[string]interface{}) {
+	content := g.generateEnvVarsContent()
+	if content == "" {
+		return
+	}
+
+	// TODO: use merge algorithm instead
+	var oldWriteFiles []interface{}
+	oldWriteFilesRaw, _ := userData["write_files"]
+	if oldWriteFilesRaw != nil {
+		var ok bool
+		oldWriteFiles, ok = oldWriteFilesRaw.([]interface{})
+		if !ok {
+			glog.Warning("malformed write_files entry in user-data, can't add env vars")
+			return
+		}
+	}
+
+	userData["write_files"] = append(oldWriteFiles, map[string]interface{}{
+		"path":    EnvFileLocation,
+		"content": content,
+	})
 }

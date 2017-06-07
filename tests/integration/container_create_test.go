@@ -75,6 +75,77 @@ func verifyUsingShell(t *testing.T, cmd, what, expected string) {
 	}
 }
 
+func checkAllCleaned(t *testing.T, id string) {
+	// Check domain is not defined
+	cmd := fmt.Sprintf("virsh list --all | grep '%s' | wc -l", id)
+	verifyUsingShell(t, cmd, "no domain defined", "0")
+	// Check root fs and ephemeral volumes are cleaned
+	cmd = fmt.Sprintf("virsh vol-list --pool volumes | grep '%s' | wc -l", id)
+	verifyUsingShell(t, cmd, "no volumes defined in 'volumes' pool", "0")
+}
+
+func TestContainerCleanup(t *testing.T) {
+	// Test checks cleanup after failure at 3 stages during domain running:
+	ct := newContainerTester(t)
+	sandbox := ct.sandboxes[0]
+	container := ct.containers[0]
+	defer ct.teardown()
+	sandbox.Annotations["VirtletVolumes"] = `[{"Name": "vol1"}, {"Name": "vol2", "Format": "qcow2", "Capacity": "2", "CapacityUnit": "MB"}, {"Name": "vol3"}]`
+	ct.pullAllImages()
+
+	ct.runPodSandbox(sandbox)
+	mounts := []*kubeapi.Mount{
+		{
+			HostPath: "/var/lib/virtlet",
+		},
+	}
+
+	uuid := getDomainUUID(sandbox.Metadata.Uid)
+	// 1. Failure during adding/processing ephemerial and flexolumes
+	// Define in advance the volume name of one of described to cause error on CreateContainer "Storage volume already exists".
+	volumeName := uuid + "-vol3"
+	if err := defineDummyVolume("volumes", volumeName); err != nil {
+		t.Fatalf("Failed to define dummy volume to test cleanup: %v", err)
+	}
+	_, err := ct.callCreateContainer(sandbox, container, ct.imageSpecs[0], mounts)
+	if err == nil {
+		ct.removeContainer(uuid)
+		t.Fatalf("Failed to cause failure on ContainerCreate to check cleanup(stage 1, defined volume: '%s').", volumeName)
+	}
+	checkAllCleaned(t, uuid)
+
+	// 2. Failure on defining domain in libvirt
+	// Define dummy VM with the same name but other id to cause error on CreateContainer "Domain <name> already exists with uuid <uuid>".
+	domainName := uuid + "-" + container.Name
+	if err := defineDummyDomainWithName(domainName); err != nil {
+		t.Errorf("Failed to define dummy domain to test cleanup: %v", err)
+	}
+	if _, err := ct.callCreateContainer(sandbox, container, ct.imageSpecs[0], mounts); err == nil {
+		ct.removeContainer(uuid)
+		t.Fatalf("Failed to cause failure on ContainerCreate to check cleanup(stage 2, defined dummy domain: '%s').", domainName)
+	}
+	if err := undefDomain(domainName); err != nil {
+		t.Errorf("Failed to undefine dummy domain '%s' to test cleanup: %v", domainName, err)
+	}
+	checkAllCleaned(t, uuid)
+
+	// 3. Failure on domain start.
+	// Call ContainerStart twice to cause error on second call of ContainerStart "Domain is already active".
+	createResp := ct.createContainer(sandbox, container, ct.imageSpecs[0], mounts)
+	ct.startContainer(createResp.ContainerId)
+
+	if err := ct.callStartContainer(createResp.ContainerId); err == nil {
+		ct.removeContainer(uuid)
+		t.Fatalf("Failed to cause failure on ContainerCreate to check cleanup(stage 3, start twice domain: '%s').", domainName)
+	}
+	checkAllCleaned(t, uuid)
+
+	if len(ct.listContainers(nil).Containers) != 0 {
+		t.Errorf("expected 0 containers to be listed")
+	}
+
+}
+
 func TestContainerVolumes(t *testing.T) {
 	ct := newContainerTester(t)
 	defer ct.teardown()
@@ -121,8 +192,7 @@ func TestContainerVolumes(t *testing.T) {
 	for _, container := range ct.containers {
 		ct.stopContainer(container.ContainerId)
 		ct.removeContainer(container.ContainerId)
-		cmd := fmt.Sprintf("virsh vol-list --pool volumes | grep '%s' | wc -l", container.ContainerId)
-		verifyUsingShell(t, cmd, "there's no attached ephemeral volumes", "0")
+		checkAllCleaned(t, container.ContainerId)
 	}
 }
 
@@ -220,6 +290,7 @@ func TestContainerCreateStartListRemove(t *testing.T) {
 	for _, container := range ct.containers {
 		ct.stopContainer(container.ContainerId)
 		ct.removeContainer(container.ContainerId)
+		checkAllCleaned(t, container.ContainerId)
 	}
 
 	if len(ct.listContainers(nil).Containers) != 0 {

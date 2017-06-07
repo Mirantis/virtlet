@@ -51,5 +51,9 @@ func GetVMConfig(in *kubeapi.CreateContainerRequest) (*VMConfig, error) {
 		r.CpuQuota = res.CpuQuota
 	}
 
+	for _, entry := range in.Config.Envs {
+		r.Environment = append(r.Environment, &VMKeyValue{Key: entry.Key, Value: entry.Value})
+	}
+
 	return r, nil
 }

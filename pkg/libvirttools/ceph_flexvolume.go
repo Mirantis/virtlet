@@ -64,7 +64,7 @@ func newCephVolume(volumeName, configPath string, config *VMConfig, owner Volume
 }
 
 func (v *cephVolume) secretUuid() string {
-	return utils.NewUuid5(containerNsUuid, v.config.PodSandboxId)
+	return utils.NewUuid5(ContainerNsUuid, v.config.PodSandboxId)
 }
 
 func (v *cephVolume) secretDef() *libvirtxml.Secret {
