@@ -78,8 +78,12 @@ function ensure_build_container {
     if ! docker ps --filter=label=virtlet_build | grep -q virtlet-build; then
         ensure_build_image
         cd "${project_dir}"
-        # need to mount docker socket into the container because of
+        # Need to mount docker socket into the container because of
         # CRI proxy deployment tests
+        # We also pass --tmpfs /tmp because log tailing doesn't work
+        # on overlayfs. This breaks 'go test' though unless we also
+        # remount /tmp with exec option (it creates and runs executable files
+        # under /tmp)
         docker run -d --privileged \
                -l virtlet_build \
                -v "virtlet_src:${remote_project_dir}" \
@@ -92,8 +96,9 @@ function ensure_build_container {
                -e CRIPROXY_TEST_REMOTE_DOCKER_ENDPOINT="${CRIPROXY_TEST_REMOTE_DOCKER_ENDPOINT:-}" \
                -p "${VIRTLET_RSYNC_PORT}:8730" \
                --name virtlet-build \
+               --tmpfs /tmp \
                "${build_image}" \
-               sleep Infinity
+               /bin/bash -c "mount /tmp -o remount,exec && sleep Infinity" >/dev/null
         if [[ ! ${VIRTLET_SKIP_RSYNC} ]]; then
             # from build/common.sh in k8s
             mkdir -p "${project_dir}/_output"
