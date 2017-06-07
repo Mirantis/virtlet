@@ -155,19 +155,19 @@ vmchat-short cirros-vm-rbd
 "${vmssh}" cirros@cirros-vm-rbd 'sudo /usr/sbin/mkfs.ext2 /dev/vdc && sudo mount /dev/vdc /mnt && ls -l /mnt | grep lost+found'
 
 # check vnc consoles are available for both domains
-if ! kubectl exec "${virtlet_pod_name}" --namespace=kube-system -- /bin/sh -c "apt-get install -y vncsnapshot"; then
+if ! kubectl exec "${virtlet_pod_name}" -c virtlet --namespace=kube-system -- /bin/sh -c "apt-get install -y vncsnapshot"; then
   echo "Failed to install vncsnapshot inside virtlet container" >&2
   exit 1
 fi
 
 # grab screenshots
 
-if ! kubectl exec "${virtlet_pod_name}" --namespace=kube-system -- /bin/sh -c "vncsnapshot :0 /domain_1.jpeg"; then
+if ! kubectl exec "${virtlet_pod_name}" -c virtlet --namespace=kube-system -- /bin/sh -c "vncsnapshot :0 /domain_1.jpeg"; then
   echo "Failed to addtach and get screenshot for vnc console for domain with 1 id" >&2
   exit 1
 fi
 
-if ! kubectl exec "${virtlet_pod_name}" --namespace=kube-system -- /bin/sh -c "vncsnapshot :1 /domain_2.jpeg"; then
+if ! kubectl exec "${virtlet_pod_name}" -c virtlet --namespace=kube-system -- /bin/sh -c "vncsnapshot :1 /domain_2.jpeg"; then
   echo "Failed to addtach and get screenshot for vnc console for domain with 2 id" >&2
   exit 1
 fi
@@ -220,7 +220,7 @@ verify-cpu-count 2
 function domain_xpath {
   local domain="${1}"
   local xpath="${2}"
-  kubectl exec -n kube-system "${virtlet_pod_name}" -- \
+  kubectl exec -n kube-system "${virtlet_pod_name}" -c virtlet -- \
           /bin/sh -c "virsh dumpxml '${domain}' | xmllint --xpath '${xpath}' -"
 }
 

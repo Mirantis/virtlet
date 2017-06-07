@@ -45,4 +45,4 @@ for ((n=0; n < ${#args[@]}; n++)); do
 done
 
 pod=$(kubectl get pods -n kube-system -l runtime=virtlet -o name|head -1|sed 's@.*/@@')
-kubectl exec ${opts} -n kube-system "${pod}" -- virsh ${args[@]+"${args[@]}"}
+kubectl exec ${opts} -n kube-system "${pod}" -c virtlet -- virsh ${args[@]+"${args[@]}"}
