@@ -22,10 +22,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/Mirantis/virtlet/pkg/libvirttools"
-	virtletutils "github.com/Mirantis/virtlet/pkg/utils"
 	libvirt "github.com/libvirt/libvirt-go"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
+
+	"github.com/Mirantis/virtlet/pkg/libvirttools"
+	virtletutils "github.com/Mirantis/virtlet/pkg/utils"
 )
 
 const (
@@ -48,15 +49,15 @@ func getDomainUUID(podID string) string {
 	return virtletutils.NewUuid5(libvirttools.ContainerNsUuid, podID)
 }
 
-func defineDummyVolume(poolName, volName string) error {
+func defineDummyVolume(poolName, volName string) (func(), error) {
 	conn, err := libvirt.NewConnect(libvirtUri)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	pool, err := conn.LookupStoragePoolByName(poolName)
 	if err != nil {
-		return fmt.Errorf("failed to lookup pool '%s': %v", poolName, err)
+		return nil, fmt.Errorf("failed to lookup pool '%s': %v", poolName, err)
 	}
 
 	volume := &libvirtxml.StorageVolume{
@@ -69,8 +70,17 @@ func defineDummyVolume(poolName, volName string) error {
 		log.Panicf("XML marshaling: %v", err)
 	}
 
-	_, err = pool.StorageVolCreateXML(volXML, 0)
-	return err
+	vol, err := pool.StorageVolCreateXML(volXML, 0)
+	return func() {
+		if vol == nil {
+			return
+		}
+		if err := vol.Delete(0); err != nil {
+			log.Printf("WARNING: failed to clean up volume %q in pool %q: %v", volName, poolName, err)
+		} else {
+			vol = nil
+		}
+	}, err
 }
 
 func undefDomain(domainName string) error {
@@ -80,10 +90,10 @@ func undefDomain(domainName string) error {
 	}
 	domain, err := conn.LookupDomainByName(domainName)
 	if err != nil {
-		return fmt.Errorf("failed to lookup domain by name '%s': %v", domainName, err)
+		return fmt.Errorf("failed to lookup domain by name %q: %v", domainName, err)
 	}
 	if err := domain.Undefine(); err != nil {
-		return fmt.Errorf("failed to lookup domain by name '%s': %v", domainName, err)
+		return fmt.Errorf("failed to lookup domain by name %q: %v", domainName, err)
 	}
 	return nil
 }

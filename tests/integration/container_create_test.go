@@ -90,7 +90,16 @@ func TestContainerCleanup(t *testing.T) {
 	sandbox := ct.sandboxes[0]
 	container := ct.containers[0]
 	defer ct.teardown()
-	sandbox.Annotations["VirtletVolumes"] = `[{"Name": "vol1"}, {"Name": "vol2", "Format": "qcow2", "Capacity": "2", "CapacityUnit": "MB"}, {"Name": "vol3"}]`
+	ct.mountFlexvolume(ct.sandboxes[0].Metadata.Uid, "vol1", map[string]interface{}{
+		"type": "qcow2",
+	})
+	ct.mountFlexvolume(ct.sandboxes[0].Metadata.Uid, "vol2", map[string]interface{}{
+		"type":     "qcow2",
+		"capacity": "2MB",
+	})
+	ct.mountFlexvolume(ct.sandboxes[0].Metadata.Uid, "vol3", map[string]interface{}{
+		"type": "qcow2",
+	})
 	ct.pullAllImages()
 
 	ct.runPodSandbox(sandbox)
@@ -104,14 +113,17 @@ func TestContainerCleanup(t *testing.T) {
 	// 1. Failure during adding/processing ephemerial and flexolumes
 	// Define in advance the volume name of one of described to cause error on CreateContainer "Storage volume already exists".
 	volumeName := uuid + "-vol3"
-	if err := defineDummyVolume("volumes", volumeName); err != nil {
+	rmDummyVolume, err := defineDummyVolume("volumes", volumeName)
+	if err != nil {
 		t.Fatalf("Failed to define dummy volume to test cleanup: %v", err)
 	}
-	_, err := ct.callCreateContainer(sandbox, container, ct.imageSpecs[0], mounts)
+	defer rmDummyVolume() // it's ok to call this func twice
+	_, err = ct.callCreateContainer(sandbox, container, ct.imageSpecs[0], mounts)
 	if err == nil {
 		ct.removeContainer(uuid)
 		t.Fatalf("Failed to cause failure on ContainerCreate to check cleanup(stage 1, defined volume: '%s').", volumeName)
 	}
+	rmDummyVolume()
 	checkAllCleaned(t, uuid)
 
 	// 2. Failure on defining domain in libvirt
