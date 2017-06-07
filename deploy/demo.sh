@@ -63,11 +63,6 @@ function demo::inject-local-image {
   docker save mirantis/virtlet | docker exec -i kube-node-1 docker load
 }
 
-function demo::inject-local-log-image {
-  demo::step "Copying local mirantis/virtlet-log image into kube-node-1 container"
-  docker save mirantis/virtlet-log | docker exec -i kube-node-1 docker load
-}
-
 function demo::label-node {
   demo::step "Applying label to kube-node-1:" "extraRuntime=virtlet"
   "${kubectl}" label node kube-node-1 extraRuntime=virtlet
@@ -117,7 +112,7 @@ function demo::virsh {
   if [[ ! ${virtlet_pod} ]]; then
     virtlet_pod=$("${kubectl}" get pods -n kube-system -l runtime=virtlet -o name|head -1|sed 's@.*/@@')
   fi
-  "${kubectl}" exec ${opts} -n kube-system "${virtlet_pod}" -- virsh "$@"
+  "${kubectl}" exec ${opts} -n kube-system "${virtlet_pod}" -c virtlet -- virsh "$@"
 }
 
 function demo::vm-ready {
@@ -150,11 +145,6 @@ function demo::start-virtlet {
       docker exec -i kube-master jq "${jq_filter}" |
       "${kubectl}" create -f -
   demo::wait-for "Virtlet DaemonSet" demo::pods-ready runtime=virtlet
-}
-
-function demo::start-virtlet-log {
-  demo::step "Deploying Virtlet Log DaemonSet"
-  "${kubectl}" create -f "${BASE_LOCATION}/deploy/virtlet-log-ds.yaml"
 }
 
 function demo::start-nginx {
@@ -199,14 +189,8 @@ demo::start-dind-cluster
 if [[ ${INJECT_LOCAL_IMAGE:-} ]]; then
   demo::inject-local-image
 fi
-if [[ ${DEPLOY_LOG_CONTAINER} == "inject" ]]; then
-  demo::inject-local-log-image
-fi 
 demo::label-node
 demo::start-virtlet
-if [[ ${DEPLOY_LOG_CONTAINER} != "" ]]; then
-  demo::start-virtlet-log  
-fi
 demo::start-nginx
 demo::start-image-server
 demo::start-vm
