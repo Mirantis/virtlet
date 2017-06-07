@@ -241,10 +241,10 @@ func (v *VirtualizationTool) RemoveLibvirtSandboxLog(sandboxId string) error {
 	return os.RemoveAll(filepath.Join(logLocation, sandboxId))
 }
 
-func (v *VirtualizationTool) addSerialDevicesToDomain(sandboxId string, containerAttempt uint32, domain *libvirtxml.Domain, settings domainSettings) error {
+func (v *VirtualizationTool) addSerialDevicesToDomain(sandboxId, containerName string, containerAttempt uint32, domain *libvirtxml.Domain, settings domainSettings) error {
 	if settings.vmLogLocation != vmLogLocationPty {
 		logDir := filepath.Join(settings.vmLogLocation, sandboxId)
-		logPath := filepath.Join(logDir, fmt.Sprintf("_%d.log", containerAttempt))
+		logPath := filepath.Join(logDir, fmt.Sprintf("%s_%d.log", containerName, containerAttempt))
 
 		// Prepare directory where libvirt will store log file to.
 		if _, err := os.Stat(logDir); os.IsNotExist(err) {
@@ -332,9 +332,18 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netNSPath, cniCon
 	}()
 
 	containerAttempt := config.Attempt
-	if err := v.addSerialDevicesToDomain(config.PodSandboxId, containerAttempt, domainConf, settings); err != nil {
+	if err := v.addSerialDevicesToDomain(config.PodSandboxId, config.Name, containerAttempt, domainConf, settings); err != nil {
 		return "", err
 	}
+
+	labels := map[string]string{}
+	for k, v := range config.ContainerLabels {
+		labels[k] = v
+	}
+	labels["io.kubernetes.pod.name"] = config.PodName
+	labels["io.kubernetes.pod.namespace"] = config.PodNamespace
+	labels["io.kubernetes.pod.uid"] = config.PodSandboxId
+	labels["io.kubernetes.container.name"] = config.Name
 
 	if _, err := v.domainConn.DefineDomain(domainConf); err != nil {
 		return "", err
@@ -350,7 +359,7 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netNSPath, cniCon
 	if err == nil {
 		// FIXME: store VMConfig + VMStatus (to be added)
 		nocloudFile := config.TempFile
-		err = v.metadataStore.SetContainer(config.Name, settings.domainUUID, config.PodSandboxId, config.Image, cloneName, config.ContainerLabels, config.ContainerAnnotations, nocloudFile, v.timeFunc)
+		err = v.metadataStore.SetContainer(config.Name, settings.domainUUID, config.PodSandboxId, config.Image, cloneName, labels, config.ContainerAnnotations, nocloudFile, v.timeFunc)
 	}
 	if err != nil {
 		return "", err
@@ -730,6 +739,7 @@ func (v *VirtualizationTool) ContainerStatus(containerId string) (*kubeapi.Conta
 		State:     containerInfo.State,
 		CreatedAt: containerInfo.CreatedAt,
 		StartedAt: containerInfo.StartedAt,
+		Labels:    containerInfo.Labels,
 	}, nil
 }
 

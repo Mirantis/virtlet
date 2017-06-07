@@ -355,7 +355,13 @@
           "image": "fake/image1"
         },
         "image_ref": "fake/image1",
-        "created_at": 1496175540000000000
+        "created_at": 1496175540000000000,
+        "labels": {
+          "io.kubernetes.container.name": "container1",
+          "io.kubernetes.pod.name": "testName_0",
+          "io.kubernetes.pod.namespace": "default",
+          "io.kubernetes.pod.uid": "69eec606-0493-5825-73a4-c5e0c0236155"
+        }
       }
     ]
   },
@@ -375,7 +381,13 @@
       "image": {
         "image": "fake/image1"
       },
-      "image_ref": "fake/image1"
+      "image_ref": "fake/image1",
+      "labels": {
+        "io.kubernetes.container.name": "container1",
+        "io.kubernetes.pod.name": "testName_0",
+        "io.kubernetes.pod.namespace": "default",
+        "io.kubernetes.pod.uid": "69eec606-0493-5825-73a4-c5e0c0236155"
+      }
     }
   },
   {
@@ -394,7 +406,13 @@
       "image": {
         "image": "fake/image1"
       },
-      "image_ref": "fake/image1"
+      "image_ref": "fake/image1",
+      "labels": {
+        "io.kubernetes.container.name": "container1",
+        "io.kubernetes.pod.name": "testName_0",
+        "io.kubernetes.pod.namespace": "default",
+        "io.kubernetes.pod.uid": "69eec606-0493-5825-73a4-c5e0c0236155"
+      }
     }
   },
   {
