@@ -17,14 +17,13 @@ limitations under the License.
 package log
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
-	"unicode"
 
 	"github.com/golang/glog"
 	"github.com/hpcloud/tail"
@@ -184,11 +183,24 @@ func (w *workerRunner) RunNewWorker(inputFile, outputFile, workerId string) {
 		}
 
 		// Convert raw line into Kubernetes json.
-		converted := fmt.Sprintf(`{"time": "%s", "stream": "stdout","log":"%s\n"}`, line.Time.Format(time.RFC3339), escapeLine(line.Text))
-		converted = converted + "\n"
-
-		f.WriteString(converted)
-		f.Sync()
+		m := map[string]interface{}{
+			"time":   line.Time.Format(time.RFC3339),
+			"stream": "stdout",
+			"log":    line.Text + "\n",
+		}
+		converted, err := json.Marshal(m)
+		if err != nil {
+			glog.V(1).Infoln("Error marshalling the log line:", line.Err.Error())
+			break
+		}
+		if _, err = f.Write(append(converted, '\n')); err != nil {
+			glog.V(1).Infoln("Error writing log line:", line.Err.Error())
+			break
+		}
+		if err = f.Sync(); err != nil {
+			glog.V(1).Infoln("Error syncing the log file:", line.Err.Error())
+			break
+		}
 
 		w.reportWorkerState("RUN", workerId)
 	}
@@ -253,10 +265,4 @@ func (w *workerRunner) registerWorker(workerId string, ch chan *tail.Line) {
 	w.workersMux.Lock()
 	defer w.workersMux.Unlock()
 	w.workers[workerId] = ch
-}
-
-func escapeLine(line string) string {
-	line = strings.TrimRightFunc(line, unicode.IsSpace)
-	line = strings.Replace(line, "\"", "\\\"", -1)
-	return line
 }
