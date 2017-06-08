@@ -13,7 +13,6 @@ kubectl="${HOME}/.kubeadm-dind-cluster/kubectl"
 BASE_LOCATION="${BASE_LOCATION:-https://raw.githubusercontent.com/Mirantis/virtlet/master/}"
 # Convenience setting for local testing:
 # BASE_LOCATION="${HOME}/work/kubernetes/src/github.com/Mirantis/virtlet"
-DEPLOY_LOG_CONTAINER=${DEPLOY_LOG_CONTAINER:-deploy} # '' = don't deploy, 'deploy' = deploy, 'inject' = inject local log image and deploy
 
 function demo::step {
   local OPTS=""
@@ -115,6 +114,33 @@ function demo::virsh {
   "${kubectl}" exec ${opts} -n kube-system "${virtlet_pod}" -c virtlet -- virsh "$@"
 }
 
+function demo::ssh {
+  if [[ ! ${virtlet_pod} ]]; then
+    virtlet_pod=$("${kubectl}" get pods -n kube-system -l runtime=virtlet -o name|head -1|sed 's@.*/@@')
+  fi  
+  
+  while true; do
+    cirros_ip=$(kubectl get pod cirros-vm -o jsonpath="{.status.podIP}")
+    if [[ -z "${cirros_ip}" ]]; then
+      echo "Waiting for cirros IP..."
+      sleep 1
+      continue
+    fi
+    echo "Cirros IP is ${cirros_ip}. Trying to ssh..."
+    internal::ssh ${virtlet_pod} ${cirros_ip} || true
+    sleep 1
+  done
+}
+
+function internal::ssh {
+  virtlet_pod=${1}
+  cirros_ip=${2}
+  shift 2
+
+  ssh -oProxyCommand="kubectl exec -i -n kube-system ${virtlet_pod} -c virtlet -- nc -q0 ${cirros_ip} 22" \
+    -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no cirros@cirros-vm "$@"
+}
+
 function demo::vm-ready {
   local name="$1"
   # note that the following is not a bulletproof check
@@ -162,8 +188,8 @@ function demo::start-vm {
   "${kubectl}" create -f "${BASE_LOCATION}/examples/cirros-vm.yaml"
   demo::wait-for "CirrOS VM" demo::vm-ready cirros-vm
   if [[ ! "${NO_VM_CONSOLE:-}" ]]; then
-    demo::step "Entering the VM, press Enter if you don't see the prompt or OS boot messages"
-    demo::virsh console $(demo::virsh list --name)
+    demo::step "Establishing ssh connection to the VM. Please use 'cubswin:)' password to login"
+    demo::ssh
   fi
 }
 
