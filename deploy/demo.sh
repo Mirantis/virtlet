@@ -13,7 +13,7 @@ kubectl="${HOME}/.kubeadm-dind-cluster/kubectl"
 BASE_LOCATION="${BASE_LOCATION:-https://raw.githubusercontent.com/Mirantis/virtlet/master/}"
 # Convenience setting for local testing:
 # BASE_LOCATION="${HOME}/work/kubernetes/src/github.com/Mirantis/virtlet"
-DEPLOY_LOG_CONTAINER=${DEPLOY_LOG_CONTAINER:-deploy} # '' = don't deploy, 'deploy' = deploy, 'inject' = inject local log image and deploy
+cirros_key="demo-cirros-private-key"
 
 function demo::step {
   local OPTS=""
@@ -47,10 +47,20 @@ function demo::get-dind-cluster {
   chmod +x "${dind_script}"
 }
 
+function demo::get-cirros-ssh-keys {
+  if [[ -f ${cirros_key} ]]; then
+    return 0
+  fi
+  demo::step "Will download ${cirros_key} into current directory"
+  demo::ask-before-continuing
+  wget -O ${cirros_key} "https://raw.githubusercontent.com/Mirantis/virtlet/master/examples/vmkey"
+  chmod 600 ${cirros_key}
+}
+
 function demo::start-dind-cluster {
   demo::step "Will now clear any kubeadm-dind-cluster data on the current Docker"
   if [[ ! ${NONINTERACTIVE} ]]; then
-    echo "VM console will be attached after Virtlet setup is complete, press Ctrl-] to detach." >&2
+    echo "Cirros ssh connection will be open after Virtlet setup is complete, press Ctrl-D to disconnect." >&2
   fi
   echo "To clean up the cluster, use './dind-cluster-v1.6.sh clean'" >&2
   demo::ask-before-continuing
@@ -115,6 +125,48 @@ function demo::virsh {
   "${kubectl}" exec ${opts} -n kube-system "${virtlet_pod}" -c virtlet -- virsh "$@"
 }
 
+function demo::ssh {
+  local cirros_ip=
+
+  demo::get-cirros-ssh-keys
+
+  if [[ ! ${virtlet_pod} ]]; then
+    virtlet_pod=$("${kubectl}" get pods -n kube-system -l runtime=virtlet -o name|head -1|sed 's@.*/@@')
+  fi
+  
+  if [[ ! ${cirros_ip} ]]; then
+    while true; do
+      cirros_ip=$(kubectl get pod cirros-vm -o jsonpath="{.status.podIP}")
+      if [[ ! ${cirros_ip} ]]; then
+        echo "Waiting for cirros IP..."
+        sleep 1
+        continue
+      fi
+      echo "Cirros IP is ${cirros_ip}."
+      break
+    done
+  fi
+
+  echo "Trying to establish ssh connection to cirros-vm..."
+  while ! internal::ssh ${virtlet_pod} ${cirros_ip} "echo Hello" | grep -q "Hello"; do
+    sleep 1
+    echo "Trying to establish ssh connection to cirros-vm..."
+  done
+
+  echo "Successfully established ssh connection. Press Ctrl-D to disconnect."
+  internal::ssh ${virtlet_pod} ${cirros_ip}
+}
+
+function internal::ssh {
+  virtlet_pod=${1}
+  cirros_ip=${2}
+  shift 2
+
+  ssh -oProxyCommand="kubectl exec -i -n kube-system ${virtlet_pod} -c virtlet -- nc -q0 ${cirros_ip} 22" \
+    -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -q \
+    -i ${cirros_key} cirros@cirros-vm "$@"
+}
+
 function demo::vm-ready {
   local name="$1"
   # note that the following is not a bulletproof check
@@ -162,8 +214,8 @@ function demo::start-vm {
   "${kubectl}" create -f "${BASE_LOCATION}/examples/cirros-vm.yaml"
   demo::wait-for "CirrOS VM" demo::vm-ready cirros-vm
   if [[ ! "${NO_VM_CONSOLE:-}" ]]; then
-    demo::step "Entering the VM, press Enter if you don't see the prompt or OS boot messages"
-    demo::virsh console $(demo::virsh list --name)
+    demo::step "Establishing ssh connection to the VM. Use Ctrl-D to disconnect"
+    demo::ssh
   fi
 }
 
