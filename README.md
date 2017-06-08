@@ -34,7 +34,7 @@ chmod +x demo.sh
 ./demo.sh
 ```
 
-The demo will start a test cluster, deploy Virtlet on it and then boot a [CirrOS](https://launchpad.net/cirros) VM there. You may access sample nginx server via `curl http://nginx.default.svc.cluster.local` from inside the VM. To detach from VM console, press `Ctrl-]`. After the VM has booted, you can also use a helper script to connect to its SSH server:
+The demo will start a test cluster, deploy Virtlet on it and then boot a [CirrOS](https://launchpad.net/cirros) VM there. You may access sample nginx server via `curl http://nginx.default.svc.cluster.local` from inside the VM. To disconnect from VM, press `Ctrl-D`. After the VM has booted, you can also use a helper script to connect to its SSH server:
 ```
 examples/vmssh.sh cirros@cirros-vm [command...]
 ```
