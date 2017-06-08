@@ -7,7 +7,7 @@ metadata:
     app: k8s
 spec:
   ports:
-  - port: 20
+  - port: 22
     name: ssh
   clusterIP: None
   selector:
@@ -65,16 +65,18 @@ spec:
                 kubeadm init --token adcb82.4eae29627dc4c5a6 --pod-network-cidr=10.200.0.0/16 --service-cidr=10.97.0.0/16 --apiserver-cert-extra-sans=127.0.0.1,localhost
                 # master node
                 export KUBECONFIG=/etc/kubernetes/admin.conf
-                kubectl apply -f "https://github.com/weaveworks/weave/blob/master/prog/weave-kube/weave-daemonset-k8s-1.6.yaml?raw=true"
+                kubectl apply -f "https://git.io/weave-kube-1.6"
                 while ! kubectl get pods -n kube-system -l k8s-app=kube-dns|grep ' 3/3'; do
                   sleep 1
                 done
                 mkdir -p /root/.kube
                 chmod 700 /root/.kube
                 cp "${KUBECONFIG}" /root/.kube/config
+                echo "Master setup complete." >&2
               else
                 # worker node
                 kubeadm join --token adcb82.4eae29627dc4c5a6 k8s-0:6443
+                echo "Node setup complete." >&2
               fi
           users:
           - name: root
@@ -97,6 +99,10 @@ spec:
       containers:
       - name: ubuntu-vm
         image: virtlet/cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img
+        readinessProbe:
+          tcpSocket:
+            port: 22
+          initialDelaySeconds: 5
       volumes:
       - name: docker
         flexVolume:
