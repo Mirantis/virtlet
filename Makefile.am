@@ -28,9 +28,10 @@ TESTS = $(check_SCRIPTS)
 all:
 	if [ ! -d vendor ]; then \
 		$(MAKE) install-vendor; \
-		cp ./vendor/github.com/libvirt/libvirt-go-xml/domain.go ./vendor/github.com/libvirt/libvirt-go-xml/domain.orig; \
 	fi
-	patch ./vendor/github.com/libvirt/libvirt-go-xml/domain.orig -i ./libvirt-xml-go.patch -o ./vendor/github.com/libvirt/libvirt-go-xml/domain.go
+	if [ ! -f ./vendor/github.com/libvirt/libvirt-go-xml/domain.go.orig ]; then \
+		patch -d vendor/github.com/libvirt/libvirt-go-xml -p1 -b -i $(CURDIR)/libvirt-xml-go.patch; \
+	fi
 	mkdir -p $(builddir)/_output $(builddir)/contrib/images/libvirt/_output
 	go build -o $(builddir)/_output/virtlet ./cmd/virtlet
 	go build -o $(builddir)/_output/vmwrapper ./cmd/vmwrapper

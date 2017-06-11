@@ -292,6 +292,12 @@ func TestDomainDefinitions(t *testing.T) {
                                   - name: cloudy`,
 			},
 		},
+		{
+			name: "virtio disk driver",
+			annotations: map[string]string{
+				"VirtletDiskDriver": "virtio",
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := fake.NewToplevelRecorder()

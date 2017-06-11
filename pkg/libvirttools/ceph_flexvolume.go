@@ -76,7 +76,7 @@ func (v *cephVolume) secretDef() *libvirtxml.Secret {
 	}
 }
 
-func (v *cephVolume) Setup(virtDev string) (*libvirtxml.DomainDisk, error) {
+func (v *cephVolume) Setup() (*libvirtxml.DomainDisk, error) {
 	secretUuid := v.secretUuid()
 	secret, err := v.owner.DomainConnection().LookupSecretByUUIDString(secretUuid)
 	ipPortPair := strings.Split(v.opts.Monitor, ":")
@@ -121,7 +121,6 @@ func (v *cephVolume) Setup(virtDev string) (*libvirtxml.DomainDisk, error) {
 				},
 			},
 		},
-		Target: &libvirtxml.DomainDiskTarget{Dev: virtDev, Bus: "virtio"},
 	}, nil
 }
 

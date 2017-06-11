@@ -126,10 +126,9 @@ func (g *CloudInitGenerator) GenerateDisk() (string, *libvirtxml.DomainDisk, err
 
 	diskDef := &libvirtxml.DomainDisk{
 		Type:     "file",
-		Device:   "disk",
+		Device:   "cdrom",
 		Driver:   &libvirtxml.DomainDiskDriver{Name: "qemu", Type: "raw"},
 		Source:   &libvirtxml.DomainDiskSource{File: isoFile.Name()},
-		Target:   &libvirtxml.DomainDiskTarget{Bus: "virtio"},
 		ReadOnly: &libvirtxml.DomainDiskReadOnly{},
 	}
 	return isoFile.Name(), diskDef, nil

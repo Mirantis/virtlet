@@ -26,14 +26,19 @@ import (
 	"github.com/ghodss/yaml"
 )
 
+type DiskDriver string
+
 const (
-	maxVCPUCount                      = 255
-	VCPUCountAnnotationKeyName        = "VirtletVCPUCount"
-	CloudInitMetaDataKeyName          = "VirtletCloudInitMetaData"
-	CloudInitUserDataKeyName          = "VirtletCloudInitUserData"
-	CloudInitUserDataOverwriteKeyName = "VirtletCloudInitUserDataOverwrite"
-	CloudInitUserDataScriptKeyName    = "VirtletCloudInitUserDataScript"
-	SSHKeysKeyName                    = "VirtletSSHKeys"
+	maxVCPUCount                                 = 255
+	VCPUCountAnnotationKeyName                   = "VirtletVCPUCount"
+	CloudInitMetaDataKeyName                     = "VirtletCloudInitMetaData"
+	CloudInitUserDataKeyName                     = "VirtletCloudInitUserData"
+	CloudInitUserDataOverwriteKeyName            = "VirtletCloudInitUserDataOverwrite"
+	CloudInitUserDataScriptKeyName               = "VirtletCloudInitUserDataScript"
+	SSHKeysKeyName                               = "VirtletSSHKeys"
+	DiskDriverKeyName                            = "VirtletDiskDriver"
+	DiskDriverVirtio                  DiskDriver = "virtio"
+	DiskDriverScsi                    DiskDriver = "scsi"
 )
 
 type VirtletAnnotations struct {
@@ -43,6 +48,7 @@ type VirtletAnnotations struct {
 	UserDataOverwrite bool
 	UserDataScript    string
 	SSHKeys           []string
+	DiskDriver        DiskDriver
 }
 
 func LoadAnnotations(podAnnotations map[string]string) (*VirtletAnnotations, error) {
@@ -95,6 +101,7 @@ func (va *VirtletAnnotations) parsePodAnnotations(podAnnotations map[string]stri
 		}
 	}
 
+	va.DiskDriver = DiskDriver(podAnnotations[DiskDriverKeyName])
 	return nil
 }
 
@@ -102,12 +109,19 @@ func (va *VirtletAnnotations) applyDefaults() {
 	if va.VCPUCount <= 0 {
 		va.VCPUCount = 1
 	}
+	if va.DiskDriver == "" {
+		va.DiskDriver = DiskDriverScsi
+	}
 }
 
 func (va *VirtletAnnotations) validate() error {
 	var errs []string
 	if va.VCPUCount > maxVCPUCount {
 		errs = append(errs, fmt.Sprintf("vcpu count %d too big, max is %d", va.VCPUCount, maxVCPUCount))
+	}
+
+	if va.DiskDriver != DiskDriverVirtio && va.DiskDriver != DiskDriverScsi {
+		errs = append(errs, fmt.Sprintf("bad disk driver %q. Must be either %q or %q", DiskDriverVirtio, DiskDriverScsi))
 	}
 
 	if errs != nil {

@@ -51,7 +51,7 @@ func (v *rootVolume) cloneVolume(name string, from virt.VirtStorageVolume) (virt
 	}, from)
 }
 
-func (v *rootVolume) Setup(virtDev string) (*libvirtxml.DomainDisk, error) {
+func (v *rootVolume) Setup() (*libvirtxml.DomainDisk, error) {
 	imageVolume, err := v.owner.ImageManager().GetImageVolume(v.config.Image)
 	if err != nil {
 		return nil, err
@@ -71,7 +71,6 @@ func (v *rootVolume) Setup(virtDev string) (*libvirtxml.DomainDisk, error) {
 		Device: "disk",
 		Driver: &libvirtxml.DomainDiskDriver{Name: "qemu", Type: "qcow2"},
 		Source: &libvirtxml.DomainDiskSource{File: volPath},
-		Target: &libvirtxml.DomainDiskTarget{Dev: virtDev, Bus: "virtio"},
 	}, nil
 }
 

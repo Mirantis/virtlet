@@ -249,10 +249,9 @@ func TestGenerateDisk(t *testing.T) {
 	}
 	if !reflect.DeepEqual(diskDef, &libvirtxml.DomainDisk{
 		Type:     "file",
-		Device:   "disk",
+		Device:   "cdrom",
 		Driver:   &libvirtxml.DomainDiskDriver{Name: "qemu", Type: "raw"},
 		Source:   &libvirtxml.DomainDiskSource{File: isoPath},
-		Target:   &libvirtxml.DomainDiskTarget{Bus: "virtio"},
 		ReadOnly: &libvirtxml.DomainDiskReadOnly{},
 	}) {
 		t.Errorf("Bad disk definition:\n%s", spew.Sdump(diskDef))

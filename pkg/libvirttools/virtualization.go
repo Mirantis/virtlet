@@ -46,11 +46,6 @@ const (
 	domainShutdownTimeout       = 60 * time.Second
 	domainDestroyCheckInterval  = 500 * time.Millisecond
 	domainDestroyTimeout        = 5 * time.Second
-	minVirtioBlockDevChar       = 'a'
-	// https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/5/html/Virtualization/sect-Virtualization-Virtualization_limitations-KVM_limitations.html
-	// Actually there can be more than 21 block devices (including
-	// the root volume), but we want to be on the safe side here
-	maxVirtioBlockDevChar = 'u'
 
 	ContainerNsUuid       = "67b7fb47-7735-4b64-86d2-6d062d121966"
 	defaultKubeletRootDir = "/var/lib/kubelet/pods"
@@ -81,17 +76,29 @@ func (ds *domainSettings) createDomain() *libvirtxml.Domain {
 		emulator = noKvmEmulator
 	}
 
+	scsiControllerIndex := uint(0)
 	return &libvirtxml.Domain{
 		Devices: &libvirtxml.DomainDeviceList{
 			Emulator: "/vmwrapper",
-			Inputs:   []libvirtxml.DomainInput{libvirtxml.DomainInput{Type: "tablet", Bus: "usb"}},
-			Graphics: []libvirtxml.DomainGraphic{libvirtxml.DomainGraphic{Type: "vnc", Port: -1}},
-			Videos:   []libvirtxml.DomainVideo{libvirtxml.DomainVideo{Model: libvirtxml.DomainVideoModel{Type: "cirrus"}}},
+			Inputs: []libvirtxml.DomainInput{
+				{Type: "tablet", Bus: "usb"},
+			},
+			Graphics: []libvirtxml.DomainGraphic{
+				{Type: "vnc", Port: -1},
+			},
+			Videos: []libvirtxml.DomainVideo{
+				{Model: libvirtxml.DomainVideoModel{Type: "cirrus"}},
+			},
+			Controllers: []libvirtxml.DomainController{
+				{Type: "scsi", Index: &scsiControllerIndex, Model: "virtio-scsi"},
+			},
 		},
 
 		OS: &libvirtxml.DomainOS{
-			Type:        &libvirtxml.DomainOSType{Type: "hvm"},
-			BootDevices: []libvirtxml.DomainBootDevice{libvirtxml.DomainBootDevice{Dev: "hd"}},
+			Type: &libvirtxml.DomainOSType{Type: "hvm"},
+			BootDevices: []libvirtxml.DomainBootDevice{
+				{Dev: "hd"},
+			},
 		},
 
 		Features: &libvirtxml.DomainFeatureList{ACPI: &libvirtxml.DomainFeature{}},
@@ -104,7 +111,7 @@ func (ds *domainSettings) createDomain() *libvirtxml.Domain {
 
 		Name:   ds.domainName,
 		UUID:   ds.domainUUID,
-		Memory: &libvirtxml.DomainMemory{Value: ds.memory, Unit: ds.memoryUnit},
+		Memory: &libvirtxml.DomainMemory{Value: uint(ds.memory), Unit: ds.memoryUnit},
 		VCPU:   &libvirtxml.DomainVCPU{Value: ds.vcpuNum},
 		CPUTune: &libvirtxml.DomainCPUTune{
 			Shares: &libvirtxml.DomainCPUTuneShares{Value: ds.cpuShares},
@@ -187,13 +194,17 @@ func (v *VirtualizationTool) setupVolumes(config *VMConfig, domainDef *libvirtxm
 	if err != nil {
 		return err
 	}
+	diskDriverFunc, err := getDiskDriverFunc(config.ParsedAnnotations.DiskDriver)
+	if err != nil {
+		return err
+	}
 	for n, vmVol := range vmVols {
-		diskChar := minVirtioBlockDevChar + n
-		if diskChar > maxVirtioBlockDevChar {
-			return fmt.Errorf("too many block devices")
+		// TODO: devName
+		_, diskTarget, diskAddress, err := diskDriverFunc(n)
+		if err != nil {
+			return err
 		}
-		virtDev := fmt.Sprintf("vd%c", diskChar)
-		diskDef, err := vmVol.Setup(virtDev)
+		diskDef, err := vmVol.Setup()
 		if err != nil {
 			// try to tear down volumes that were already set up
 			for _, vmVol := range vmVols[:n] {
@@ -203,6 +214,8 @@ func (v *VirtualizationTool) setupVolumes(config *VMConfig, domainDef *libvirtxm
 			}
 			return err
 		}
+		diskDef.Target = diskTarget
+		diskDef.Address = diskAddress
 		domainDef.Devices.Disks = append(domainDef.Devices.Disks, *diskDef)
 	}
 	return nil
@@ -242,6 +255,7 @@ func (v *VirtualizationTool) RemoveLibvirtSandboxLog(sandboxId string) error {
 }
 
 func (v *VirtualizationTool) addSerialDevicesToDomain(sandboxId string, containerAttempt uint32, domain *libvirtxml.Domain, settings domainSettings) error {
+	port := uint(0)
 	if settings.vmLogLocation != vmLogLocationPty {
 		logDir := filepath.Join(settings.vmLogLocation, sandboxId)
 		logPath := filepath.Join(logDir, fmt.Sprintf("_%d.log", containerAttempt))
@@ -253,31 +267,31 @@ func (v *VirtualizationTool) addSerialDevicesToDomain(sandboxId string, containe
 			}
 		}
 
-		domain.Devices.Serials = []libvirtxml.DomainChardev{
-			libvirtxml.DomainChardev{
+		domain.Devices.Serials = []libvirtxml.DomainSerial{
+			{
 				Type:   "file",
-				Target: &libvirtxml.DomainChardevTarget{Port: "0"},
+				Target: &libvirtxml.DomainSerialTarget{Port: &port},
 				Source: &libvirtxml.DomainChardevSource{Path: logPath},
 			},
 		}
-		domain.Devices.Consoles = []libvirtxml.DomainChardev{
-			libvirtxml.DomainChardev{
+		domain.Devices.Consoles = []libvirtxml.DomainConsole{
+			{
 				Type:   "file",
-				Target: &libvirtxml.DomainChardevTarget{Type: "serial", Port: "0"},
+				Target: &libvirtxml.DomainConsoleTarget{Type: "serial", Port: &port},
 				Source: &libvirtxml.DomainChardevSource{Path: logPath},
 			},
 		}
 	} else {
-		domain.Devices.Serials = []libvirtxml.DomainChardev{
-			libvirtxml.DomainChardev{
+		domain.Devices.Serials = []libvirtxml.DomainSerial{
+			{
 				Type:   "pty",
-				Target: &libvirtxml.DomainChardevTarget{Port: "0"},
+				Target: &libvirtxml.DomainSerialTarget{Port: &port},
 			},
 		}
-		domain.Devices.Consoles = []libvirtxml.DomainChardev{
-			libvirtxml.DomainChardev{
+		domain.Devices.Consoles = []libvirtxml.DomainConsole{
+			{
 				Type:   "pty",
-				Target: &libvirtxml.DomainChardevTarget{Type: "serial", Port: "0"},
+				Target: &libvirtxml.DomainConsoleTarget{Type: "serial", Port: &port},
 			},
 		}
 	}

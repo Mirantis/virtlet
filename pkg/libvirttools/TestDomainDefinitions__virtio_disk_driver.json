@@ -109,8 +109,8 @@
   {
     "name": "domain conn: iso image",
     "data": {
-      "meta-data": "{\"instance-id\":\"testName_0.default\",\"local-hostname\":\"testName_0\",\"public-keys\":[\"key1\",\"key2\"]}",
-      "user-data": "#cloud-config\nusers:\n- name: cloudy\n"
+      "meta-data": "{\"instance-id\":\"testName_0.default\",\"local-hostname\":\"testName_0\"}",
+      "user-data": "#cloud-config\n"
     }
   },
   {
@@ -234,22 +234,22 @@
               "StartupPolicy": ""
             },
             "Target": {
-              "Dev": "sda",
-              "Bus": "scsi"
+              "Dev": "vda",
+              "Bus": "virtio"
             },
             "Serial": "",
             "ReadOnly": null,
             "Shareable": null,
             "Address": {
-              "Type": "drive",
-              "Controller": 0,
-              "Domain": null,
-              "Bus": 0,
+              "Type": "pci",
+              "Controller": null,
+              "Domain": 0,
+              "Bus": 1,
               "Port": null,
-              "Slot": null,
-              "Function": null,
-              "Target": 0,
-              "Unit": 0
+              "Slot": 1,
+              "Function": 0,
+              "Target": null,
+              "Unit": null
             },
             "Boot": null
           },
@@ -280,22 +280,22 @@
               "StartupPolicy": ""
             },
             "Target": {
-              "Dev": "sdb",
-              "Bus": "scsi"
+              "Dev": "vdb",
+              "Bus": "virtio"
             },
             "Serial": "",
             "ReadOnly": {},
             "Shareable": null,
             "Address": {
-              "Type": "drive",
-              "Controller": 0,
-              "Domain": null,
-              "Bus": 0,
+              "Type": "pci",
+              "Controller": null,
+              "Domain": 0,
+              "Bus": 1,
               "Port": null,
-              "Slot": null,
-              "Function": null,
-              "Target": 0,
-              "Unit": 1
+              "Slot": 2,
+              "Function": 0,
+              "Target": null,
+              "Unit": null
             },
             "Boot": null
           }

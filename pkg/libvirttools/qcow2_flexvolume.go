@@ -83,7 +83,7 @@ func (v *qcow2Volume) createQCOW2Volume(name string, capacity uint64, capacityUn
 	})
 }
 
-func (v *qcow2Volume) Setup(virtDev string) (*libvirtxml.DomainDisk, error) {
+func (v *qcow2Volume) Setup() (*libvirtxml.DomainDisk, error) {
 	vol, err := v.createQCOW2Volume(v.volumeName(), uint64(v.capacity), v.capacityUnit)
 	if err != nil {
 		return nil, fmt.Errorf("error during creation of volume '%s' with virtlet description %s: %v", v.volumeName(), v.name, err)
@@ -104,7 +104,6 @@ func (v *qcow2Volume) Setup(virtDev string) (*libvirtxml.DomainDisk, error) {
 		Device: "disk",
 		Source: &libvirtxml.DomainDiskSource{File: path},
 		Driver: &libvirtxml.DomainDiskDriver{Name: "qemu", Type: "qcow2"},
-		Target: &libvirtxml.DomainDiskTarget{Dev: virtDev, Bus: "virtio"},
 	}, nil
 }
 

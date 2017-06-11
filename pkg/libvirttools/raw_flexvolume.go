@@ -72,7 +72,7 @@ func (v *rawDeviceVolume) verifyRawDeviceWhitelisted(path string) error {
 	return fmt.Errorf("device '%s' not whitelisted on this virtlet node", path)
 }
 
-func (v *rawDeviceVolume) Setup(virtDev string) (*libvirtxml.DomainDisk, error) {
+func (v *rawDeviceVolume) Setup() (*libvirtxml.DomainDisk, error) {
 	if err := v.verifyRawDeviceWhitelisted(v.devPath); err != nil {
 		return nil, err
 	}
@@ -85,7 +85,6 @@ func (v *rawDeviceVolume) Setup(virtDev string) (*libvirtxml.DomainDisk, error) 
 		Device: "disk",
 		Source: &libvirtxml.DomainDiskSource{Device: v.devPath},
 		Driver: &libvirtxml.DomainDiskDriver{Name: "qemu", Type: "raw"},
-		Target: &libvirtxml.DomainDiskTarget{Dev: virtDev, Bus: "virtio"},
 	}, nil
 }
 
