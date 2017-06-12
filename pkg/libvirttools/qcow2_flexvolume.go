@@ -42,6 +42,7 @@ var capacityRx = regexp.MustCompile(`^\s*(\d+)\s*(\S*)\s*$`)
 
 type qcow2VolumeOptions struct {
 	Capacity string `json:"capacity,omitempty"`
+	Uuid     string `json:"uuid"`
 }
 
 // qcow2Volume denotes a volume in QCOW2 format
@@ -50,17 +51,19 @@ type qcow2Volume struct {
 	capacity     int
 	capacityUnit string
 	name         string
+	uuid         string
 }
 
 func newQCOW2Volume(volumeName, configPath string, config *VMConfig, owner VolumeOwner) (VMVolume, error) {
-	v := &qcow2Volume{
-		volumeBase: volumeBase{config, owner},
-		name:       volumeName,
-	}
 	var err error
 	var opts qcow2VolumeOptions
 	if err = utils.ReadJson(configPath, &opts); err != nil {
 		return nil, fmt.Errorf("failed to parse qcow2 volume config %q: %v", configPath, err)
+	}
+	v := &qcow2Volume{
+		volumeBase: volumeBase{config, owner},
+		name:       volumeName,
+		uuid:       opts.Uuid,
 	}
 
 	v.capacity, v.capacityUnit, err = parseCapacityStr(opts.Capacity)
@@ -83,7 +86,11 @@ func (v *qcow2Volume) createQCOW2Volume(name string, capacity uint64, capacityUn
 	})
 }
 
-func (v *qcow2Volume) Setup() (*libvirtxml.DomainDisk, error) {
+func (v *qcow2Volume) Uuid() string {
+	return v.uuid
+}
+
+func (v *qcow2Volume) Setup(volumeMap map[string]string) (*libvirtxml.DomainDisk, error) {
 	vol, err := v.createQCOW2Volume(v.volumeName(), uint64(v.capacity), v.capacityUnit)
 	if err != nil {
 		return nil, fmt.Errorf("error during creation of volume '%s' with virtlet description %s: %v", v.volumeName(), v.name, err)

@@ -37,8 +37,10 @@ func GetNocloudVolume(config *VMConfig, owner VolumeOwner) ([]VMVolume, error) {
 	}, nil
 }
 
-func (v *nocloudVolume) Setup() (*libvirtxml.DomainDisk, error) {
-	g := NewCloudInitGenerator(v.config)
+func (v *nocloudVolume) Uuid() string { return "" }
+
+func (v *nocloudVolume) Setup(volumeMap map[string]string) (*libvirtxml.DomainDisk, error) {
+	g := NewCloudInitGenerator(v.config, volumeMap)
 	isoPath, nocloudDiskDef, err := g.GenerateDisk()
 	if err != nil {
 		return nil, err

@@ -28,6 +28,7 @@ import (
 
 type rawVolumeOptions struct {
 	Path string `json:"path"`
+	Uuid string `json:"uuid"`
 }
 
 func (vo *rawVolumeOptions) validate() error {
@@ -40,7 +41,7 @@ func (vo *rawVolumeOptions) validate() error {
 // rawDeviceVolume denotes a raw device that's made accessible for a VM
 type rawDeviceVolume struct {
 	volumeBase
-	devPath string
+	opts *rawVolumeOptions
 }
 
 func newRawDeviceVolume(volumeName, configPath string, config *VMConfig, owner VolumeOwner) (VMVolume, error) {
@@ -53,7 +54,7 @@ func newRawDeviceVolume(volumeName, configPath string, config *VMConfig, owner V
 	}
 	return &rawDeviceVolume{
 		volumeBase: volumeBase{config, owner},
-		devPath:    opts.Path,
+		opts:       &opts,
 	}, nil
 }
 
@@ -72,18 +73,22 @@ func (v *rawDeviceVolume) verifyRawDeviceWhitelisted(path string) error {
 	return fmt.Errorf("device '%s' not whitelisted on this virtlet node", path)
 }
 
-func (v *rawDeviceVolume) Setup() (*libvirtxml.DomainDisk, error) {
-	if err := v.verifyRawDeviceWhitelisted(v.devPath); err != nil {
+func (v *rawDeviceVolume) Uuid() string {
+	return v.opts.Uuid
+}
+
+func (v *rawDeviceVolume) Setup(volumeMap map[string]string) (*libvirtxml.DomainDisk, error) {
+	if err := v.verifyRawDeviceWhitelisted(v.opts.Path); err != nil {
 		return nil, err
 	}
 
-	if err := verifyRawDeviceAccess(v.devPath); err != nil {
+	if err := verifyRawDeviceAccess(v.opts.Path); err != nil {
 		return nil, err
 	}
 	return &libvirtxml.DomainDisk{
 		Type:   "block",
 		Device: "disk",
-		Source: &libvirtxml.DomainDiskSource{Device: v.devPath},
+		Source: &libvirtxml.DomainDiskSource{Device: v.opts.Path},
 		Driver: &libvirtxml.DomainDiskDriver{Name: "qemu", Type: "raw"},
 	}, nil
 }

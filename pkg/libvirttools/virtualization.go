@@ -194,17 +194,25 @@ func (v *VirtualizationTool) setupVolumes(config *VMConfig, domainDef *libvirtxm
 	if err != nil {
 		return err
 	}
-	diskDriverFunc, err := getDiskDriverFunc(config.ParsedAnnotations.DiskDriver)
+	diskDriverFactory, err := getDiskDriverFactory(config.ParsedAnnotations.DiskDriver)
 	if err != nil {
 		return err
 	}
+	volumeMap := make(map[string]string)
+	var diskDrivers []diskDriver
 	for n, vmVol := range vmVols {
-		// TODO: devName
-		_, diskTarget, diskAddress, err := diskDriverFunc(n)
+		driver, err := diskDriverFactory(n)
 		if err != nil {
 			return err
 		}
-		diskDef, err := vmVol.Setup()
+		diskDrivers = append(diskDrivers, driver)
+		uuid := vmVol.Uuid()
+		if uuid != "" {
+			volumeMap[uuid] = driver.devPath()
+		}
+	}
+	for n, vmVol := range vmVols {
+		diskDef, err := vmVol.Setup(volumeMap)
 		if err != nil {
 			// try to tear down volumes that were already set up
 			for _, vmVol := range vmVols[:n] {
@@ -214,8 +222,8 @@ func (v *VirtualizationTool) setupVolumes(config *VMConfig, domainDef *libvirtxm
 			}
 			return err
 		}
-		diskDef.Target = diskTarget
-		diskDef.Address = diskAddress
+		diskDef.Target = diskDrivers[n].target()
+		diskDef.Address = diskDrivers[n].address()
 		domainDef.Devices.Disks = append(domainDef.Devices.Disks, *diskDef)
 	}
 	return nil

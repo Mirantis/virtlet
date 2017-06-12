@@ -32,65 +32,99 @@ const (
 	maxScsiBlockDevChar   = 'z'
 )
 
-type diskDriverFunc func(n int) (string, *libvirtxml.DomainDiskTarget, *libvirtxml.DomainAddress, error)
-
-var diskDriverMap = map[DiskDriver]diskDriverFunc{
-	DiskDriverVirtio: virtioBlkDriver,
-	DiskDriverScsi:   scsiDriver,
+type diskDriver interface {
+	devPath() string
+	target() *libvirtxml.DomainDiskTarget
+	address() *libvirtxml.DomainAddress
 }
 
-func virtioBlkDriver(n int) (string, *libvirtxml.DomainDiskTarget, *libvirtxml.DomainAddress, error) {
+type diskDriverFactory func(n int) (diskDriver, error)
+
+var diskDriverMap = map[DiskDriver]diskDriverFactory{
+	DiskDriverVirtio: virtioBlkDriverFactory,
+	DiskDriverScsi:   scsiDriverFactory,
+}
+
+type virtioBlkDriver struct {
+	n        int
+	diskChar int
+}
+
+func virtioBlkDriverFactory(n int) (diskDriver, error) {
 	diskChar := minBlockDevChar + n
 	if diskChar > maxVirtioBlockDevChar {
-		return "", nil, nil, errors.New("too many virtio block devices")
+		return nil, errors.New("too many virtio block devices")
 	}
-	virtDev := fmt.Sprintf("vd%c", diskChar)
-	diskTarget := &libvirtxml.DomainDiskTarget{
-		Dev: virtDev,
+	return &virtioBlkDriver{n, diskChar}, nil
+}
+
+func (d *virtioBlkDriver) devPath() string {
+	return fmt.Sprintf("/dev/vd%c", d.diskChar)
+}
+
+func (d *virtioBlkDriver) target() *libvirtxml.DomainDiskTarget {
+	return &libvirtxml.DomainDiskTarget{
+		Dev: fmt.Sprintf("vd%c", d.diskChar),
 		Bus: "virtio",
 	}
+}
+
+func (d *virtioBlkDriver) address() *libvirtxml.DomainAddress {
 	domain := uint(0)
 	// use bus1 to have more predictable addressing for virtio devs
 	bus := uint(1)
-	slot := uint(n + 1)
+	slot := uint(d.n + 1)
 	function := uint(0)
-	diskAddress := &libvirtxml.DomainAddress{
+	return &libvirtxml.DomainAddress{
 		Type:     "pci",
 		Domain:   &domain,
 		Bus:      &bus,
 		Slot:     &slot,
 		Function: &function,
 	}
-	return "/dev/" + virtDev, diskTarget, diskAddress, nil
 }
 
-func scsiDriver(n int) (string, *libvirtxml.DomainDiskTarget, *libvirtxml.DomainAddress, error) {
+type scsiDriver struct {
+	n        int
+	diskChar int
+}
+
+func scsiDriverFactory(n int) (diskDriver, error) {
 	diskChar := minBlockDevChar + n
 	if diskChar > maxScsiBlockDevChar {
-		return "", nil, nil, errors.New("too many scsi block devices")
+		return nil, errors.New("too many scsi block devices")
 	}
-	virtDev := fmt.Sprintf("sd%c", diskChar)
-	diskTarget := &libvirtxml.DomainDiskTarget{
-		Dev: virtDev,
+	return &scsiDriver{n, diskChar}, nil
+}
+
+func (d *scsiDriver) devPath() string {
+	// FIXME: in case of cdrom, that's actually sr0, but we're
+	// only using cdrom for nocloud drive currently
+	return fmt.Sprintf("/dev/sd%c", d.diskChar)
+}
+
+func (d *scsiDriver) target() *libvirtxml.DomainDiskTarget {
+	return &libvirtxml.DomainDiskTarget{
+		Dev: fmt.Sprintf("sd%c", d.diskChar),
 		Bus: "scsi",
 	}
+}
+
+func (d *scsiDriver) address() *libvirtxml.DomainAddress {
 	controller := uint(0)
 	bus := uint(0)
 	target := uint(0)
-	unit := uint(n)
-	diskAddress := &libvirtxml.DomainAddress{
+	unit := uint(d.n)
+	return &libvirtxml.DomainAddress{
 		Type:       "drive",
 		Controller: &controller,
 		Bus:        &bus,
 		Target:     &target,
 		Unit:       &unit,
 	}
-	// FIXME: in case of cdrom, that's actually sr0, but we're
-	// only using cdrom for nocloud drive currently
-	return "/dev/" + virtDev, diskTarget, diskAddress, nil
 }
 
-func getDiskDriverFunc(name DiskDriver) (diskDriverFunc, error) {
+func getDiskDriverFactory(name DiskDriver) (diskDriverFactory, error) {
 	if f, found := diskDriverMap[name]; found {
 		return f, nil
 	}

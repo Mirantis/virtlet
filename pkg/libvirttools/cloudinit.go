@@ -27,6 +27,7 @@ import (
 	"github.com/golang/glog"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
+	"github.com/Mirantis/virtlet/pkg/flexvolume"
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
@@ -35,11 +36,12 @@ const (
 )
 
 type CloudInitGenerator struct {
-	config *VMConfig
+	config    *VMConfig
+	volumeMap map[string]string
 }
 
-func NewCloudInitGenerator(config *VMConfig) *CloudInitGenerator {
-	return &CloudInitGenerator{config}
+func NewCloudInitGenerator(config *VMConfig, volumeMap map[string]string) *CloudInitGenerator {
+	return &CloudInitGenerator{config: config, volumeMap: volumeMap}
 }
 
 func (g *CloudInitGenerator) generateMetaData() ([]byte, error) {
@@ -76,6 +78,9 @@ func (g *CloudInitGenerator) generateUserData() ([]byte, error) {
 
 	// TODO: use merge algorithm
 	g.addEnvVarsFileToWriteFiles(userData)
+
+	// TODO: use merge algorithm
+	g.addMounts(userData)
 
 	r := []byte{}
 	if len(userData) != 0 {
@@ -165,4 +170,49 @@ func (g *CloudInitGenerator) addEnvVarsFileToWriteFiles(userData map[string]inte
 		"path":    EnvFileLocation,
 		"content": content,
 	})
+}
+
+func (g *CloudInitGenerator) generateMounts() []interface{} {
+	var r []interface{}
+	for _, m := range g.config.Mounts {
+		uuid, part, err := flexvolume.GetFlexvolumeInfo(m.HostPath)
+		if err != nil {
+			glog.Errorf("Can't mount directory %q to %q inside the VM: can't get flexvolume uuid: %v", m.HostPath, m.ContainerPath, err)
+			continue
+		}
+		devPath, found := g.volumeMap[uuid]
+		if !found {
+			glog.Errorf("Can't mount directory %q to %q inside the VM: no device found for flexvolume uuid %q", m.HostPath, m.ContainerPath, uuid)
+			continue
+		}
+		if part < 0 {
+			part = 1
+		}
+		if part != 0 {
+			devPath = fmt.Sprintf("%s%d", devPath, part)
+		}
+		r = append(r, []interface{}{devPath, m.ContainerPath})
+	}
+	return r
+}
+
+func (g *CloudInitGenerator) addMounts(userData map[string]interface{}) {
+	mounts := g.generateMounts()
+	if len(mounts) == 0 {
+		return
+	}
+
+	// TODO: use merge algorithm instead
+	var oldMounts []interface{}
+	oldMountsRaw, _ := userData["mounts"]
+	if oldMountsRaw != nil {
+		var ok bool
+		oldMounts, ok = oldMountsRaw.([]interface{})
+		if !ok {
+			glog.Warning("malformed mounts entry in user-data, can't add mounts")
+			return
+		}
+	}
+
+	userData["mounts"] = append(oldMounts, mounts...)
 }

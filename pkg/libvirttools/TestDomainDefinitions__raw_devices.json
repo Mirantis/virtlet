@@ -258,52 +258,6 @@
               "Space": "",
               "Local": ""
             },
-            "Type": "file",
-            "Device": "cdrom",
-            "Snapshot": "",
-            "Driver": {
-              "Name": "qemu",
-              "Type": "raw",
-              "Cache": "",
-              "IO": "",
-              "ErrorPolicy": ""
-            },
-            "Auth": null,
-            "Source": {
-              "File": "--volatile-path-replaced-by-FakeDomainConnection--",
-              "Device": "",
-              "Protocol": "",
-              "Name": "",
-              "Pool": "",
-              "Volume": "",
-              "Hosts": null,
-              "StartupPolicy": ""
-            },
-            "Target": {
-              "Dev": "sdb",
-              "Bus": "scsi"
-            },
-            "Serial": "",
-            "ReadOnly": {},
-            "Shareable": null,
-            "Address": {
-              "Type": "drive",
-              "Controller": 0,
-              "Domain": null,
-              "Bus": 0,
-              "Port": null,
-              "Slot": null,
-              "Function": null,
-              "Target": 0,
-              "Unit": 1
-            },
-            "Boot": null
-          },
-          {
-            "XMLName": {
-              "Space": "",
-              "Local": ""
-            },
             "Type": "block",
             "Device": "disk",
             "Snapshot": "",
@@ -326,11 +280,57 @@
               "StartupPolicy": ""
             },
             "Target": {
-              "Dev": "sdc",
+              "Dev": "sdb",
               "Bus": "scsi"
             },
             "Serial": "",
             "ReadOnly": null,
+            "Shareable": null,
+            "Address": {
+              "Type": "drive",
+              "Controller": 0,
+              "Domain": null,
+              "Bus": 0,
+              "Port": null,
+              "Slot": null,
+              "Function": null,
+              "Target": 0,
+              "Unit": 1
+            },
+            "Boot": null
+          },
+          {
+            "XMLName": {
+              "Space": "",
+              "Local": ""
+            },
+            "Type": "file",
+            "Device": "cdrom",
+            "Snapshot": "",
+            "Driver": {
+              "Name": "qemu",
+              "Type": "raw",
+              "Cache": "",
+              "IO": "",
+              "ErrorPolicy": ""
+            },
+            "Auth": null,
+            "Source": {
+              "File": "--volatile-path-replaced-by-FakeDomainConnection--",
+              "Device": "",
+              "Protocol": "",
+              "Name": "",
+              "Pool": "",
+              "Volume": "",
+              "Hosts": null,
+              "StartupPolicy": ""
+            },
+            "Target": {
+              "Dev": "sdc",
+              "Bus": "scsi"
+            },
+            "Serial": "",
+            "ReadOnly": {},
             "Shareable": null,
             "Address": {
               "Type": "drive",

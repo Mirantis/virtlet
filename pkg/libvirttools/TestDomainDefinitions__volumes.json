@@ -370,11 +370,11 @@
               "Local": ""
             },
             "Type": "file",
-            "Device": "cdrom",
+            "Device": "disk",
             "Snapshot": "",
             "Driver": {
               "Name": "qemu",
-              "Type": "raw",
+              "Type": "qcow2",
               "Cache": "",
               "IO": "",
               "ErrorPolicy": ""
@@ -395,7 +395,7 @@
               "Bus": "scsi"
             },
             "Serial": "",
-            "ReadOnly": {},
+            "ReadOnly": null,
             "Shareable": null,
             "Address": {
               "Type": "drive",
@@ -508,11 +508,11 @@
               "Local": ""
             },
             "Type": "file",
-            "Device": "disk",
+            "Device": "cdrom",
             "Snapshot": "",
             "Driver": {
               "Name": "qemu",
-              "Type": "qcow2",
+              "Type": "raw",
               "Cache": "",
               "IO": "",
               "ErrorPolicy": ""
@@ -533,7 +533,7 @@
               "Bus": "scsi"
             },
             "Serial": "",
-            "ReadOnly": null,
+            "ReadOnly": {},
             "Shareable": null,
             "Address": {
               "Type": "drive",

@@ -37,6 +37,7 @@ type cephFlexvolumeOptions struct {
 	Secret   string `json:"secret"`
 	User     string `json:"user"`
 	Protocol string `json:"protocol"`
+	Uuid     string `json:"uuid"`
 }
 
 // cephVolume denotes a Ceph RBD volume
@@ -76,7 +77,11 @@ func (v *cephVolume) secretDef() *libvirtxml.Secret {
 	}
 }
 
-func (v *cephVolume) Setup() (*libvirtxml.DomainDisk, error) {
+func (v *cephVolume) Uuid() string {
+	return v.opts.Uuid
+}
+
+func (v *cephVolume) Setup(volumeMap map[string]string) (*libvirtxml.DomainDisk, error) {
 	secretUuid := v.secretUuid()
 	secret, err := v.owner.DomainConnection().LookupSecretByUUIDString(secretUuid)
 	ipPortPair := strings.Split(v.opts.Monitor, ":")
