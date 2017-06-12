@@ -63,7 +63,7 @@ func WriteJson(filename string, v interface{}, perm os.FileMode) error {
 		return fmt.Errorf("couldn't marshal the data to JSON for %q: %v", filename, err)
 	}
 	if err := ioutil.WriteFile(filename, content, perm); err != nil {
-		return fmt.Errorf("error writing JSON data file %q: %V", filename, err)
+		return fmt.Errorf("error writing JSON data file %q: %v", filename, err)
 	}
 	return nil
 }
