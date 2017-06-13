@@ -1,12 +1,34 @@
 # Volume Handling
 
+Virtlet volumes can use either `virtio-blk` or `virtio-scsi` storage
+backends for the volumes. `virtio-scsi` is the default, but it can be
+overridden using `VirtletDiskDriver` annotation:
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cirros-vm
+  annotations:
+    kubernetes.io/target-runtime: virtlet
+    VirtletDiskDriver: virtio
+```
+
+The selected mechanism is used for the rootfs, nocloud cloud-init
+CD-ROM and all the flexvolume types that Virtlet supports.
+
 ## Caveats and Limitations
 
-1. Virtlet uses virtio block device driver.
-1. The overal allowed number of volumes can be attached to single VM is up to 20 regardless of ephemeral, persistent and/or raw devices.
-1. Virtlet sets name for disks in a form ```vd + <disk-letter>```, where disk letter for disk is set in alphabet order from 'b' to 'u' (20 in overall) while forms domain's xml definition. The first one - 'vda' - is used for boot image.
+1. The overall allowed number of volumes that can be attached to a
+   single VM (including implicit volumes for the boot disk and nocloud
+   cloud-init CD-ROM) is 20 in case of `virtio-blk` and 26 in case of
+   `virtio-scsi` driver. The limits can be exteneded in future.
+1. When generating libvirt domain definition, Virtlet constructs disk
+   names as ```sd + <disk-char>``` in case of `virtio-scsi` and as
+   ```vd + <disk-char>``` in case of `virtio-blk`, where `disk-char`
+   is a lowercase latin letter starting with 'a'. The first block
+   device, `sda` or `vda`, is used for the boot disk.
 
-```
+```xml
 <domain type='qemu' id='2' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'>
   <name>de0ae972-4154-4f8f-70ff-48335987b5ce-cirros-vm-rbd</name>
 ....
@@ -15,17 +37,17 @@
     <emulator>/vmwrapper</emulator>
     <disk type='file' device='disk'>
       ...
-      <target dev='vda' bus='virtio'/>
+      <target dev='sda' bus='scsi/'>
       ...
     </disk>
     <disk type='file' device='disk'>
       ...
-      <target dev='vdb' bus='virtio'/>
+      <target dev='sdb' bus='scsi'/>
       ...
     </disk>
     <disk type='network' device='disk'>
       ...
-      <target dev='vdc' bus='virtio'/>
+      <target dev='sdc' bus='scsi'/>
       ...
     </disk>
 
@@ -35,19 +57,27 @@
 ...
 </domain>
 ```
-Despite of this you must not expect correspondence between the name of device within OS and the one which was set in domain definition, as this part is up to the guest OS.
 
-From [Libvirt spec](http://libvirt.org/formatdomain.html#elementsDisks):
+Virtlet tries to do its best so as to make the disk names specified in
+the domain definition to match the devices inside VM in case of Linux
+system.  This will be the case with most Linux images when using
+`virtio-scsi` driver, but in case of `virtio-blk` it depends on
+whether the device naming/numbering in the VM follows the numbering of
+PCI slots used for `virtio-blk` devices. We didn't study this part
+well enough yet.
 
-> **target**
-> The target element controls the bus / device under which the disk is exposed to the guest OS. The dev attribute indicates the "logical" device name. The actual device name specified is not guaranteed to map to the device name in the guest OS. Treat it as a device ordering hint
-
-4. Attached disks are visible by the OS inside VM as hard disk devices `/dev/vdb`, `/dev/vdc` and so on. As said above there is no fixed behaviour for device names and their order on the PCI bus.
+3. The attached disks are visible by the OS inside VM as hard disk
+   devices `/dev/sdb`, `/dev/sdc` and so on (`/dev/sdb`, `/dev/sdc`
+   and so on in case of `virtio-blk`). As said above there is no fixed
+   behavior for device names and their order on the PCI bus.
 
 ## Flexvolume driver
 
-Virtlet uses custom [FlexVolume](https://github.com/kubernetes/community/blob/master/contributors/devel/flexvolume.md) driver (`virtlet/flexvolume_driver`) to specify block devices for the VMs.
-Flexvolume options must include `type` field with one of the following values:
+Virtlet uses custom
+[FlexVolume](https://github.com/kubernetes/community/blob/master/contributors/devel/flexvolume.md)
+driver (`virtlet/flexvolume_driver`) to specify block devices for the
+VMs. Flexvolume options must include `type` field with one of the
+following values:
 * `qcow2` - ephemeral volume
 * `raw` - raw device
 * `ceph` - Ceph RBD
@@ -105,11 +135,19 @@ spec:
         type: qcow2
 ```
 
-According to this definition will be created VM-POD with VM with 2 equal volumes, attached, which can be found in "volumes" pool under `<domain-uuid>-vol1` and `<domain-uuid>-vol2`
-A clone of boot image is exposed as **vda** device to the guest OS.
-On a typical linux system the additional volume disks are assigned to /dev/vdX devices in an alphabetical order, so vol1 will be /dev/vdb and vol2 will be /dev/vdc, but please refer to caveat #3 at the beginning of this document.
+According to this definition will be created VM-POD with VM with 2
+equal volumes, attached, which can be found in "volumes" pool under
+`<domain-uuid>-vol1` and `<domain-uuid>-vol2` A clone of boot image is
+exposed as `sda` device to the guest OS.
+On a typical Linux system the additional volume disks are assigned to
+`/dev/sdX` (`/dev/vdX` in case of `virtio-blk`) devices in an
+alphabetical order, so vol1 will be `/dev/sdb` (`/dev/vdb`) and vol2
+will be `/dev/sdc` (`/dev/vdc`), but please refer to the caveat #3 at
+the beginning of this document.
 
-When a pod is removed, all the volumes related to it are removed too. This includes the root disk (a clone of the boot image) and any additional volumes.
+When a pod is removed, all the volumes related to it are removed
+too. This includes the root disk (a clone of the boot image) and any
+additional volumes.
 
 ## Persistent Storage
 
@@ -130,11 +168,11 @@ As of now, there's no need to mount volumes into the container, it's enough to d
 - pool: <pool-name>
 ```
 
-## Flexvolume driver implemetation details
+## Flexvolume driver implementation details
 1. It's expected that the driver's binary resides at `/usr/libexec/kubernetes/kubelet-plugins/volume/exec/virtlet~flexvolume_driver/flexvolume_driver` before kubelet is started. Note that if you're using DaemonSet for virtlet deployment, you don't need to bother about that because in that case it's done automatically.
 1. Kubelet calls the virtlet flexvolume driver and passes volume info to it
-1. Virtlet flexvolume driver uses standard kubelet's dir `/var/lib/kubelet/pods/<pod-id>/volumes/virtlet~flexvolume_driver/<volume-name>` to store a json file with flexvolume configuration.
-4. Virtlet checks whether there are dirs with volume info under `/var/lib/kubelet/pods/<pod-id>/volumes/virtlet~flexvolume_driver`. If yes, virtlet parses the json configuration file and updates the domain definition accordingly.
+1. Virtlet flexvolume driver uses standard kubelet dir `/var/lib/kubelet/pods/<pod-id>/volumes/virtlet~flexvolume_driver/<volume-name>` to store a JSON file with flexvolume configuration.
+4. Virtlet checks whether there are dirs with volume info under `/var/lib/kubelet/pods/<pod-id>/volumes/virtlet~flexvolume_driver`. If yes, virtlet parses the JSON configuration file and updates the domain definition accordingly.
 
 #### Example of VM-pod definition with a ceph volume:
 ```yaml
@@ -176,8 +214,8 @@ spec:
 # virsh domblklist 2
 Target     Source
 ------------------------------------------------
-vda        /var/lib/virtlet/root_de0ae972-4154-4f8f-70ff-48335987b5ce
-vdb        libvirt-pool/rbd-test-image
+sda        /var/lib/virtlet/root_de0ae972-4154-4f8f-70ff-48335987b5ce
+sdb        libvirt-pool/rbd-test-image
 ```
 
 ### Raw devices
@@ -216,18 +254,19 @@ spec:
         path: /dev/loop0
 ```
 
-As always, the boot image is exposed to the guest OS under **vda** device.
+As always, the boot disk is exposed to the guest OS as `sda` device.
 This pod definition exposes a single raw device to the VM (/dev/loop0).
-As devices/volumes are exposed in the alphabet order starting from `b`, `vol1` will be visible on typical linux VM as `vdb`, but please reffer to third caveats of listed at the top of this document.
+As devices/volumes are exposed in the alphabet order starting from `b`, `vol1` will be visible on typical Linux VM as `sdb`, but please refer to the caveat #3 at the beginning of this document.
 
 #### Raw device whitelist
 
-Virtlet allows to expose to VM only whitelisted raw devices. This list is controlled by `-raw-devices` parameter for `virtlet` binary. It's value is passed to `virtlet` daemonset using `VIRTLET_RAW_DEVICES` environment variable.
-This `-raw-devices` parameter should contain comma separated patterns of paths relative to `/dev` directory, which are used to [glob](https://en.wikipedia.org/wiki/Glob_(programming)) paths of devices, allowed to use by virtual machines.
+Virtlet only allows exposing to VM only those raw devices that are whitelisted. This list is controlled by `-raw-devices` parameter for `virtlet` binary. Its value is passed to `virtlet` daemonset using `VIRTLET_RAW_DEVICES` environment variable.
+This `-raw-devices` parameter should contain comma separated patterns of paths relative to `/dev` directory, which are [globbed](https://en.wikipedia.org/wiki/Glob_(programming)) to get the list of paths of raw devices that can be used by virtual machines.
 When not set, it defaults to `loop*`.
 
-The easiest method of passing this parameter to `virtlet` is to use [configmap](https://kubernetes.io/docs/tasks/configure-pod-container/configmap) to contain a key/value pair (e.x. `devices.raw=loop*,mapper/vm_pool-*`), which then can be used in `deploy/virtlet_ds.yaml` after setting:
+One way to pass this parameter to `virtlet` is to use [configmap](https://kubernetes.io/docs/tasks/configure-pod-container/configmap) to contain a key/value pair (e.x. `devices.raw=loop*,mapper/vm_pool-*`), which then can be used by modifying `deploy/virtlet-ds.yaml` in the following manner:
 ```yaml
+...
 spec:
   ...
   containers:
@@ -240,4 +279,51 @@ spec:
           configMapKeyRef:
             name: name-of-configmap-for-this-node
             key: devices.raw
+```
+
+### Mounting the volumes into the VMs
+
+In case if the guest OS supports proper `#cloud-config` format of
+cloud-init userdata which includes supporting `mounts` module,
+it's possible to mount the flexvolumes into the VM using usual
+pod `volumeMounts` notation:
+
+```yaml
+...
+spec:
+...
+  containers:
+  - name: ubuntu-vm
+    image: virtlet/cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img
+    volumeMounts:
+    - name: docker
+      mountPath: /var/lib/docker
+  volumes:
+  - name: docker
+    flexVolume:
+      driver: "virtlet/flexvolume_driver"
+      options:
+        type: qcow2
+        capacity: 2048MB
+```
+
+The example above adds an ephemeral volume to the VM and mounts it
+under `/var/lib/docker` in the guest OS filesystem.
+
+When mounting a device, Virtlet defaults to mounting its 1st
+partition. This can be changed by specifying `part` option in the
+flexvolume definition, which may make sense in case of e.g. raw
+devices. `part` value of `0` denotes mounting the device itself and
+not looking for partitions on it, and `part` values above 0 denote the
+corresponding partition numbers. Below is an example:
+
+```yaml
+  volumes:
+  - name: raw
+    flexVolume:
+      driver: "virtlet/flexvolume_driver"
+      options:
+        type: raw
+        path: /dev/sdc
+        part: 2
 ```
