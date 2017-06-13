@@ -27,8 +27,6 @@ spec:
       annotations:
         kubernetes.io/target-runtime: virtlet
         VirtletCloudInitUserData: |
-          mounts:
-          - [ /dev/vdc1, /var/lib/docker ]
           write_files:
           - path: /etc/systemd/system/docker.service.d/env.conf
             permissions: "0644"
@@ -103,6 +101,9 @@ spec:
           tcpSocket:
             port: 22
           initialDelaySeconds: 5
+        volumeMounts:
+        - name: docker
+          mountPath: /var/lib/docker
       volumes:
       - name: docker
         flexVolume:
