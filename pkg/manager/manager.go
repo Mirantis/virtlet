@@ -354,8 +354,6 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 	netNSPath := cni.PodNetNSPath(podSandboxId)
 	glog.V(2).Infof("CreateContainer: imageName %s, ip %s, network namespace %s", config.GetImage().Image, netResult.IP4.IP.IP.String(), netNSPath)
 
-	// TODO: we should not pass whole "in" to CreateContainer - we should pass there only needed info for CreateContainer
-	// without whole data container
 	// TODO: use network configuration by CreateContainer
 	vmConfig, err := libvirttools.GetVMConfig(in)
 	if err != nil {
