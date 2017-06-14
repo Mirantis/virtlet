@@ -28,6 +28,8 @@ SCRIPT_DIR="$(cd $(dirname "$(readlinkf "${BASH_SOURCE}")"); pwd)"
 virsh="${SCRIPT_DIR}/../../examples/virsh.sh"
 vmssh="${SCRIPT_DIR}/../../examples/vmssh.sh"
 
+source "${SCRIPT_DIR}/../../examples/util.sh"
+
 # provide path for kubectl
 export PATH="${HOME}/.kubeadm-dind-cluster:${PATH}"
 
@@ -47,6 +49,28 @@ function wait-for-pod {
     echo -n "." >&2
   done
   echo >&2
+}
+
+function check-all-cleaned {
+  local podID="${1}"
+  # TODO: get rid of this sleep
+  # for some reason even after 'kubectl get pod' check returns 'NOT FOUND'
+  # domain remains defined for some time
+  sleep 60
+  if "${virsh}" list --all | grep ${podID}; then
+    echo "domain ${podID} still listed after deletion" >&2
+    exit 1
+  fi
+
+  if "${virsh}" vol-list --pool volumes | grep ${podID}; then
+    echo "volumes for domain ${podID} still listed after deletion" >&2
+    exit 1
+  fi
+
+   if "${virsh}" secret-list | grep ceph; then
+     echo "secret for domain ${podID} still listed after deletion" >&2
+     exit 1
+   fi
 }
 
 function wait-for-ssh {
@@ -90,7 +114,7 @@ function vmchat-short {
 
   count=$(../../examples/vmssh.sh "cirros@${vmname}" "ip a" | grep "eth0:" | wc -l)
   if [[ ${count} != 1 ]]; then
-    echo "Executing 'ip a' failed. Expected 1 line but got ${count}"
+    echExecuting 'ip a' failed. Expected 1 line but got ${count}"
     exit 1
   fi
 }
@@ -225,7 +249,13 @@ verify-cpu-count 1
 
 # test pod removal
 
-delete-pod-and-wait cirros-vm
+podID=$(get_pod_domain_id @cirros-vm-rbd | sed s/-cirros-vm-rbd//)
+delete-pod-and-wait cirros-vm-rbd
+check-all-cleaned ${podID}
+
+podID=$(get_pod_domain_id @cirros-vm | sed s/-cirros-vm//)
+delete-pod-and-wait cirros-vm-rbd
+check-all-cleaned ${podID}
 
 # test changing vcpu count
 
