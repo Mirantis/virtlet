@@ -78,6 +78,12 @@ well enough yet.
    devices `/dev/sdb`, `/dev/sdc` and so on (`/dev/vdb`, `/dev/vdc`
    and so on in case of `virtio-blk`). As said above there is no fixed
    behavior for device names and their order on the PCI bus.
+4. As with the majority of other guest OS functionality, Virtlet
+   doesn't give any guarantee about the possibility of mounting
+   flexvolumes into the VM. This depends on the cloud-init
+   functionality supported by the image used. Also note that Virtlet
+   doesn't perform any checks on the guest OS side to ensure that
+   volume mounting succeeded.
 
 ## Flexvolume driver
 
