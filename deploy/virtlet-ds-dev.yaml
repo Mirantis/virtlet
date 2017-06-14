@@ -96,7 +96,10 @@ spec:
           name: dind
         - mountPath: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
           name: k8s-flexvolume-plugins-dir
-        - mountPath: /var/lib/kubelet/pods
+          # below `:shared` is unofficial way to pass this option docker
+          # which then will allow virtlet to see what kubelet mounts in
+          # underlaying directories, after virtlet container is created
+        - mountPath: /var/lib/kubelet/pods:shared
           name: k8s-pods-dir
         securityContext:
           privileged: true

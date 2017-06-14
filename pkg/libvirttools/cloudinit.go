@@ -18,10 +18,14 @@ package libvirttools
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
+	"path/filepath"
+	"strings"
 
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
@@ -78,6 +82,10 @@ func (g *CloudInitGenerator) generateUserData() ([]byte, error) {
 
 	// TODO: use merge algorithm
 	g.addEnvVarsFileToWriteFiles(userData)
+
+	writeFilesManipulator := NewWriteFilesManipulator(userData, g.config.Mounts)
+	writeFilesManipulator.AddSecrets()
+	writeFilesManipulator.AddConfigMapEntries()
 
 	// TODO: use merge algorithm
 	g.addMounts(userData)
@@ -209,10 +217,134 @@ func (g *CloudInitGenerator) addMounts(userData map[string]interface{}) {
 		var ok bool
 		oldMounts, ok = oldMountsRaw.([]interface{})
 		if !ok {
-			glog.Warning("malformed mounts entry in user-data, can't add mounts")
+			glog.Warning("Malformed mounts entry in user-data, can't add mounts")
 			return
 		}
 	}
 
 	userData["mounts"] = append(oldMounts, mounts...)
+}
+
+type WriteFilesManipulator struct {
+	userData map[string]interface{}
+	mounts   []*VMMount
+}
+
+func NewWriteFilesManipulator(userData map[string]interface{}, mounts []*VMMount) *WriteFilesManipulator {
+	return &WriteFilesManipulator{
+		userData: userData,
+		mounts:   mounts,
+	}
+}
+
+func (m *WriteFilesManipulator) AddSecrets() {
+	m.addFilesFor("secret", "0600")
+}
+
+func (m *WriteFilesManipulator) AddConfigMapEntries() {
+	m.addFilesFor("configmap", "0644")
+}
+
+func (m *WriteFilesManipulator) addFilesFor(suffix, permissions string) {
+	var oldWriteFiles []interface{}
+	oldWriteFilesRaw, _ := m.userData["write_files"]
+	if oldWriteFilesRaw != nil {
+		var ok bool
+		oldWriteFiles, ok = oldWriteFilesRaw.([]interface{})
+		if !ok {
+			glog.Warning("Malformed write_files entry in user-data, can't add new entries")
+			return
+		}
+	}
+
+	filter := "volumes/kubernetes.io~" + suffix + "/"
+
+	var writeFiles []interface{}
+	for _, mount := range m.mounts {
+		if !strings.Contains(mount.HostPath, filter) {
+			continue
+		}
+		entries := m.addFilesForMount(mount, permissions)
+		writeFiles = append(writeFiles, entries...)
+	}
+	if writeFiles != nil {
+		m.userData["write_files"] = append(oldWriteFiles, writeFiles...)
+	}
+}
+
+func (m *WriteFilesManipulator) addFilesForMount(mount *VMMount, permissions string) []interface{} {
+	var writeFiles []interface{}
+
+	addFileContent := func(fullPath string) error {
+		content, err := ioutil.ReadFile(fullPath)
+		if err != nil {
+			return err
+		}
+		relativePath := fullPath[len(mount.HostPath)+1:]
+
+		encodedContent := base64.StdEncoding.EncodeToString(content)
+		writeFiles = append(writeFiles, map[string]interface{}{
+			"path":        path.Join(mount.ContainerPath, relativePath),
+			"content":     encodedContent,
+			"encoding":    "b64",
+			"permissions": permissions,
+		})
+
+		return nil
+	}
+
+	scanDirectory := func(name string) error {
+		entries, err := ioutil.ReadDir(name)
+		if err != nil {
+			return err
+		}
+
+		for _, entry := range entries {
+			fullPath := path.Join(name, entry.Name())
+			// look for regular files
+			if entry.Mode().IsRegular() {
+				glog.V(3).Infof("Found regular file: %s", entry.Name())
+				err := addFileContent(fullPath)
+				if err != nil {
+					return err
+				}
+				continue
+			}
+
+			// .. or for symlinks for regular files
+			if entry.Mode()&os.ModeSymlink != 0 {
+				glog.V(3).Infof("Found symlink: %s", entry.Name())
+				fi, err := os.Stat(fullPath)
+				if err != nil {
+					return err
+				}
+				if fi.Mode().IsRegular() {
+					err := addFileContent(fullPath)
+					if err != nil {
+						return err
+					}
+				} else {
+					glog.V(3).Infof("... but it's pointing to something other than regular file")
+				}
+			}
+		}
+		return nil
+	}
+
+	scanner := func(name string, f os.FileInfo, err error) error {
+		if f.IsDir() {
+			glog.V(3).Infof("Found dir: %s", name)
+			return scanDirectory(name)
+		}
+
+		return nil
+	}
+
+	glog.V(3).Infof("Scanning %s for files", mount.HostPath)
+	if err := filepath.Walk(mount.HostPath, scanner); err != nil {
+		glog.Errorf("Error while scanning directory %s: %v", mount.HostPath, err)
+	}
+	glog.V(3).Infof("Found %d entries", len(writeFiles))
+
+	return writeFiles
 }
