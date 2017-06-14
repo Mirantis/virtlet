@@ -98,8 +98,6 @@ following values:
 
 See the following sections for more info on these.
 
-The plan is also to provide examples of using the flexvolume driver for [PVs and PVCs](https://kubernetes.io/docs/concepts/storage/persistent-volumes/).
-
 ## Ephemeral Local Storage
 
 **Volume naming:** `<domain-uuid>-<vol-name-specified-in-the-flexvolume>`
@@ -222,7 +220,68 @@ spec:
           Pool: libvirt-pool
 ```
 
+### Example of VM-pod definition with a ceph volume using [PVs and PVCs](https://kubernetes.io/docs/concepts/storage/persistent-volumes/).
+
+```yaml
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-rbd-virtlet
+spec:
+  capacity:
+    storage: 10M
+  accessModes:
+    - ReadWriteOnce
+  flexVolume:
+    driver: "virtlet/flexvolume_driver"
+    options:
+      type: ceph
+      monitor: 10.192.0.1:6789
+      user: libvirt
+      secret: AQA1VTpZMnf7ChAAqWQPmvq8pIXPYIDBiRsXeA==
+      volume: rbd-test-image-pv
+      pool: libvirt-pool
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: rbd-claim
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10M
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cirros-vm-rbd
+  annotations:
+    kubernetes.io/target-runtime: virtlet
+spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: extraRuntime
+            operator: In
+            values:
+            - virtlet
+  containers:
+    - name: cirros-vm-rbd
+      image: virtlet/image-service.kube-system/cirros
+  volumes:
+    - name: test
+      persistentVolumeClaim:
+        claimName: rbd-claim
+
+```
+
 **NOTE: All defined volumes will be attached to VM, no additional settings needed inside container spec.**
+
 
 ```
 # virsh domblklist 2

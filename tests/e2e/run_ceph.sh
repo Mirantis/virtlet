@@ -50,7 +50,8 @@ docker exec ${container_name} /bin/bash -c 'echo -e "rbd default features = 1\nr
 # Add rbd pool and volume
 docker exec ${container_name} ceph osd pool create libvirt-pool 8 8
 docker exec ceph_cluster /bin/bash -c "apt-get update && apt-get install -y qemu-utils"
-docker exec ${container_name} qemu-img create -f rbd rbd:libvirt-pool/rbd-test-image 2G
+docker exec ${container_name} qemu-img create -f rbd rbd:libvirt-pool/rbd-test-image 10M 
+docker exec ${container_name} qemu-img create -f rbd rbd:libvirt-pool/rbd-test-image-pv 10M
 
 # Add user for virtlet
 docker exec ${container_name} ceph auth get-or-create client.libvirt
@@ -61,3 +62,6 @@ SECRET="$(docker exec ${container_name} ceph auth get-key client.libvirt)"
 sed "s^@MON_IP@^${MON_IP}^g;s^@SECRET@^${SECRET}^g" \
     "${SCRIPT_DIR}/../../examples/cirros-vm-rbd-volume.yaml.tmpl" \
     > "${SCRIPT_DIR}/cirros-vm-rbd-volume.yaml"
+sed "s^@MON_IP@^${MON_IP}^g;s^@SECRET@^${SECRET}^g" \
+    "${SCRIPT_DIR}/../../examples/cirros-vm-rbd-pv-volume.yaml.tmpl" \
+    > "${SCRIPT_DIR}/cirros-vm-rbd-pv-volume.yaml"

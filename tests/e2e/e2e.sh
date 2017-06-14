@@ -142,10 +142,28 @@ virtlet_pod_name=$(kubectl get pods --namespace=kube-system | grep -v virtlet-lo
 # Run one-node ceph cluster
 "${SCRIPT_DIR}/run_ceph.sh" "${SCRIPT_DIR}"
 
+# check attaching RBD device that's specified in the pod definition
 kubectl create -f "${SCRIPT_DIR}/cirros-vm-rbd-volume.yaml"
 wait-for-pod cirros-vm-rbd
-if [ "$(${virsh} domblklist @cirros-vm-rbd | grep rbd-test-image | wc -l)" != "1" ]; then
+if [ "$(${virsh} domblklist @cirros-vm-rbd | grep rbd-test-image$ | wc -l)" != "1" ]; then
   echo "ceph: failed to find rbd-test-image in domblklist" >&2
+  exit 1
+fi
+
+# check attaching rbd device specified using PV/PVC
+# tmp workaround: clear secret
+secretUUID=$(${virsh} secret-list | grep ceph | awk '{print $1}')
+if [[ ${secretUUID} ]]; then
+  if ! ${virsh} secret-undefine ${secretUUID} >&/dev/null; then
+    echo "ceph: failed to clear secret"
+    exit 1
+  fi
+fi
+
+kubectl create -f "${SCRIPT_DIR}/cirros-vm-rbd-pv-volume.yaml"
+wait-for-pod cirros-vm-rbd-pv
+if [ "$(${virsh} domblklist @cirros-vm-rbd-pv | grep rbd-test-image-pv$ | wc -l)" != "1" ]; then
+  echo "ceph: failed to find rbd-test-image-pv in domblklist" >&2
   exit 1
 fi
 
@@ -163,12 +181,12 @@ fi
 # grab screenshots
 
 if ! kubectl exec "${virtlet_pod_name}" -c virtlet --namespace=kube-system -- /bin/sh -c "vncsnapshot :0 /domain_1.jpeg"; then
-  echo "Failed to addtach and get screenshot for vnc console for domain with 1 id" >&2
+  echo "Failed to attach and get screenshot for vnc console for domain with 1 id" >&2
   exit 1
 fi
 
 if ! kubectl exec "${virtlet_pod_name}" -c virtlet --namespace=kube-system -- /bin/sh -c "vncsnapshot :1 /domain_2.jpeg"; then
-  echo "Failed to addtach and get screenshot for vnc console for domain with 2 id" >&2
+  echo "Failed to attach and get screenshot for vnc console for domain with 2 id" >&2
   exit 1
 fi
 
