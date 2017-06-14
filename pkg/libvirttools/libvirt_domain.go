@@ -173,5 +173,5 @@ func (secret *LibvirtSecret) SetValue(value []byte) error {
 }
 
 func (secret *LibvirtSecret) Remove() error {
-	return secret.Remove()
+	return secret.s.Undefine()
 }
