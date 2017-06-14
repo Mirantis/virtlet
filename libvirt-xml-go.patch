@@ -1,61 +1,8 @@
---- domain_ref.go	2017-05-15 22:08:28.735308800 +0000
-+++ domain.go	2017-05-18 19:18:59.300460500 +0000
-@@ -73,14 +73,19 @@
- 	Bus string `xml:"bus,attr,omitempty"`
- }
- 
-+type DomainDiskReadOnly struct {
-+	//empty
-+}
-+
- type DomainDisk struct {
--	Type     string            `xml:"type,attr"`
--	Device   string            `xml:"device,attr"`
--	Snapshot string            `xml:"snapshot,attr,omitempty"`
--	Driver   *DomainDiskDriver `xml:"driver"`
--	Auth     *DomainDiskAuth   `xml:"auth"`
--	Source   *DomainDiskSource `xml:"source"`
--	Target   *DomainDiskTarget `xml:"target"`
-+	Type     string              `xml:"type,attr"`
-+	Device   string              `xml:"device,attr"`
-+	Snapshot string              `xml:"snapshot,attr,omitempty"`
-+	Driver   *DomainDiskDriver   `xml:"driver"`
-+	Auth     *DomainDiskAuth     `xml:"auth"`
-+	Source   *DomainDiskSource   `xml:"source"`
-+	Target   *DomainDiskTarget   `xml:"target"`
-+	ReadOnly *DomainDiskReadOnly `xml:"readonly"`
- }
- 
- type DomainFilesystemDriver struct {
-@@ -184,9 +189,8 @@
- }
- 
- type DomainChardevTarget struct {
--	Type  string `xml:"type,attr"`
--	Name  string `xml:"name,attr"`
--	State string `xml:"state,attr,omitempty"` // is guest agent connected?
-+	Type string `xml:"type,attr,omitempty"`
-+	Port string `xml:"name,attr,omitempty"`
- }
- 
- type DomainAlias struct {
-@@ -202,6 +206,7 @@
- 
- type DomainChardev struct {
- 	Type    string               `xml:"type,attr"`
-+	TTY     string               `xml:"tty,attr,omitempty"`
- 	Source  *DomainChardevSource `xml:"source"`
- 	Target  *DomainChardevTarget `xml:"target"`
- 	Alias   *DomainAlias         `xml:"alias"`
-@@ -251,6 +256,7 @@
- }
- 
- type DomainDeviceList struct {
-+	Emulator    string             `xml:"emulator,omitempty"`
- 	Controllers []DomainController `xml:"controller"`
- 	Disks       []DomainDisk       `xml:"disk"`
- 	Filesystems []DomainFilesystem `xml:"filesystem"`
-@@ -431,24 +437,67 @@
+diff --git a/domain.go b/domain.go
+index eb7ff9e..46cd806 100644
+--- a/domain.go
++++ b/domain.go
+@@ -522,27 +522,70 @@ type DomainFeatureList struct {
  	SMM        *DomainFeatureState  `xml:"smm"`
  }
  
@@ -99,6 +46,9 @@
 +	Locked *DomainMemoryBackingLocked `xml:"locked"`
 +}
 +
+ // NB, try to keep the order of fields in this struct
+ // matching the order of XML elements that libvirt
+ // will generate when dumping XML.
  type Domain struct {
 -	XMLName       xml.Name           `xml:"domain"`
 -	Type          string             `xml:"type,attr,omitempty"`
@@ -108,15 +58,15 @@
 -	CurrentMemory *DomainMemory      `xml:"currentMemory"`
 -	MaximumMemory *DomainMaxMemory   `xml:"maxMemory"`
 -	VCPU          *DomainVCPU        `xml:"vcpu"`
--	CPU           *DomainCPU         `xml:"cpu"`
 -	Resource      *DomainResource    `xml:"resource"`
--	Devices       *DomainDeviceList  `xml:"devices"`
--	OS            *DomainOS          `xml:"os"`
 -	SysInfo       *DomainSysInfo     `xml:"sysinfo"`
+-	OS            *DomainOS          `xml:"os"`
+-	Features      *DomainFeatureList `xml:"features"`
+-	CPU           *DomainCPU         `xml:"cpu"`
 -	OnPoweroff    string             `xml:"on_poweroff,omitempty"`
 -	OnReboot      string             `xml:"on_reboot,omitempty"`
 -	OnCrash       string             `xml:"on_crash,omitempty"`
--	Features      *DomainFeatureList `xml:"features"`
+-	Devices       *DomainDeviceList  `xml:"devices"`
 +	XMLName       xml.Name             `xml:"domain"`
 +	Type          string               `xml:"type,attr,omitempty"`
 +	Name          string               `xml:"name"`
@@ -126,16 +76,16 @@
 +	MaximumMemory *DomainMaxMemory     `xml:"maxMemory"`
 +	MemoryBacking *DomainMemoryBacking `xml:"memoryBacking"`
 +	VCPU          *DomainVCPU          `xml:"vcpu"`
-+	CPU           *DomainCPU           `xml:"cpu"`
 +	CPUTune       *DomainCPUTune       `xml:"cputune"`
 +	Resource      *DomainResource      `xml:"resource"`
-+	Devices       *DomainDeviceList    `xml:"devices"`
-+	OS            *DomainOS            `xml:"os"`
 +	SysInfo       *DomainSysInfo       `xml:"sysinfo"`
++	OS            *DomainOS            `xml:"os"`
++	Features      *DomainFeatureList   `xml:"features"`
++	CPU           *DomainCPU           `xml:"cpu"`
 +	OnPoweroff    string               `xml:"on_poweroff,omitempty"`
 +	OnReboot      string               `xml:"on_reboot,omitempty"`
 +	OnCrash       string               `xml:"on_crash,omitempty"`
-+	Features      *DomainFeatureList   `xml:"features"`
++	Devices       *DomainDeviceList    `xml:"devices"`
 +	CMDLine       *DomainCMDLine       `xml:"http://libvirt.org/schemas/domain/qemu/1.0 commandline"`
  }
  

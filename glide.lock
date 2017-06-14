@@ -1,5 +1,5 @@
-hash: 9f5c3fc2a95e67236dfaa31d352b76f9d762d6c5871b61092b863bc83ed10b56
-updated: 2017-05-15T19:39:56.7455294Z
+hash: c3e8bb2d74e1ee4ba62edccda9945b80238226e5236c91456a23a945446a080c
+updated: 2017-06-10T18:28:53.78884615+03:00
 imports:
 - name: bitbucket.org/ww/goautoneg
   version: 75cd24fc2f2c2a2088577d12123ddee5f54e0675
@@ -235,7 +235,7 @@ imports:
 - name: github.com/libvirt/libvirt-go
   version: c3209e4ba8b8dda65c85ca0ac04302e55895caf7
 - name: github.com/libvirt/libvirt-go-xml
-  version: e515652baed5eb4eb96b99a6dcc9acfcd4fc300f
+  version: cc4025ea01eee7c73a7c75b4211b07125a8119ae
 - name: github.com/mailru/easyjson
   version: d5b7844b561a7bc640052f1b935f7b800330d7e0
   subpackages:
@@ -371,7 +371,7 @@ imports:
   - peer
   - transport
 - name: gopkg.in/fsnotify.v1
-  version: 629574ca2a5df945712d3079857300b5e4da0236
+  version: 96c060f6a6b7e0d6f75fddd10efeaca3e5d1bcb0
 - name: gopkg.in/inf.v0
   version: 3887ee99ecf07df5b447e9b00d9c0b2adaa9f3e4
 - name: gopkg.in/tomb.v1

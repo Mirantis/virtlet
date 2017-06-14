@@ -31,6 +31,10 @@ import (
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 )
 
+const (
+	fakeUuid = "abb67e3c-71b3-4ddd-5505-8c4215d5c4eb"
+)
+
 type fakeMounter struct {
 	t       *testing.T
 	tmpDir  string
@@ -115,6 +119,12 @@ func TestFlexVolume(t *testing.T) {
 		"secret":  "foobar",
 		"user":    "libvirt",
 	}
+	cephJsonVolumeInfo := map[string]interface{}{
+		"uuid": fakeUuid,
+	}
+	for k, v := range cephJsonOpts {
+		cephJsonVolumeInfo[k] = v
+	}
 	cephDir := path.Join(tmpDir, "ceph")
 	for _, step := range []struct {
 		name         string
@@ -170,9 +180,9 @@ func TestFlexVolume(t *testing.T) {
 			status: "Success",
 			subdir: "ceph",
 			files: map[string]interface{}{
-				"virtlet-flexvolume.json": utils.MapToJsonUnindented(cephJsonOpts),
+				"virtlet-flexvolume.json": utils.MapToJsonUnindented(cephJsonVolumeInfo),
 				".shadowed": map[string]interface{}{
-					"virtlet-flexvolume.json": utils.MapToJsonUnindented(cephJsonOpts),
+					"virtlet-flexvolume.json": utils.MapToJsonUnindented(cephJsonVolumeInfo),
 				},
 			},
 			mountJournal: []string{
@@ -194,9 +204,9 @@ func TestFlexVolume(t *testing.T) {
 			status: "Success",
 			subdir: "ceph",
 			files: map[string]interface{}{
-				"virtlet-flexvolume.json": utils.MapToJsonUnindented(cephJsonOpts),
+				"virtlet-flexvolume.json": utils.MapToJsonUnindented(cephJsonVolumeInfo),
 				".shadowed": map[string]interface{}{
-					"virtlet-flexvolume.json": utils.MapToJsonUnindented(cephJsonOpts),
+					"virtlet-flexvolume.json": utils.MapToJsonUnindented(cephJsonVolumeInfo),
 				},
 			},
 			mountJournal: []string{
@@ -247,7 +257,9 @@ func TestFlexVolume(t *testing.T) {
 			var subdir string
 			args := step.args
 			mounter := newFakeMounter(t, tmpDir)
-			d := NewFlexVolumeDriver(mounter)
+			d := NewFlexVolumeDriver(func() string {
+				return fakeUuid
+			}, mounter)
 			result := d.Run(args)
 			var m map[string]interface{}
 			if err := json.Unmarshal([]byte(result), &m); err != nil {

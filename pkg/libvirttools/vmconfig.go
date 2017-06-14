@@ -22,6 +22,13 @@ type VMKeyValue struct {
 	Value string
 }
 
+// VMMount denotes a host directory corresponding to a volume which is
+// to be mounted inside the VM
+type VMMount struct {
+	ContainerPath string
+	HostPath      string
+}
+
 // VMConfig contains the information needed to start create a VM
 // TODO: use this struct to store VM metadata
 type VMConfig struct {
@@ -58,6 +65,9 @@ type VMConfig struct {
 	DomainUUID string
 	// Environment variables to set in the VM
 	Environment []*VMKeyValue
+	// Host directories corresponding to the volumes which are to
+	// be mounted inside the VM
+	Mounts []*VMMount
 	// A temporary file or directory associated with this domain.
 	// Currently used by nocloudVolume
 	// TODO: this field should be moved to VMStatus.

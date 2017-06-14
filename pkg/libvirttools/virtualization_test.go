@@ -37,6 +37,7 @@ import (
 const (
 	fakeImageName = "fake/image1"
 	fakeCNIConfig = `{"noCniForNow":true}`
+	fakeUuid      = "abb67e3c-71b3-4ddd-5505-8c4215d5c4eb"
 )
 
 type containerTester struct {
@@ -91,8 +92,10 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 
 	volSrc := CombineVMVolumeSources(
 		GetRootVolume,
-		GetNocloudVolume,
-		ScanFlexvolumes)
+		ScanFlexvolumes,
+		// XXX: GetNocloudVolume must go last because it
+		// doesn't produce correct name for cdrom devices
+		GetNocloudVolume)
 	ct.virtTool, err = NewVirtualizationTool(domainConn, storageConn, imageTool, ct.boltClient, "volumes", "loop*", volSrc)
 	if err != nil {
 		t.Fatalf("failed to create VirtualizationTool: %v", err)
@@ -222,12 +225,21 @@ func TestContainerLifecycle(t *testing.T) {
 	gm.Verify(t, ct.rec.Content())
 }
 
+type volMount struct {
+	name          string
+	containerPath string
+}
+
 func TestDomainDefinitions(t *testing.T) {
-	flexVolumeDriver := flexvolume.NewFlexVolumeDriver(flexvolume.NullMounter)
+	flexVolumeDriver := flexvolume.NewFlexVolumeDriver(func() string {
+		// note that this is only good for just one flexvolume
+		return fakeUuid
+	}, flexvolume.NullMounter)
 	for _, tc := range []struct {
 		name        string
 		annotations map[string]string
 		flexVolumes map[string]map[string]interface{}
+		mounts      []volMount
 	}{
 		{
 			name: "plain domain",
@@ -276,6 +288,12 @@ func TestDomainDefinitions(t *testing.T) {
 					"user":    "libvirt",
 				},
 			},
+			mounts: []volMount{
+				{
+					name:          "ceph",
+					containerPath: "/var/lib/whatever",
+				},
+			},
 		},
 		{
 			name: "cloud-init",
@@ -290,6 +308,12 @@ func TestDomainDefinitions(t *testing.T) {
 				"VirtletCloudInitUserData": `
                                   users:
                                   - name: cloudy`,
+			},
+		},
+		{
+			name: "virtio disk driver",
+			annotations: map[string]string{
+				"VirtletDiskDriver": "virtio",
 			},
 		},
 	} {
@@ -316,6 +340,13 @@ func TestDomainDefinitions(t *testing.T) {
 				}
 			}
 
+			var mounts []*kubeapi.Mount
+			for _, m := range tc.mounts {
+				mounts = append(mounts, &kubeapi.Mount{
+					HostPath:      filepath.Join(ct.kubeletRootDir, sandbox.Metadata.Uid, "volumes/virtlet~flexvolume_driver", m.name),
+					ContainerPath: m.containerPath,
+				})
+			}
 			req := &kubeapi.CreateContainerRequest{
 				PodSandboxId: sandbox.Metadata.Uid,
 				Config: &kubeapi.ContainerConfig{
@@ -325,6 +356,7 @@ func TestDomainDefinitions(t *testing.T) {
 					Image: &kubeapi.ImageSpec{
 						Image: fakeImageName,
 					},
+					Mounts: mounts,
 				},
 				SandboxConfig: sandbox,
 			}

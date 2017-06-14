@@ -22,12 +22,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 const (
+	uuidOptionsKey     = "uuid"
+	partOptionsKey     = "part"
 	flexvolumeDataFile = "virtlet-flexvolume.json"
 )
 
@@ -60,12 +63,15 @@ func (m *nullMounter) Unmount(target string) error {
 
 var NullMounter = &nullMounter{}
 
+type UuidGen func() string
+
 type FlexVolumeDriver struct {
+	uuidGen UuidGen
 	mounter Mounter
 }
 
-func NewFlexVolumeDriver(mounter Mounter) *FlexVolumeDriver {
-	return &FlexVolumeDriver{mounter: mounter}
+func NewFlexVolumeDriver(uuidGen UuidGen, mounter Mounter) *FlexVolumeDriver {
+	return &FlexVolumeDriver{uuidGen: uuidGen, mounter: mounter}
 }
 
 func (d *FlexVolumeDriver) populateVolumeDir(targetDir string, opts map[string]interface{}) error {
@@ -106,6 +112,7 @@ func (d *FlexVolumeDriver) mount(targetMountDir, jsonOptions string) (map[string
 	if err := json.Unmarshal([]byte(jsonOptions), &opts); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal json options: %v", err)
 	}
+	opts[uuidOptionsKey] = d.uuidGen()
 	if err := os.MkdirAll(targetMountDir, 0700); err != nil {
 		return nil, fmt.Errorf("os.MkDirAll(): %v", err)
 	}
@@ -260,4 +267,37 @@ func formatResult(fields map[string]interface{}, err error) string {
 		panic("error marshalling the data")
 	}
 	return string(s) + "\n"
+}
+
+// GetFlexvolumeInfo tries to extract flexvolume uuid and partition
+// number from the specified directory. Negative partition number
+// means that no partition number was specified.
+func GetFlexvolumeInfo(dir string) (string, int, error) {
+	dataFile := filepath.Join(dir, flexvolumeDataFile)
+	var opts map[string]interface{}
+	if err := utils.ReadJson(dataFile, &opts); err != nil {
+		return "", 0, fmt.Errorf("can't read flexvolume data file %q: %v", dataFile, err)
+	}
+	uuidRaw, found := opts[uuidOptionsKey]
+	if !found {
+		return "", 0, fmt.Errorf("%q: flexvolume doesn't have an uuid", dataFile)
+	}
+	uuid, ok := uuidRaw.(string)
+	if !ok {
+		return "", 0, fmt.Errorf("%q: flexvolume uuid is not a string", dataFile)
+	}
+	part := -1
+	partRaw, found := opts[partOptionsKey]
+	if found {
+		partStr, ok := partRaw.(string)
+		if !ok {
+			return "", 0, fmt.Errorf("%q: 'part' value is not a string", dataFile)
+		}
+		var err error
+		part, err = strconv.Atoi(partStr)
+		if err != nil {
+			return "", 0, fmt.Errorf("%q: malformed 'part' value (partition number): %q: %v", dataFile, partRaw, err)
+		}
+	}
+	return uuid, part, nil
 }

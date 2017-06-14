@@ -42,7 +42,8 @@ type VolumeOwner interface {
 type VMVolumeSource func(config *VMConfig, owner VolumeOwner) ([]VMVolume, error)
 
 type VMVolume interface {
-	Setup(virtDev string) (*libvirtxml.DomainDisk, error)
+	Uuid() string
+	Setup(volumeMap map[string]string) (*libvirtxml.DomainDisk, error)
 	Teardown() error
 }
 

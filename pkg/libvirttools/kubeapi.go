@@ -55,5 +55,12 @@ func GetVMConfig(in *kubeapi.CreateContainerRequest) (*VMConfig, error) {
 		r.Environment = append(r.Environment, &VMKeyValue{Key: entry.Key, Value: entry.Value})
 	}
 
+	for _, mount := range in.Config.Mounts {
+		r.Mounts = append(r.Mounts, &VMMount{
+			ContainerPath: mount.ContainerPath,
+			HostPath:      mount.HostPath,
+		})
+	}
+
 	return r, nil
 }

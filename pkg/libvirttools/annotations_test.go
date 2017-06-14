@@ -31,27 +31,42 @@ func TestVirtletAnnotations(t *testing.T) {
 		{
 			name:        "nil annotations",
 			annotations: nil,
-			va:          &VirtletAnnotations{VCPUCount: 1},
+			va: &VirtletAnnotations{
+				VCPUCount:  1,
+				DiskDriver: "scsi",
+			},
 		},
 		{
 			name:        "empty annotations",
 			annotations: map[string]string{},
-			va:          &VirtletAnnotations{VCPUCount: 1},
+			va: &VirtletAnnotations{
+				VCPUCount:  1,
+				DiskDriver: "scsi",
+			},
 		},
 		{
 			name:        "negative vcpu count (default)",
 			annotations: map[string]string{"VirtletVCPUCount": "-1"},
-			va:          &VirtletAnnotations{VCPUCount: 1},
+			va: &VirtletAnnotations{
+				VCPUCount:  1,
+				DiskDriver: "scsi",
+			},
 		},
 		{
 			name:        "zero vcpu count (default)",
 			annotations: map[string]string{"VirtletVCPUCount": "0"},
-			va:          &VirtletAnnotations{VCPUCount: 1},
+			va: &VirtletAnnotations{
+				VCPUCount:  1,
+				DiskDriver: "scsi",
+			},
 		},
 		{
 			name:        "vcpu count specified",
 			annotations: map[string]string{"VirtletVCPUCount": "4"},
-			va:          &VirtletAnnotations{VCPUCount: 4},
+			va: &VirtletAnnotations{
+				VCPUCount:  4,
+				DiskDriver: "scsi",
+			},
 		},
 		{
 			name: "cloud-init yaml and ssh keys",
@@ -76,7 +91,8 @@ func TestVirtletAnnotations(t *testing.T) {
 						},
 					},
 				},
-				SSHKeys: []string{"key1", "key2"},
+				SSHKeys:    []string{"key1", "key2"},
+				DiskDriver: "scsi",
 			},
 		},
 		{
@@ -87,6 +103,7 @@ func TestVirtletAnnotations(t *testing.T) {
 			va: &VirtletAnnotations{
 				VCPUCount:         1,
 				UserDataOverwrite: true,
+				DiskDriver:        "scsi",
 			},
 		},
 		{
@@ -97,12 +114,17 @@ func TestVirtletAnnotations(t *testing.T) {
 			va: &VirtletAnnotations{
 				VCPUCount:      1,
 				UserDataScript: "#!/bin/sh\necho hi\n",
+				DiskDriver:     "scsi",
 			},
 		},
 		// bad metadata items follow
 		{
 			name:        "bad vcpu count",
 			annotations: map[string]string{"VirtletVCPUCount": "256"},
+		},
+		{
+			name:        "bad disk driver",
+			annotations: map[string]string{"VirtletDiskDriver": "ducttape"},
 		},
 		{
 			name: "bad cloud-init meta-data",

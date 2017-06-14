@@ -138,7 +138,6 @@
         "Current": "",
         "Value": 1
       },
-      "CPU": null,
       "CPUTune": {
         "Shares": {
           "Value": 0
@@ -151,17 +150,77 @@
         }
       },
       "Resource": null,
+      "SysInfo": null,
+      "OS": {
+        "Type": {
+          "Arch": "",
+          "Machine": "",
+          "Type": "hvm"
+        },
+        "Loader": null,
+        "NVRam": null,
+        "Kernel": "",
+        "Initrd": "",
+        "KernelArgs": "",
+        "BootDevices": [
+          {
+            "Dev": "hd"
+          }
+        ],
+        "BootMenu": null,
+        "SMBios": null,
+        "BIOS": null,
+        "Init": "",
+        "InitArgs": null
+      },
+      "Features": {
+        "PAE": null,
+        "ACPI": {},
+        "APIC": null,
+        "HAP": null,
+        "Viridian": null,
+        "PrivNet": null,
+        "HyperV": null,
+        "KVM": null,
+        "PVSpinlock": null,
+        "PMU": null,
+        "VMPort": null,
+        "GIC": null,
+        "SMM": null
+      },
+      "CPU": null,
+      "OnPoweroff": "destroy",
+      "OnReboot": "restart",
+      "OnCrash": "restart",
       "Devices": {
         "Emulator": "/vmwrapper",
-        "Controllers": null,
+        "Controllers": [
+          {
+            "XMLName": {
+              "Space": "",
+              "Local": ""
+            },
+            "Type": "scsi",
+            "Index": 0,
+            "Model": "virtio-scsi",
+            "Address": null
+          }
+        ],
         "Disks": [
           {
+            "XMLName": {
+              "Space": "",
+              "Local": ""
+            },
             "Type": "file",
             "Device": "disk",
             "Snapshot": "",
             "Driver": {
               "Name": "qemu",
-              "Type": "qcow2"
+              "Type": "qcow2",
+              "Cache": "",
+              "IO": "",
+              "ErrorPolicy": ""
             },
             "Auth": null,
             "Source": {
@@ -175,43 +234,39 @@
               "StartupPolicy": ""
             },
             "Target": {
-              "Dev": "vda",
-              "Bus": "virtio"
+              "Dev": "sda",
+              "Bus": "scsi"
             },
-            "ReadOnly": null
+            "Serial": "",
+            "ReadOnly": null,
+            "Shareable": null,
+            "Address": {
+              "Type": "drive",
+              "Controller": 0,
+              "Domain": null,
+              "Bus": 0,
+              "Port": null,
+              "Slot": null,
+              "Function": null,
+              "Target": 0,
+              "Unit": 0
+            },
+            "Boot": null
           },
           {
-            "Type": "file",
-            "Device": "disk",
-            "Snapshot": "",
-            "Driver": {
-              "Name": "qemu",
-              "Type": "raw"
+            "XMLName": {
+              "Space": "",
+              "Local": ""
             },
-            "Auth": null,
-            "Source": {
-              "File": "--volatile-path-replaced-by-FakeDomainConnection--",
-              "Device": "",
-              "Protocol": "",
-              "Name": "",
-              "Pool": "",
-              "Volume": "",
-              "Hosts": null,
-              "StartupPolicy": ""
-            },
-            "Target": {
-              "Dev": "vdb",
-              "Bus": "virtio"
-            },
-            "ReadOnly": {}
-          },
-          {
             "Type": "block",
             "Device": "disk",
             "Snapshot": "",
             "Driver": {
               "Name": "qemu",
-              "Type": "raw"
+              "Type": "raw",
+              "Cache": "",
+              "IO": "",
+              "ErrorPolicy": ""
             },
             "Auth": null,
             "Source": {
@@ -225,22 +280,85 @@
               "StartupPolicy": ""
             },
             "Target": {
-              "Dev": "vdc",
-              "Bus": "virtio"
+              "Dev": "sdb",
+              "Bus": "scsi"
             },
-            "ReadOnly": null
+            "Serial": "",
+            "ReadOnly": null,
+            "Shareable": null,
+            "Address": {
+              "Type": "drive",
+              "Controller": 0,
+              "Domain": null,
+              "Bus": 0,
+              "Port": null,
+              "Slot": null,
+              "Function": null,
+              "Target": 0,
+              "Unit": 1
+            },
+            "Boot": null
+          },
+          {
+            "XMLName": {
+              "Space": "",
+              "Local": ""
+            },
+            "Type": "file",
+            "Device": "cdrom",
+            "Snapshot": "",
+            "Driver": {
+              "Name": "qemu",
+              "Type": "raw",
+              "Cache": "",
+              "IO": "",
+              "ErrorPolicy": ""
+            },
+            "Auth": null,
+            "Source": {
+              "File": "--volatile-path-replaced-by-FakeDomainConnection--",
+              "Device": "",
+              "Protocol": "",
+              "Name": "",
+              "Pool": "",
+              "Volume": "",
+              "Hosts": null,
+              "StartupPolicy": ""
+            },
+            "Target": {
+              "Dev": "sdc",
+              "Bus": "scsi"
+            },
+            "Serial": "",
+            "ReadOnly": {},
+            "Shareable": null,
+            "Address": {
+              "Type": "drive",
+              "Controller": 0,
+              "Domain": null,
+              "Bus": 0,
+              "Port": null,
+              "Slot": null,
+              "Function": null,
+              "Target": 0,
+              "Unit": 2
+            },
+            "Boot": null
           }
         ],
         "Filesystems": null,
         "Interfaces": null,
         "Serials": [
           {
+            "XMLName": {
+              "Space": "",
+              "Local": ""
+            },
             "Type": "pty",
-            "TTY": "",
             "Source": null,
             "Target": {
               "Type": "",
-              "Port": "0"
+              "Port": 0
             },
             "Alias": null,
             "Address": null
@@ -248,12 +366,15 @@
         ],
         "Consoles": [
           {
+            "XMLName": {
+              "Space": "",
+              "Local": ""
+            },
             "Type": "pty",
-            "TTY": "",
             "Source": null,
             "Target": {
               "Type": "serial",
-              "Port": "0"
+              "Port": 0
             },
             "Alias": null,
             "Address": null
@@ -261,8 +382,13 @@
         ],
         "Inputs": [
           {
+            "XMLName": {
+              "Space": "",
+              "Local": ""
+            },
             "Type": "tablet",
-            "Bus": "usb"
+            "Bus": "usb",
+            "Address": null
           }
         ],
         "Graphics": [
@@ -290,53 +416,23 @@
         ],
         "Videos": [
           {
+            "XMLName": {
+              "Space": "",
+              "Local": ""
+            },
             "Model": {
-              "Type": "cirrus"
-            }
+              "Type": "cirrus",
+              "Heads": 0,
+              "Ram": 0,
+              "VRam": 0,
+              "VGAMem": 0
+            },
+            "Address": null
           }
         ],
-        "Channels": null
-      },
-      "OS": {
-        "Type": {
-          "Arch": "",
-          "Machine": "",
-          "Type": "hvm"
-        },
-        "Loader": null,
-        "NVRam": null,
-        "Kernel": "",
-        "Initrd": "",
-        "KernelArgs": "",
-        "BootDevices": [
-          {
-            "Dev": "hd"
-          }
-        ],
-        "BootMenu": null,
-        "SMBios": null,
-        "BIOS": null,
-        "Init": "",
-        "InitArgs": null
-      },
-      "SysInfo": null,
-      "OnPoweroff": "destroy",
-      "OnReboot": "restart",
-      "OnCrash": "restart",
-      "Features": {
-        "PAE": null,
-        "ACPI": {},
-        "APIC": null,
-        "HAP": null,
-        "Viridian": null,
-        "PrivNet": null,
-        "HyperV": null,
-        "KVM": null,
-        "PVSpinlock": null,
-        "PMU": null,
-        "VMPort": null,
-        "GIC": null,
-        "SMM": null
+        "Channels": null,
+        "MemBalloon": null,
+        "Sounds": null
       },
       "CMDLine": {
         "Args": null,
