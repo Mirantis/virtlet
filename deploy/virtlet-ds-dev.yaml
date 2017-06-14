@@ -96,7 +96,7 @@ spec:
           name: dind
         - mountPath: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
           name: k8s-flexvolume-plugins-dir
-        - mountPath: /var/lib/kubelet/pods
+        - mountPath: /var/lib/kubelet/pods:shared
           name: k8s-pods-dir
         securityContext:
           privileged: true
