@@ -13,7 +13,6 @@ kubectl="${HOME}/.kubeadm-dind-cluster/kubectl"
 BASE_LOCATION="${BASE_LOCATION:-https://raw.githubusercontent.com/Mirantis/virtlet/master/}"
 # Convenience setting for local testing:
 # BASE_LOCATION="${HOME}/work/kubernetes/src/github.com/Mirantis/virtlet"
-DEPLOY_LOG_CONTAINER=${DEPLOY_LOG_CONTAINER:-deploy} # '' = don't deploy, 'deploy' = deploy, 'inject' = inject local log image and deploy
 cirros_key="demo-cirros-private-key"
 
 function demo::step {
@@ -162,7 +161,7 @@ function internal::ssh {
   cirros_ip=${2}
   shift 2
 
-  ssh -oProxyCommand="kubectl exec -i -n kube-system ${virtlet_pod} -c virtlet -- nc -q0 ${cirros_ip} 22" \
+  ssh -oProxyCommand="${kubectl} exec -i -n kube-system ${virtlet_pod} -c virtlet -- nc -q0 ${cirros_ip} 22" \
     -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -q \
     -i ${cirros_key} cirros@cirros-vm "$@"
 }
