@@ -170,7 +170,7 @@ func SetUpBolt(t *testing.T, sandboxConfigs []*kubeapi.PodSandboxConfig, contain
 	}
 
 	for _, sandbox := range sandboxConfigs {
-		if err := b.SetPodSandbox(sandbox, []byte{}, time.Now); err != nil {
+		if err := b.SetPodSandbox(sandbox, []byte{}, kubeapi.PodSandboxState_SANDBOX_READY, time.Now); err != nil {
 			t.Fatal(err)
 		}
 	}
