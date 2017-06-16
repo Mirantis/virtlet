@@ -55,3 +55,33 @@ systemctl restart kubelet
 docker rm -fv $(docker ps -qf label=criproxy=true)
 rm /etc/criproxy/kubelet.conf
 ```
+
+## Increasing CRI proxy verbosity level after the bootstrap
+
+You can use the following command to restart CRI proxy in a more
+verbose mode:
+
+```bash
+docker rm -f $(docker ps -q --filter=label=criproxy=true)
+docker run -d --privileged \
+      -l criproxy=true \
+      --restart always \
+       --log-opt max-size=10m \
+       --name criproxy \
+       --net=host \
+       --pid=host \
+       --uts=host \
+       --userns=host \
+       mirantis/virtlet \
+       nsenter --mount=/proc/1/ns/mnt -- \
+       /opt/criproxy/bin/criproxy \
+       -v 3 -alsologtostderr \
+       -connect docker,virtlet:/run/virtlet.sock
+```
+
+`-v` option of `criproxy` controls the verbosity here. 0-1 means some
+very basic logging during startup and displaying serious errors, 2 is
+the same as 1 plus logging of CRI request errors and 3 causes dumping
+of actual CRI requests and responses in addition to what's logged on
+level 2. `--log-opt` docker option controls the maximum size of the
+docker log for CRI proxy container.
