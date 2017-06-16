@@ -37,7 +37,7 @@ func (b *BoltClient) EnsureSandboxSchema() error {
 	})
 }
 
-func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConfiguration []byte, timeFunc func() time.Time) error {
+func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConfiguration []byte, state kubeapi.PodSandboxState, timeFunc func() time.Time) error {
 	podId := config.Metadata.Uid
 
 	strLabels, err := json.Marshal(config.GetLabels())
@@ -95,7 +95,7 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConf
 			return err
 		}
 
-		if err := sandboxBucket.Put([]byte("state"), []byte{byte(kubeapi.PodSandboxState_SANDBOX_READY)}); err != nil {
+		if err := sandboxBucket.Put([]byte("state"), []byte{byte(state)}); err != nil {
 			return err
 		}
 

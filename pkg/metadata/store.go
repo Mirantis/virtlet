@@ -46,7 +46,7 @@ type ImageMetadataStore interface {
 
 // SandboxMetadataStore contains methods to operate on POD sandboxes
 type SandboxMetadataStore interface {
-	SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConfiguration []byte, timeFunc func() time.Time) error
+	SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConfiguration []byte, state kubeapi.PodSandboxState, timeFunc func() time.Time) error
 	UpdatePodState(podId string, state byte) error
 	RemovePodSandbox(podId string) error
 	GetPodSandboxContainerID(podId string) (string, error)

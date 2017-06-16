@@ -57,7 +57,7 @@ func TestRemovePodSandbox(t *testing.T) {
 		uid := ""
 		if tc.sandbox != nil {
 			uid = tc.sandbox.GetMetadata().Uid
-			if err := b.SetPodSandbox(tc.sandbox, []byte{}, time.Now); err != nil {
+			if err := b.SetPodSandbox(tc.sandbox, []byte{}, kubeapi.PodSandboxState_SANDBOX_READY, time.Now); err != nil {
 				t.Fatal(err)
 			}
 		}

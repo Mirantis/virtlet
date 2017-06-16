@@ -121,7 +121,7 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 }
 
 func (ct *containerTester) setPodSandbox(config *kubeapi.PodSandboxConfig) {
-	if err := ct.boltClient.SetPodSandbox(config, []byte(fakeCNIConfig), ct.fakeTime); err != nil {
+	if err := ct.boltClient.SetPodSandbox(config, []byte(fakeCNIConfig), kubeapi.PodSandboxState_SANDBOX_READY, ct.fakeTime); err != nil {
 		ct.t.Fatalf("Failed to store pod sandbox: %v", err)
 	}
 }
