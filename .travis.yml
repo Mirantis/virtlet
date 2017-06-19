@@ -18,8 +18,7 @@ addons:
 
 before_install:
   - sudo apt-get -qq update
-  - sudo apt-get install -y expect
-  - sudo apt-get install libxml2-utils
+  - sudo apt-get install -y libxml2-utils jq
 
 before_script:
   - sudo /etc/init.d/mysql stop
