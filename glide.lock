@@ -1,5 +1,5 @@
-hash: c3e8bb2d74e1ee4ba62edccda9945b80238226e5236c91456a23a945446a080c
-updated: 2017-06-10T18:28:53.78884615+03:00
+hash: 6614ef51794b9d3b6dd265c4fb11ab1bfa0c3e5dde84198ed5401844987754f7
+updated: 2017-06-19T16:15:10.800293005+03:00
 imports:
 - name: bitbucket.org/ww/goautoneg
   version: 75cd24fc2f2c2a2088577d12123ddee5f54e0675
@@ -228,6 +228,8 @@ imports:
   - winfile
 - name: github.com/jmespath/go-jmespath
   version: 3433f3ea46d9f8019119e7dd41274e112a2359a9
+- name: github.com/jonboulle/clockwork
+  version: bcac9884e7502bb2b474c0339d889cb981a2f27f
 - name: github.com/juju/ratelimit
   version: 77ed1c8a01217656d2080ad51981f6e99adaa177
 - name: github.com/kr/pty
@@ -371,11 +373,11 @@ imports:
   - peer
   - transport
 - name: gopkg.in/fsnotify.v1
-  version: 96c060f6a6b7e0d6f75fddd10efeaca3e5d1bcb0
+  version: 7be54206639f256967dd82fa767397ba5f8f48f5
 - name: gopkg.in/inf.v0
   version: 3887ee99ecf07df5b447e9b00d9c0b2adaa9f3e4
 - name: gopkg.in/tomb.v1
-  version: dd632973f1e7218eb1089048e0798ec9ae7dceb8
+  version: c131134a1947e9afd9cecfe11f4c6dff0732ae58
 - name: gopkg.in/yaml.v2
   version: 53feefa2559fb8dfa8d81baad31be332c97d6c77
 - name: k8s.io/apimachinery

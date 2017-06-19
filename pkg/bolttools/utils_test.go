@@ -19,11 +19,12 @@ package bolttools
 import (
 	"fmt"
 	"testing"
-	"time"
+
+	"github.com/boltdb/bolt"
+	"github.com/jonboulle/clockwork"
+	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
 	"github.com/Mirantis/virtlet/tests/criapi"
-	"github.com/boltdb/bolt"
-	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
 func TestGet(t *testing.T) {
@@ -169,8 +170,9 @@ func SetUpBolt(t *testing.T, sandboxConfigs []*kubeapi.PodSandboxConfig, contain
 		t.Fatal(err)
 	}
 
+	clock := clockwork.NewRealClock()
 	for _, sandbox := range sandboxConfigs {
-		if err := b.SetPodSandbox(sandbox, []byte{}, kubeapi.PodSandboxState_SANDBOX_READY, time.Now); err != nil {
+		if err := b.SetPodSandbox(sandbox, []byte{}, kubeapi.PodSandboxState_SANDBOX_READY, clock); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -180,7 +182,7 @@ func SetUpBolt(t *testing.T, sandboxConfigs []*kubeapi.PodSandboxConfig, contain
 	}
 
 	for _, container := range containerConfigs {
-		if err := b.SetContainer(container.Name, container.ContainerId, container.SandboxId, container.Image, container.RootImageVolumeName, container.Labels, container.Annotations, "/tmp/nocloud.iso", time.Now); err != nil {
+		if err := b.SetContainer(container.Name, container.ContainerId, container.SandboxId, container.Image, container.RootImageVolumeName, container.Labels, container.Annotations, "/tmp/nocloud.iso", clock); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -19,8 +19,8 @@ package bolttools
 import (
 	"reflect"
 	"testing"
-	"time"
 
+	"github.com/jonboulle/clockwork"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
 	"github.com/Mirantis/virtlet/tests/criapi"
@@ -57,7 +57,7 @@ func TestRemovePodSandbox(t *testing.T) {
 		uid := ""
 		if tc.sandbox != nil {
 			uid = tc.sandbox.GetMetadata().Uid
-			if err := b.SetPodSandbox(tc.sandbox, []byte{}, kubeapi.PodSandboxState_SANDBOX_READY, time.Now); err != nil {
+			if err := b.SetPodSandbox(tc.sandbox, []byte{}, kubeapi.PodSandboxState_SANDBOX_READY, clockwork.NewRealClock()); err != nil {
 				t.Fatal(err)
 			}
 		}

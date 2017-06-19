@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/jonboulle/clockwork"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 	"k8s.io/apimachinery/pkg/fields"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
@@ -144,7 +145,7 @@ type VirtualizationTool struct {
 	volumePool     virt.VirtStoragePool
 	imageManager   ImageManager
 	metadataStore  metadata.MetadataStore
-	timeFunc       func() time.Time
+	clock          clockwork.Clock
 	forceKVM       bool
 	kubeletRootDir string
 	rawDevices     []string
@@ -163,7 +164,7 @@ func NewVirtualizationTool(domainConn virt.VirtDomainConnection, storageConn vir
 		volumePool:    volumePool,
 		imageManager:  imageManager,
 		metadataStore: metadataStore,
-		timeFunc:      time.Now,
+		clock:         clockwork.NewRealClock(),
 		// FIXME: kubelet's --root-dir may be something other than /var/lib/kubelet
 		// Need to remove it from daemonset mounts (both dev and non-dev)
 		// Use 'nsenter -t 1 -m -- tar ...' or something to grab the path
@@ -178,8 +179,8 @@ func (v *VirtualizationTool) SetForceKVM(forceKVM bool) {
 	v.forceKVM = forceKVM
 }
 
-func (v *VirtualizationTool) SetTimeFunc(timeFunc func() time.Time) {
-	v.timeFunc = timeFunc
+func (v *VirtualizationTool) SetClock(clock clockwork.Clock) {
+	v.clock = clock
 }
 
 func (v *VirtualizationTool) SetKubeletRootDir(kubeletRootDir string) {
@@ -385,7 +386,7 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netNSPath, cniCon
 		err = v.metadataStore.SetContainer(config.Name, settings.domainUUID,
 			config.PodSandboxId, config.Image, cloneName,
 			labels, config.ContainerAnnotations,
-			nocloudFile, v.timeFunc)
+			nocloudFile, v.clock)
 	}
 	if err != nil {
 		return "", err
@@ -418,6 +419,11 @@ func (v *VirtualizationTool) StopContainer(containerId string) error {
 		return err
 	}
 
+	// TODO: handle shutdown errors!!!!
+	// TODO: this call must be idempotent!!!!
+	// TODO: handle grace period!!!!
+	//       (but add some extra wait to it perhaps?)
+	// TODO: destroy the domain after failure
 	// To process cases when VM is booting and cannot handle the shutdown signal
 	// send sequential shutdown requests with 1 sec interval until domain is shutoff or time after 60 sec.
 	return utils.WaitLoop(func() (bool, error) {
@@ -433,7 +439,7 @@ func (v *VirtualizationTool) StopContainer(containerId string) error {
 			return false, err
 		}
 		return state == virt.DOMAIN_SHUTDOWN || state == virt.DOMAIN_SHUTOFF, nil
-	}, domainShutdownRetryInterval, domainShutdownTimeout)
+	}, domainShutdownRetryInterval, domainShutdownTimeout, v.clock)
 }
 
 func (v *VirtualizationTool) removeDomain(containerId string, config *VMConfig) error {
@@ -465,7 +471,7 @@ func (v *VirtualizationTool) removeDomain(containerId string, config *VMConfig) 
 			return false, fmt.Errorf("error looking up domain %q: %v", containerId, err)
 		}
 		return false, nil
-	}, domainDestroyCheckInterval, domainDestroyTimeout); err != nil {
+	}, domainDestroyCheckInterval, domainDestroyTimeout, v.clock); err != nil {
 		return err
 	}
 
@@ -568,7 +574,7 @@ func (v *VirtualizationTool) getContainerInfo(domain virt.VirtDomain, containerI
 		if err := v.metadataStore.UpdateState(containerId, byte(containerState)); err != nil {
 			return nil, err
 		}
-		startedAt := v.timeFunc().UnixNano()
+		startedAt := v.clock.Now().UnixNano()
 		if containerState == kubeapi.ContainerState_CONTAINER_RUNNING {
 			strStartedAt := strconv.FormatInt(startedAt, 10)
 			if err := v.metadataStore.UpdateStartedAt(containerId, strStartedAt); err != nil {

@@ -17,8 +17,7 @@ limitations under the License.
 package metadata
 
 import (
-	"time"
-
+	"github.com/jonboulle/clockwork"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
@@ -46,7 +45,7 @@ type ImageMetadataStore interface {
 
 // SandboxMetadataStore contains methods to operate on POD sandboxes
 type SandboxMetadataStore interface {
-	SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConfiguration []byte, state kubeapi.PodSandboxState, timeFunc func() time.Time) error
+	SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConfiguration []byte, state kubeapi.PodSandboxState, clock clockwork.Clock) error
 	UpdatePodState(podId string, state byte) error
 	RemovePodSandbox(podId string) error
 	GetPodSandboxContainerID(podId string) (string, error)
@@ -59,7 +58,7 @@ type SandboxMetadataStore interface {
 
 // ContainerMetadataStore contains methods to operate on containers (VMs)
 type ContainerMetadataStore interface {
-	SetContainer(name, containerId, sandboxId, image, rootImageVolumeName string, labels, annotations map[string]string, nocloudFile string, timeFunc func() time.Time) error
+	SetContainer(name, containerId, sandboxId, image, rootImageVolumeName string, labels, annotations map[string]string, nocloudFile string, clock clockwork.Clock) error
 	UpdateStartedAt(containerId string, startedAt string) error
 	UpdateState(containerId string, state byte) error
 	GetContainerInfo(containerId string) (*ContainerInfo, error)
