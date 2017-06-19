@@ -43,10 +43,12 @@ const (
 	noKvmDomainType   = "qemu"
 	noKvmEmulator     = "/usr/bin/qemu-system-x86_64"
 
-	domainShutdownRetryInterval = 10 * time.Second
-	domainShutdownTimeout       = 60 * time.Second
-	domainDestroyCheckInterval  = 500 * time.Millisecond
-	domainDestroyTimeout        = 5 * time.Second
+	domainStartCheckInterval      = 250 * time.Millisecond
+	domainStartTimeout            = 10 * time.Second
+	domainShutdownRetryInterval   = 5 * time.Second
+	domainShutdownOnRemoveTimeout = 60 * time.Second
+	domainDestroyCheckInterval    = 500 * time.Millisecond
+	domainDestroyTimeout          = 5 * time.Second
 
 	ContainerNsUuid       = "67b7fb47-7735-4b64-86d2-6d062d121966"
 	defaultKubeletRootDir = "/var/lib/kubelet/pods"
@@ -392,9 +394,41 @@ func (v *VirtualizationTool) StartContainer(containerId string) error {
 		err = domain.Create()
 	}
 
+	// XXX: maybe we don't really have to wait here but I couldn't
+	// find it in libvirt docs.
+	err = utils.WaitLoop(func() (bool, error) {
+		state, err := domain.State()
+		if err != nil {
+			return false, fmt.Errorf("failed to get state of the domain %q: %v", containerId, err)
+		}
+		switch state {
+		case virt.DOMAIN_RUNNING:
+			return true, nil
+		case virt.DOMAIN_SHUTDOWN:
+			return false, fmt.Errorf("unexpected shutdown for new domain %q", containerId)
+		case virt.DOMAIN_CRASHED:
+			return false, fmt.Errorf("domain %q crashed on start", containerId)
+		default:
+			return false, nil
+		}
+	}, domainStartCheckInterval, domainStartTimeout, v.clock)
+
+	if err == nil {
+		err = v.metadataStore.UpdateState(containerId, byte(kubeapi.ContainerState_CONTAINER_RUNNING))
+	}
+
+	if err == nil {
+		err = v.metadataStore.UpdateStartedAt(containerId, strconv.FormatInt(v.clock.Now().UnixNano(), 10))
+	}
+
 	if err != nil {
+		// FIXME: we do this here because kubelet may attempt new `CreateContainer()`
+		// calls for this VM after failed `StartContainer()` without first removing it.
+		// Better solution is perhaps moving domain setup logic to `StartContainer()`
+		// and cleaning it all up upon failure, but for now we just remove the VM
+		// so the next `CreateContainer()` call succeeds.
 		if rmErr := v.RemoveContainer(containerId); rmErr != nil {
-			return fmt.Errorf("Container start error: %v \n %v", err, rmErr)
+			return fmt.Errorf("Container start error: %v \n+ container removal error: %v", err, rmErr)
 		} else {
 			return err
 		}
@@ -403,33 +437,60 @@ func (v *VirtualizationTool) StartContainer(containerId string) error {
 	return nil
 }
 
-func (v *VirtualizationTool) StopContainer(containerId string) error {
+func (v *VirtualizationTool) StopContainer(containerId string, timeout time.Duration) error {
 	domain, err := v.domainConn.LookupDomainByUUIDString(containerId)
 	if err != nil {
 		return err
 	}
 
-	// TODO: handle shutdown errors!!!!
-	// TODO: this call must be idempotent!!!!
-	// TODO: handle grace period!!!!
-	//       (but add some extra wait to it perhaps?)
-	// TODO: destroy the domain after failure
-	// To process cases when VM is booting and cannot handle the shutdown signal
-	// send sequential shutdown requests with 1 sec interval until domain is shutoff or time after 60 sec.
-	return utils.WaitLoop(func() (bool, error) {
-		domain.Shutdown()
-
+	// We try to shut down the VM gracefully first. This may take several attempts
+	// because shutdown requests may be ignored e.g. when the VM boots.
+	// If this fails, we just destroy the domain (i.e. power off the VM).
+	err = utils.WaitLoop(func() (bool, error) {
 		_, err := v.domainConn.LookupDomainByUUIDString(containerId)
-		if err != nil {
-			return true, err
+		if err == virt.ErrDomainNotFound {
+			return true, nil
 		}
+		if err != nil {
+			return false, fmt.Errorf("failed to look up the domain %q: %v", containerId, err)
+		}
+
+		// domain.Shutdown() may return 'invalid operation' error if domain is already
+		// shut down. But checking the state beforehand will not make the situation
+		// any simpler because we'll still have a race, thus we need multiple attempts
+		domainShutdownErr := domain.Shutdown()
 
 		state, err := domain.State()
 		if err != nil {
-			return false, err
+			return false, fmt.Errorf("failed to get state of the domain %q: %v", containerId, err)
 		}
-		return state == virt.DOMAIN_SHUTDOWN || state == virt.DOMAIN_SHUTOFF, nil
-	}, domainShutdownRetryInterval, domainShutdownTimeout, v.clock)
+
+		if state == virt.DOMAIN_SHUTOFF {
+			return true, nil
+		}
+
+		if domainShutdownErr != nil {
+			// The domain is not in 'DOMAIN_SHUTOFF' state and domain.Shutdown() failed,
+			// so we need to return the error that happened during Shutdown()
+			return false, fmt.Errorf("failed to shut down domain %q: %v", containerId, err)
+		}
+
+		return false, nil
+	}, domainShutdownRetryInterval, timeout, v.clock)
+
+	if err != nil {
+		glog.Warningf("Failed to shut down VM %q: %v -- trying to destroy the domain", containerId, err)
+		// if the domain is destroyed successfully we return no error
+		if err = domain.Destroy(); err != nil {
+			return fmt.Errorf("failed to destroy the domain: %v", err)
+		}
+	}
+
+	if err == nil {
+		err = v.metadataStore.UpdateState(containerId, byte(kubeapi.ContainerState_CONTAINER_EXITED))
+	}
+
+	return err
 }
 
 func (v *VirtualizationTool) removeDomain(containerId string, config *VMConfig) error {
@@ -441,28 +502,32 @@ func (v *VirtualizationTool) removeDomain(containerId string, config *VMConfig) 
 	}
 
 	if domain != nil {
-		if err := v.StopContainer(containerId); err != nil {
-			if err := domain.Destroy(); err != nil {
-				return err
+		state, err := domain.State()
+		if err != nil {
+			return fmt.Errorf("failed to get state of the domain %q: %v", containerId, err)
+		}
+		if state != virt.DOMAIN_SHUTOFF {
+			if err := v.StopContainer(containerId, domainShutdownOnRemoveTimeout); err != nil {
+				return fmt.Errorf("error removing the domain %q: %v", containerId, err)
 			}
 		}
 
 		if err := domain.Undefine(); err != nil {
+			return fmt.Errorf("error undefining the domain %q: %v", containerId, err)
+		}
+
+		// Wait until domain is really removed or timeout after 5 sec.
+		if err := utils.WaitLoop(func() (bool, error) {
+			if _, err := v.domainConn.LookupDomainByUUIDString(containerId); err == virt.ErrDomainNotFound {
+				return true, nil
+			} else if err != nil {
+				// Unexpected error occured
+				return false, fmt.Errorf("error looking up domain %q: %v", containerId, err)
+			}
+			return false, nil
+		}, domainDestroyCheckInterval, domainDestroyTimeout, v.clock); err != nil {
 			return err
 		}
-	}
-
-	// Wait until domain is really removed or timeout after 5 sec.
-	if err := utils.WaitLoop(func() (bool, error) {
-		if _, err := v.domainConn.LookupDomainByUUIDString(containerId); err == virt.ErrDomainNotFound {
-			return true, nil
-		} else if err != nil {
-			// Unexpected error occured
-			return false, fmt.Errorf("error looking up domain %q: %v", containerId, err)
-		}
-		return false, nil
-	}, domainDestroyCheckInterval, domainDestroyTimeout, v.clock); err != nil {
-		return err
 	}
 
 	if err := v.teardownVolumes(config); err != nil {
@@ -518,6 +583,9 @@ func virtToKubeState(domainState virt.DomainState, lastState kubeapi.ContainerSt
 	var containerState kubeapi.ContainerState
 
 	switch domainState {
+	case virt.DOMAIN_SHUTDOWN:
+		// the domain is being shut down, but is still running
+		fallthrough
 	case virt.DOMAIN_RUNNING:
 		containerState = kubeapi.ContainerState_CONTAINER_RUNNING
 	case virt.DOMAIN_PAUSED:
@@ -526,8 +594,6 @@ func virtToKubeState(domainState virt.DomainState, lastState kubeapi.ContainerSt
 		} else {
 			containerState = kubeapi.ContainerState_CONTAINER_EXITED
 		}
-	case virt.DOMAIN_SHUTDOWN:
-		containerState = kubeapi.ContainerState_CONTAINER_EXITED
 	case virt.DOMAIN_SHUTOFF:
 		if lastState == kubeapi.ContainerState_CONTAINER_CREATED {
 			containerState = kubeapi.ContainerState_CONTAINER_CREATED
@@ -564,14 +630,6 @@ func (v *VirtualizationTool) getContainerInfo(domain virt.VirtDomain, containerI
 		if err := v.metadataStore.UpdateState(containerId, byte(containerState)); err != nil {
 			return nil, err
 		}
-		startedAt := v.clock.Now().UnixNano()
-		if containerState == kubeapi.ContainerState_CONTAINER_RUNNING {
-			strStartedAt := strconv.FormatInt(startedAt, 10)
-			if err := v.metadataStore.UpdateStartedAt(containerId, strStartedAt); err != nil {
-				return nil, err
-			}
-		}
-		containerInfo.StartedAt = startedAt
 		containerInfo.State = containerState
 	}
 	return containerInfo, nil

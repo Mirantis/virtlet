@@ -234,22 +234,22 @@
               "StartupPolicy": ""
             },
             "Target": {
-              "Dev": "vda",
-              "Bus": "virtio"
+              "Dev": "sda",
+              "Bus": "scsi"
             },
             "Serial": "",
             "ReadOnly": null,
             "Shareable": null,
             "Address": {
-              "Type": "pci",
-              "Controller": null,
-              "Domain": 0,
-              "Bus": 1,
+              "Type": "drive",
+              "Controller": 0,
+              "Domain": null,
+              "Bus": 0,
               "Port": null,
-              "Slot": 1,
-              "Function": 0,
-              "Target": null,
-              "Unit": null
+              "Slot": null,
+              "Function": null,
+              "Target": 0,
+              "Unit": 0
             },
             "Boot": null
           },
@@ -280,22 +280,22 @@
               "StartupPolicy": ""
             },
             "Target": {
-              "Dev": "vdb",
-              "Bus": "virtio"
+              "Dev": "sdb",
+              "Bus": "scsi"
             },
             "Serial": "",
             "ReadOnly": {},
             "Shareable": null,
             "Address": {
-              "Type": "pci",
-              "Controller": null,
-              "Domain": 0,
-              "Bus": 1,
+              "Type": "drive",
+              "Controller": 0,
+              "Domain": null,
+              "Bus": 0,
               "Port": null,
-              "Slot": 2,
-              "Function": 0,
-              "Target": null,
-              "Unit": null
+              "Slot": null,
+              "Function": null,
+              "Target": 0,
+              "Unit": 1
             },
             "Boot": null
           }
@@ -406,6 +406,52 @@
         ]
       }
     }
+  },
+  {
+    "name": "domain conn: 231700d5-c9a6-5a49-738d-99a954c51550-container1: Create"
+  },
+  {
+    "name": "invoking StopContainer()"
+  },
+  {
+    "name": "domain conn: 231700d5-c9a6-5a49-738d-99a954c51550-container1: Shutdown",
+    "data": {
+      "ignored": true
+    }
+  },
+  {
+    "name": "domain conn: 231700d5-c9a6-5a49-738d-99a954c51550-container1: Shutdown",
+    "data": {
+      "ignored": true
+    }
+  },
+  {
+    "name": "domain conn: 231700d5-c9a6-5a49-738d-99a954c51550-container1: Shutdown",
+    "data": {
+      "ignored": true
+    }
+  },
+  {
+    "name": "domain conn: 231700d5-c9a6-5a49-738d-99a954c51550-container1: Destroy"
+  },
+  {
+    "name": "container status after the container is stopped",
+    "data": {
+      "id": "231700d5-c9a6-5a49-738d-99a954c51550",
+      "metadata": {
+        "name": "container1"
+      },
+      "state": 2,
+      "created_at": 1496175540000000000,
+      "started_at": 1496175541000000000,
+      "image": {
+        "image": "fake/image1"
+      },
+      "image_ref": "fake/image1"
+    }
+  },
+  {
+    "name": "invoking RemoveContainer()"
   },
   {
     "name": "domain conn: 231700d5-c9a6-5a49-738d-99a954c51550-container1: Undefine"

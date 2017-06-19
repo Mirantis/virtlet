@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"syscall"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
@@ -402,7 +403,7 @@ func (v *VirtletManager) StopContainer(ctx context.Context, in *kubeapi.StopCont
 	glog.V(2).Infof("StopContainer called for containerID: %s", in.ContainerId)
 	glog.V(3).Infof("StopContainer: %s", spew.Sdump(in))
 
-	if err := v.libvirtVirtualizationTool.StopContainer(in.ContainerId); err != nil {
+	if err := v.libvirtVirtualizationTool.StopContainer(in.ContainerId, time.Duration(in.Timeout)*time.Second); err != nil {
 		glog.Errorf("Error when stopping container %s: %v", in.ContainerId, err)
 		return nil, err
 	}

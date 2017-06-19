@@ -30,10 +30,11 @@ import (
 )
 
 type FakeDomainConnection struct {
-	rec           Recorder
-	domains       map[string]*FakeDomain
-	domainsByUuid map[string]*FakeDomain
-	secretsByUuid map[string]*FakeSecret
+	rec            Recorder
+	domains        map[string]*FakeDomain
+	domainsByUuid  map[string]*FakeDomain
+	secretsByUuid  map[string]*FakeSecret
+	ignoreShutdown bool
 }
 
 var _ virt.VirtDomainConnection = &FakeDomainConnection{}
@@ -48,6 +49,10 @@ func NewFakeDomainConnection(rec Recorder) *FakeDomainConnection {
 		domainsByUuid: make(map[string]*FakeDomain),
 		secretsByUuid: make(map[string]*FakeSecret),
 	}
+}
+
+func (dc *FakeDomainConnection) SetIgnoreShutdown(ignoreShutdown bool) {
+	dc.ignoreShutdown = ignoreShutdown
 }
 
 func (dc *FakeDomainConnection) removeDomain(d *FakeDomain) {
@@ -185,7 +190,7 @@ func (d *FakeDomain) Create() error {
 }
 
 func (d *FakeDomain) Destroy() error {
-	d.rec.Rec("Desroy", nil)
+	d.rec.Rec("Destroy", nil)
 	if d.removed {
 		return fmt.Errorf("Destroy() called on a removed (undefined) domain %q", d.name)
 	}
@@ -204,12 +209,18 @@ func (d *FakeDomain) Undefine() error {
 }
 
 func (d *FakeDomain) Shutdown() error {
-	d.rec.Rec("Shutdown", nil)
+	if d.dc.ignoreShutdown {
+		d.rec.Rec("Shutdown", map[string]interface{}{"ignored": true})
+	} else {
+		d.rec.Rec("Shutdown", nil)
+	}
 	if d.removed {
 		return fmt.Errorf("Shutdown() called on a removed (undefined) domain %q", d.name)
 	}
-	// TODO: need to test DOMAIN_SHUTDOWN stage too
-	d.state = virt.DOMAIN_SHUTOFF
+	if !d.dc.ignoreShutdown {
+		// TODO: need to test DOMAIN_SHUTDOWN stage too
+		d.state = virt.DOMAIN_SHUTOFF
+	}
 	return nil
 }
 
