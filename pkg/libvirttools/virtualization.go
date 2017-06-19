@@ -398,15 +398,27 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netNSPath, cniCon
 	return settings.domainUUID, nil
 }
 
-func (v *VirtualizationTool) StartContainer(containerId string) error {
+func (v *VirtualizationTool) startContainer(containerId string) error {
 	domain, err := v.domainConn.LookupDomainByUUIDString(containerId)
-	if err == nil {
-		err = domain.Create()
+	if err != nil {
+		return fmt.Errorf("failed to look up domain %q: %v", containerId, err)
+	}
+
+	state, err := domain.State()
+	if err != nil {
+		return fmt.Errorf("failed to get state of the domain %q: %v", containerId, err)
+	}
+	if state != virt.DOMAIN_SHUTOFF {
+		return fmt.Errorf("domain %q: bad state %v upon StartContainer()", containerId, state)
+	}
+
+	if err = domain.Create(); err != nil {
+		return fmt.Errorf("failed to create domain %q: %v", containerId, err)
 	}
 
 	// XXX: maybe we don't really have to wait here but I couldn't
 	// find it in libvirt docs.
-	err = utils.WaitLoop(func() (bool, error) {
+	if err = utils.WaitLoop(func() (bool, error) {
 		state, err := domain.State()
 		if err != nil {
 			return false, fmt.Errorf("failed to get state of the domain %q: %v", containerId, err)
@@ -421,17 +433,23 @@ func (v *VirtualizationTool) StartContainer(containerId string) error {
 		default:
 			return false, nil
 		}
-	}, domainStartCheckInterval, domainStartTimeout, v.clock)
-
-	if err == nil {
-		err = v.metadataStore.UpdateState(containerId, byte(kubeapi.ContainerState_CONTAINER_RUNNING))
+	}, domainStartCheckInterval, domainStartTimeout, v.clock); err != nil {
+		return err
 	}
 
-	if err == nil {
-		err = v.metadataStore.UpdateStartedAt(containerId, strconv.FormatInt(v.clock.Now().UnixNano(), 10))
+	if err = v.metadataStore.UpdateState(containerId, byte(kubeapi.ContainerState_CONTAINER_RUNNING)); err != nil {
+		return fmt.Errorf("failed to update state of the domain %q: %v", containerId, err)
 	}
 
-	if err != nil {
+	if err = v.metadataStore.UpdateStartedAt(containerId, strconv.FormatInt(v.clock.Now().UnixNano(), 10)); err != nil {
+		return fmt.Errorf("Failed to update start time of the domain %q: %v", containerId, err)
+	}
+
+	return nil
+}
+
+func (v *VirtualizationTool) StartContainer(containerId string) error {
+	if err := v.startContainer(containerId); err != nil {
 		// FIXME: we do this here because kubelet may attempt new `CreateContainer()`
 		// calls for this VM after failed `StartContainer()` without first removing it.
 		// Better solution is perhaps moving domain setup logic to `StartContainer()`

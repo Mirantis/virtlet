@@ -278,6 +278,21 @@ func TestDomainForcedShutdown(t *testing.T) {
 	gm.Verify(t, ct.rec.Content())
 }
 
+func TestDoubleStartError(t *testing.T) {
+	ct := newContainerTester(t, fake.NewToplevelRecorder())
+	defer ct.teardown()
+
+	sandbox := criapi.GetSandboxes(1)[0]
+	ct.setPodSandbox(sandbox)
+
+	containerId := ct.createContainer(sandbox, nil)
+	ct.clock.Advance(1 * time.Second)
+	ct.startContainer(containerId)
+	if err := ct.virtTool.StartContainer(containerId); err == nil {
+		t.Errorf("2nd StartContainer() didn't produce an error")
+	}
+}
+
 type volMount struct {
 	name          string
 	containerPath string
