@@ -146,10 +146,10 @@ function vcmd_simple {
 }
 
 function stop {
-  docker ps -q --filter=label=virtlet_build | while read container_id; do
-    echo >&2 "Removing container:" "${container_id}"
-    docker rm -fv "${container_id}"
-  done
+    docker ps -q --filter=label=virtlet_build | while read container_id; do
+        echo >&2 "Removing container:" "${container_id}"
+        docker rm -fv "${container_id}"
+    done
 }
 
 function copy_output {
@@ -160,8 +160,8 @@ function copy_output {
 
 function copy_dind {
     if ! docker volume ls -q | grep -q '^kubeadm-dind-kube-node-1$'; then
-      echo "No active or snapshotted kubeadm-dind-cluster" >&2
-      exit 1
+        echo "No active or snapshotted kubeadm-dind-cluster" >&2
+        exit 1
     fi
     ensure_build_image
     cd "${project_dir}"
@@ -173,9 +173,24 @@ function copy_dind {
            /bin/sh -c "cp -av _output/* /dind"
 }
 
+function kvm_ok {
+    # The check is done inside node-1 container because it has proper /lib/modules
+    # from the docker host. Also, it'll have to use mirantis/virtlet image
+    # later anyway.
+    if ! docker exec kube-node-1 docker run --privileged --rm -v /lib/modules:/lib/modules mirantis/virtlet kvm-ok; then
+        return 1
+    fi
+}
+
 function start_dind {
-  kubectl label node kube-node-1 extraRuntime=virtlet
-  kubectl create -f "${project_dir}/deploy/virtlet-ds-dev.yaml"
+    kubectl label node kube-node-1 extraRuntime=virtlet
+    if kvm_ok; then
+        kubectl convert -f "${project_dir}/deploy/virtlet-ds-dev.yaml" --local -o json |
+            jq '.items[0].spec.template.spec.containers[0].env|=map(select(.name!="VIRTLET_DISABLE_KVM"))' |
+            kubectl create -f -
+    else
+        kubectl create -f "${project_dir}/deploy/virtlet-ds-dev.yaml"
+    fi
 }
 
 function virtlet_subdir {
