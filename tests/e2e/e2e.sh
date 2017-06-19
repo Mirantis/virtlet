@@ -65,6 +65,25 @@ function wait-for-ssh {
   done
 }
 
+function delete-pod-and-wait {
+  local pod="${1}"
+  kubectl delete pod "${pod}"
+  n=180
+  while kubectl get pod "${pod}" >&/dev/null; do
+    if ((--n == 0)); then
+      echo "Timed out waiting for pod removal" >&2
+      exit 1
+    fi
+    sleep 1
+    echo -n "." >&2
+  done
+  echo >&2
+  if "${virsh}" list --name|grep -- '-${pod}$'; then
+    echo "${pod} domain still listed after deletion" >&2
+    exit 1
+  fi
+}
+
 function vmchat-short {
   local vmname=${1}
   wait-for-ssh ${vmname}
@@ -206,26 +225,11 @@ verify-cpu-count 1
 
 # test pod removal
 
-kubectl delete pod cirros-vm
-n=180
-while kubectl get pod cirros-vm >&/dev/null; do
-  if ((--n == 0)); then
-    echo "Timed out waiting for pod removal" >&2
-    exit 1
-  fi
-  sleep 1
-  echo -n "." >&2
-done
-echo >&2
-
-if "${virsh}" list --name|grep -- '-cirros-vm$'; then
-  echo "cirros-vm domain still listed after deletion" >&2
-  exit 1
-fi
+delete-pod-and-wait cirros-vm
 
 # test changing vcpu count
 
-kubectl convert -f "${SCRIPT_DIR}/../../examples/cirros-vm.yaml" --local -o json | docker exec -i kube-master jq '.metadata.annotations.VirtletVCPUCount = "2" | .spec.containers[0].resources.limits.cpu = "500m"' | kubectl create -f -
+kubectl convert -f "${SCRIPT_DIR}/../../examples/cirros-vm.yaml" --local -o json | jq '.metadata.annotations.VirtletVCPUCount = "2" | .spec.containers[0].resources.limits.cpu = "500m"' | kubectl create -f -
 
 wait-for-pod cirros-vm
 
@@ -293,3 +297,15 @@ if [[ ${mem_size_k} != ${expected_mem_size_k} ]]; then
   echo "Bad memory size (inside VM). Expected ${expected_mem_size_k}, but got ${mem_size_k}" >&2
   exit 1
 fi
+
+# Try stopping hung vm. We make VM hang by invoking 'halt -nf' from
+# cloud-init userdata
+kubectl convert -f "${SCRIPT_DIR}/../../examples/cirros-vm.yaml" --local -o json |
+    jq '.metadata.name="haltme"|.metadata.annotations.VirtletCloudInitUserDataScript="#!/bin/sh\n/sbin/halt -nf"' |
+    kubectl create -f -
+wait-for-pod haltme
+# FIXME: it would be better to halt the VM over ssh + wait for it to
+# stop receiving pings probably. We can do it after rewriting e2e
+# tests in Go.
+sleep 15
+delete-pod-and-wait haltme
