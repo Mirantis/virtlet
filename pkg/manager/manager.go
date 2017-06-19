@@ -22,10 +22,10 @@ import (
 	"net"
 	"os"
 	"syscall"
-	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
+	"github.com/jonboulle/clockwork"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
@@ -208,7 +208,7 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 		state = kubeapi.PodSandboxState_SANDBOX_NOTREADY
 	}
 
-	if storeErr := v.metadataStore.SetPodSandbox(config, netConfigAsBytes, state, time.Now); storeErr != nil {
+	if storeErr := v.metadataStore.SetPodSandbox(config, netConfigAsBytes, state, clockwork.NewRealClock()); storeErr != nil {
 		glog.Errorf("Error when creating pod sandbox for pod %s (%s): %v", podName, podId, storeErr)
 		return nil, storeErr
 	}

@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jonboulle/clockwork"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
 	"github.com/Mirantis/virtlet/pkg/bolttools"
@@ -42,8 +43,7 @@ const (
 
 type containerTester struct {
 	t              *testing.T
-	curTime        time.Time
-	fakeTime       func() time.Time
+	clock          clockwork.FakeClock
 	tmpDir         string
 	kubeletRootDir string
 	virtTool       *VirtualizationTool
@@ -53,11 +53,9 @@ type containerTester struct {
 
 func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTester {
 	ct := &containerTester{
-		t:       t,
-		curTime: time.Date(2017, 5, 30, 20, 19, 0, 0, time.UTC),
+		t:     t,
+		clock: clockwork.NewFakeClockAt(time.Date(2017, 5, 30, 20, 19, 0, 0, time.UTC)),
 	}
-
-	ct.fakeTime = func() time.Time { return ct.curTime }
 
 	var err error
 	ct.tmpDir, err = ioutil.TempDir("", "virtualization-test-")
@@ -100,7 +98,7 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 	if err != nil {
 		t.Fatalf("failed to create VirtualizationTool: %v", err)
 	}
-	ct.virtTool.SetTimeFunc(ct.fakeTime)
+	ct.virtTool.SetClock(ct.clock)
 	// avoid unneeded difs in the golden master data
 	ct.virtTool.SetForceKVM(true)
 	ct.kubeletRootDir = filepath.Join(ct.tmpDir, "kubelet-root")
@@ -121,13 +119,9 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 }
 
 func (ct *containerTester) setPodSandbox(config *kubeapi.PodSandboxConfig) {
-	if err := ct.boltClient.SetPodSandbox(config, []byte(fakeCNIConfig), kubeapi.PodSandboxState_SANDBOX_READY, ct.fakeTime); err != nil {
+	if err := ct.boltClient.SetPodSandbox(config, []byte(fakeCNIConfig), kubeapi.PodSandboxState_SANDBOX_READY, ct.clock); err != nil {
 		ct.t.Fatalf("Failed to store pod sandbox: %v", err)
 	}
-}
-
-func (ct *containerTester) elapse(d time.Duration) {
-	ct.curTime = ct.curTime.Add(1 * time.Second)
 }
 
 func (ct *containerTester) teardown() {
@@ -183,7 +177,7 @@ func TestContainerLifecycle(t *testing.T) {
 	}
 	ct.rec.Rec("container list after the container is created", containers)
 
-	ct.elapse(1 * time.Second)
+	ct.clock.Advance(1 * time.Second)
 	if err = ct.virtTool.StartContainer(containerId); err != nil {
 		t.Fatalf("StartContainer failed for container %q: %v", containerId, err)
 	}

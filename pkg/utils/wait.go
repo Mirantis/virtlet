@@ -19,11 +19,18 @@ package utils
 import (
 	"fmt"
 	"time"
+
+	"github.com/jonboulle/clockwork"
 )
 
-// WaitLoop executes test func in loop until it returns error, true, or timeout passes
-func WaitLoop(test func() (bool, error), retryPeriod time.Duration, timeout time.Duration) error {
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(retryPeriod) {
+// WaitLoop executes test func in loop until it returns error, true, or the timeout elapses.
+// clock argument denotes a clock object to use for waiting.
+// When clock is nil, WaitLoop uses clockwork.NewRealClock()
+func WaitLoop(test func() (bool, error), retryPeriod time.Duration, timeout time.Duration, clock clockwork.Clock) error {
+	if clock == nil {
+		clock = clockwork.NewRealClock()
+	}
+	for start := clock.Now(); clock.Since(start) < timeout; clock.Sleep(retryPeriod) {
 		result, err := test()
 		if err != nil {
 			return err

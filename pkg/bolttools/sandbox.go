@@ -20,9 +20,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/jonboulle/clockwork"
 	"k8s.io/apimachinery/pkg/fields"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
@@ -37,7 +37,7 @@ func (b *BoltClient) EnsureSandboxSchema() error {
 	})
 }
 
-func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConfiguration []byte, state kubeapi.PodSandboxState, timeFunc func() time.Time) error {
+func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConfiguration []byte, state kubeapi.PodSandboxState, clock clockwork.Clock) error {
 	podId := config.Metadata.Uid
 
 	strLabels, err := json.Marshal(config.GetLabels())
@@ -75,7 +75,7 @@ func (b *BoltClient) SetPodSandbox(config *kubeapi.PodSandboxConfig, networkConf
 			return err
 		}
 
-		if err := sandboxBucket.Put([]byte("createdAt"), []byte(strconv.FormatInt(timeFunc().UnixNano(), 10))); err != nil {
+		if err := sandboxBucket.Put([]byte("createdAt"), []byte(strconv.FormatInt(clock.Now().UnixNano(), 10))); err != nil {
 			return err
 		}
 
