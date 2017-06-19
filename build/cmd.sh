@@ -173,9 +173,24 @@ function copy_dind {
            /bin/sh -c "cp -av _output/* /dind"
 }
 
+function kvm_ok {
+  # The check is done inside node-1 container because it has proper /lib/modules
+  # from the docker host. Also, it'll have to use mirantis/virtlet image
+  # later anyway.
+  if ! docker exec kube-node-1 docker run --privileged --rm -v /lib/modules:/lib/modules mirantis/virtlet kvm-ok; then
+    return 1
+  fi
+}
+
 function start_dind {
-  kubectl label node kube-node-1 extraRuntime=virtlet
-  kubectl create -f "${project_dir}/deploy/virtlet-ds-dev.yaml"
+    kubectl label node kube-node-1 extraRuntime=virtlet
+    if kvm_ok; then
+        kubectl convert -f "${project_dir}/deploy/virtlet-ds-dev.yaml" --local -o json |
+            jq '.items[0].spec.template.spec.containers[0].env|=map(select(.name!="VIRTLET_DISABLE_KVM"))' |
+            kubectl create -f -
+    else
+        kubectl create -f "${project_dir}/deploy/virtlet-ds-dev.yaml"
+    fi
 }
 
 function virtlet_subdir {
