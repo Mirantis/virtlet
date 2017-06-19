@@ -18,6 +18,10 @@ spec:
             operator: In
             values:
             - virtlet
+  # This is the number of seconds Virtlet gives the VM to shut down cleanly.
+  # The default value of 30 seconds is ok for containers but probably too
+  # low for VM, so overriding it here is strongly advised.
+  terminationGracePeriodSeconds: 120
   containers:
   - name: ubuntu-vm
     image: virtlet/cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img
