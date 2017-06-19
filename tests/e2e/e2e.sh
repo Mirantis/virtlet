@@ -110,7 +110,7 @@ virshid=$($virsh list | grep "\-cirros-vm " | cut -f2 -d " ")
 logpath=$($virsh dumpxml $virshid | xmllint --xpath 'string(//serial[@type="file"]/source/@path)' -)
 filename=$(echo $logpath | sed -E 's#.+/##')
 sandboxid=$(echo $logpath | sed 's#/var/log/vms/##' | sed -E 's#/.+##')
-nodeid=$(docker ps | grep kube-node-1 | cut -f1 -d " ")
+nodeid=$(docker ps | grep kube-master | cut -f1 -d " ")
 
 count=$(docker exec -it ${nodeid} /bin/bash -c "cat /var/log/virtlet/vms/${sandboxid}/${filename}" | \
      grep "login as 'cirros' user. default password: 'cubswin:)'. use 'sudo' for root." | \

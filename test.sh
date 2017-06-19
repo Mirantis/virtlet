@@ -15,7 +15,9 @@ cd "${SCRIPT_DIR}"
 
 build/cmd.sh build
 build/cmd.sh copy
-build/cmd.sh test
+if [[ ! ${SKIP_TEST:-} ]]; then
+  build/cmd.sh test
+fi
 
 docker build -t mirantis/virtlet .
 

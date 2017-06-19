@@ -159,7 +159,7 @@ function copy_output {
 }
 
 function copy_dind {
-    if ! docker volume ls -q | grep -q '^kubeadm-dind-kube-node-1$'; then
+    if ! docker volume ls -q | grep -q '^kubeadm-dind-kube-master$'; then
       echo "No active or snapshotted kubeadm-dind-cluster" >&2
       exit 1
     fi
@@ -167,14 +167,14 @@ function copy_dind {
     cd "${project_dir}"
     docker run --rm \
            -v "virtlet_src:${remote_project_dir}" \
-           -v kubeadm-dind-kube-node-1:/dind \
+           -v kubeadm-dind-kube-master:/dind \
            --name ${tmp_container_name} \
            "${build_image}" \
            /bin/sh -c "cp -av _output/* /dind"
 }
 
 function start_dind {
-  kubectl label node kube-node-1 extraRuntime=virtlet
+  kubectl label node kube-master extraRuntime=virtlet
   kubectl create -f "${project_dir}/deploy/virtlet-ds-dev.yaml"
 }
 
