@@ -93,11 +93,6 @@ func (i *ImageTool) GetImageVolume(imageName string) (virt.VirtStorageVolume, er
 	return i.pool.LookupVolumeByName(imageVolumeName)
 }
 
-func ImageNameFromVirtVolumeName(volumeName string) string {
-	parts := strings.SplitN(volumeName, "_", 2)
-	return parts[1]
-}
-
 func stripTagFromImageName(imageName string) string {
 	return strings.Split(imageName, ":")[0]
 }
