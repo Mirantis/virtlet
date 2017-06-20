@@ -469,7 +469,11 @@
     "name": "domain conn: 231700d5-c9a6-5a49-738d-99a954c51550-container1: Shutdown"
   },
   {
-    "name": "container status after the container is stopped",
+    "name": "storage: volumes: RemoveVolumeByName",
+    "data": "root_231700d5-c9a6-5a49-738d-99a954c51550"
+  },
+  {
+    "name": "container status the container is stopped",
     "data": {
       "id": "231700d5-c9a6-5a49-738d-99a954c51550",
       "metadata": {
@@ -491,11 +495,21 @@
     }
   },
   {
+<<<<<<< 532233475976e1b491a4732db3c689878d00bf5f
     "name": "domain conn: 231700d5-c9a6-5a49-738d-99a954c51550-container1: Undefine"
+=======
+    "name": "domain conn: 231700d5-c9a6-5a49-738d-99a954c51550-container1: Shutdown"
+>>>>>>> Fixed golden tests
   },
   {
     "name": "storage: volumes: RemoveVolumeByName",
     "data": "root_231700d5-c9a6-5a49-738d-99a954c51550"
+  },
+  {
+    "name": "domain conn: 231700d5-c9a6-5a49-738d-99a954c51550-container1: Desroy"
+  },
+  {
+    "name": "domain conn: 231700d5-c9a6-5a49-738d-99a954c51550-container1: Undefine"
   },
   {
     "name": "domain conn: ListDomains",

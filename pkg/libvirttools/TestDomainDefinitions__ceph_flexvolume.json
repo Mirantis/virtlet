@@ -499,5 +499,8 @@
   },
   {
     "name": "domain conn: secret 231700d5-c9a6-5a49-738d-99a954c51550: Remove"
+  },
+  {
+    "name": "domain conn: 231700d5-c9a6-5a49-738d-99a954c51550-container1: Undefine"
   }
 ]
