@@ -26,6 +26,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
+	"github.com/jonboulle/clockwork"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
@@ -208,7 +209,7 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 		state = kubeapi.PodSandboxState_SANDBOX_NOTREADY
 	}
 
-	if storeErr := v.metadataStore.SetPodSandbox(config, netConfigAsBytes, state, time.Now); storeErr != nil {
+	if storeErr := v.metadataStore.SetPodSandbox(config, netConfigAsBytes, state, clockwork.NewRealClock()); storeErr != nil {
 		glog.Errorf("Error when creating pod sandbox for pod %s (%s): %v", podName, podId, storeErr)
 		return nil, storeErr
 	}
@@ -402,7 +403,7 @@ func (v *VirtletManager) StopContainer(ctx context.Context, in *kubeapi.StopCont
 	glog.V(2).Infof("StopContainer called for containerID: %s", in.ContainerId)
 	glog.V(3).Infof("StopContainer: %s", spew.Sdump(in))
 
-	if err := v.libvirtVirtualizationTool.StopContainer(in.ContainerId); err != nil {
+	if err := v.libvirtVirtualizationTool.StopContainer(in.ContainerId, time.Duration(in.Timeout)*time.Second); err != nil {
 		glog.Errorf("Error when stopping container %s: %v", in.ContainerId, err)
 		return nil, err
 	}

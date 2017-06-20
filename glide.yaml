@@ -32,3 +32,5 @@ import:
   version: 76153773eaa3a268131d3d993290a194a1370585
 - package: k8s.io/apimachinery
   version: 75b8dd260ef0469d96d578705a87cffd0e09dab8
+- package: github.com/jonboulle/clockwork
+  version: bcac9884e7502bb2b474c0339d889cb981a2f27f

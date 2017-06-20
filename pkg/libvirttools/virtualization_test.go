@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jonboulle/clockwork"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
 	"github.com/Mirantis/virtlet/pkg/bolttools"
@@ -35,29 +36,29 @@ import (
 )
 
 const (
-	fakeImageName = "fake/image1"
-	fakeCNIConfig = `{"noCniForNow":true}`
-	fakeUuid      = "abb67e3c-71b3-4ddd-5505-8c4215d5c4eb"
+	fakeImageName        = "fake/image1"
+	fakeCNIConfig        = `{"noCniForNow":true}`
+	fakeUuid             = "abb67e3c-71b3-4ddd-5505-8c4215d5c4eb"
+	stopContainerTimeout = 30 * time.Second
 )
 
 type containerTester struct {
 	t              *testing.T
-	curTime        time.Time
-	fakeTime       func() time.Time
+	clock          clockwork.FakeClock
 	tmpDir         string
 	kubeletRootDir string
 	virtTool       *VirtualizationTool
 	rec            *fake.TopLevelRecorder
+	domainConn     *fake.FakeDomainConnection
+	storageConn    *fake.FakeStorageConnection
 	boltClient     *bolttools.BoltClient
 }
 
 func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTester {
 	ct := &containerTester{
-		t:       t,
-		curTime: time.Date(2017, 5, 30, 20, 19, 0, 0, time.UTC),
+		t:     t,
+		clock: clockwork.NewFakeClockAt(time.Date(2017, 5, 30, 20, 19, 0, 0, time.UTC)),
 	}
-
-	ct.fakeTime = func() time.Time { return ct.curTime }
 
 	var err error
 	ct.tmpDir, err = ioutil.TempDir("", "virtualization-test-")
@@ -67,8 +68,8 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 
 	downloader := utils.NewFakeDownloader(ct.tmpDir)
 	ct.rec = rec
-	domainConn := fake.NewFakeDomainConnection(ct.rec.Child("domain conn"))
-	storageConn := fake.NewFakeStorageConnection(ct.rec.Child("storage"))
+	ct.domainConn = fake.NewFakeDomainConnection(ct.rec.Child("domain conn"))
+	ct.storageConn = fake.NewFakeStorageConnection(ct.rec.Child("storage"))
 
 	ct.boltClient, err = bolttools.NewFakeBoltClient()
 	if err != nil {
@@ -85,7 +86,7 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 		t.Fatalf("boltClient: failed to create virtualization schema: %v", err)
 	}
 
-	imageTool, err := NewImageTool(storageConn, downloader, "default")
+	imageTool, err := NewImageTool(ct.storageConn, downloader, "default")
 	if err != nil {
 		t.Fatalf("Failed to create ImageTool: %v", err)
 	}
@@ -96,11 +97,11 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 		// XXX: GetNocloudVolume must go last because it
 		// doesn't produce correct name for cdrom devices
 		GetNocloudVolume)
-	ct.virtTool, err = NewVirtualizationTool(domainConn, storageConn, imageTool, ct.boltClient, "volumes", "loop*", volSrc)
+	ct.virtTool, err = NewVirtualizationTool(ct.domainConn, ct.storageConn, imageTool, ct.boltClient, "volumes", "loop*", volSrc)
 	if err != nil {
 		t.Fatalf("failed to create VirtualizationTool: %v", err)
 	}
-	ct.virtTool.SetTimeFunc(ct.fakeTime)
+	ct.virtTool.SetClock(ct.clock)
 	// avoid unneeded difs in the golden master data
 	ct.virtTool.SetForceKVM(true)
 	ct.kubeletRootDir = filepath.Join(ct.tmpDir, "kubelet-root")
@@ -121,34 +122,16 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 }
 
 func (ct *containerTester) setPodSandbox(config *kubeapi.PodSandboxConfig) {
-	if err := ct.boltClient.SetPodSandbox(config, []byte(fakeCNIConfig), kubeapi.PodSandboxState_SANDBOX_READY, ct.fakeTime); err != nil {
+	if err := ct.boltClient.SetPodSandbox(config, []byte(fakeCNIConfig), kubeapi.PodSandboxState_SANDBOX_READY, ct.clock); err != nil {
 		ct.t.Fatalf("Failed to store pod sandbox: %v", err)
 	}
-}
-
-func (ct *containerTester) elapse(d time.Duration) {
-	ct.curTime = ct.curTime.Add(1 * time.Second)
 }
 
 func (ct *containerTester) teardown() {
 	os.RemoveAll(ct.tmpDir)
 }
 
-func TestContainerLifecycle(t *testing.T) {
-	ct := newContainerTester(t, fake.NewToplevelRecorder())
-	defer ct.teardown()
-
-	sandbox := criapi.GetSandboxes(1)[0]
-	ct.setPodSandbox(sandbox)
-
-	containers, err := ct.virtTool.ListContainers(nil)
-	switch {
-	case err != nil:
-		t.Fatalf("ListContainers() failed: %v", err)
-	case len(containers) != 0:
-		t.Errorf("Unexpected containers when no containers are started: %#v", containers)
-	}
-
+func (ct *containerTester) createContainer(sandbox *kubeapi.PodSandboxConfig, mounts []*kubeapi.Mount) string {
 	req := &kubeapi.CreateContainerRequest{
 		PodSandboxId: sandbox.Metadata.Uid,
 		Config: &kubeapi.ContainerConfig{
@@ -158,22 +141,72 @@ func TestContainerLifecycle(t *testing.T) {
 			Image: &kubeapi.ImageSpec{
 				Image: fakeImageName,
 			},
+			Mounts: mounts,
 		},
 		SandboxConfig: sandbox,
 	}
 	vmConfig, err := GetVMConfig(req)
 	if err != nil {
-		t.Fatalf("GetVMConfig(): %v", err)
+		ct.t.Fatalf("GetVMConfig(): %v", err)
 	}
 	containerId, err := ct.virtTool.CreateContainer(vmConfig, "/tmp/fakenetns", fakeCNIConfig)
 	if err != nil {
-		t.Fatalf("CreateContainer(): %v", err)
+		ct.t.Fatalf("CreateContainer: %v", err)
+	}
+	return containerId
+}
+
+func (ct *containerTester) listContainers(filter *kubeapi.ContainerFilter) []*kubeapi.Container {
+	containers, err := ct.virtTool.ListContainers(nil)
+	if err != nil {
+		ct.t.Fatalf("ListContainers() failed: %v", err)
+	}
+	return containers
+}
+
+func (ct *containerTester) containerStatus(containerId string) *kubeapi.ContainerStatus {
+	status, err := ct.virtTool.ContainerStatus(containerId)
+	if err != nil {
+		ct.t.Errorf("ContainerStatus(): %v", err)
+	}
+	return status
+
+}
+
+func (ct *containerTester) startContainer(containerId string) {
+	if err := ct.virtTool.StartContainer(containerId); err != nil {
+		ct.t.Fatalf("StartContainer failed for container %q: %v", containerId, err)
+	}
+}
+
+func (ct *containerTester) stopContainer(containerId string) {
+	if err := ct.virtTool.StopContainer(containerId, stopContainerTimeout); err != nil {
+		ct.t.Fatalf("StopContainer failed for container %q: %v", containerId, err)
+	}
+}
+
+func (ct *containerTester) removeContainer(containerId string) {
+	if err := ct.virtTool.RemoveContainer(containerId); err != nil {
+		ct.t.Fatalf("RemoveContainer failed for container %q: %v", containerId, err)
+	}
+}
+
+func TestContainerLifecycle(t *testing.T) {
+	ct := newContainerTester(t, fake.NewToplevelRecorder())
+	defer ct.teardown()
+
+	sandbox := criapi.GetSandboxes(1)[0]
+	ct.setPodSandbox(sandbox)
+
+	containers := ct.listContainers(nil)
+	if len(containers) != 0 {
+		t.Errorf("Unexpected containers when no containers are started: %#v", containers)
 	}
 
-	containers, err = ct.virtTool.ListContainers(nil)
+	containerId := ct.createContainer(sandbox, nil)
+
+	containers = ct.listContainers(nil)
 	switch {
-	case err != nil:
-		t.Errorf("ListContainers() failed: %v", err)
 	case len(containers) != 1:
 		t.Errorf("Expected single container to be started, but got: %#v", containers)
 	case containers[0].Id != containerId:
@@ -183,46 +216,81 @@ func TestContainerLifecycle(t *testing.T) {
 	}
 	ct.rec.Rec("container list after the container is created", containers)
 
-	ct.elapse(1 * time.Second)
-	if err = ct.virtTool.StartContainer(containerId); err != nil {
-		t.Fatalf("StartContainer failed for container %q: %v", containerId, err)
-	}
+	ct.clock.Advance(1 * time.Second)
+	ct.startContainer(containerId)
 
-	status, err := ct.virtTool.ContainerStatus(containerId)
-	switch {
-	case err != nil:
-		t.Errorf("ContainerStatus(): %v", err)
-	case status.State != kubeapi.ContainerState_CONTAINER_RUNNING:
-		t.Errorf("Bad container state: %v instead of %v", containers[0].State, kubeapi.ContainerState_CONTAINER_RUNNING)
+	status := ct.containerStatus(containerId)
+	if status.State != kubeapi.ContainerState_CONTAINER_RUNNING {
+		t.Errorf("Bad container state: %v instead of %v", status.State, kubeapi.ContainerState_CONTAINER_RUNNING)
 	}
-	ct.rec.Rec("container status the container is created", status)
+	ct.rec.Rec("container status after the container is started", status)
 
-	if err = ct.virtTool.StopContainer(containerId); err != nil {
-		t.Fatalf("StopContainer failed for container %q: %v", containerId, err)
+	ct.stopContainer(containerId)
+
+	status = ct.containerStatus(containerId)
+	if status.State != kubeapi.ContainerState_CONTAINER_EXITED {
+		t.Errorf("Bad container state: %v instead of %v", status.State, kubeapi.ContainerState_CONTAINER_EXITED)
 	}
+	ct.rec.Rec("container status after the container is stopped", status)
 
-	status, err = ct.virtTool.ContainerStatus(containerId)
-	switch {
-	case err != nil:
-		t.Errorf("ContainerStatus(): %v", err)
-	case status.State != kubeapi.ContainerState_CONTAINER_EXITED:
-		t.Errorf("Bad container state: %v instead of %v", containers[0].State, kubeapi.ContainerState_CONTAINER_EXITED)
-	}
-	ct.rec.Rec("container status the container is stopped", status)
+	ct.removeContainer(containerId)
 
-	if err = ct.virtTool.RemoveContainer(containerId); err != nil {
-		t.Fatalf("RemoveContainer failed for container %q: %v", containerId, err)
-	}
-
-	containers, err = ct.virtTool.ListContainers(nil)
-	switch {
-	case err != nil:
-		t.Fatalf("ListContainers() failed: %v", err)
-	case len(containers) != 0:
+	containers = ct.listContainers(nil)
+	if len(containers) != 0 {
 		t.Errorf("Unexpected containers when no containers are started: %#v", containers)
 	}
 
 	gm.Verify(t, ct.rec.Content())
+}
+
+func TestDomainForcedShutdown(t *testing.T) {
+	ct := newContainerTester(t, fake.NewToplevelRecorder())
+	defer ct.teardown()
+
+	sandbox := criapi.GetSandboxes(1)[0]
+	ct.setPodSandbox(sandbox)
+
+	containerId := ct.createContainer(sandbox, nil)
+	ct.clock.Advance(1 * time.Second)
+	ct.startContainer(containerId)
+
+	ct.domainConn.SetIgnoreShutdown(true)
+	go func() {
+		// record a couple of ignored shutdown attempts before container destruction
+		ct.clock.BlockUntil(1)
+		ct.clock.Advance(6 * time.Second)
+		ct.clock.BlockUntil(1)
+		ct.clock.Advance(6 * time.Second)
+		ct.clock.BlockUntil(1)
+		ct.clock.Advance(30 * time.Second)
+	}()
+
+	ct.rec.Rec("invoking StopContainer()", nil)
+	ct.stopContainer(containerId)
+	status := ct.containerStatus(containerId)
+	if status.State != kubeapi.ContainerState_CONTAINER_EXITED {
+		t.Errorf("Bad container state: %v instead of %v", status.State, kubeapi.ContainerState_CONTAINER_EXITED)
+	}
+	ct.rec.Rec("container status after the container is stopped", status)
+
+	ct.rec.Rec("invoking RemoveContainer()", nil)
+	ct.removeContainer(containerId)
+	gm.Verify(t, ct.rec.Content())
+}
+
+func TestDoubleStartError(t *testing.T) {
+	ct := newContainerTester(t, fake.NewToplevelRecorder())
+	defer ct.teardown()
+
+	sandbox := criapi.GetSandboxes(1)[0]
+	ct.setPodSandbox(sandbox)
+
+	containerId := ct.createContainer(sandbox, nil)
+	ct.clock.Advance(1 * time.Second)
+	ct.startContainer(containerId)
+	if err := ct.virtTool.StartContainer(containerId); err == nil {
+		t.Errorf("2nd StartContainer() didn't produce an error")
+	}
 }
 
 type volMount struct {
@@ -347,32 +415,8 @@ func TestDomainDefinitions(t *testing.T) {
 					ContainerPath: m.containerPath,
 				})
 			}
-			req := &kubeapi.CreateContainerRequest{
-				PodSandboxId: sandbox.Metadata.Uid,
-				Config: &kubeapi.ContainerConfig{
-					Metadata: &kubeapi.ContainerMetadata{
-						Name: "container1",
-					},
-					Image: &kubeapi.ImageSpec{
-						Image: fakeImageName,
-					},
-					Mounts: mounts,
-				},
-				SandboxConfig: sandbox,
-			}
-			vmConfig, err := GetVMConfig(req)
-			if err != nil {
-				t.Fatalf("GetVMConfig(): %v", err)
-			}
-			containerId, err := ct.virtTool.CreateContainer(vmConfig, "/tmp/fakenetns", fakeCNIConfig)
-			if err != nil {
-				t.Fatalf("CreateContainer: %v", err)
-			}
-
-			if err = ct.virtTool.RemoveContainer(containerId); err != nil {
-				t.Fatalf("RemoveContainer failed for container %q: %v", containerId, err)
-			}
-
+			containerId := ct.createContainer(sandbox, mounts)
+			ct.removeContainer(containerId)
 			gm.Verify(t, ct.rec.Content())
 		})
 	}

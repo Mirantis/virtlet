@@ -236,7 +236,7 @@ func (ct *containerTester) waitForContainerRunning(containerId, containerName st
 		}
 
 		return false, nil
-	}, time.Second, 20*time.Second)
+	}, time.Second, 20*time.Second, nil)
 
 	if err != nil {
 		ct.t.Errorf("Container not reaching RUNNING state: %v", err)
