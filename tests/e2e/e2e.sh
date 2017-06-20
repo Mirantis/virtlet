@@ -55,7 +55,7 @@ function check-all-cleaned {
   local podID="${1}"
   # TODO: get rid of this sleep
   # for some reason even after 'kubectl get pod' check returns 'NOT FOUND'
-  # domain remains defined for some time
+  # domain remains defined being in "shut off" state for noticable time
   sleep 60
   if "${virsh}" list --all | grep ${podID}; then
     echo "domain ${podID} still listed after deletion" >&2
@@ -114,7 +114,7 @@ function vmchat-short {
 
   count=$(../../examples/vmssh.sh "cirros@${vmname}" "ip a" | grep "eth0:" | wc -l)
   if [[ ${count} != 1 ]]; then
-    echExecuting 'ip a' failed. Expected 1 line but got ${count}"
+    echo "Executing 'ip a' failed. Expected 1 line but got ${count}" 
     exit 1
   fi
 }
@@ -249,12 +249,12 @@ verify-cpu-count 1
 
 # test pod removal
 
-podID=$(get_pod_domain_id @cirros-vm-rbd | sed s/-cirros-vm-rbd//)
-delete-pod-and-wait cirros-vm-rbd
+podID=$(get_pod_domain_id @cirros-vm-rbd-pv | sed s/-cirros-vm-rbd-pv//)
+delete-pod-and-wait cirros-vm-rbd-pv
 check-all-cleaned ${podID}
 
 podID=$(get_pod_domain_id @cirros-vm | sed s/-cirros-vm//)
-delete-pod-and-wait cirros-vm-rbd
+delete-pod-and-wait cirros-vm
 check-all-cleaned ${podID}
 
 # test changing vcpu count

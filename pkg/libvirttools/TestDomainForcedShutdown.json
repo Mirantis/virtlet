@@ -435,6 +435,10 @@
     "name": "domain conn: 231700d5-c9a6-5a49-738d-99a954c51550-container1: Destroy"
   },
   {
+    "name": "storage: volumes: RemoveVolumeByName",
+    "data": "root_231700d5-c9a6-5a49-738d-99a954c51550"
+  },
+  {
     "name": "container status after the container is stopped",
     "data": {
       "id": "231700d5-c9a6-5a49-738d-99a954c51550",
@@ -461,9 +465,5 @@
   },
   {
     "name": "domain conn: 231700d5-c9a6-5a49-738d-99a954c51550-container1: Undefine"
-  },
-  {
-    "name": "storage: volumes: RemoveVolumeByName",
-    "data": "root_231700d5-c9a6-5a49-738d-99a954c51550"
   }
 ]

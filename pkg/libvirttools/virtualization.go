@@ -410,7 +410,6 @@ func (v *VirtualizationTool) startContainer(containerId string) error {
 
 	state, err := domain.State()
 	if err != nil {
-<<<<<<< d36335959d762c89cc6ad920f4eda6aaeb6e678b
 		return fmt.Errorf("failed to get state of the domain %q: %v", containerId, err)
 	}
 	if state != virt.DOMAIN_SHUTOFF {
@@ -450,6 +449,7 @@ func (v *VirtualizationTool) startContainer(containerId string) error {
 		return fmt.Errorf("Failed to update start time of the domain %q: %v", containerId, err)
 	}
 
+
 	return nil
 }
 
@@ -461,14 +461,16 @@ func (v *VirtualizationTool) StartContainer(containerId string) error {
 		// and cleaning it all up upon failure, but for now we just remove the VM
 		// so the next `CreateContainer()` call succeeds.
 		if rmErr := v.RemoveContainer(containerId); rmErr != nil {
-			return mt.Errorf("Container start error: %v \n+ container removal error: %v", err, rmErr)
+			return fmt.Errorf("Container start error: %v \n+ container removal error: %v", err, rmErr)
 		}
 		if clErr := v.volumeCleanup(containerId); clErr != nil {
 			return fmt.Errorf("Container start error: %v \n+ volume cleanup error: %v", err, clErr)
 		}
+
+		return err
 	}
 
-	return err
+	return nil
 }
 
 func (v *VirtualizationTool) StopContainer(containerId string, timeout time.Duration) error {

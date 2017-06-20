@@ -416,6 +416,7 @@ func TestDomainDefinitions(t *testing.T) {
 				})
 			}
 			containerId := ct.createContainer(sandbox, mounts)
+			ct.stopContainer(containerId)
 			ct.removeContainer(containerId)
 			gm.Verify(t, ct.rec.Content())
 		})
