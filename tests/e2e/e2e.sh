@@ -120,8 +120,9 @@ if [[ ${count} != 1 ]]; then
   exit 1
 fi
 
-count=$(docker exec -it ${nodeid} /bin/bash -c "cat /var/log/pods/${sandboxid}/${filename}" | \
-     grep -E "{\"time\": \".+\", \"stream\": \"stdout\",\"log\":\"login as 'cirros' user. default password:.+'. use 'sudo' for root.+\"}" | \
+# DIND containers have jq installed so we can use it
+count=$(docker exec -it ${nodeid} /bin/bash -c "jq .log /var/log/pods/${sandboxid}/${filename}" | \
+     grep "login as 'cirros' user. default password:.*'. use 'sudo' for root" | \
      wc -l)
 if [[ ${count} != 1 ]]; then
   echo "Checking formatted log file failed. Expected 1 line but got ${count}"

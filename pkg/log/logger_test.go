@@ -17,47 +17,18 @@ limitations under the License.
 package log
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/hpcloud/tail"
 )
-
-func TestEscapeLine(t *testing.T) {
-	m := []struct {
-		comment  string
-		line     string
-		expected string
-	}{
-		{
-			"with newline at the end",
-			"This is log message\n",
-			"This is log message",
-		},
-		{
-			"with double quotes",
-			"This is \"log\" message",
-			"This is \\\"log\\\" message",
-		},
-	}
-	for i, args := range m {
-		t.Logf("CASE #%d: %s", i, args.comment)
-
-		// This is what we're testing here.
-		escapedLine := escapeLine(args.line)
-
-		// Expectations.
-		if escapedLine != args.expected {
-			t.Errorf("obtained '%s', expected '%s'", escapedLine, args.expected)
-		}
-	}
-}
 
 func TestWorkerRunner_ListWorkers(t *testing.T) {
 	// Setup.
@@ -113,10 +84,12 @@ func TestWorkerRunner_RunNewWorker(t *testing.T) {
 	waitWorkerStatus(statusCh, 1, "STOP", t)
 
 	// Expectations.
-	expectedPattern := fmt.Sprintf(`^{"time": ".+", "stream": "stdout","log":"Foo Bar\\n"}\n$`)
-	if err := checkFileContentMatchesPattern(outFile, expectedPattern); err != nil {
-		t.Error(err)
-	}
+	verifyJsonLines(t, outFile, []map[string]interface{}{
+		{
+			"stream": "stdout",
+			"log":    "Foo Bar\n",
+		},
+	})
 }
 
 func TestWorkerRunner_RunNewWorker_Twice(t *testing.T) {
@@ -143,10 +116,12 @@ func TestWorkerRunner_RunNewWorker_Twice(t *testing.T) {
 	waitWorkerStatus(statusCh, 1, "STOP", t)
 
 	// Expectations.
-	expectedPattern := fmt.Sprintf(`^{"time": ".+", "stream": "stdout","log":"Foo Bar\\n"}\n$`)
-	if err := checkFileContentMatchesPattern(outFile, expectedPattern); err != nil {
-		t.Error(err)
-	}
+	verifyJsonLines(t, outFile, []map[string]interface{}{
+		{
+			"stream": "stdout",
+			"log":    "Foo Bar\n",
+		},
+	})
 }
 
 func TestWorkerRunner_RunNewWorker_Append(t *testing.T) {
@@ -173,13 +148,20 @@ func TestWorkerRunner_RunNewWorker_Append(t *testing.T) {
 	runner.StopAllWorkers()
 	waitWorkerStatus(statusCh, 1, "STOP", t)
 
-	expectedPattern := fmt.Sprintf("^%s\n%s\n%s\n$",
-		`{"time": ".+", "stream": "stdout","log":"Foo Bar\\n"}`,
-		`{"time": ".+", "stream": "stdout","log":"Append Line 1\\n"}`,
-		`{"time": ".+", "stream": "stdout","log":"Append Line 2\\n"}`)
-	if err := checkFileContentMatchesPattern(outFile, expectedPattern); err != nil {
-		t.Error(err)
-	}
+	verifyJsonLines(t, outFile, []map[string]interface{}{
+		{
+			"stream": "stdout",
+			"log":    "Foo Bar\n",
+		},
+		{
+			"stream": "stdout",
+			"log":    "Append Line 1\n",
+		},
+		{
+			"stream": "stdout",
+			"log":    "Append Line 2\n",
+		},
+	})
 }
 
 func TestVirtletLogger_SpawnWorkers(t *testing.T) {
@@ -341,22 +323,53 @@ func setupDirStructure(sandboxIds []string, initialContent string) (string, stri
 	return baseDir, baseInputDir, baseOutputDir
 }
 
-func checkFileContentMatchesPattern(filePath, pattern string) error {
+func verifyJsonLines(t *testing.T, filePath string, lines []map[string]interface{}) {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		return fmt.Errorf("output file should exist, but does not")
+		t.Errorf("output file should exist, but does not")
 	}
-	data, err := ioutil.ReadFile(filePath)
+
+	f, err := os.Open(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to read output file: %s", filePath)
+		t.Errorf("failed to open file: %s", filePath)
 	}
+	defer f.Close()
 
-	obtained := string(data)
-
-	if matches, _ := regexp.MatchString(pattern, obtained); !matches {
-		return fmt.Errorf("obtained '%s', expected '%s'", obtained, pattern)
+	scanner := bufio.NewScanner(f)
+	for n := 0; scanner.Scan(); n++ {
+		l := scanner.Text()
+		if n >= len(lines) {
+			t.Errorf("excess line in the log: %q", l)
+			continue
+		}
+		var m map[string]interface{}
+		if err := json.Unmarshal([]byte(l), &m); err != nil {
+			t.Errorf("failed to unmarshal log line %q: %v", l, err)
+			continue
+		}
+		timeStr, ok := m["time"].(string)
+		if !ok {
+			t.Errorf("bad/absent time in the log line %q", l)
+			continue
+		}
+		logTime, err := time.Parse(time.RFC3339, timeStr)
+		if err != nil {
+			t.Errorf("failed to parse log time %q: %v", m["time"], err)
+			continue
+		}
+		timeDiff := time.Now().Sub(logTime)
+		if timeDiff < 0 || timeDiff > 10*time.Minute {
+			t.Errorf("log time too far from now: %v", m["time"])
+			continue
+		}
+		for k, v := range lines[n] {
+			if m[k] != v {
+				t.Errorf("bad %q value in log line %q: got %v, expected %v", k, l, m[k], v)
+			}
+		}
 	}
-
-	return nil
+	if err := scanner.Err(); err != nil {
+		t.Errorf("error reading the output file: %v", err)
+	}
 }
 
 func waitWorkerStatus(statusCh chan string, nWorkers int, status string, t *testing.T) {
