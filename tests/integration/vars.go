@@ -19,7 +19,7 @@ package integration
 var (
 	imageCirrosUrl     = "localhost/cirros-0.3.4-x86_64-disk.img"
 	imageCopyCirrosUrl = "localhost/copy/cirros-0.3.4-x86_64-disk.img"
-	imageCirrosId      = "cirros-0.3.4-x86_64-disk.img"
+	imageCirrosId      = "localhost/cirros-0.3.4-x86_64-disk.img"
 	cirrosVolumeSize   = 41126400
 	imageCirrosUrl2    = "localhost/cirros-0.3.3-x86_64-disk.img"
 )
