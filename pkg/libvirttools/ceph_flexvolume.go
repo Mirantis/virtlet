@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"strings"
 
+       "github.com/golang/glog"
+
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
 	"github.com/Mirantis/virtlet/pkg/utils"
@@ -134,7 +136,10 @@ func (v *cephVolume) Teardown() error {
 	switch {
 	case err == virt.ErrSecretNotFound:
 		// ok, no need to delete the secret
+               glog.V(3).Infof("No secret with uuid %q for ceph volume was found.", v.secretUuid())
+               return nil
 	case err == nil:
+               glog.V(3).Infof("Removing secret: %q", v.secretUuid())
 		err = secret.Remove()
 	}
 	if err != nil {

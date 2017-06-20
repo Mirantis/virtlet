@@ -353,8 +353,10 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netNSPath, cniCon
 			return
 		}
 		if err := v.removeDomain(settings.domainUUID, config); err != nil {
-			glog.Warning("failed to remove domain: %v", err)
+			glog.Warningf("Failed to remove domain %q: %v", settings.domainUUID, err)
+			return
 		}
+		v.volumeCleanup(settings.domainUUID)
 	}()
 
 	containerAttempt := config.Attempt
@@ -456,13 +458,14 @@ func (v *VirtualizationTool) StartContainer(containerId string) error {
 		// and cleaning it all up upon failure, but for now we just remove the VM
 		// so the next `CreateContainer()` call succeeds.
 		if rmErr := v.RemoveContainer(containerId); rmErr != nil {
-			return fmt.Errorf("Container start error: %v \n+ container removal error: %v", err, rmErr)
-		} else {
-			return err
+			return mt.Errorf("Container start error: %v \n+ container removal error: %v", err, rmErr)
+		}
+		if clErr := v.volumeCleanup(containerId); clErr != nil {
+			return fmt.Errorf("Container start error: %v \n+ volume cleanup error: %v", err, clErr)
 		}
 	}
 
-	return nil
+	return err
 }
 
 func (v *VirtualizationTool) StopContainer(containerId string, timeout time.Duration) error {
@@ -518,7 +521,67 @@ func (v *VirtualizationTool) StopContainer(containerId string, timeout time.Dura
 		err = v.metadataStore.UpdateState(containerId, byte(kubeapi.ContainerState_CONTAINER_EXITED))
 	}
 
+	if err == nil {
+		// Note: volume cleanup is done right after domain has been stopped
+		// due to by the time the ContainerRemove request all flexvolume
+		// data is already removed by kubelet's VolumeManager
+		return v.volumeCleanup(containerId)
+	}
+
 	return err
+}
+
+func (v *VirtualizationTool) getVMConfigFromMetadata(containerId string) (*VMConfig, error) {
+	containerInfo, err := v.metadataStore.GetContainerInfo(containerId)
+	if err != nil {
+		glog.Errorf("Error when retrieving domain %q info from metadata store: %v", containerId, err)
+		return nil, err
+	}
+	if containerInfo == nil {
+		// the vm is already removed
+		return nil, nil
+	}
+
+	// TODO: here we're using incomplete VMConfig to tear down the volumes
+	// What actually needs to be done is storing VMConfig and VMStatus (to be added)
+	config := &VMConfig{
+		PodSandboxId:         containerInfo.SandboxId,
+		Name:                 containerInfo.Name,
+		Image:                containerInfo.Image,
+		DomainUUID:           containerId,
+		PodAnnotations:       containerInfo.SandBoxAnnotations,
+		ContainerAnnotations: containerInfo.Annotations,
+		ContainerLabels:      containerInfo.Labels,
+		TempFile:             containerInfo.NocloudFile,
+	}
+
+	if err := config.LoadAnnotations(); err != nil {
+		glog.Errorf("Error when parsing annotations for domain %q : %v", containerId, err)
+		return nil, err
+	}
+
+	return config, nil
+}
+
+func (v *VirtualizationTool) volumeCleanup(containerId string) error {
+	config, err := v.getVMConfigFromMetadata(containerId)
+
+	if err != nil {
+		return err
+	}
+
+	if config == nil {
+		glog.Warningf("No info found for domain %q in metadata store. Volume cleanup skipped.", containerId)
+		return nil
+	}
+
+	if err := v.teardownVolumes(config); err != nil {
+		glog.Errorf("Volume teardown failed for domain %q: %v", containerId, err)
+		return err
+
+	}
+
+	return nil
 }
 
 func (v *VirtualizationTool) removeDomain(containerId string, config *VMConfig) error {
@@ -558,9 +621,9 @@ func (v *VirtualizationTool) removeDomain(containerId string, config *VMConfig) 
 		}
 	}
 
-	if err := v.teardownVolumes(config); err != nil {
-		return err
-	}
+	// Note: volume cleanup is done right after domain has been stopped
+	// due to by the time the ContainerRemove request all flexvolume
+	// data is already removed by kubelet's VolumeManager
 
 	return nil
 }
@@ -569,30 +632,15 @@ func (v *VirtualizationTool) removeDomain(containerId string, config *VMConfig) 
 // even if it's still running
 // it waits up to 5 sec for doing the job by libvirt
 func (v *VirtualizationTool) RemoveContainer(containerId string) error {
-	containerInfo, err := v.metadataStore.GetContainerInfo(containerId)
+	config, err := v.getVMConfigFromMetadata(containerId)
+
 	if err != nil {
-		glog.Errorf("Error when retrieving container '%s' info from metadata store: %v", containerId, err)
 		return err
-	}
-	if containerInfo == nil {
-		// the vm is already removed
-		return nil
 	}
 
-	// TODO: here we're using incomplete VMConfig to tear down the volumes
-	// What actually needs to be done is storing VMConfig and VMStatus (to be added)
-	config := &VMConfig{
-		PodSandboxId:         containerInfo.SandboxId,
-		Name:                 containerInfo.Name,
-		Image:                containerInfo.Image,
-		DomainUUID:           containerId,
-		PodAnnotations:       containerInfo.SandBoxAnnotations,
-		ContainerAnnotations: containerInfo.Annotations,
-		ContainerLabels:      containerInfo.Labels,
-		TempFile:             containerInfo.NocloudFile,
-	}
-	if err := config.LoadAnnotations(); err != nil {
-		return err
+	if config == nil {
+		glog.Warningf("No info found for domain %q in metadata store. Domain cleanup skipped.", containerId)
+		return nil
 	}
 
 	if err := v.removeDomain(containerId, config); err != nil {
