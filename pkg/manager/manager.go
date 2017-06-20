@@ -518,7 +518,7 @@ func (v *VirtletManager) imageFromVolume(virtVolume virt.VirtStorageVolume) (*ku
 	}
 
 	return &kubeapi.Image{
-		Id:       libvirttools.ImageNameFromVirtVolumeName(virtVolume.Name()),
+		Id:       imageName,
 		RepoTags: []string{imageName},
 		Size_:    size,
 	}, nil
