@@ -356,7 +356,9 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netNSPath, cniCon
 			glog.Warningf("Failed to remove domain %q: %v", settings.domainUUID, err)
 			return
 		}
-		v.volumeCleanup(settings.domainUUID)
+		if err := v.teardownVolumes(config); err != nil {
+			glog.Errorf("Volume teardown failed for domain %q: %v", settings.domainUUID, err)
+		}
 	}()
 
 	containerAttempt := config.Attempt
