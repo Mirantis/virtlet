@@ -296,7 +296,7 @@ func child(exitEOF chan bool, sigTERM chan os.Signal) {
 
 		return nil
 	}); err != nil {
-		glog.Error("Error occurred while in VM network namespace: %s", err)
+		glog.Errorf("Error occurred while in VM network namespace: %s", err)
 		os.Exit(1)
 	}
 }
