@@ -18,6 +18,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -55,7 +56,7 @@ func runCommand(name string, args []string, exitEOF chan bool, sigTERM chan os.S
 
 	if len(args) >= 1 && args[0] == "-child" && tapFile != nil {
 		glog.Error("Unexpected combination of input args: '-child' and tapFile are set simultaneously")
-		return fmt.Errorf("Unexpected combination of input args: '-child' and tapFile are set simultaneously"), false
+		return errors.New("Unexpected combination of input args: '-child' and tapFile are set simultaneously"), false
 	}
 
 	if tapFile != nil {
@@ -97,9 +98,9 @@ L:
 			break L
 		case ret := <-exitEOF:
 			if ret {
-				glog.Infof("Received EOF on pipe from parent process. Forwarding to child SIGKILL.")
+				glog.Info("Received EOF on pipe from parent process. Forwarding to child SIGKILL.")
 			} else {
-				glog.Infof("Unexpected error on read pipe from parent process. Forwarding to child SIGKILL.")
+				glog.Info("Unexpected error on read pipe from parent process. Forwarding to child SIGKILL.")
 			}
 			if err := cmd.Process.Signal(syscall.SIGKILL); err != nil {
 				glog.Errorf("Error forwarding SIGKILL to child %v.", err)
@@ -271,7 +272,7 @@ func child(exitEOF chan bool, sigTERM chan os.Signal) {
 			err, _ := runCommand(emulator, append(emulatorArgs, netArgs...), exitEOF, sigTERM, csn.TapFile)
 			return err
 		}); err != nil {
-			glog.Error("Error occurred while starting subprocess in Virtlet base network namespace: %s", err)
+			glog.Errorf("Error occurred while starting subprocess in Virtlet base network namespace: %v", err)
 		}
 
 		select {
@@ -296,7 +297,7 @@ func child(exitEOF chan bool, sigTERM chan os.Signal) {
 
 		return nil
 	}); err != nil {
-		glog.Error("Error occurred while in VM network namespace: %s", err)
+		glog.Errorf("Error occurred while in VM network namespace: %v", err)
 		os.Exit(1)
 	}
 }
