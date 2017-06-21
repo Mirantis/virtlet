@@ -400,3 +400,31 @@ corresponding partition numbers. Below is an example:
         path: /dev/sdc
         part: 2
 ```
+
+## Injecting Secret and ConfigMap content into the VMs as files
+
+Virtlet supports the standard `volumeMounts` notation for placing ConfigMap
+and Secret content into the VM filesystem.
+It does so using `write_files`
+[cloud-init](http://cloudinit.readthedocs.io/en/latest/index.html)
+module which is used to write Secret/ConfigMap content to appropriate
+locations.
+
+Virtlet only handles files in the top level directory for each
+Secret/ConfigMap `VolumeMounts` entry. This limitation is to be lifted soon.
+
+### Consuming a ConfigMap using Kubernetes volume
+
+See [the following example](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#add-configmap-data-to-a-volume)
+that demonstrates how to pass ConfigMap data to VM.
+
+[![ConfigMap volume demo](https://asciinema.org/a/084dbr1V0zpxNbF4iaTJpEgJA.png)](https://asciinema.org/a/084dbr1V0zpxNbF4iaTJpEgJA)
+
+### Secret as volume
+
+Secrets can be consumed in the same manner as ConfigMaps, see
+[the example](https://kubernetes.io/docs/concepts/configuration/secret/#use-case-pod-with-ssh-keys).
+
+Like any other pod, Virtlet VM pods have predefined secret with Kubernetes API
+access token which is written into
+`/var/run/secrets/kubernetes.io/serviceaccount` directory.
