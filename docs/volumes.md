@@ -400,3 +400,26 @@ corresponding partition numbers. Below is an example:
         path: /dev/sdc
         part: 2
 ```
+
+## Providing files to VM using Secretes or ConfigMaps
+
+Virtlet supports passing files to VM contained in Secrets and ConfigMaps.
+It is using [cloud-init](http://cloudinit.readthedocs.io/en/latest/index.html)
+`write_files` support.
+Current limitation is that only files from top level directory will be
+delivered to VM.
+
+### ConfigMap as volume
+
+User can pass data to VM using ConfigMap following
+[this](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#add-configmap-data-to-a-volume) example.
+
+[![Example of passing file in ConfigMap through volume](https://asciinema.org/a/084dbr1V0zpxNbF4iaTJpEgJA.png)](https://asciinema.org/a/084dbr1V0zpxNbF4iaTJpEgJA)
+
+### Secret as volume
+
+In same manner as files in ConfigMaps user can use Secret according to
+[example](https://kubernetes.io/docs/concepts/configuration/secret/#use-case-pod-with-ssh-keys)
+in kubernetes documentation.
+Each started VM also has predefined secret containing api access token which
+is propagated to `/var/run/secrets/kubernetes.io/serviceaccount` directory.
