@@ -26,6 +26,7 @@ import (
 
 	"github.com/jonboulle/clockwork"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 
 	"github.com/Mirantis/virtlet/pkg/bolttools"
 	"github.com/Mirantis/virtlet/pkg/flexvolume"
@@ -39,6 +40,8 @@ const (
 	fakeImageName        = "fake/image1"
 	fakeCNIConfig        = `{"noCniForNow":true}`
 	fakeUuid             = "abb67e3c-71b3-4ddd-5505-8c4215d5c4eb"
+	fakeContainerName    = "container1"
+	fakeContainerAttempt = 42
 	stopContainerTimeout = 30 * time.Second
 )
 
@@ -136,12 +139,14 @@ func (ct *containerTester) createContainer(sandbox *kubeapi.PodSandboxConfig, mo
 		PodSandboxId: sandbox.Metadata.Uid,
 		Config: &kubeapi.ContainerConfig{
 			Metadata: &kubeapi.ContainerMetadata{
-				Name: "container1",
+				Name:    fakeContainerName,
+				Attempt: fakeContainerAttempt,
 			},
 			Image: &kubeapi.ImageSpec{
 				Image: fakeImageName,
 			},
-			Mounts: mounts,
+			Mounts:      mounts,
+			Annotations: map[string]string{"foo": "bar"},
 		},
 		SandboxConfig: sandbox,
 	}
@@ -206,13 +211,27 @@ func TestContainerLifecycle(t *testing.T) {
 	containerId := ct.createContainer(sandbox, nil)
 
 	containers = ct.listContainers(nil)
-	switch {
-	case len(containers) != 1:
+	if len(containers) != 1 {
 		t.Errorf("Expected single container to be started, but got: %#v", containers)
-	case containers[0].Id != containerId:
-		t.Errorf("Bad container id in response: %q instead of %q", containers[0].Id, containerId)
-	case containers[0].State != kubeapi.ContainerState_CONTAINER_CREATED:
-		t.Errorf("Bad container state: %v instead of %v", containers[0].State, kubeapi.ContainerState_CONTAINER_CREATED)
+	} else {
+		if containers[0].Id != containerId {
+			t.Errorf("Bad container id in response: %q instead of %q", containers[0].Id, containerId)
+		}
+		if containers[0].State != kubeapi.ContainerState_CONTAINER_CREATED {
+			t.Errorf("Bad container state: %v instead of %v", containers[0].State, kubeapi.ContainerState_CONTAINER_CREATED)
+		}
+		if containers[0].Metadata.Name != fakeContainerName {
+			t.Errorf("Bad container name: %q instead of %q", containers[0].Metadata.Name, fakeContainerName)
+		}
+		if containers[0].Metadata.Attempt != fakeContainerAttempt {
+			t.Errorf("Bad container attempt: %d instead of %d", containers[0].Metadata.Attempt, fakeContainerAttempt)
+		}
+		if containers[0].Labels[kubetypes.KubernetesContainerNameLabel] != fakeContainerName {
+			t.Errorf("Bad container name label: %q instead of %q", containers[0].Labels[kubetypes.KubernetesContainerNameLabel], fakeContainerName)
+		}
+		if containers[0].Annotations["foo"] != "bar" {
+			t.Errorf("Bad container annotation value: %q instead of %q", containers[0].Annotations["foo"], "bar")
+		}
 	}
 	ct.rec.Rec("container list after the container is created", containers)
 
@@ -230,6 +249,18 @@ func TestContainerLifecycle(t *testing.T) {
 	status = ct.containerStatus(containerId)
 	if status.State != kubeapi.ContainerState_CONTAINER_EXITED {
 		t.Errorf("Bad container state: %v instead of %v", status.State, kubeapi.ContainerState_CONTAINER_EXITED)
+	}
+	if status.Metadata.Name != fakeContainerName {
+		t.Errorf("Bad container name: %q instead of %q", status.Metadata.Name, fakeContainerName)
+	}
+	if status.Metadata.Attempt != fakeContainerAttempt {
+		t.Errorf("Bad container attempt: %d instead of %d", status.Metadata.Attempt, fakeContainerAttempt)
+	}
+	if status.Labels[kubetypes.KubernetesContainerNameLabel] != fakeContainerName {
+		t.Errorf("Bad container name label: %q instead of %q", containers[0].Labels[kubetypes.KubernetesContainerNameLabel], fakeContainerName)
+	}
+	if status.Annotations["foo"] != "bar" {
+		t.Errorf("Bad container annotation value: %q instead of %q", status.Annotations["foo"], "bar")
 	}
 	ct.rec.Rec("container status after the container is stopped", status)
 

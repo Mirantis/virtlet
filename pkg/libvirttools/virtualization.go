@@ -388,7 +388,7 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netNSPath, cniCon
 		err = v.metadataStore.SetContainer(config.Name, settings.domainUUID,
 			config.PodSandboxId, config.Image, cloneName,
 			labels, config.ContainerAnnotations,
-			nocloudFile, v.clock)
+			nocloudFile, config.Attempt, v.clock)
 	}
 	if err != nil {
 		return "", err
@@ -705,7 +705,8 @@ func (v *VirtualizationTool) getContainer(domain virt.VirtDomain) (*kubeapi.Cont
 	podSandboxId := containerInfo.SandboxId
 
 	metadata := &kubeapi.ContainerMetadata{
-		Name: containerId,
+		Name:    containerInfo.Name,
+		Attempt: containerInfo.Attempt,
 	}
 
 	image := &kubeapi.ImageSpec{Image: containerInfo.Image}
@@ -840,14 +841,15 @@ func (v *VirtualizationTool) ContainerStatus(containerId string) (*kubeapi.Conta
 		Id: containerId,
 		Metadata: &kubeapi.ContainerMetadata{
 			Name:    containerInfo.Name,
-			Attempt: 0,
+			Attempt: containerInfo.Attempt,
 		},
-		Image:     image,
-		ImageRef:  containerInfo.Image,
-		State:     containerInfo.State,
-		CreatedAt: containerInfo.CreatedAt,
-		StartedAt: containerInfo.StartedAt,
-		Labels:    containerInfo.Labels,
+		Image:       image,
+		ImageRef:    containerInfo.Image,
+		State:       containerInfo.State,
+		CreatedAt:   containerInfo.CreatedAt,
+		StartedAt:   containerInfo.StartedAt,
+		Labels:      containerInfo.Labels,
+		Annotations: containerInfo.Annotations,
 	}, nil
 }
 

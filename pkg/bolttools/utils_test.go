@@ -182,7 +182,7 @@ func SetUpBolt(t *testing.T, sandboxConfigs []*kubeapi.PodSandboxConfig, contain
 	}
 
 	for _, container := range containerConfigs {
-		if err := b.SetContainer(container.Name, container.ContainerId, container.SandboxId, container.Image, container.RootImageVolumeName, container.Labels, container.Annotations, "/tmp/nocloud.iso", clock); err != nil {
+		if err := b.SetContainer(container.Name, container.ContainerId, container.SandboxId, container.Image, container.RootImageVolumeName, container.Labels, container.Annotations, "/tmp/nocloud.iso", 0, clock); err != nil {
 			t.Fatal(err)
 		}
 	}
