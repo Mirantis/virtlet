@@ -439,7 +439,8 @@
     "data": {
       "id": "231700d5-c9a6-5a49-738d-99a954c51550",
       "metadata": {
-        "name": "container1"
+        "name": "container1",
+        "attempt": 42
       },
       "state": 2,
       "created_at": 1496175540000000000,
@@ -453,6 +454,9 @@
         "io.kubernetes.pod.name": "testName_0",
         "io.kubernetes.pod.namespace": "default",
         "io.kubernetes.pod.uid": "69eec606-0493-5825-73a4-c5e0c0236155"
+      },
+      "annotations": {
+        "foo": "bar"
       }
     }
   },

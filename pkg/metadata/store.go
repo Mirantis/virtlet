@@ -32,6 +32,7 @@ type ContainerInfo struct {
 	Labels              map[string]string
 	Annotations         map[string]string
 	SandBoxAnnotations  map[string]string
+	Attempt             uint32
 	NocloudFile         string
 	State               kubeapi.ContainerState
 }
@@ -58,7 +59,7 @@ type SandboxMetadataStore interface {
 
 // ContainerMetadataStore contains methods to operate on containers (VMs)
 type ContainerMetadataStore interface {
-	SetContainer(name, containerId, sandboxId, image, rootImageVolumeName string, labels, annotations map[string]string, nocloudFile string, clock clockwork.Clock) error
+	SetContainer(name, containerId, sandboxId, image, rootImageVolumeName string, labels, annotations map[string]string, nocloudFile string, attempt uint32, clock clockwork.Clock) error
 	UpdateStartedAt(containerId string, startedAt string) error
 	UpdateState(containerId string, state byte) error
 	GetContainerInfo(containerId string) (*ContainerInfo, error)
