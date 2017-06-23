@@ -578,14 +578,3 @@ func (b *BoltClient) GetPodNetworkConfigurationAsBytes(podId string) ([]byte, er
 	})
 	return config, err
 }
-
-func (b *BoltClient) GetPodSandboxNameAndNamespace(podId string) (string, string, error) {
-	podSandbox, _, err := b.getPodSandbox([]byte(podId), nil)
-	if err != nil {
-		return "", "", err
-	}
-	if podSandbox.Metadata == nil {
-		return "", "", fmt.Errorf("storage: malformed pod metadata detected for pod %q", podId)
-	}
-	return podSandbox.Metadata.Name, podSandbox.Metadata.Namespace, nil
-}

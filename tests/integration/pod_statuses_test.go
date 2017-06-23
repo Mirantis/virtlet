@@ -22,7 +22,7 @@ import (
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
-func TestContainerStatuses(t *testing.T) {
+func TestPodStatuses(t *testing.T) {
 	ct := newContainerTester(t)
 	defer ct.teardown()
 	imageSpec := ct.imageSpecs[0]
@@ -30,22 +30,20 @@ func TestContainerStatuses(t *testing.T) {
 	container := ct.containers[0]
 	ct.pullImage(imageSpec)
 	ct.runPodSandbox(sandbox)
+	ct.verifyPodSandboxState(sandbox, kubeapi.PodSandboxState_SANDBOX_READY)
 	ct.createContainer(sandbox, container, imageSpec, nil)
-	ct.verifyContainerState(container.ContainerId, container.Name, kubeapi.ContainerState_CONTAINER_CREATED)
+	ct.verifyPodSandboxState(sandbox, kubeapi.PodSandboxState_SANDBOX_READY)
 	ct.startContainer(container.ContainerId)
-
-	listResp := ct.listContainers(&kubeapi.ContainerFilter{
-		Id: container.ContainerId,
-	})
-	if len(listResp.Containers) != 1 {
-		t.Errorf("Expected single container, instead got: %d", len(listResp.Containers))
-	} else if listResp.Containers[0].Id != container.ContainerId {
-		t.Errorf("Didn't find expected container id %s in returned containers list %v", container.ContainerId, listResp.Containers)
-	}
-
-	ct.verifyContainerState(container.ContainerId, container.Name, kubeapi.ContainerState_CONTAINER_RUNNING)
+	ct.verifyPodSandboxState(sandbox, kubeapi.PodSandboxState_SANDBOX_READY)
 	ct.stopContainer(container.ContainerId)
-	ct.verifyContainerState(container.ContainerId, container.Name, kubeapi.ContainerState_CONTAINER_EXITED)
 	ct.removeContainer(container.ContainerId)
-	ct.verifyNoContainers(nil)
+	ct.stopPodSandbox(sandbox.Metadata.Uid)
+	ct.verifyPodSandboxState(sandbox, kubeapi.PodSandboxState_SANDBOX_NOTREADY)
+	// make sure stopping sandbox is idempotent
+	ct.stopPodSandbox(sandbox.Metadata.Uid)
+	ct.verifyPodSandboxState(sandbox, kubeapi.PodSandboxState_SANDBOX_NOTREADY)
+	ct.removePodSandbox(sandbox.Metadata.Uid)
+	if len(ct.listPodSandbox(nil)) > 0 {
+		t.Errorf("pod sandbox still returned from ListPodSandbox() after removal")
+	}
 }

@@ -22,7 +22,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"golang.org/x/net/context"
@@ -97,25 +96,9 @@ func (ct *containerTester) cleanupContainers() {
 }
 
 func (ct *containerTester) cleanupPods() {
-	ctx := context.Background()
-	podList, err := ct.runtimeServiceClient.ListPodSandbox(ctx, &kubeapi.ListPodSandboxRequest{})
-	if err != nil {
-		ct.t.Log("warning: couldn't list pods for removal")
-		return
-	}
-	for _, pod := range podList.Items {
-		_, err := ct.runtimeServiceClient.StopPodSandbox(ctx, &kubeapi.StopPodSandboxRequest{
-			PodSandboxId: pod.Id,
-		})
-		if err != nil {
-			ct.t.Log("warning: couldn't stop pod sandbox %q", pod.Id)
-		}
-		_, err = ct.runtimeServiceClient.RemovePodSandbox(ctx, &kubeapi.RemovePodSandboxRequest{
-			PodSandboxId: pod.Id,
-		})
-		if err != nil {
-			ct.t.Log("warning: couldn't remove container %q", pod.Id)
-		}
+	for _, pod := range ct.listPodSandbox(nil) {
+		ct.stopPodSandbox(pod.Id)
+		ct.removePodSandbox(pod.Id)
 	}
 }
 
@@ -155,6 +138,35 @@ func (ct *containerTester) pullAllImages() {
 	}
 }
 
+func (ct *containerTester) listPodSandbox(filter *kubeapi.PodSandboxFilter) []*kubeapi.PodSandbox {
+	resp, err := ct.runtimeServiceClient.ListPodSandbox(context.Background(), &kubeapi.ListPodSandboxRequest{
+		Filter: filter,
+	})
+	if err != nil {
+		ct.t.Errorf("warning: couldn't list pods: %v", err)
+		return nil
+	}
+	return resp.Items
+}
+
+func (ct *containerTester) stopPodSandbox(podSandboxId string) {
+	_, err := ct.runtimeServiceClient.StopPodSandbox(context.Background(), &kubeapi.StopPodSandboxRequest{
+		PodSandboxId: podSandboxId,
+	})
+	if err != nil {
+		ct.t.Errorf("warning: couldn't stop pod sandbox %q: %v", podSandboxId, err)
+	}
+}
+
+func (ct *containerTester) removePodSandbox(podSandboxId string) {
+	_, err := ct.runtimeServiceClient.RemovePodSandbox(context.Background(), &kubeapi.RemovePodSandboxRequest{
+		PodSandboxId: podSandboxId,
+	})
+	if err != nil {
+		ct.t.Errorf("warning: couldn't stop pod sandbox %q: %v", podSandboxId, err)
+	}
+}
+
 func (ct *containerTester) runPodSandbox(sandbox *kubeapi.PodSandboxConfig) *kubeapi.RunPodSandboxResponse {
 	resp, err := ct.runtimeServiceClient.RunPodSandbox(context.Background(), &kubeapi.RunPodSandboxRequest{Config: sandbox})
 	if err != nil {
@@ -162,6 +174,56 @@ func (ct *containerTester) runPodSandbox(sandbox *kubeapi.PodSandboxConfig) *kub
 	}
 	sandbox.Metadata.Uid = resp.PodSandboxId
 	return resp
+}
+
+func (ct *containerTester) verifyPodSandboxStateViaStatus(podSandboxId, podSandboxName string, expectedState kubeapi.PodSandboxState) {
+	resp, err := ct.runtimeServiceClient.PodSandboxStatus(context.Background(), &kubeapi.PodSandboxStatusRequest{
+		PodSandboxId: podSandboxId,
+	})
+	if err != nil {
+		ct.t.Errorf("PodSandboxStatus() failed for pod sandbox %q (id %q): %v", podSandboxName, podSandboxId, err)
+		return
+	}
+
+	if podSandboxName != "" && resp.Status.Metadata.Name != podSandboxName {
+		ct.t.Errorf("Bad pod sandbox name returned: %q instead of %q",
+			podSandboxName, resp.Status.Metadata.Name)
+	}
+
+	if resp.Status == nil {
+		ct.t.Errorf("Null pod sandbox status returned for pod sandbox %q (id %q)", podSandboxName, podSandboxId)
+		return
+	}
+	if resp.Status.State != expectedState {
+		ct.t.Errorf("Bad pod sandbox state: %v instead of %v", resp.GetStatus().State, expectedState)
+	}
+}
+
+func (ct *containerTester) verifyPodSandboxStateViaList(podSandboxId, podSandboxName string, expectedState kubeapi.PodSandboxState) {
+	pods := ct.listPodSandbox(nil)
+	if pods == nil {
+		// this means an error that's already reported by listPodSandbox()
+		return
+	}
+
+	if len(pods) != 1 {
+		ct.t.Errorf("Bad pod sandbox list returned by ListPodSandbox() (expected 1 pod sandbox):\n%s", spew.Sdump(pods))
+		return
+	}
+
+	if podSandboxName != "" && pods[0].Metadata.Name != podSandboxName {
+		ct.t.Errorf("Bad pod sandbox name in ListPodSandbox() response: %q instead of %q",
+			podSandboxName, pods[0].Metadata.Name)
+	}
+
+	if pods[0].State != expectedState {
+		ct.t.Errorf("Bad pod sandbox state in ListPodSandbox() response: %v instead of %v", pods[0].State, expectedState)
+	}
+}
+
+func (ct *containerTester) verifyPodSandboxState(sandbox *kubeapi.PodSandboxConfig, expectedState kubeapi.PodSandboxState) {
+	ct.verifyPodSandboxStateViaStatus(sandbox.Metadata.Uid, sandbox.Metadata.Name, expectedState)
+	ct.verifyPodSandboxStateViaList(sandbox.Metadata.Uid, sandbox.Metadata.Name, expectedState)
 }
 
 func (ct *containerTester) callCreateContainer(sandbox *kubeapi.PodSandboxConfig, container *criapi.ContainerTestConfig, imageSpec *kubeapi.ImageSpec, mounts []*kubeapi.Mount) (*kubeapi.CreateContainerResponse, error) {
@@ -216,31 +278,58 @@ func (ct *containerTester) listContainers(filter *kubeapi.ContainerFilter) *kube
 	return resp
 }
 
-func (ct *containerTester) waitForContainerRunning(containerId, containerName string) {
-	containerStatusRequest := &kubeapi.ContainerStatusRequest{
+func (ct *containerTester) verifyContainerStateViaStatus(containerId, containerName string, expectedState kubeapi.ContainerState) {
+	resp, err := ct.runtimeServiceClient.ContainerStatus(context.Background(), &kubeapi.ContainerStatusRequest{
 		ContainerId: containerId,
-	}
-	err := utils.WaitLoop(func() (bool, error) {
-		resp, err := ct.runtimeServiceClient.ContainerStatus(context.Background(), containerStatusRequest)
-		if err != nil {
-			return false, err
-		}
-
-		if containerName != "" && resp.Status.Metadata.Name != containerName {
-			return false, fmt.Errorf("bad container name returned: %q instead of %q",
-				containerName, resp.Status.Metadata.Name)
-		}
-
-		if resp.GetStatus().State == kubeapi.ContainerState_CONTAINER_RUNNING {
-			return true, nil
-		}
-
-		return false, nil
-	}, time.Second, 20*time.Second, nil)
-
+	})
 	if err != nil {
-		ct.t.Errorf("Container not reaching RUNNING state: %v", err)
+		ct.t.Errorf("ContainerStatus() failed for container %q (id %q): %v", containerName, containerId, err)
+		return
 	}
+
+	if containerName != "" && resp.Status.Metadata.Name != containerName {
+		ct.t.Errorf("Bad container name returned: %q instead of %q",
+			containerName, resp.Status.Metadata.Name)
+	}
+
+	if resp.Status == nil {
+		ct.t.Errorf("Null container status returned for container %q (id %q)", containerName, containerId)
+		return
+	}
+	if resp.Status.State != expectedState {
+		ct.t.Errorf("Bad container state: %v instead of %v", resp.GetStatus().State, expectedState)
+	}
+}
+
+func (ct *containerTester) verifyContainerStateViaList(containerId, containerName string, expectedState kubeapi.ContainerState) {
+	resp, err := ct.runtimeServiceClient.ListContainers(context.Background(), &kubeapi.ListContainersRequest{
+		Filter: &kubeapi.ContainerFilter{
+			Id: containerId,
+		},
+	})
+	if err != nil {
+		ct.t.Errorf("ListContainers() failed when called with filter for container %q (id %q): %v", containerName, containerId, err)
+		return
+	}
+
+	if len(resp.Containers) != 1 {
+		ct.t.Errorf("Bad container list returned by ListContainers() (expected 1 container):\n%s", spew.Sdump(resp.Containers))
+		return
+	}
+
+	if containerName != "" && resp.Containers[0].Metadata.Name != containerName {
+		ct.t.Errorf("Bad container name in ListContainers() response: %q instead of %q",
+			containerName, resp.Containers[0].Metadata.Name)
+	}
+
+	if resp.Containers[0].State != expectedState {
+		ct.t.Errorf("Bad container state in ListContainers() response: %v instead of %v", resp.Containers[0].State, expectedState)
+	}
+}
+
+func (ct *containerTester) verifyContainerState(containerId, containerName string, expectedState kubeapi.ContainerState) {
+	ct.verifyContainerStateViaStatus(containerId, containerName, expectedState)
+	ct.verifyContainerStateViaList(containerId, containerName, expectedState)
 }
 
 func (ct *containerTester) stopContainer(containerId string) {
