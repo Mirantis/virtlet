@@ -352,12 +352,8 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netNSPath, cniCon
 		if ok {
 			return
 		}
-		if err := v.removeDomain(settings.domainUUID, config); err != nil {
+		if err := v.removeDomain(settings.domainUUID, config, kubeapi.ContainerState_CONTAINER_UNKNOWN, true); err != nil {
 			glog.Warningf("Failed to remove domain %q: %v", settings.domainUUID, err)
-			return
-		}
-		if err := v.teardownVolumes(config); err != nil {
-			glog.Errorf("Volume teardown failed for domain %q: %v", settings.domainUUID, err)
 		}
 	}()
 
@@ -448,7 +444,6 @@ func (v *VirtualizationTool) startContainer(containerId string) error {
 		return fmt.Errorf("Failed to update start time of the domain %q: %v", containerId, err)
 	}
 
-
 	return nil
 }
 
@@ -461,9 +456,6 @@ func (v *VirtualizationTool) StartContainer(containerId string) error {
 		// so the next `CreateContainer()` call succeeds.
 		if rmErr := v.RemoveContainer(containerId); rmErr != nil {
 			return fmt.Errorf("Container start error: %v \n+ container removal error: %v", err, rmErr)
-		}
-		if clErr := v.volumeCleanup(containerId); clErr != nil {
-			return fmt.Errorf("Container start error: %v \n+ volume cleanup error: %v", err, clErr)
 		}
 
 		return err
@@ -529,21 +521,21 @@ func (v *VirtualizationTool) StopContainer(containerId string, timeout time.Dura
 		// Note: volume cleanup is done right after domain has been stopped
 		// due to by the time the ContainerRemove request all flexvolume
 		// data is already removed by kubelet's VolumeManager
-		return v.volumeCleanup(containerId)
+		return v.cleanupVolumes(containerId)
 	}
 
 	return err
 }
 
-func (v *VirtualizationTool) getVMConfigFromMetadata(containerId string) (*VMConfig, error) {
+func (v *VirtualizationTool) getVMConfigFromMetadata(containerId string) (*VMConfig, kubeapi.ContainerState, error) {
 	containerInfo, err := v.metadataStore.GetContainerInfo(containerId)
 	if err != nil {
 		glog.Errorf("Error when retrieving domain %q info from metadata store: %v", containerId, err)
-		return nil, err
+		return nil, kubeapi.ContainerState_CONTAINER_UNKNOWN, err
 	}
 	if containerInfo == nil {
 		// the vm is already removed
-		return nil, nil
+		return nil, kubeapi.ContainerState_CONTAINER_UNKNOWN,  nil
 	}
 
 	// TODO: here we're using incomplete VMConfig to tear down the volumes
@@ -560,14 +552,14 @@ func (v *VirtualizationTool) getVMConfigFromMetadata(containerId string) (*VMCon
 
 	if err := config.LoadAnnotations(); err != nil {
 		glog.Errorf("Error when parsing annotations for domain %q : %v", containerId, err)
-		return nil, err
+		return nil, containerInfo.State, err
 	}
 
-	return config, nil
+	return config, containerInfo.State, nil
 }
 
-func (v *VirtualizationTool) volumeCleanup(containerId string) error {
-	config, err := v.getVMConfigFromMetadata(containerId)
+func (v *VirtualizationTool) cleanupVolumes(containerId string) error {
+	config, _,  err := v.getVMConfigFromMetadata(containerId)
 
 	if err != nil {
 		return err
@@ -587,7 +579,7 @@ func (v *VirtualizationTool) volumeCleanup(containerId string) error {
 	return nil
 }
 
-func (v *VirtualizationTool) removeDomain(containerId string, config *VMConfig) error {
+func (v *VirtualizationTool) removeDomain(containerId string, config *VMConfig, state kubeapi.ContainerState, doVolumesCleanup bool) error {
 	// Give a chance to gracefully stop domain
 	// TODO: handle errors - there could be e.x. connection errori
 	domain, err := v.domainConn.LookupDomainByUUIDString(containerId)
@@ -596,13 +588,9 @@ func (v *VirtualizationTool) removeDomain(containerId string, config *VMConfig) 
 	}
 
 	if domain != nil {
-		state, err := domain.State()
-		if err != nil {
-			return fmt.Errorf("failed to get state of the domain %q: %v", containerId, err)
-		}
-		if state != virt.DOMAIN_SHUTOFF {
-			if err := v.StopContainer(containerId, domainShutdownOnRemoveTimeout); err != nil {
-				return fmt.Errorf("error removing the domain %q: %v", containerId, err)
+		if state == kubeapi.ContainerState_CONTAINER_RUNNING {
+			if err := domain.Destroy(); err != nil {
+				return fmt.Errorf("failed to destroy the domain: %v", err)
 			}
 		}
 
@@ -624,9 +612,17 @@ func (v *VirtualizationTool) removeDomain(containerId string, config *VMConfig) 
 		}
 	}
 
-	// Note: volume cleanup is done right after domain has been stopped
+	// Note: volume cleanup in common case is done right after domain has been stopped
 	// due to by the time the ContainerRemove request all flexvolume
 	// data is already removed by kubelet's VolumeManager
+	// For uncommon VM lifecycle sequences (as it doesn't excluded explicitly
+	// by CRI spec), like CreateContainer->RemoveContainer,
+	// should be fixed in https://github.com/Mirantis/virtlet/issues/352
+	if doVolumesCleanup {
+		if err := v.teardownVolumes(config); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
@@ -635,18 +631,19 @@ func (v *VirtualizationTool) removeDomain(containerId string, config *VMConfig) 
 // even if it's still running
 // it waits up to 5 sec for doing the job by libvirt
 func (v *VirtualizationTool) RemoveContainer(containerId string) error {
-	config, err := v.getVMConfigFromMetadata(containerId)
+	config, state, err := v.getVMConfigFromMetadata(containerId)
 
 	if err != nil {
 		return err
 	}
 
 	if config == nil {
-		glog.Warningf("No info found for domain %q in metadata store. Domain cleanup skipped.", containerId)
+		glog.Warningf("No info found for domain %q in metadata store. Domain cleanup skipped", containerId)
 		return nil
 	}
 
-	if err := v.removeDomain(containerId, config); err != nil {
+	if err := v.removeDomain(containerId, config, state, state == kubeapi.ContainerState_CONTAINER_CREATED ||
+		state == kubeapi.ContainerState_CONTAINER_RUNNING); err != nil {
 		return err
 	}
 

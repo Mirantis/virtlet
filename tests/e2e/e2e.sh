@@ -28,8 +28,6 @@ SCRIPT_DIR="$(cd $(dirname "$(readlinkf "${BASH_SOURCE}")"); pwd)"
 virsh="${SCRIPT_DIR}/../../examples/virsh.sh"
 vmssh="${SCRIPT_DIR}/../../examples/vmssh.sh"
 
-source "${SCRIPT_DIR}/../../examples/util.sh"
-
 # provide path for kubectl
 export PATH="${HOME}/.kubeadm-dind-cluster:${PATH}"
 
@@ -249,11 +247,11 @@ verify-cpu-count 1
 
 # test pod removal
 
-podID=$(get_pod_domain_id @cirros-vm-rbd-pv | sed s/-cirros-vm-rbd-pv//)
+podID=$("${virsh}" poddomain @cirros-vm-rbd-pv | sed s/-cirros-vm-rbd-pv//)
 delete-pod-and-wait cirros-vm-rbd-pv
 check-all-cleaned ${podID}
 
-podID=$(get_pod_domain_id @cirros-vm | sed s/-cirros-vm//)
+podID=$("${virsh}" poddomain @cirros-vm | sed s/-cirros-vm//)
 delete-pod-and-wait cirros-vm
 check-all-cleaned ${podID}
 
