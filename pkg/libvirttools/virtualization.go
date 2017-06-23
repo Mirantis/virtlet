@@ -463,7 +463,7 @@ func (v *VirtualizationTool) StartContainer(containerId string) error {
 		if rmErr := v.RemoveContainer(containerId); rmErr != nil {
 			return fmt.Errorf("Container start error: %v \n+ container removal error: %v", err, rmErr)
 		}
-		if clErr := v.volumeCleanup(containerId); clErr != nil {
+		if clErr := v.cleanupVolumes(containerId); clErr != nil {
 			return fmt.Errorf("Container start error: %v \n+ volume cleanup error: %v", err, clErr)
 		}
 
@@ -530,7 +530,7 @@ func (v *VirtualizationTool) StopContainer(containerId string, timeout time.Dura
 		// Note: volume cleanup is done right after domain has been stopped
 		// due to by the time the ContainerRemove request all flexvolume
 		// data is already removed by kubelet's VolumeManager
-		return v.volumeCleanup(containerId)
+		return v.cleanupVolumes(containerId)
 	}
 
 	return err
@@ -568,7 +568,7 @@ func (v *VirtualizationTool) getVMConfigFromMetadata(containerId string) (*VMCon
 	return config, nil
 }
 
-func (v *VirtualizationTool) volumeCleanup(containerId string) error {
+func (v *VirtualizationTool) cleanupVolumes(containerId string) error {
 	config, err := v.getVMConfigFromMetadata(containerId)
 
 	if err != nil {
@@ -644,7 +644,7 @@ func (v *VirtualizationTool) RemoveContainer(containerId string) error {
 	}
 
 	if config == nil {
-		glog.Warningf("No info found for domain %q in metadata store. Domain cleanup skipped.", containerId)
+		glog.Warningf("No info found for domain %q in metadata store. Domain cleanup skipped", containerId)
 		return nil
 	}
 
