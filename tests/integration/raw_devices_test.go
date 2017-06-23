@@ -22,6 +22,8 @@ import (
 	"log"
 	"os"
 	"testing"
+
+	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
 const (
@@ -72,7 +74,7 @@ func TestRawDevices(t *testing.T) {
 	ct.createContainer(sandbox, container, imageSpec, nil)
 	ct.startContainer(container.ContainerId)
 
-	ct.waitForContainerRunning(container.ContainerId, container.Name)
+	ct.verifyContainerState(container.ContainerId, container.Name, kubeapi.ContainerState_CONTAINER_RUNNING)
 
 	// check for loop in container dom
 	cmd := fmt.Sprintf("virsh domblklist %s | grep '/dev/loop' | wc -l", container.ContainerId)

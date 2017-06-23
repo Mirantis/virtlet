@@ -20,6 +20,8 @@ import (
 	"reflect"
 	"testing"
 
+	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+
 	"github.com/Mirantis/virtlet/pkg/utils"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 )
@@ -41,7 +43,7 @@ func TestCloudInitNoCloud(t *testing.T) {
 	ct.createContainer(sandbox, container, imageSpec, nil)
 	ct.startContainer(container.ContainerId)
 
-	ct.waitForContainerRunning(container.ContainerId, container.Name)
+	ct.verifyContainerState(container.ContainerId, container.Name, kubeapi.ContainerState_CONTAINER_RUNNING)
 
 	isoPath := runShellCommand(t, "virsh domblklist $(virsh list --name)|grep -o '/.*nocloud-iso[^ ]*'")
 	files, err := testutils.IsoToMap(isoPath)

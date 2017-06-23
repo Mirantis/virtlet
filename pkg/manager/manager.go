@@ -248,25 +248,28 @@ func (v *VirtletManager) StopPodSandbox(ctx context.Context, in *kubeapi.StopPod
 	podSandboxId := in.PodSandboxId
 	glog.V(2).Infof("StopPodSandbox called for pod %s", in.PodSandboxId)
 	glog.V(3).Infof("StopPodSandbox: %s", spew.Sdump(in))
-	if err := v.metadataStore.UpdatePodState(in.PodSandboxId, byte(kubeapi.PodSandboxState_SANDBOX_NOTREADY)); err != nil {
-		glog.Errorf("Error when stopping pod sandbox '%s': %v", in.PodSandboxId, err)
-		return nil, err
-	}
-
-	podName, podNs, err := v.metadataStore.GetPodSandboxNameAndNamespace(in.PodSandboxId)
+	status, err := v.metadataStore.GetPodSandboxStatus(in.PodSandboxId)
 	if err != nil {
-		glog.Errorf("Error retrieving pod info for pod sandbox %q during removal: %v", podSandboxId, err)
+		glog.Errorf("Error retrieving pod sandbox status for pod %q while stopping it: %v", in.PodSandboxId, err)
 		return nil, err
 	}
 
-	if err := v.cniClient.RemoveSandboxFromNetwork(in.PodSandboxId, podName, podNs); err != nil {
-		glog.Errorf("Error when removing pod sandbox %q from CNI network: %v", in.PodSandboxId, err)
-		return nil, err
-	}
+	// check if the sandbox is already stopped
+	if status.State != kubeapi.PodSandboxState_SANDBOX_NOTREADY {
+		if err := v.metadataStore.UpdatePodState(in.PodSandboxId, byte(kubeapi.PodSandboxState_SANDBOX_NOTREADY)); err != nil {
+			glog.Errorf("Error updating pod sandbox status for pod %q while stopping it: %v", in.PodSandboxId, err)
+			return nil, err
+		}
 
-	if err := cni.DestroyNetNS(podSandboxId); err != nil {
-		glog.Errorf("Error when removing network namespace for pod sandbox %q: %v", in.PodSandboxId, err)
-		return nil, err
+		if err := v.cniClient.RemoveSandboxFromNetwork(in.PodSandboxId, status.Metadata.Name, status.Metadata.Namespace); err != nil {
+			glog.Errorf("Error when removing pod sandbox %q from CNI network: %v", in.PodSandboxId, err)
+			return nil, err
+		}
+
+		if err := cni.DestroyNetNS(podSandboxId); err != nil {
+			glog.Errorf("Error when removing network namespace for pod sandbox %q: %v", in.PodSandboxId, err)
+			return nil, err
+		}
 	}
 
 	response := &kubeapi.StopPodSandboxResponse{}
