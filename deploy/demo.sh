@@ -37,16 +37,51 @@ function demo::ask-before-continuing {
   fi
 }
 
-function demo::get-dind-cluster {
-  if [[ -f ${dind_script} ]]; then
-    demo::step "Will now clear existent ${dind_script} to be sure it is up to date"
-    demo::ask-before-continuing
-    rm "${dind_script}"
+function demo::ask-user {
+  if [[ ${1:-} = "" ]]; then
+    echo "no prompt message provided" >&2
+    exit 1
   fi
-  demo::step "Will download dind-cluster-v1.6.sh into current directory"
-  demo::ask-before-continuing
-  wget "https://raw.githubusercontent.com/Mirantis/kubeadm-dind-cluster/master/fixed/${dind_script}"
-  chmod +x "${dind_script}"
+
+  if [[ ${2:-} = "" ]]; then
+    echo "no return var name provided" >&2
+    exit 1
+  fi
+
+  local  __resultvar=$2
+  local reply="false"
+  while true; do
+    read -p "$(tput bold)$(tput setaf 3) ${1} (yY/nN): $(tput sgr0)" reply
+    case $reply in
+      Y|y) reply="true"; break;;
+      N|n) echo "Abort"; reply="false"; break;;
+      *) echo "Please answer y[Y] or n[N].";;
+    esac
+  done
+  eval $__resultvar="'$reply'"
+}
+
+function demo::get-dind-cluster {
+  download="true"
+  if [[ -f ${dind_script} ]]; then
+    demo::step "Will update ${dind_script} script to the latest version"
+    if [[ ! ${NONINTERACTIVE} ]]; then
+        demo::ask-user "Do you want to redownload ${dind_script} ?" download
+        if [[ ${download} = "true" ]]; then
+          rm "${dind_script}"
+        fi
+    else
+       demo::step "Will now clear existing ${dind_script}"
+       rm "${dind_script}"
+    fi
+  fi
+
+  if [[ ${download} = "true" ]]; then
+    demo::step "Will download ${dind_script} into current directory"
+    demo::ask-before-continuing
+    wget "https://raw.githubusercontent.com/Mirantis/kubeadm-dind-cluster/master/fixed/${dind_script}"
+    chmod +x "${dind_script}"
+  fi
 }
 
 function demo::get-cirros-ssh-keys {
