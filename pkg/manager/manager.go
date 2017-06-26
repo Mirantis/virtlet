@@ -227,20 +227,6 @@ func validatePodSandboxConfig(config *kubeapi.PodSandboxConfig) error {
 		return fmt.Errorf("sandbox config is missing Metadata attribute: %s", spew.Sdump(config))
 	}
 
-	linuxSandbox := config.GetLinux()
-	if linuxSandbox == nil {
-		return fmt.Errorf("sandbox config is missing Linux attribute: %s", spew.Sdump(config))
-	}
-
-	if linuxSandbox.GetSecurityContext() == nil {
-		return fmt.Errorf("Linux sandbox config is missing SecurityContext attribute: %s", spew.Sdump(config))
-	}
-
-	namespaceOptions := linuxSandbox.GetSecurityContext().GetNamespaceOptions()
-	if namespaceOptions == nil {
-		return fmt.Errorf("SecurityContext is missing Namespaces attribute: %s", spew.Sdump(config))
-	}
-
 	return nil
 }
 
