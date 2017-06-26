@@ -410,9 +410,6 @@ It does so using `write_files`
 module which is used to write Secret/ConfigMap content to appropriate
 locations.
 
-Virtlet only handles files in the top level directory for each
-Secret/ConfigMap `VolumeMounts` entry. This limitation is to be lifted soon.
-
 ### Consuming a ConfigMap using Kubernetes volume
 
 See [the following example](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#add-configmap-data-to-a-volume)
