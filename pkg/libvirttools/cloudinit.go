@@ -271,7 +271,7 @@ func (m *WriteFilesManipulator) addFilesFor(suffix, permissions string) {
 	}
 }
 
-func dirScanner(dirPath string, adder func(string) error) error {
+func scanDirectory(dirPath string, callback func(string) error) error {
 	entries, err := ioutil.ReadDir(dirPath)
 	if err != nil {
 		return err
@@ -280,48 +280,42 @@ func dirScanner(dirPath string, adder func(string) error) error {
 	for _, entry := range entries {
 		fullPath := path.Join(dirPath, entry.Name())
 
-		// look for directories
-		if entry.Mode().IsDir() {
-			glog.V(3).Infof("Found directory: %s", entry.Name())
-			glog.V(3).Infof("Going into it...")
-			if err := dirScanner(fullPath, adder); err != nil {
+		switch {
+		case entry.Mode().IsDir():
+			glog.V(3).Infof("Scanning directory: %s", entry.Name())
+			if err := scanDirectory(fullPath, callback); err != nil {
 				return err
 			}
-			glog.V(3).Infof("... came back from directory: %s", entry.Name())
-			continue
-		}
-
-		// ... and for regular files
-		if entry.Mode().IsRegular() {
+			glog.V(3).Infof("Leaving directory: %s", entry.Name())
+		case entry.Mode().IsRegular():
 			glog.V(3).Infof("Found regular file: %s", entry.Name())
-			err := adder(fullPath)
+			err := callback(fullPath)
 			if err != nil {
 				return err
 			}
 			continue
-		}
-
-		// .. or for symlinks
-		if entry.Mode()&os.ModeSymlink != 0 {
+		case entry.Mode()&os.ModeSymlink != 0:
 			glog.V(3).Infof("Found symlink: %s", entry.Name())
 			fi, err := os.Stat(fullPath)
-			if err != nil {
+			switch {
+			case err != nil:
 				return err
-			}
-			if fi.Mode().IsRegular() {
-				err := adder(fullPath)
+			case fi.Mode().IsRegular():
+				err = callback(fullPath)
 				if err != nil {
 					return err
 				}
-			} else if fi.Mode().IsDir() {
+			case fi.Mode().IsDir():
 				glog.V(3).Info("... which points to directory, going deeper ...")
 
-				// WARNING: this needs to be protected against loops!
-				if err := dirScanner(fullPath, adder); err != nil {
+				// NOTE: this does not need to be protected against loops
+				// because it's prepared by kubelet in safe manner (if it's not
+				// it's bug on kubelet side
+				if err := scanDirectory(fullPath, callback); err != nil {
 					return err
 				}
 				glog.V(3).Infof("... came back from symlink to directory: %s", entry.Name())
-			} else {
+			default:
 				glog.V(3).Info("... but it's pointing to something other than directory or regular file")
 			}
 		}
@@ -352,7 +346,7 @@ func (m *WriteFilesManipulator) addFilesForMount(mount *VMMount, permissions str
 	}
 
 	glog.V(3).Infof("Scanning %s for files", mount.HostPath)
-	if err := dirScanner(mount.HostPath, addFileContent); err != nil {
+	if err := scanDirectory(mount.HostPath, addFileContent); err != nil {
 		glog.Errorf("Error while scanning directory %s: %v", mount.HostPath, err)
 	}
 	glog.V(3).Infof("Found %d entries", len(writeFiles))
