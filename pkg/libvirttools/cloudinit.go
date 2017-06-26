@@ -24,7 +24,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 
 	"github.com/ghodss/yaml"
@@ -272,6 +271,65 @@ func (m *WriteFilesManipulator) addFilesFor(suffix, permissions string) {
 	}
 }
 
+func dirScanner(dirPath string, adder func(string) error) error {
+	entries, err := ioutil.ReadDir(dirPath)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		fullPath := path.Join(dirPath, entry.Name())
+
+		// look for directories
+		if entry.Mode().IsDir() {
+			glog.V(3).Infof("Found directory: %s", entry.Name())
+			glog.V(3).Infof("Going into it...")
+			if err := dirScanner(fullPath, adder); err != nil {
+				return err
+			}
+			glog.V(3).Infof("... came back from directory: %s", entry.Name())
+			continue
+		}
+
+		// ... and for regular files
+		if entry.Mode().IsRegular() {
+			glog.V(3).Infof("Found regular file: %s", entry.Name())
+			err := adder(fullPath)
+			if err != nil {
+				return err
+			}
+			continue
+		}
+
+		// .. or for symlinks
+		if entry.Mode()&os.ModeSymlink != 0 {
+			glog.V(3).Infof("Found symlink: %s", entry.Name())
+			fi, err := os.Stat(fullPath)
+			if err != nil {
+				return err
+			}
+			if fi.Mode().IsRegular() {
+				err := adder(fullPath)
+				if err != nil {
+					return err
+				}
+			} else if fi.Mode().IsDir() {
+				glog.V(3).Info("... which points to directory, going deeper ...")
+
+				// WARNING: this needs to be protected against loops!
+				if err := dirScanner(fullPath, adder); err != nil {
+					return err
+				}
+				glog.V(3).Infof("... came back from symlink to directory: %s", entry.Name())
+			} else {
+				glog.V(3).Info("... but it's pointing to something other than directory or regular file")
+			}
+		}
+	}
+
+	return nil
+}
+
 func (m *WriteFilesManipulator) addFilesForMount(mount *VMMount, permissions string) []interface{} {
 	var writeFiles []interface{}
 
@@ -293,55 +351,8 @@ func (m *WriteFilesManipulator) addFilesForMount(mount *VMMount, permissions str
 		return nil
 	}
 
-	scanDirectory := func(name string) error {
-		entries, err := ioutil.ReadDir(name)
-		if err != nil {
-			return err
-		}
-
-		for _, entry := range entries {
-			fullPath := path.Join(name, entry.Name())
-			// look for regular files
-			if entry.Mode().IsRegular() {
-				glog.V(3).Infof("Found regular file: %s", entry.Name())
-				err := addFileContent(fullPath)
-				if err != nil {
-					return err
-				}
-				continue
-			}
-
-			// .. or for symlinks for regular files
-			if entry.Mode()&os.ModeSymlink != 0 {
-				glog.V(3).Infof("Found symlink: %s", entry.Name())
-				fi, err := os.Stat(fullPath)
-				if err != nil {
-					return err
-				}
-				if fi.Mode().IsRegular() {
-					err := addFileContent(fullPath)
-					if err != nil {
-						return err
-					}
-				} else {
-					glog.V(3).Infof("... but it's pointing to something other than regular file")
-				}
-			}
-		}
-		return nil
-	}
-
-	scanner := func(name string, f os.FileInfo, err error) error {
-		if f.IsDir() {
-			glog.V(3).Infof("Found dir: %s", name)
-			return scanDirectory(name)
-		}
-
-		return nil
-	}
-
 	glog.V(3).Infof("Scanning %s for files", mount.HostPath)
-	if err := filepath.Walk(mount.HostPath, scanner); err != nil {
+	if err := dirScanner(mount.HostPath, addFileContent); err != nil {
 		glog.Errorf("Error while scanning directory %s: %v", mount.HostPath, err)
 	}
 	glog.V(3).Infof("Found %d entries", len(writeFiles))
