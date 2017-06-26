@@ -19,6 +19,8 @@ package manager
 import (
 	"testing"
 
+	"github.com/davecgh/go-spew/spew"
+
 	"github.com/Mirantis/virtlet/tests/criapi"
 )
 
@@ -34,7 +36,7 @@ func TestPodSanboxConfigValidation(t *testing.T) {
 	for _, sandbox := range invalidSandboxes {
 		if sandbox != nil {
 			if err := validatePodSandboxConfig(sandbox); err == nil {
-				t.Fatalf("Expected to recieve error on attempt on invalid sandbox %v", sandbox)
+				t.Errorf("Invalid pod sandbox passed validation:\n%s", spew.Sdump(sandbox))
 			}
 		}
 	}
