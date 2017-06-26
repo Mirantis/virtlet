@@ -460,7 +460,6 @@ func (r *RuntimeProxy) PodSandboxStatus(ctx context.Context, in *runtimeapi.PodS
 		glog.V(2).Infof("FAIL: PodSandboxStatus(): %v", err)
 		return nil, err
 	}
-	glog.V(3).Infof("ENTER: PodSandboxStatus() [%s]: %s", client.id, spew.Sdump(in))
 	in.PodSandboxId = unprefixed
 
 	glog.V(3).Infof("ENTER: PodSandboxStatus() [%s]: %s", client.id, spew.Sdump(in))
@@ -492,7 +491,7 @@ func (r *RuntimeProxy) ListPodSandbox(ctx context.Context, in *runtimeapi.ListPo
 		clientStr = client.id
 	}
 
-	glog.V(3).Infof("ENTER: ListPodSandbox() [%s]: %s", clientStr, spew.Sdump(in))
+	glog.V(4).Infof("ENTER: ListPodSandbox() [%s]: %s", clientStr, spew.Sdump(in))
 	var sandboxes []*runtimeapi.PodSandbox
 	for _, client := range clients {
 		if client.currentState() != clientStateConnected {
@@ -515,7 +514,7 @@ func (r *RuntimeProxy) ListPodSandbox(ctx context.Context, in *runtimeapi.ListPo
 	}
 
 	resp := &runtimeapi.ListPodSandboxResponse{Items: sandboxes}
-	glog.V(3).Infof("LEAVE: ListPodSandbox() [%s]: %s", clientStr, spew.Sdump(resp))
+	glog.V(4).Infof("LEAVE: ListPodSandbox() [%s]: %s", clientStr, spew.Sdump(resp))
 	return resp, nil
 }
 
@@ -666,7 +665,7 @@ func (r *RuntimeProxy) ListContainers(ctx context.Context, in *runtimeapi.ListCo
 		}
 	}
 
-	glog.V(3).Infof("ENTER: ListContainers() [%s]: %s", clientStr, spew.Sdump(in))
+	glog.V(4).Infof("ENTER: ListContainers() [%s]: %s", clientStr, spew.Sdump(in))
 	var containers []*runtimeapi.Container
 	for _, client := range clients {
 		if client.currentState() != clientStateConnected {
@@ -689,7 +688,7 @@ func (r *RuntimeProxy) ListContainers(ctx context.Context, in *runtimeapi.ListCo
 	}
 
 	resp := &runtimeapi.ListContainersResponse{Containers: containers}
-	glog.V(3).Infof("LEAVE: ListContainers() [%s]: %s", clientStr, spew.Sdump(resp))
+	glog.V(4).Infof("LEAVE: ListContainers() [%s]: %s", clientStr, spew.Sdump(resp))
 	return resp, nil
 }
 
@@ -868,7 +867,7 @@ func (r *RuntimeProxy) ListImages(ctx context.Context, in *runtimeapi.ListImages
 		clientStr = client.id
 	}
 
-	glog.V(3).Infof("ENTER: ListImages() [%s]: %s", clientStr, spew.Sdump(in))
+	glog.V(4).Infof("ENTER: ListImages() [%s]: %s", clientStr, spew.Sdump(in))
 	var images []*runtimeapi.Image
 	for _, client := range clients {
 		if client.currentState() != clientStateConnected {
@@ -891,7 +890,7 @@ func (r *RuntimeProxy) ListImages(ctx context.Context, in *runtimeapi.ListImages
 	}
 
 	resp := &runtimeapi.ListImagesResponse{Images: images}
-	glog.V(3).Infof("LEAVE: ListImages() [%s]: %s", clientStr, spew.Sdump(resp))
+	glog.V(4).Infof("LEAVE: ListImages() [%s]: %s", clientStr, spew.Sdump(resp))
 	return resp, nil
 }
 

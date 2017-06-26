@@ -66,7 +66,7 @@ docker rm -f $(docker ps -q --filter=label=criproxy=true)
 docker run -d --privileged \
       -l criproxy=true \
       --restart always \
-       --log-opt max-size=10m \
+       --log-opt max-size=100m \
        --name criproxy \
        --net=host \
        --pid=host \
@@ -82,6 +82,8 @@ docker run -d --privileged \
 `-v` option of `criproxy` controls the verbosity here. 0-1 means some
 very basic logging during startup and displaying serious errors, 2 is
 the same as 1 plus logging of CRI request errors and 3 causes dumping
-of actual CRI requests and responses in addition to what's logged on
-level 2. `--log-opt` docker option controls the maximum size of the
-docker log for CRI proxy container.
+of actual CRI requests and responses except for `ListPodSandbox`,
+`ListContainers` and `ListImages` requests in addition to what's
+logged on level 2. Level 4 adds dumping `List*` requests which may
+cause the log to grow fast. `--log-opt` docker option controls the
+maximum size of the docker log for CRI proxy container.
