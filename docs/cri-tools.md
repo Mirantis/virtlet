@@ -5,7 +5,7 @@ CRI-tools project utilizes [ginkgo](https://onsi.github.io/ginkgo) package, whic
 ## Summary by Groups (Specs)
 ### Validation
 
-| Test Spec Name | Overall number | Compatible to virtlet  | Passed |
+| Test Spec Name | Overall number | Compatible with virtlet  | Passed |
 | -----------------------|:---------------------:|:---------------------------:|:----------:|
 | Container            | 7  | 7  | 5  |
 | Image Manager  | 6  | 4  | 4  |
@@ -22,7 +22,7 @@ Use `Spec names` from the first column above to run specif subsets of tests:
 #### critest validation results
 
 ##### "Container" Spec:
-| Test Spec Name | Short description | Compatible to virtlet  | Passed |
+| Test Spec Name | Short description | Compatible with virtlet  | Passed |
 | -----------------------|:---------------------:|:---------------------------:|:----------:|
 | creating container  | create, list |  y | y |
 | starting container   | create, start |  y | y |
@@ -33,7 +33,7 @@ Use `Spec names` from the first column above to run specif subsets of tests:
 | container with log | start container with LogPath | y | n |
 
 ##### "Image Manager"
-| Test Spec Name | Short description | Compatible to virtlet  | Passed |
+| Test Spec Name | Short description | Compatible with virtlet  | Passed |
 | -----------------------|:---------------------:|:---------------------------:|:----------:|
 | image with tag | pull image by ref| y | y |
 | image without tag| pull image by name| y | y |
@@ -43,27 +43,27 @@ Use `Spec names` from the first column above to run specif subsets of tests:
 | exactly 3 repoTags | tags | n | n |
 
 ##### "Networking"
-| Test Spec Name | Short description | Compatible to virtlet  | Passed |
+| Test Spec Name | Short description | Compatible with virtlet  | Passed |
 | -----------------------|:---------------------:|:---------------------------:|:----------:|
 | support DNS config| check /etc/resolv.conf content | n | n |
 | port mapping with only container port | | n | n |
 | port mapping with host port and container port | | n | n |
 
 ##### "PodSandbox"
-| Test Spec Name | Short description | Compatible to virtlet  | Passed |
+| Test Spec Name | Short description | Compatible with virtlet  | Passed |
 | -----------------------|:---------------------:|:---------------------------:|:----------:|
 | running PodSandbox | run sandbox, list | y | y |
 | stopping PodSandbox | run sandbox, stop | y | y |
 | removing PodSandbox| run sandbox, stop, remove | y | y |
 
 ##### "Runtime info"
-| Test Spec Name | Short description | Compatible to virtlet  | Passed |
+| Test Spec Name | Short description | Compatible with virtlet  | Passed |
 | -----------------------|:---------------------:|:---------------------------:|:----------:|
 | runtime info | get runtime version | y | y |
 | runtime conditions | get runtime status | y | y |
 
 ##### "Security Context"
-| Test Spec Name | Short description | Compatible to virtlet  | Passed |
+| Test Spec Name | Short description | Compatible with virtlet  | Passed |
 | -----------------------|:---------------------:|:---------------------------:|:----------:|
 | support HostPID |  created sandbox with nginx and busybox containers with with hostPID. Nginx pid must be seen from within busybox. Using execSync for checking. | n | n |
 | HostIpc is true | check shared memory segment in included in the “busybox” container created with hostIPC set. Using execSync for check. | n | n |
@@ -79,7 +79,7 @@ Use `Spec names` from the first column above to run specif subsets of tests:
 | setting Capability| | ? | n |
 
 ##### "Streaming"
-| Test Spec Name | Short description | Compatible to virtlet  | Passed |
+| Test Spec Name | Short description | Compatible with virtlet  | Passed |
 | -----------------------|:---------------------:|:---------------------------:|:----------:|
 | support exec | | y | n |
 | support attach | y | n |
