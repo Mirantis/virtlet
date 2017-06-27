@@ -4,6 +4,8 @@ set -o nounset
 set -o pipefail
 set -o errtrace
 
+mkdir -p /var/lib/virtlet/volumes
+
 if [[ -f /dind/virtlet ]]; then
   ln -fs /dind/virtlet /usr/local/bin/virtlet
 fi

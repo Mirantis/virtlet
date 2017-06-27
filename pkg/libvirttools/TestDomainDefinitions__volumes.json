@@ -35,7 +35,7 @@
       "Capacity": null,
       "Available": null,
       "Target": {
-        "Path": "/var/lib/virtlet",
+        "Path": "/var/lib/virtlet/volumes",
         "Permissions": null,
         "Timestamps": null,
         "Encryption": null

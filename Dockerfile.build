@@ -55,7 +55,7 @@ WORKDIR /go/src/github.com/Mirantis/virtlet
 
 RUN mkdir -p ~/.ssh && \
     ssh-keyscan github.com >> ~/.ssh/known_hosts && \
-    mkdir -p /var/data/virtlet /var/lib/virtlet /opt/cni/bin && \
+    mkdir -p /var/lib/virtlet/volumes /opt/cni/bin && \
     curl -L https://github.com/containernetworking/cni/releases/download/v0.3.0/cni-v0.3.0.tgz | \
       tar zxC /opt/cni/bin && \
     ln -s /go/src/github.com/Mirantis/virtlet/_output/vmwrapper /vmwrapper
