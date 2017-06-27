@@ -34,10 +34,10 @@ var (
 		"Storage pool in which the images should be stored")
 	storageBackend = flag.String("storage-backend", "dir",
 		"Libvirt storage pool type/backend")
-	boltPath = flag.String("bolt-path", "/var/data/virtlet/virtlet.db",
+	boltPath = flag.String("bolt-path", "/var/lib/virtlet/virtlet.db",
 		"Path to the bolt database file")
-	listen = flag.String("listen", "/run/virtlet.sock",
-		"The unix socket to listen on, e.g. /run/virtlet.sock")
+	listen = flag.String("listen", "/var/run/virtlet.sock",
+		"The unix socket to listen on, e.g. /var/run/virtlet.sock")
 	cniPluginsDir = flag.String("cni-bin-dir", "/opt/cni/bin",
 		"Path to CNI plugin binaries")
 	cniConfigsDir = flag.String("cni-conf-dir", "/etc/cni/net.d",
