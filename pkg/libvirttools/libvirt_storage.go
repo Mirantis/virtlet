@@ -81,6 +81,13 @@ func (pool *LibvirtStoragePool) CreateStorageVol(def *libvirtxml.StorageVolume) 
 	if err != nil {
 		return nil, err
 	}
+	// libvirt may report qcow2 file size as 'capacity' for
+	// qcow2-based volumes for some time after creating them.
+	// Here we work around this problem by refreshing the pool
+	// which invokes acquiring volume info.
+	if err := pool.p.Refresh(0); err != nil {
+		return nil, fmt.Errorf("failed to refresh the storage pool: %v", err)
+	}
 	return &LibvirtStorageVolume{name: def.Name, v: v}, nil
 }
 
