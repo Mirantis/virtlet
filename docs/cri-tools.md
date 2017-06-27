@@ -2,10 +2,9 @@
 
 CRI-tools project utilizes [ginkgo](https://onsi.github.io/ginkgo) package, which provides means for setup/teardown, organizing tests in groups, and flags for running/skipping specific subsets of tests.
 
-## Summary by Groups (Specs)
-### Validation
+## Summary of validation by Groups (Specs)
 
-| Test Spec Name | Overall number | Compatible to virtlet  | Passed |
+| Test Spec Name | Overall number | Compatible with virtlet  | Passed |
 | -----------------------|:---------------------:|:---------------------------:|:----------:|
 | Container            | 7  | 7  | 5  |
 | Image Manager  | 6  | 4  | 4  |
@@ -19,10 +18,10 @@ CRI-tools project utilizes [ginkgo](https://onsi.github.io/ginkgo) package, whic
 Use `Spec names` from the first column above to run specif subsets of tests:
 `# critest --runtime-endpoint=/run/virtlet.sock --image-endpoint=/run/virtlet.sock --focus="Container" validation`
 
-#### critest validation results
+## critest validation result details
 
-##### "Container" Spec:
-| Test Spec Name | Short description | Compatible to virtlet  | Passed |
+### "Container" Spec:
+| Test Spec Name | Short description | Compatible with virtlet  | Passed |
 | -----------------------|:---------------------:|:---------------------------:|:----------:|
 | creating container  | create, list |  y | y |
 | starting container   | create, start |  y | y |
@@ -32,8 +31,8 @@ Use `Spec names` from the first column above to run specif subsets of tests:
 | container with volume | create container with hostDir |  y | y |
 | container with log | start container with LogPath | y | n |
 
-##### "Image Manager"
-| Test Spec Name | Short description | Compatible to virtlet  | Passed |
+### "Image Manager" Spec:
+| Test Spec Name | Short description | Compatible with virtlet  | Passed |
 | -----------------------|:---------------------:|:---------------------------:|:----------:|
 | image with tag | pull image by ref| y | y |
 | image without tag| pull image by name| y | y |
@@ -42,28 +41,28 @@ Use `Spec names` from the first column above to run specif subsets of tests:
 | exactly 3 image | tags | n | n |
 | exactly 3 repoTags | tags | n | n |
 
-##### "Networking"
-| Test Spec Name | Short description | Compatible to virtlet  | Passed |
+### "Networking" Spec:
+| Test Spec Name | Short description | Compatible with virtlet  | Passed |
 | -----------------------|:---------------------:|:---------------------------:|:----------:|
 | support DNS config| check /etc/resolv.conf content | n | n |
 | port mapping with only container port | | n | n |
 | port mapping with host port and container port | | n | n |
 
-##### "PodSandbox"
-| Test Spec Name | Short description | Compatible to virtlet  | Passed |
+### "PodSandbox" Spec:
+| Test Spec Name | Short description | Compatible with virtlet  | Passed |
 | -----------------------|:---------------------:|:---------------------------:|:----------:|
 | running PodSandbox | run sandbox, list | y | y |
 | stopping PodSandbox | run sandbox, stop | y | y |
 | removing PodSandbox| run sandbox, stop, remove | y | y |
 
-##### "Runtime info"
-| Test Spec Name | Short description | Compatible to virtlet  | Passed |
+### "Runtime info" Spec:
+| Test Spec Name | Short description | Compatible with virtlet  | Passed |
 | -----------------------|:---------------------:|:---------------------------:|:----------:|
 | runtime info | get runtime version | y | y |
 | runtime conditions | get runtime status | y | y |
 
-##### "Security Context"
-| Test Spec Name | Short description | Compatible to virtlet  | Passed |
+### "Security Context" Spec:
+| Test Spec Name | Short description | Compatible with virtlet  | Passed |
 | -----------------------|:---------------------:|:---------------------------:|:----------:|
 | support HostPID |  created sandbox with nginx and busybox containers with with hostPID. Nginx pid must be seen from within busybox. Using execSync for checking. | n | n |
 | HostIpc is true | check shared memory segment in included in the “busybox” container created with hostIPC set. Using execSync for check. | n | n |
@@ -78,8 +77,8 @@ Use `Spec names` from the first column above to run specif subsets of tests:
 | Privileged is false| | ? | n |
 | setting Capability| | ? | n |
 
-##### "Streaming"
-| Test Spec Name | Short description | Compatible to virtlet  | Passed |
+### "Streaming" Spec:
+| Test Spec Name | Short description | Compatible with virtlet  | Passed |
 | -----------------------|:---------------------:|:---------------------------:|:----------:|
 | support exec | | y | n |
 | support attach | y | n |
@@ -87,8 +86,8 @@ Use `Spec names` from the first column above to run specif subsets of tests:
 
 ## critest running steps
 1.  To be able to run virtlet compatible tests you need to fix following issues in cri-tools"
-    1. Currently CRI-tools uses hardcoded "busybox" and "nginx" image names for tests. To be able to run compatible with virtlet tests you need to make changes following changes in cri-tools:
-    1. Virtlet adds ids when creating to domain’s name + cri-tools also adds id and prefix, what leads to error on domain creation:
+    1. Currently CRI-tools uses hardcoded "busybox" and "nginx" image names for tests. So need to change them on cirros url.
+    1. Virtlet adds ids to domain’s name and cri-tools also adds id and prefix, what leads to error on domain creation:
 
           > Monitor path /var/lib/libvirt/qemu/domain-ceb27ab2-385b-574b-54cc-90a9db9e92be-container-for-start-test-7916763f-5b2e-11e7-87bc-52540070019e/monitor.sock too big for destination'
 
@@ -156,9 +155,6 @@ download.cirros-cloud.net/0.3.5/cirros-0.3.5-x86_64-disk.img
  Name                 Path                                    
 ------------------------------------------------------------------------------
  10da1bf07c27b64768ed07b798095f8d779bdbc3_cirros-0.3.5-x86_64-disk.img /var/lib/libvirt/images/10da1bf07c27b64768ed07b798095f8d779bdbc3_cirros-0.3.5-x86_64-disk.img
-
-# crictl --runtime-endpoint=/run/virtlet.sock --image-endpoint=/run/virtlet.sock container create hdishd83djaidwnduwk28bcsb ./vm-container.json ./vm-sandbox.json 
-264e1739-7b6a-5a3d-564c-baae69b5bdb0
 
 # crictl --runtime-endpoint=/run/virtlet.sock --image-endpoint=/run/virtlet.sock container create hdishd83djaidwnduwk28bcsb ./vm-container.json ./vm-sandbox.json 
 264e1739-7b6a-5a3d-564c-baae69b5bdb0
