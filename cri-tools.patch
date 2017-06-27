@@ -1,0 +1,82 @@
+diff --git a/pkg/framework/util.go b/pkg/framework/util.go
+index 290485a..7b53fe6 100644
+--- a/pkg/framework/util.go
++++ b/pkg/framework/util.go
+@@ -50,7 +50,7 @@ const (
+ 	DefaultAttempt uint32 = 2
+ 
+ 	// DefaultContainerImage is the default image for container using
+-	DefaultContainerImage string = "busybox:1.26"
++       DefaultContainerImage string = "download.cirros-cloud.net/0.3.5/cirros-0.3.5-x86_64-disk.img"
+ 
+ 	// DefaultStopContainerTimeout is the default timeout for stopping container
+ 	DefaultStopContainerTimeout int64 = 60
+@@ -120,7 +120,7 @@ func NewUUID() string {
+ 
+ // RunDefaultPodSandbox runs a PodSandbox with default options.
+ func RunDefaultPodSandbox(c internalapi.RuntimeService, prefix string) string {
+-	podSandboxName := prefix + NewUUID()
++       podSandboxName := prefix
+ 	uid := DefaultUIDPrefix + NewUUID()
+ 	namespace := DefaultNamespacePrefix + NewUUID()
+ 
+@@ -172,7 +172,7 @@ func BuildContainerMetadata(containerName string, attempt uint32) *runtimeapi.Co
+ 
+ // CreateDefaultContainer creates a  default container with default options.
+ func CreateDefaultContainer(rc internalapi.RuntimeService, ic internalapi.ImageManagerService, podID string, podConfig *runtimeapi.PodSandboxConfig, prefix string) string {
+-	containerName := prefix + NewUUID()
++       containerName := prefix
+ 	containerConfig := &runtimeapi.ContainerConfig{
+ 		Metadata: BuildContainerMetadata(containerName, DefaultAttempt),
+ 		Image:    &runtimeapi.ImageSpec{Image: DefaultContainerImage},
+diff --git a/pkg/validate/container.go b/pkg/validate/container.go
+index 67a414f..e7d6097 100644
+--- a/pkg/validate/container.go
++++ b/pkg/validate/container.go
+@@ -223,7 +223,7 @@ func getContainerStatus(c internalapi.RuntimeService, containerID string) *runti
+ 
+ // createShellContainer creates a container to run /bin/sh.
+ func createShellContainer(rc internalapi.RuntimeService, ic internalapi.ImageManagerService, podID string, podConfig *runtimeapi.PodSandboxConfig, prefix string) string {
+-	containerName := prefix + framework.NewUUID()
++       containerName := prefix
+ 	containerConfig := &runtimeapi.ContainerConfig{
+ 		Metadata: framework.BuildContainerMetadata(containerName, framework.DefaultAttempt),
+ 		Image:    &runtimeapi.ImageSpec{Image: framework.DefaultContainerImage},
+@@ -342,7 +342,7 @@ func createHostPath(podID string) (string, string) {
+ // createVolContainerOrFail creates a container with volume and the prefix of containerName and fails if it gets error.
+ func createVolumeContainer(rc internalapi.RuntimeService, ic internalapi.ImageManagerService, prefix string, podID string, podConfig *runtimeapi.PodSandboxConfig, hostPath, flagFile string) string {
+ 	By("create a container with volume and name")
+-	containerName := prefix + framework.NewUUID()
++       containerName := prefix
+ 	containerConfig := &runtimeapi.ContainerConfig{
+ 		Metadata: framework.BuildContainerMetadata(containerName, framework.DefaultAttempt),
+ 		Image:    &runtimeapi.ImageSpec{Image: framework.DefaultContainerImage},
+@@ -362,7 +362,7 @@ func createVolumeContainer(rc internalapi.RuntimeService, ic internalapi.ImageMa
+ // createLogContainer creates a container with log and the prefix of containerName.
+ func createLogContainer(rc internalapi.RuntimeService, ic internalapi.ImageManagerService, prefix string, podID string, podConfig *runtimeapi.PodSandboxConfig) (string, string) {
+ 	By("create a container with log and name")
+-	containerName := prefix + framework.NewUUID()
++       containerName := prefix
+ 	path := fmt.Sprintf("%s.log", containerName)
+ 	containerConfig := &runtimeapi.ContainerConfig{
+ 		Metadata: framework.BuildContainerMetadata(containerName, framework.DefaultAttempt),
+diff --git a/pkg/validate/image.go b/pkg/validate/image.go
+index 343ac67..cab9247 100644
+--- a/pkg/validate/image.go
++++ b/pkg/validate/image.go
+@@ -29,13 +29,13 @@ import (
+ 
+ var (
+ 	// image name for test image api
+-	testImageName = "busybox"
++       testImageName = "download.cirros-cloud.net/0.3.5/cirros-0.3.5-x86_64-disk.img"
+ 
+ 	// name-tagged reference for test image
+ 	testImageRef = testImageName + ":1.26.2"
+ 
+ 	// Digested reference for test image
+-	busyboxDigestRef = testImageName + "@sha256:817a12c32a39bbe394944ba49de563e085f1d3c5266eb8e9723256bc4448680e"
++       busyboxDigestRef = "download.cirros-cloud.net/0.3.5/cirros-0.3.5-x86_64-disk.img"
+ )
+ 
+ var _ = framework.KubeDescribe("Image Manager", func() {
