@@ -25,18 +25,15 @@ import (
 )
 
 func TestPodSanboxConfigValidation(t *testing.T) {
-	invalidSandboxes := criapi.GetSandboxes(4)
+	invalidSandboxes := criapi.GetSandboxes(1)
 
 	// Now let's make generated configs to be invalid
 	invalidSandboxes[0].Metadata = nil
-	invalidSandboxes[1].Linux = nil
-	invalidSandboxes[2].Linux.SecurityContext = nil
-	invalidSandboxes[3].Linux.SecurityContext.NamespaceOptions = nil
 
 	for _, sandbox := range invalidSandboxes {
 		if sandbox != nil {
 			if err := validatePodSandboxConfig(sandbox); err == nil {
-				t.Errorf("Invalid pod sandbox passed validation:\n%s", spew.Sdump(sandbox))
+				t.Errorf("Invalid pod sandbox passed to validation:\n%s", spew.Sdump(sandbox))
 			}
 		}
 	}
