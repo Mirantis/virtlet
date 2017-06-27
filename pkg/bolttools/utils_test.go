@@ -163,7 +163,7 @@ func SetUpBolt(t *testing.T, sandboxConfigs []*kubeapi.PodSandboxConfig, contain
 		t.Fatal(err)
 	}
 	if sandboxList == nil || len(sandboxList) != 0 {
-		t.Errorf("Expected to recieve array of zero lenght as a result of list request against empty Bolt db.")
+		t.Errorf("ListPodSandbox() returned non-empty result for an empty db")
 	}
 
 	if err := b.EnsureSandboxSchema(); err != nil {
