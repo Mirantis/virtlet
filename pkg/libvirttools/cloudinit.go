@@ -42,10 +42,11 @@ const (
 type CloudInitGenerator struct {
 	config    *VMConfig
 	volumeMap map[string]string
+	isoDir    string
 }
 
-func NewCloudInitGenerator(config *VMConfig, volumeMap map[string]string) *CloudInitGenerator {
-	return &CloudInitGenerator{config: config, volumeMap: volumeMap}
+func NewCloudInitGenerator(config *VMConfig, volumeMap map[string]string, isoDir string) *CloudInitGenerator {
+	return &CloudInitGenerator{config: config, volumeMap: volumeMap, isoDir: isoDir}
 }
 
 func (g *CloudInitGenerator) generateMetaData() ([]byte, error) {
@@ -101,10 +102,14 @@ func (g *CloudInitGenerator) generateUserData() ([]byte, error) {
 	return []byte("#cloud-config\n" + string(r)), nil
 }
 
-func (g *CloudInitGenerator) GenerateDisk() (string, *libvirtxml.DomainDisk, error) {
+func (g *CloudInitGenerator) IsoPath() string {
+	return filepath.Join(g.isoDir, fmt.Sprintf("nocloud-%s.iso", g.config.DomainUUID))
+}
+
+func (g *CloudInitGenerator) GenerateDisk() (*libvirtxml.DomainDisk, error) {
 	tmpDir, err := ioutil.TempDir("", "nocloud-")
 	if err != nil {
-		return "", nil, fmt.Errorf("can't create temp dir for nocloud: %v", err)
+		return nil, fmt.Errorf("can't create temp dir for nocloud: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
@@ -114,37 +119,35 @@ func (g *CloudInitGenerator) GenerateDisk() (string, *libvirtxml.DomainDisk, err
 		userData, err = g.generateUserData()
 	}
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 
 	if err := utils.WriteFiles(tmpDir, map[string][]byte{
 		"user-data": userData,
 		"meta-data": metaData,
 	}); err != nil {
-		return "", nil, fmt.Errorf("can't write user-data: %v", err)
+		return nil, fmt.Errorf("can't write user-data: %v", err)
 	}
 
-	isoFile, err := ioutil.TempFile("", "nocloud-iso-")
-	if err != nil {
-		return "", nil, fmt.Errorf("can't create temporary file: %v", err)
+	if err := os.MkdirAll(g.isoDir, 0777); err != nil {
+		return nil, fmt.Errorf("error making iso directory %q: %v", g.isoDir, err)
 	}
-	isoFile.Close()
 
-	if err := utils.GenIsoImage(isoFile.Name(), "cidata", tmpDir); err != nil {
-		if rmErr := os.Remove(isoFile.Name()); rmErr != nil {
-			glog.Warning("Error removing temporary file %s: %v", isoFile.Name(), rmErr)
+	if err := utils.GenIsoImage(g.IsoPath(), "cidata", tmpDir); err != nil {
+		if rmErr := os.Remove(g.IsoPath()); rmErr != nil {
+			glog.Warning("Error removing iso file %s: %v", g.IsoPath(), rmErr)
 		}
-		return "", nil, fmt.Errorf("error generating iso image: %v", err)
+		return nil, fmt.Errorf("error generating iso image: %v", err)
 	}
 
 	diskDef := &libvirtxml.DomainDisk{
 		Type:     "file",
 		Device:   "cdrom",
 		Driver:   &libvirtxml.DomainDiskDriver{Name: "qemu", Type: "raw"},
-		Source:   &libvirtxml.DomainDiskSource{File: isoFile.Name()},
+		Source:   &libvirtxml.DomainDiskSource{File: g.IsoPath()},
 		ReadOnly: &libvirtxml.DomainDiskReadOnly{},
 	}
-	return isoFile.Name(), diskDef, nil
+	return diskDef, nil
 }
 
 func (g *CloudInitGenerator) generateEnvVarsContent() string {

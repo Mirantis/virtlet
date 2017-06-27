@@ -228,7 +228,7 @@
             },
             "Auth": null,
             "Source": {
-              "File": "--volatile-path-replaced-by-FakeDomainConnection--",
+              "File": "/var/lib/virtlet/volumes/root_231700d5-c9a6-5a49-738d-99a954c51550",
               "Device": "",
               "Protocol": "",
               "Name": "",
@@ -274,7 +274,7 @@
             },
             "Auth": null,
             "Source": {
-              "File": "--volatile-path-replaced-by-FakeDomainConnection--",
+              "File": "/var/lib/virtlet/nocloud/nocloud-231700d5-c9a6-5a49-738d-99a954c51550.iso",
               "Device": "",
               "Protocol": "",
               "Name": "",

@@ -384,11 +384,10 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netNSPath, cniCon
 
 	if err == nil {
 		// FIXME: store VMConfig + VMStatus (to be added)
-		nocloudFile := config.TempFile
 		err = v.metadataStore.SetContainer(config.Name, settings.domainUUID,
 			config.PodSandboxId, config.Image, cloneName,
 			labels, config.ContainerAnnotations,
-			nocloudFile, config.Attempt, v.clock)
+			config.Attempt, v.clock)
 	}
 	if err != nil {
 		return "", err
@@ -589,7 +588,6 @@ func (v *VirtualizationTool) RemoveContainer(containerId string) error {
 		PodAnnotations:       containerInfo.SandBoxAnnotations,
 		ContainerAnnotations: containerInfo.Annotations,
 		ContainerLabels:      containerInfo.Labels,
-		TempFile:             containerInfo.NocloudFile,
 	}
 	if err := config.LoadAnnotations(); err != nil {
 		return err

@@ -80,7 +80,6 @@ func (dc *FakeDomainConnection) DefineDomain(def *libvirtxml.Domain) (virt.VirtD
 				continue
 			}
 			origPath := disk.Source.File
-			disk.Source.File = "--volatile-path-replaced-by-FakeDomainConnection--"
 			if filepath.Ext(origPath) == ".iso" || strings.HasPrefix(filepath.Base(origPath), "nocloud-iso") {
 				m, err := testutils.IsoToMap(origPath)
 				if err != nil {
