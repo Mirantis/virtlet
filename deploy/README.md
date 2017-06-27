@@ -87,3 +87,12 @@ of actual CRI requests and responses except for `ListPodSandbox`,
 logged on level 2. Level 4 adds dumping `List*` requests which may
 cause the log to grow fast. `--log-opt` docker option controls the
 maximum size of the docker log for CRI proxy container.
+
+## Concerns about restarting Virtlet on a node
+
+If virtlet pod restarts on a node when some VM pods are active on it,
+these VM pods will enter `ContainerCreating` state and remain in it
+for a period of up to several minutes before going back to `Running`
+state. You may restart CRI proxy on the node to make the VM pods
+return to `Running` state immediately. This issue is to be fixed
+later.
