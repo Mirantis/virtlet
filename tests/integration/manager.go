@@ -32,15 +32,6 @@ const (
 	virtletSocket = "/tmp/virtlet.sock"
 )
 
-func createEnviron() []string {
-	environ := os.Environ()
-
-	environ = append(environ, "LIBGUESTFS_DEBUG=1")
-	environ = append(environ, "LIBGUESTFS_TRACE=1")
-
-	return environ
-}
-
 type VirtletManager struct {
 	libvirtUri string
 	pid        int
@@ -82,7 +73,7 @@ func (v *VirtletManager) Run() error {
 		"-image-download-protocol=http",
 	}, &syscall.ProcAttr{
 		Dir:   virtletDir,
-		Env:   createEnviron(),
+		Env:   os.Environ(),
 		Files: []uintptr{0, 1, 2},
 		Sys:   &syscall.SysProcAttr{},
 	})
