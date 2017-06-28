@@ -65,8 +65,8 @@ function check-all-cleaned {
     exit 1
   fi
 
-   if "${virsh}" secret-list | grep ceph; then
-     echo "secret for domain ${podID} still listed after deletion" >&2
+   if "${virsh}" secret-list | grep ${podID}; then
+     echo "secret(s) for domain ${podID} still listed after deletion" >&2
      exit 1
    fi
 }
@@ -184,24 +184,15 @@ virtlet_pod_name=$(kubectl get pods --namespace=kube-system | grep -v virtlet-lo
 # Run one-node ceph cluster
 "${SCRIPT_DIR}/run_ceph.sh" "${SCRIPT_DIR}"
 
-# check attaching RBD device that's specified in the pod definition
+# check attaching multiple RBD device specified in the pod definition
 kubectl create -f "${SCRIPT_DIR}/cirros-vm-rbd-volume.yaml"
 wait-for-pod cirros-vm-rbd
-if [ "$(${virsh} domblklist @cirros-vm-rbd | grep rbd-test-image$ | wc -l)" != "1" ]; then
+if [ "$(${virsh} domblklist @cirros-vm-rbd | grep rbd-test-image[12]$ | wc -l)" != "2" ]; then
   echo "ceph: failed to find rbd-test-image in domblklist" >&2
   exit 1
 fi
 
 # check attaching rbd device specified using PV/PVC
-# tmp workaround: clear secret
-secretUUID=$(${virsh} secret-list | grep ceph | awk '{print $1}')
-if [[ ${secretUUID} ]]; then
-  if ! ${virsh} secret-undefine ${secretUUID} >&/dev/null; then
-    echo "ceph: failed to clear secret"
-    exit 1
-  fi
-fi
-
 kubectl create -f "${SCRIPT_DIR}/cirros-vm-rbd-pv-volume.yaml"
 wait-for-pod cirros-vm-rbd-pv
 if [ "$(${virsh} domblklist @cirros-vm-rbd-pv | grep rbd-test-image-pv$ | wc -l)" != "1" ]; then

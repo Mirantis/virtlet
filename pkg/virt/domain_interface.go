@@ -72,6 +72,10 @@ type VirtDomainConnection interface {
 	// secret cannot be found but no other error occurred, it returns
 	// ErrSecretNotFound
 	LookupSecretByUUIDString(uuid string) (VirtSecret, error)
+	// LookupSecretByUsageName tries to locate the secret by its Usage name. In case if the
+	// secret cannot be found but no other error occurred, it returns
+	// ErrSecretNotFound
+	LookupSecretByUsageName(usageType string, usageName string) (VirtSecret, error)
 }
 
 // Secret represents a secret that's used by the domain

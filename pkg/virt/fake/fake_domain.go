@@ -30,11 +30,11 @@ import (
 )
 
 type FakeDomainConnection struct {
-	rec            Recorder
-	domains        map[string]*FakeDomain
-	domainsByUuid  map[string]*FakeDomain
-	secretsByUuid  map[string]*FakeSecret
-	ignoreShutdown bool
+	rec                 Recorder
+	domains             map[string]*FakeDomain
+	domainsByUuid       map[string]*FakeDomain
+	secretsByUsageName  map[string]*FakeSecret
+	ignoreShutdown      bool
 }
 
 var _ virt.VirtDomainConnection = &FakeDomainConnection{}
@@ -44,10 +44,10 @@ func NewFakeDomainConnection(rec Recorder) *FakeDomainConnection {
 		rec = NullRecorder
 	}
 	return &FakeDomainConnection{
-		rec:           rec,
-		domains:       make(map[string]*FakeDomain),
-		domainsByUuid: make(map[string]*FakeDomain),
-		secretsByUuid: make(map[string]*FakeSecret),
+		rec:                rec,
+		domains:            make(map[string]*FakeDomain),
+		domainsByUuid:      make(map[string]*FakeDomain),
+		secretsByUsageName: make(map[string]*FakeSecret),
 	}
 }
 
@@ -67,10 +67,10 @@ func (dc *FakeDomainConnection) removeDomain(d *FakeDomain) {
 }
 
 func (dc *FakeDomainConnection) removeSecret(s *FakeSecret) {
-	if _, found := dc.secretsByUuid[s.uuid]; !found {
-		log.Panicf("secret %q not found", s.uuid)
+	if _, found := dc.secretsByUsageName[s.usageName]; !found {
+		log.Panicf("secret %q not found", s.usageName)
 	}
-	delete(dc.secretsByUuid, s.uuid)
+	delete(dc.secretsByUsageName, s.usageName)
 }
 
 func (dc *FakeDomainConnection) DefineDomain(def *libvirtxml.Domain) (virt.VirtDomain, error) {
@@ -136,17 +136,27 @@ func (dc *FakeDomainConnection) LookupDomainByUUIDString(uuid string) (virt.Virt
 }
 
 func (dc *FakeDomainConnection) DefineSecret(def *libvirtxml.Secret) (virt.VirtSecret, error) {
-	dc.rec.Rec("DefineSecret", def)
 	if def.UUID == "" {
 		return nil, fmt.Errorf("the secret has empty uuid")
 	}
-	s := newFakeSecret(dc, def.UUID)
-	dc.secretsByUuid[def.UUID] = s
+	if def.Usage.Name == "" {
+		return nil, fmt.Errorf("the secret has empty Usage name")
+	}
+	// clear secret uuid as it's generated randomly
+	def.UUID = ""
+	dc.rec.Rec("DefineSecret", def)
+
+	s := newFakeSecret(dc, def.Usage.Name)
+	dc.secretsByUsageName[def.Usage.Name] = s
 	return s, nil
 }
 
 func (dc *FakeDomainConnection) LookupSecretByUUIDString(uuid string) (virt.VirtSecret, error) {
-	if d, found := dc.secretsByUuid[uuid]; found {
+	return nil, virt.ErrSecretNotFound
+}
+
+func (dc *FakeDomainConnection) LookupSecretByUsageName(usageType string, usageName string) (virt.VirtSecret, error) {
+	if d, found := dc.secretsByUsageName[usageName]; found {
 		return d, nil
 	}
 	return nil, virt.ErrSecretNotFound
@@ -238,16 +248,16 @@ func (d *FakeDomain) UUIDString() (string, error) {
 }
 
 type FakeSecret struct {
-	rec  Recorder
-	dc   *FakeDomainConnection
-	uuid string
+	rec       Recorder
+	dc        *FakeDomainConnection
+	usageName string
 }
 
-func newFakeSecret(dc *FakeDomainConnection, uuid string) *FakeSecret {
+func newFakeSecret(dc *FakeDomainConnection, usageName string) *FakeSecret {
 	return &FakeSecret{
-		rec:  NewChildRecorder(dc.rec, "secret "+uuid),
-		dc:   dc,
-		uuid: uuid,
+		rec:       NewChildRecorder(dc.rec, "secret "+usageName),
+		dc:        dc,
+		usageName: usageName,
 	}
 }
 
