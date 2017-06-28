@@ -16,14 +16,14 @@ image name / pod id / container id prefixes.
 
 Let's say CRI proxy is started as follows:
 ```
-/usr/local/bin/criproxy -v 3 -alsologtostderr -connect docker,virtlet:/var/run/virtlet.sock
+/usr/local/bin/criproxy -v 3 -alsologtostderr -connect docker,virtlet:/run/virtlet.sock
 ```
 
 `-v 3 -alsologtostderr` options here may be quite useful for
 debugging, because they make CRI proxy log detailed info about every
 CRI request going through it, including any errors and the result.
 
-`-connect docker,virtlet:/var/run/virtlet.sock` specifies the list of
+`-connect docker,virtlet:/run/virtlet.sock` specifies the list of
 runtimes that the proxy passes requests to.
 
 The `docker` part is a special case, meaning that `criproxy` must
@@ -31,11 +31,11 @@ start in-process `docker-shim` and use it as the primary (prefixless)
 runtime.  It's also possible to specify other primary runtime instead,
 e.g. `/run/some-other-runtime.sock`.
 
-`virtlet:/var/run/virtlet.sock` denotes an alternative runtime
+`virtlet:/run/virtlet.sock` denotes an alternative runtime
 socket. This means that image service requests that include image
 names starting with `virtlet/` must be directed to the CRI
 implementation listening on a Unix domain socket at
-`/var/run/virtlet.sock`. Pods that need to run on `virtlet` runtime must
+`/run/virtlet.sock`. Pods that need to run on `virtlet` runtime must
 have `virtlet` as the value of `kubernetes.io/target-runtime`
 annotation.
 

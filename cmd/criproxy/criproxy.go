@@ -34,7 +34,7 @@ const (
 
 var (
 	listen = flag.String("listen", "/run/criproxy.sock",
-		"The unix socket to listen on, e.g. /var/run/virtlet.sock")
+		"The unix socket to listen on, e.g. /run/virtlet.sock")
 	connect = flag.String("connect", "/var/run/dockershim.sock",
 		"CRI runtime ids and unix socket(s) to connect to, e.g. /var/run/dockershim.sock,alt:/var/run/another.sock")
 	kubeletConfigPath = flag.String("kubeletcfg", "/etc/criproxy/kubelet.conf", "path to saved kubelet config file")
@@ -102,7 +102,7 @@ func installCriProxy(execPath, savedConfigPath string) error {
 			"3",
 			"-alsologtostderr",
 			"-connect",
-			"docker,virtlet:/var/run/virtlet.sock",
+			"docker,virtlet:/run/virtlet.sock",
 		},
 		ProxySocketPath: "/run/criproxy.sock",
 	}, nil)
