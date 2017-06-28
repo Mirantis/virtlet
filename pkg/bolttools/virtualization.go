@@ -40,7 +40,7 @@ func (b *BoltClient) EnsureVirtualizationSchema() error {
 	return err
 }
 
-func (b *BoltClient) SetContainer(name, containerId, sandboxId, image, rootImageVolumeName string, labels, annotations map[string]string, nocloudFile string, attempt uint32, clock clockwork.Clock) error {
+func (b *BoltClient) SetContainer(name, containerId, sandboxId, image, rootImageVolumeName string, labels, annotations map[string]string, attempt uint32, clock clockwork.Clock) error {
 	strLabels, err := json.Marshal(labels)
 	if err != nil {
 		return err
@@ -113,9 +113,6 @@ func (b *BoltClient) SetContainer(name, containerId, sandboxId, image, rootImage
 			return err
 		}
 
-		if err := bucket.Put([]byte("nocloudFile"), []byte(nocloudFile)); err != nil {
-			return err
-		}
 		return nil
 	})
 
@@ -279,11 +276,6 @@ func (b *BoltClient) GetContainerInfo(containerId string) (*metadata.ContainerIn
 			attempt = 0
 		}
 
-		nocloudFile, err := getString(bucket, "nocloudFile")
-		if err != nil {
-			return err
-		}
-
 		byteState, err := get(bucket, []byte("state"))
 		if err != nil {
 			return err
@@ -300,7 +292,6 @@ func (b *BoltClient) GetContainerInfo(containerId string) (*metadata.ContainerIn
 			SandBoxAnnotations:  sandBoxAnnotations,
 			Annotations:         annotations,
 			Attempt:             uint32(attempt),
-			NocloudFile:         nocloudFile,
 			State:               kubeapi.ContainerState(byteState[0]),
 		}
 

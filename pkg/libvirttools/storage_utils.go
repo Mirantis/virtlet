@@ -27,7 +27,7 @@ import (
 
 var supportedStoragePools = map[string]string{
 	"default": "/var/lib/libvirt/images",
-	"volumes": "/var/lib/virtlet",
+	"volumes": "/var/lib/virtlet/volumes",
 }
 
 func ensureStoragePool(conn virt.VirtStorageConnection, name string) (virt.VirtStoragePool, error) {

@@ -50,10 +50,6 @@ func TestSetGetContainerInfo(t *testing.T) {
 		if !reflect.DeepEqual(containerInfo.Annotations, container.Annotations) {
 			t.Errorf("Expected %v, instead got %v", container.Annotations, containerInfo.Annotations)
 		}
-
-		if containerInfo.NocloudFile != "/tmp/nocloud.iso" {
-			t.Errorf("Bad nocloud file: %q", containerInfo.NocloudFile)
-		}
 	}
 }
 

@@ -45,7 +45,7 @@ func TestCloudInitNoCloud(t *testing.T) {
 
 	ct.verifyContainerState(container.ContainerId, container.Name, kubeapi.ContainerState_CONTAINER_RUNNING)
 
-	isoPath := runShellCommand(t, "virsh domblklist $(virsh list --name)|grep -o '/.*nocloud-iso[^ ]*'")
+	isoPath := runShellCommand(t, `virsh domblklist $(virsh list --name)|grep -o '/.*nocloud-.*\.iso[^ ]*'`)
 	files, err := testutils.IsoToMap(isoPath)
 	if err != nil {
 		t.Fatalf("isoToMap() on %q: %v", isoPath, err)

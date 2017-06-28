@@ -4,6 +4,13 @@ set -o nounset
 set -o pipefail
 set -o errtrace
 
+novirtlet=
+if [[ ${1:-} != -novirtlet ]]; then
+  novirtlet=1
+fi
+
+mkdir -p /var/lib/virtlet/volumes
+
 if [[ -f /dind/virtlet ]]; then
   ln -fs /dind/virtlet /usr/local/bin/virtlet
 fi
@@ -44,17 +51,10 @@ if [[ -e /var/lib/libvirt/qemu ]]; then
   mv /var/lib/libvirt/qemu.ok /var/lib/libvirt/qemu
 fi
 
-# leftover socket prevents libvirt from initializing correctly
-rm -f /var/lib/libvirt/qemu/capabilities.monitor.sock
-
-if [[ ${LIBVIRT_CLEANUP:-} ]]; then
-  /usr/sbin/libvirtd -d
-  /cleanup.py
-  kill -9 $(cat /var/run/libvirtd.pid)
+if [[ ${novirtlet} ]]; then
+  # leftover socket prevents libvirt from initializing correctly
+  rm -f /var/lib/libvirt/qemu/capabilities.monitor.sock
 fi
-
-# leftover socket prevents libvirt from initializing correctly
-rm -f /var/lib/libvirt/qemu/capabilities.monitor.sock
 
 if [[ ! ${VIRTLET_DISABLE_KVM:-} ]]; then
   chown root:kvm /dev/kvm
@@ -75,7 +75,7 @@ fi
 
 PROTOCOL="${VIRTLET_DOWNLOAD_PROTOCOL:-https}"
 
-if [[ ${1:-} != -novirtlet ]]; then
+if [[ ${novirtlet} ]]; then
     FLEXVOLUME_DIR=/usr/libexec/kubernetes/kubelet-plugins/volume/exec
     if [ ! -d ${FLEXVOLUME_DIR}/virtlet~flexvolume_driver ]; then
       mkdir ${FLEXVOLUME_DIR}/virtlet~flexvolume_driver

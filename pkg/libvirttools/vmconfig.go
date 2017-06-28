@@ -68,14 +68,6 @@ type VMConfig struct {
 	// Host directories corresponding to the volumes which are to
 	// be mounted inside the VM
 	Mounts []*VMMount
-	// A temporary file or directory associated with this domain.
-	// Currently used by nocloudVolume
-	// TODO: this field should be moved to VMStatus.
-	// Better, there should be a directory associated with each domain
-	// storing its metadata as json file and also containing nocloud
-	// iso image. This directory should be removed together with the
-	// domain
-	TempFile string
 }
 
 // LoadAnnotations parses pod annotations in the VM config an

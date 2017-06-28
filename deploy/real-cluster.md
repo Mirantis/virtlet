@@ -81,7 +81,7 @@ the following content (you can also use `systemctl --force edit criproxy.service
 Description=CRI Proxy
 
 [Service]
-ExecStart=/usr/local/bin/criproxy -v 3 -alsologtostderr -connect docker,virtlet:/run/virtlet.sock -kubeletcfg /etc/criproxy/kubelet.conf -listen /run/criproxy.sock
+ExecStart=/usr/local/bin/criproxy -v 3 -alsologtostderr -connect docker,virtlet:/var/run/virtlet.sock -kubeletcfg /etc/criproxy/kubelet.conf -listen /run/criproxy.sock
 Restart=always
 StartLimitInterval=0
 RestartSec=10

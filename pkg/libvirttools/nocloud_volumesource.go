@@ -23,6 +23,11 @@ import (
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 )
 
+const (
+	// FIXME: make this configurable
+	nocloudIsoDir = "/var/lib/virtlet/nocloud"
+)
+
 // nocloudVolume denotes an ISO image using nocloud format
 // that contains cloud-init meta-data nad user-data
 type nocloudVolume struct {
@@ -40,22 +45,19 @@ func GetNocloudVolume(config *VMConfig, owner VolumeOwner) ([]VMVolume, error) {
 func (v *nocloudVolume) Uuid() string { return "" }
 
 func (v *nocloudVolume) Setup(volumeMap map[string]string) (*libvirtxml.DomainDisk, error) {
-	g := NewCloudInitGenerator(v.config, volumeMap)
-	isoPath, nocloudDiskDef, err := g.GenerateDisk()
+	g := NewCloudInitGenerator(v.config, volumeMap, nocloudIsoDir)
+	nocloudDiskDef, err := g.GenerateDisk()
 	if err != nil {
 		return nil, err
 	}
-	v.config.TempFile = isoPath
 	return nocloudDiskDef, nil
 }
 
 func (v *nocloudVolume) Teardown() error {
-	if v.config.TempFile == "" {
-		return nil
-	}
+	isoPath := NewCloudInitGenerator(v.config, nil, nocloudIsoDir).IsoPath()
 	// don't fail to remove the pod if the file cannot be removed, just warn
-	if err := os.Remove(v.config.TempFile); err != nil {
-		glog.Warning("Cannot remove temporary nocloud file %q: %v", v.config.TempFile, err)
+	if err := os.Remove(isoPath); err != nil {
+		glog.Warning("Cannot remove temporary nocloud file %q: %v", isoPath, err)
 	}
 	return nil
 }

@@ -11,7 +11,7 @@ RUN apt-get update && \
                        netbase iproute2 iptables ebtables && \
     apt-get clean
 
-RUN mkdir -p /var/data/virtlet /var/lib/virtlet /opt/cni/bin && \
+RUN mkdir -p /var/lib/virtlet/volumes /opt/cni/bin && \
     curl -L https://github.com/containernetworking/cni/releases/download/v0.3.0/cni-v0.3.0.tgz | \
       tar zxC /opt/cni/bin
 

@@ -285,7 +285,9 @@ func TestCloudInitGenerator(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			g := NewCloudInitGenerator(tc.config, tc.volumeMap)
+			// we're not invoking actual iso generation here so "/foobar"
+			// as isoDir will do
+			g := NewCloudInitGenerator(tc.config, tc.volumeMap, "/foobar")
 
 			metaDataBytes, err := g.generateMetaData()
 			if err != nil {
@@ -325,12 +327,18 @@ func TestCloudInitGenerator(t *testing.T) {
 }
 
 func TestGenerateDisk(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", "nocloud-")
+	if err != nil {
+		t.Fatalf("Can't create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	g := NewCloudInitGenerator(&VMConfig{
 		PodName:           "foo",
 		PodNamespace:      "default",
 		ParsedAnnotations: &VirtletAnnotations{},
-	}, nil)
-	isoPath, diskDef, err := g.GenerateDisk()
+	}, nil, tmpDir)
+	diskDef, err := g.GenerateDisk()
 	if err != nil {
 		t.Fatalf("GenerateDisk(): %v", err)
 	}
@@ -338,12 +346,12 @@ func TestGenerateDisk(t *testing.T) {
 		Type:     "file",
 		Device:   "cdrom",
 		Driver:   &libvirtxml.DomainDiskDriver{Name: "qemu", Type: "raw"},
-		Source:   &libvirtxml.DomainDiskSource{File: isoPath},
+		Source:   &libvirtxml.DomainDiskSource{File: g.IsoPath()},
 		ReadOnly: &libvirtxml.DomainDiskReadOnly{},
 	}) {
 		t.Errorf("Bad disk definition:\n%s", spew.Sdump(diskDef))
 	}
-	m, err := testutils.IsoToMap(isoPath)
+	m, err := testutils.IsoToMap(g.IsoPath())
 	if err != nil {
 		t.Fatalf("IsoToMap(): %v", err)
 	}
