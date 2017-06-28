@@ -1035,7 +1035,7 @@ func (r *RuntimeProxy) clientForImage(image *runtimeapi.ImageSpec, noErrorIfNotC
 // (add apiClient.Name() or something)
 
 // TODO: tolerate runtime disconnection & enable the 'race' test on travis
-// dbox.go:185] ListPodSandbox failed: rpc error: code = 2 desc = "/var/run/virtlet.sock": rpc error: code = 14 desc = grpc: the connection is unavailable
-// GenericPLEG: Unable to retrieve pods: rpc error: code = 2 desc = "/var/run/virtlet.sock": rpc error: code = 14 desc = grpc: the connection is unavailable
+// dbox.go:185] ListPodSandbox failed: rpc error: code = 2 desc = "/run/virtlet.sock": rpc error: code = 14 desc = grpc: the connection is unavailable
+// GenericPLEG: Unable to retrieve pods: rpc error: code = 2 desc = "/run/virtlet.sock": rpc error: code = 14 desc = grpc: the connection is unavailable
 
 // https://github.com/grpc/grpc-go/blob/master/codes/codes.go
