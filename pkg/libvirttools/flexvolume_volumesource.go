@@ -42,6 +42,7 @@ func AddFlexvolumeSource(fvType string, source FlexvolumeSource) {
 func ScanFlexvolumes(config *VMConfig, owner VolumeOwner) ([]VMVolume, error) {
 	dir := filepath.Join(owner.KubeletRootDir(), config.PodSandboxId, flexvolumeSubdir)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		glog.V(2).Infof("No flexvolumes to process for %q with uuid %q", config.Name, config.DomainUUID)
 		return nil, nil
 	} else if err != nil {
 		return nil, err
@@ -80,6 +81,7 @@ func ScanFlexvolumes(config *VMConfig, owner VolumeOwner) ([]VMVolume, error) {
 		if err != nil {
 			return nil, err
 		}
+		glog.V(3).Infof("Found flexvolume: %s", string(content))
 		vols = append(vols, vol)
 	}
 	return vols, nil
