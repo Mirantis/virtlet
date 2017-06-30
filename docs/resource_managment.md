@@ -6,7 +6,7 @@ As Kubelet uses cAdvisor to collect metrics about running containers and Virtlet
 ### CPU cgroups facilities:
 1. `shares` - relative value of cpu time assigned, not recommended for using in production as it's hard to predict the actual performance which highly depends on the neighboring cgroups.
 1. `CFS CPU bandwidth control` - period and quota - hard limits.
-`Parent_Period/Quota >= Child_1_Period/Quota + .. + Child_N_Period/Quota`,
+`Parent_Period/Quota <= Child_1_Period/Quota + .. + Child_N_Period/Quota`,
 where `Child_N_Period/Quota <= Parent_Period/Quota`.
 
 ### K8s CPU allocation:
@@ -18,7 +18,7 @@ where `Child_N_Period/Quota <= Parent_Period/Quota`.
 ### Libvirt CPU allocation:
 1. `shares` is set per each vCPU.
 1. `period` and `quota` are set per each vCPU. As libvirt imposes limits per each vCPU thread, so actual `CPU quota` is `quota` value from the domain definition times the number of vCPUs. More details re reasons of libvirt per vCPU cgroup approach can be found at https://www.redhat.com/archives/libvir-list/2015-June/msg00923.html.
-1. `emulator_period` and `emulator_quota` denote the limits for emulator threads(those excluding vcpus). At the same time for unlimites domains benchmarks show that these activities may measure up to 40-80% of overall physical CPU usage by QEMU/KVM process running the guest VM.
+1. `emulator_period` and `emulator_quota` denote the limits for emulator threads(those excluding vcpus). At the same time for unlimited domains benchmarks show that these activities may measure up to 40-80% of overall physical CPU usage by QEMU/KVM process running the guest VM.
 1. vCPUs per VM - it's commonly recommended to have vCPU count set to 1 (see details in section **"CPU overcommit"** below).
 
 **Defaults:** In absence of explicitly set values each domain has 1024 shares set by default.
