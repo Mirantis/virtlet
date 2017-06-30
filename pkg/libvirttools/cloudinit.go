@@ -87,6 +87,7 @@ func (g *CloudInitGenerator) generateUserData() ([]byte, error) {
 	writeFilesManipulator := NewWriteFilesManipulator(userData, g.config.Mounts)
 	writeFilesManipulator.AddSecrets()
 	writeFilesManipulator.AddConfigMapEntries()
+	writeFilesManipulator.AddFileLikeMounts()
 
 	// TODO: use merge algorithm
 	g.addMounts(userData)
@@ -241,14 +242,52 @@ func NewWriteFilesManipulator(userData map[string]interface{}, mounts []*VMMount
 }
 
 func (m *WriteFilesManipulator) AddSecrets() {
-	m.addFilesFor("secret", "0600")
+	m.addFilesForVolumeType("secret", "0600")
 }
 
 func (m *WriteFilesManipulator) AddConfigMapEntries() {
-	m.addFilesFor("configmap", "0644")
+	m.addFilesForVolumeType("configmap", "0644")
 }
 
-func (m *WriteFilesManipulator) addFilesFor(suffix, permissions string) {
+func (m *WriteFilesManipulator) AddFileLikeMounts() {
+	m.processMounts(func(path string) bool {
+		fi, err := os.Stat(path)
+		switch {
+		case err != nil:
+			return false
+		case fi.Mode().IsRegular():
+			return true
+		}
+		return false
+	}, func(mount *VMMount) []interface{} {
+		content, err := ioutil.ReadFile(mount.HostPath)
+		if err != nil {
+			glog.Warningf("Error during reading content of '%s' file: %v", mount.HostPath, err)
+			return nil
+		}
+
+		glog.V(3).Infof("Adding file '%s' as volume: %s", mount.HostPath, mount.ContainerPath)
+		encodedContent := base64.StdEncoding.EncodeToString(content)
+		return []interface{}{map[string]interface{}{
+			"path":        mount.ContainerPath,
+			"content":     encodedContent,
+			"encoding":    "b64",
+			"permissions": "0644",
+		}}
+	})
+}
+
+func (m *WriteFilesManipulator) addFilesForVolumeType(suffix, permissions string) {
+	filter := "volumes/kubernetes.io~" + suffix + "/"
+
+	m.processMounts(func(path string) bool {
+		return strings.Contains(path, filter)
+	}, func(mount *VMMount) []interface{} {
+		return m.addFilesForMount(mount, permissions)
+	})
+}
+
+func (m *WriteFilesManipulator) processMounts(filter func(string) bool, generateEntries func(*VMMount) []interface{}) {
 	var oldWriteFiles []interface{}
 	oldWriteFilesRaw, _ := m.userData["write_files"]
 	if oldWriteFilesRaw != nil {
@@ -260,14 +299,12 @@ func (m *WriteFilesManipulator) addFilesFor(suffix, permissions string) {
 		}
 	}
 
-	filter := "volumes/kubernetes.io~" + suffix + "/"
-
 	var writeFiles []interface{}
 	for _, mount := range m.mounts {
-		if !strings.Contains(mount.HostPath, filter) {
+		if !filter(mount.HostPath) {
 			continue
 		}
-		entries := m.addFilesForMount(mount, permissions)
+		entries := generateEntries(mount)
 		writeFiles = append(writeFiles, entries...)
 	}
 	if writeFiles != nil {
