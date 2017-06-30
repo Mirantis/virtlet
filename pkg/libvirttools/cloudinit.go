@@ -87,6 +87,7 @@ func (g *CloudInitGenerator) generateUserData() ([]byte, error) {
 	writeFilesManipulator := NewWriteFilesManipulator(userData, g.config.Mounts)
 	writeFilesManipulator.AddSecrets()
 	writeFilesManipulator.AddConfigMapEntries()
+	writeFilesManipulator.AddFileLikeMounts()
 
 	// TODO: use merge algorithm
 	g.addMounts(userData)
@@ -248,7 +249,46 @@ func (m *WriteFilesManipulator) AddConfigMapEntries() {
 	m.addFilesFor("configmap", "0644")
 }
 
+func (m *WriteFilesManipulator) AddFileLikeMounts() {
+	m.mountsIterator(func(path string) bool {
+		fi, err := os.Stat(path)
+		switch {
+		case err != nil:
+			return false
+		case fi.Mode().IsRegular():
+			return true
+		}
+		return false
+	}, func(mount *VMMount) []interface{} {
+		content, err := ioutil.ReadFile(mount.HostPath)
+		if err != nil {
+			glog.Warningf("Error during reading content of '%s' file: %v", mount.HostPath, err)
+			return nil
+		}
+
+		glog.V(3).Infof("Adding file '%s' as volume: %s", mount.HostPath, mount.ContainerPath)
+		encodedContent := base64.StdEncoding.EncodeToString(content)
+		var entries []interface{}
+		return append(entries, map[string]interface{}{
+			"path":        mount.ContainerPath,
+			"content":     encodedContent,
+			"encoding":    "b64",
+			"permissions": "0644",
+		})
+	})
+}
+
 func (m *WriteFilesManipulator) addFilesFor(suffix, permissions string) {
+	filter := "volumes/kubernetes.io~" + suffix + "/"
+
+	m.mountsIterator(func(path string) bool {
+		return strings.Contains(path, filter)
+	}, func(mount *VMMount) []interface{} {
+		return m.addFilesForMount(mount, permissions)
+	})
+}
+
+func (m *WriteFilesManipulator) mountsIterator(filter func(string) bool, entriesPreparator func(*VMMount) []interface{}) {
 	var oldWriteFiles []interface{}
 	oldWriteFilesRaw, _ := m.userData["write_files"]
 	if oldWriteFilesRaw != nil {
@@ -260,14 +300,12 @@ func (m *WriteFilesManipulator) addFilesFor(suffix, permissions string) {
 		}
 	}
 
-	filter := "volumes/kubernetes.io~" + suffix + "/"
-
 	var writeFiles []interface{}
 	for _, mount := range m.mounts {
-		if !strings.Contains(mount.HostPath, filter) {
+		if !filter(mount.HostPath) {
 			continue
 		}
-		entries := m.addFilesForMount(mount, permissions)
+		entries := entriesPreparator(mount)
 		writeFiles = append(writeFiles, entries...)
 	}
 	if writeFiles != nil {
