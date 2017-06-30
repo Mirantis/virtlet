@@ -26,7 +26,7 @@ spec:
         # This memory limit is applied to the libvirt domain definition
         memory: 128Mi
   volumes:
-  - name: test
+  - name: test1
     flexVolume:
       driver: "virtlet/flexvolume_driver"
       options:
@@ -34,5 +34,15 @@ spec:
         monitor: @MON_IP@:6789
         user: libvirt
         secret: @SECRET@
-        volume: rbd-test-image
+        volume: rbd-test-image1
+        pool: libvirt-pool
+  - name: test2
+    flexVolume:
+      driver: "virtlet/flexvolume_driver"
+      options:
+        type: ceph
+        monitor: @MON_IP@:6789
+        user: libvirt
+        secret: @SECRET@
+        volume: rbd-test-image2
         pool: libvirt-pool

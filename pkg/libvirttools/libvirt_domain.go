@@ -111,6 +111,23 @@ func (dc *LibvirtDomainConnection) LookupSecretByUUIDString(uuid string) (virt.V
 	return &LibvirtSecret{secret}, nil
 }
 
+func (dc *LibvirtDomainConnection) LookupSecretByUsageName(usageType string, usageName string) (virt.VirtSecret, error) {
+
+	if usageType != "ceph" {
+		return nil, fmt.Errorf("unsupported type %q for secret with usage name: %q", usageType, usageName)
+	}
+
+	secret, err := dc.conn.LookupSecretByUsage(libvirt.SECRET_USAGE_TYPE_CEPH, usageName)
+	if err != nil {
+		libvirtErr, ok := err.(libvirt.Error)
+		if ok && libvirtErr.Code == libvirt.ERR_NO_SECRET {
+			return nil, virt.ErrSecretNotFound
+		}
+		return nil, err
+	}
+	return &LibvirtSecret{secret}, nil
+}
+
 type LibvirtDomain struct {
 	d *libvirt.Domain
 }

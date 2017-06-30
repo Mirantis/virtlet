@@ -45,6 +45,7 @@ type cephFlexvolumeOptions struct {
 // cephVolume denotes a Ceph RBD volume
 type cephVolume struct {
 	volumeBase
+	volumeName string
 	opts *cephFlexvolumeOptions
 }
 
@@ -55,6 +56,7 @@ func newCephVolume(volumeName, configPath string, config *VMConfig, owner Volume
 	if err := utils.ReadJson(configPath, &v.opts); err != nil {
 		return nil, fmt.Errorf("failed to parse ceph flexvolume config %q: %v", configPath, err)
 	}
+	v.volumeName = volumeName
 	// Remove the key from flexvolume options to limit exposure.
 	// The file itself will be needed to recreate cephVolume during the teardown,
 	// but we don't need secret content at that time anymore
@@ -66,16 +68,21 @@ func newCephVolume(volumeName, configPath string, config *VMConfig, owner Volume
 	return v, nil
 }
 
-func (v *cephVolume) secretUuid() string {
-	return utils.NewUuid5(ContainerNsUuid, v.config.PodSandboxId)
+func (v *cephVolume) secretUsageName() string {
+	return v.opts.User + "-" + utils.NewUuid5(ContainerNsUuid, v.config.PodSandboxId) + "-" + v.volumeName
 }
 
 func (v *cephVolume) secretDef() *libvirtxml.Secret {
 	return &libvirtxml.Secret{
 		Ephemeral: "no",
 		Private:   "no",
-		UUID:      v.secretUuid(),
-		Usage:     &libvirtxml.SecretUsage{Name: v.opts.User, Type: "ceph"},
+		// Both secret UUID and Usage name must be unique across all definitions
+		// As Usage name is a string and can be used to lookup secret
+		// it's more convenient to use it for manipulating secrets
+		// and preserve using UUIDv5 as part of value
+		// UUID value is generated randomly
+		UUID:      utils.NewUuid(),
+		Usage:     &libvirtxml.SecretUsage{Name: v.secretUsageName(), Type: "ceph"},
 	}
 }
 
@@ -84,16 +91,12 @@ func (v *cephVolume) Uuid() string {
 }
 
 func (v *cephVolume) Setup(volumeMap map[string]string) (*libvirtxml.DomainDisk, error) {
-	secretUuid := v.secretUuid()
-	secret, err := v.owner.DomainConnection().LookupSecretByUUIDString(secretUuid)
 	ipPortPair := strings.Split(v.opts.Monitor, ":")
 	if len(ipPortPair) != 2 {
 		return nil, fmt.Errorf("invalid format of ceph monitor setting: %s. Expected ip:port", v.opts.Monitor)
 	}
 
-	if err == virt.ErrSecretNotFound {
-		secret, err = v.owner.DomainConnection().DefineSecret(v.secretDef())
-	}
+	secret, err := v.owner.DomainConnection().DefineSecret(v.secretDef())
 	if err != nil {
 		return nil, fmt.Errorf("error defining ceph secret: %v", err)
 	}
@@ -104,7 +107,7 @@ func (v *cephVolume) Setup(volumeMap map[string]string) (*libvirtxml.DomainDisk,
 	}
 
 	if err := secret.SetValue([]byte(key)); err != nil {
-		return nil, fmt.Errorf("error setting value of secret %q: %v", secretUuid, err)
+		return nil, fmt.Errorf("error setting value of secret %q: %v", v.secretUsageName(), err)
 	}
 
 	return &libvirtxml.DomainDisk{
@@ -115,7 +118,7 @@ func (v *cephVolume) Setup(volumeMap map[string]string) (*libvirtxml.DomainDisk,
 			Username: v.opts.User,
 			Secret: &libvirtxml.DomainDiskSecret{
 				Type: "ceph",
-				UUID: secretUuid,
+				Usage: v.secretUsageName(),
 			},
 		},
 		Source: &libvirtxml.DomainDiskSource{
@@ -132,18 +135,18 @@ func (v *cephVolume) Setup(volumeMap map[string]string) (*libvirtxml.DomainDisk,
 }
 
 func (v *cephVolume) Teardown() error {
-	secret, err := v.owner.DomainConnection().LookupSecretByUUIDString(v.secretUuid())
+	secret, err := v.owner.DomainConnection().LookupSecretByUsageName("ceph", v.secretUsageName())
 	switch {
 	case err == virt.ErrSecretNotFound:
 		// ok, no need to delete the secret
-               glog.V(3).Infof("No secret with uuid %q for ceph volume was found", v.secretUuid())
+               glog.V(3).Infof("No secret with usage name %q for ceph volume was found", v.secretUsageName())
                return nil
 	case err == nil:
-               glog.V(3).Infof("Removing secret: %q", v.secretUuid())
+               glog.V(3).Infof("Removing secret with usage name: %q", v.secretUsageName())
 		err = secret.Remove()
 	}
 	if err != nil {
-		return fmt.Errorf("error deleting secret %q: %v", v.secretUuid(), err)
+		return fmt.Errorf("error deleting secret with usage name %q: %v", v.secretUsageName(), err)
 	}
 	return nil
 }
