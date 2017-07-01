@@ -1,42 +1,53 @@
 version: 2
 jobs:
   build:
-    # docker:
-    # - image: ubuntu:xenial
-    executorType: machine
+    docker:
+    - image: ubuntu:xenial
     working_directory: ~/virtlet
     steps:
     - checkout
-    # - setup_remote_docker
+    - setup_remote_docker
 
     - run:
         name: Ensure prerequisites
         command: |
-          sudo apt-get -qq update
-          sudo apt-get install -y libxml2-utils jq curl ca-certificates openssh-client rsync
-          sudo service apparmor stop
-          sudo service apparmor teardown
-          sudo update-rc.d -f apparmor remove
-          sudo apt-get remove -y apparmor
+          apt-get -qq update
+          apt-get install -y libxml2-utils jq curl ca-certificates openssh-client rsync socat wget
 
-    # - run:
-    #     name: Install Docker client
-    #     command: |
-    #       set -x
-    #       VER="17.03.0-ce"
-    #       curl -L -o /tmp/docker-$VER.tgz https://get.docker.com/builds/Linux/x86_64/docker-$VER.tgz
-    #       tar -xz -C /tmp -f /tmp/docker-$VER.tgz
-    #       mv /tmp/docker/* /usr/bin
+    - run:
+        name: Install Docker client
+        command: |
+          set -x
+          VER="17.03.0-ce"
+          curl -L -o /tmp/docker-$VER.tgz https://get.docker.com/builds/Linux/x86_64/docker-$VER.tgz
+          tar -xz -C /tmp -f /tmp/docker-$VER.tgz
+          mv /tmp/docker/* /usr/bin
+
+    - run:
+        name: Disable apparmor on the remote docker VM
+        # TODO: use smaller image for nsenter.
+        # Or, even better, learn to live with apparmor
+        command: |
+          docker run --rm --pid=host -it --privileged ubuntu:xenial \
+            nsenter -t 1 -m -u -i -n /bin/bash -c \
+            "service apparmor stop && service apparmor teardown && update-rc.d -f apparmor remove && apt-get remove -y apparmor"
+
+    - run:
+        name: Start port forwarder
+        command: |
+          build/portforward.sh start
 
     - run:
         name: Build virtlet
         command: |
+          build/portforward.sh 18730&
           build/cmd.sh build
           build/cmd.sh copy
 
     - run:
         name: Run tests
         command: |
+          build/portforward.sh 18730&
           build/cmd.sh test
 
     - run:
@@ -47,9 +58,11 @@ jobs:
     - run:
         name: Start the demo
         command: |
+          build/portforward.sh 8080&
           NONINTERACTIVE=1 NO_VM_CONSOLE=1 INJECT_LOCAL_IMAGE=1 BASE_LOCATION="$PWD" deploy/demo.sh
 
     - run:
         name: Run e2e tests
         command: |
+          build/portforward.sh 8080&
           tests/e2e/e2e.sh
