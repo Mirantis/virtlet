@@ -93,6 +93,11 @@ function ensure_build_container {
                -v /boot:/boot:ro \
                -v /var/run/docker.sock:/var/run/docker.sock \
                -e TRAVIS="${TRAVIS:-}" \
+               -e TRAVIS_PULL_REQUEST="${TRAVIS_PULL_REQUEST:-}" \
+               -e TRAVIS_BRANCH="${TRAVIS_BRANCH:-}" \
+               -e CIRCLECI="${CIRCLECI:-}" \
+               -e CIRCLE_PULL_REQUEST="${CIRCLE_PULL_REQUEST:-}" \
+               -e CIRCLE_BRANCH="${CIRCLE_PULL_REQUEST:-}" \
                -e CRIPROXY_TEST_REMOTE_DOCKER_ENDPOINT="${CRIPROXY_TEST_REMOTE_DOCKER_ENDPOINT:-}" \
                -p "${VIRTLET_RSYNC_PORT}:8730" \
                --name virtlet-build \
