@@ -50,7 +50,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
 type clientState int
@@ -846,6 +846,36 @@ func (r *RuntimeProxy) Status(ctx context.Context, in *runtimeapi.StatusRequest)
 	return resp, nil
 }
 
+func (r *RuntimeProxy) ContainerStats(ctx context.Context, in *runtimeapi.ContainerStatsRequest) (*runtimeapi.ContainerStatsResponse, error) {
+	glog.V(3).Infof("ENTER: ContainerStats()", spew.Sdump(in))
+	client, err := r.primaryClient()
+	if err != nil {
+		glog.V(2).Infof("FAIL: ContainerStats(): %v", err)
+		return nil, err
+	}
+	resp, err := client.ContainerStats(ctx, in)
+	if err != nil {
+		glog.V(2).Infof("FAIL: ContainerStats(): %v", err)
+		return nil, err
+	}
+	return resp, err
+}
+
+func (r *RuntimeProxy) ListContainerStats(ctx context.Context, in *runtimeapi.ListContainerStatsRequest) (*runtimeapi.ListContainerStatsResponse, error) {
+	glog.V(3).Infof("ENTER: ListContainerStats()", spew.Sdump(in))
+	client, err := r.primaryClient()
+	if err != nil {
+		glog.V(2).Infof("FAIL: ListContainerStats(): %v", err)
+		return nil, err
+	}
+	resp, err := client.ListContainerStats(ctx, in)
+	if err != nil {
+		glog.V(2).Infof("FAIL: ListContainerStats(): %v", err)
+		return nil, err
+	}
+	return resp, err
+}
+
 // ImageServiceServer methods follow
 
 // ListImages lists available images.
@@ -966,6 +996,22 @@ func (r *RuntimeProxy) RemoveImage(ctx context.Context, in *runtimeapi.RemoveIma
 
 	glog.V(3).Infof("LEAVE: RemoveImage() [%s]: %s", client.id, spew.Sdump(resp))
 	return resp, nil
+}
+
+// TODO: merge infos, test
+func (r *RuntimeProxy) ImageFsInfo(ctx context.Context, in *runtimeapi.ImageFsInfoRequest) (*runtimeapi.ImageFsInfoResponse, error) {
+	glog.V(3).Infof("ENTER: ImageFsInfo()", spew.Sdump(in))
+	client, err := r.primaryClient()
+	if err != nil {
+		glog.V(2).Infof("FAIL: ImageFsInfo(): %v", err)
+		return nil, err
+	}
+	resp, err := client.ImageFsInfo(ctx, in)
+	if err != nil {
+		glog.V(2).Infof("FAIL: ImageFsInfo(): %v", err)
+		return nil, err
+	}
+	return resp, err
 }
 
 func (r *RuntimeProxy) primaryClient() (*apiClient, error) {

@@ -19,7 +19,7 @@ package libvirttools
 import (
 	"errors"
 
-	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
 // TODO: this file should be moved to 'pkg/manager' at some point

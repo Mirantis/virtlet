@@ -26,6 +26,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/containernetworking/cni/pkg/types/current"
 	"github.com/golang/glog"
 	"go.universe.tf/netboot/dhcp4"
 )
@@ -146,8 +147,15 @@ func (s *Server) prepareResponse(pkt *dhcp4.Packet, serverIP net.IP, mt dhcp4.Me
 		return nil, fmt.Errorf("unexpected packet from %v", pkt.HardwareAddr)
 	}
 
-	if s.config.CNIResult.IP4 == nil {
-		return nil, fmt.Errorf("IP4 is not specified in CNI config")
+	var cfg *current.IPConfig
+	for _, curCfg := range s.config.CNIResult.IPs {
+		if curCfg.Version == "4" {
+			cfg = curCfg
+		}
+	}
+
+	if cfg == nil {
+		return nil, fmt.Errorf("IPv4 config is not specified in CNI config")
 	}
 
 	p := &dhcp4.Packet{
@@ -166,8 +174,8 @@ func (s *Server) prepareResponse(pkt *dhcp4.Packet, serverIP net.IP, mt dhcp4.Me
 		p.Options[97] = pkt.Options[97]
 	}
 
-	p.YourAddr = s.config.CNIResult.IP4.IP.IP
-	p.Options[dhcp4.OptSubnetMask] = s.config.CNIResult.IP4.IP.Mask
+	p.YourAddr = cfg.Address.IP
+	p.Options[dhcp4.OptSubnetMask] = cfg.Address.Mask
 
 	router, routeData, err := s.getStaticRoutes()
 	if err != nil {
@@ -228,20 +236,27 @@ func (s *Server) ackDHCP(pkt *dhcp4.Packet, serverIP net.IP) (*dhcp4.Packet, err
 }
 
 func (s *Server) getStaticRoutes() (router, routes []byte, err error) {
-	if len(s.config.CNIResult.IP4.Routes) == 0 {
+	if len(s.config.CNIResult.Routes) == 0 {
 		return nil, nil, nil
 	}
 
 	var b bytes.Buffer
-	for _, route := range s.config.CNIResult.IP4.Routes {
+	for _, route := range s.config.CNIResult.Routes {
 		if route.Dst.IP == nil {
 			return nil, nil, fmt.Errorf("invalid route: %#v", route)
 		}
 		dstIP := route.Dst.IP.To4()
 		gw := route.GW
 		if gw == nil {
-			gw = s.config.CNIResult.IP4.Gateway.To4()
-			if gw == nil && s.config.CNIResult.IP4.Gateway != nil {
+			// FIXME: this should not be really needed for newer CNI
+			var cfg *current.IPConfig
+			for _, curCfg := range s.config.CNIResult.IPs {
+				if curCfg.Version == "4" {
+					cfg = curCfg
+				}
+			}
+			gw = cfg.Gateway.To4()
+			if gw == nil && cfg.Gateway != nil {
 				return nil, nil, fmt.Errorf("unexpected IPv6 gateway address: %#v", gw)
 			}
 		} else {

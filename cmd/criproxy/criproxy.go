@@ -37,48 +37,14 @@ var (
 		"The unix socket to listen on, e.g. /run/virtlet.sock")
 	connect = flag.String("connect", "/var/run/dockershim.sock",
 		"CRI runtime ids and unix socket(s) to connect to, e.g. /var/run/dockershim.sock,alt:/var/run/another.sock")
+	// TODO: rm
 	kubeletConfigPath = flag.String("kubeletcfg", "/etc/criproxy/kubelet.conf", "path to saved kubelet config file")
 	apiServerHost     = flag.String("apiserver", "", "apiserver URL")
 )
 
 func runCriProxy(connect, listen, savedConfigPath string) error {
 	addrs := strings.Split(connect, ",")
-	dockerStarted := false
-
-	kubeCfg, err := criproxy.LoadKubeletConfig(savedConfigPath)
-	if err != nil {
-		return err
-	}
-
-	for n, addr := range addrs {
-		if addr != "docker" {
-			continue
-		}
-		if dockerStarted {
-			return fmt.Errorf("More than one 'docker' endpoint is specified")
-		}
-
-		dockerEndpoint, err := criproxy.StartDockerShim(kubeCfg)
-		if err != nil {
-			return fmt.Errorf("Failed to start docker-shim: %v", err)
-		}
-		addrs[n] = dockerEndpoint
-		dockerStarted = true
-	}
-
-	cleanupDone := false
-	proxy, err := criproxy.NewRuntimeProxy(addrs, connectionTimeout, func() {
-		if cleanupDone {
-			return
-		}
-		// Perform the cleanup only when we're completely sure that kubelet
-		// with proper runtime is active. Otherwise the old containers may
-		// get recreated.
-		if err := criproxy.RemoveContainersFromDefaultDockerRuntime(kubeCfg); err != nil {
-			glog.Errorf("Container cleanup error: %v", err)
-		}
-		cleanupDone = true
-	})
+	proxy, err := criproxy.NewRuntimeProxy(addrs, connectionTimeout, nil)
 	if err != nil {
 		return fmt.Errorf("Error starting CRI proxy: %v", err)
 	}

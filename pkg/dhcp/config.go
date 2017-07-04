@@ -20,11 +20,11 @@ package dhcp
 import (
 	"net"
 
-	"github.com/containernetworking/cni/pkg/types"
+	"github.com/containernetworking/cni/pkg/types/current"
 )
 
 type Config struct {
 	// TODO: don't use CNI result type here
-	CNIResult           types.Result
+	CNIResult           current.Result
 	PeerHardwareAddress net.HardwareAddr
 }

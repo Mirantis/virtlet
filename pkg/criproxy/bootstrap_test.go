@@ -26,7 +26,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path"
 	"reflect"
 	"strings"
 	"testing"
@@ -44,7 +43,6 @@ import (
 	k8sapi "k8s.io/kubernetes/pkg/api"
 	// testapi is needed to get default values in kubelet config
 	_ "k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 
 	cfg "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 )
@@ -86,16 +84,12 @@ func mustMarshalJson(data interface{}) []byte {
 func TestPatchKubeletConfig(t *testing.T) {
 	var kubeCfg cfg.KubeletConfiguration
 	k8sapi.Scheme.Default(&kubeCfg)
-	kubeCfg.CNIConfDir = "/etc/kubernetes/cni/net.d"
-	kubeCfg.CNIBinDir = "/usr/lib/kubernetes/cni/bin"
 
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var v interface{}
 		switch r.URL.Path {
 		case "/configz":
 			v = map[string]interface{}{"componentconfig": &kubeCfg}
-		case "/stats/summary":
-			v = &stats.Summary{Node: stats.NodeStats{NodeName: "samplenode"}}
 		default:
 			http.NotFound(w, r)
 			return
@@ -110,31 +104,17 @@ func TestPatchKubeletConfig(t *testing.T) {
 		t.Fatalf("TempDir(): %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	confFileName := path.Join(tmpDir, "kubelet.conf")
 
 	b := NewBootstrap(&BootstrapConfig{
-		ConfigzBaseUrl:  s.URL,
-		StatsBaseUrl:    s.URL,
-		SavedConfigPath: confFileName,
+		ConfigzBaseUrl: s.URL,
+		NodeInfo: &NodeInfo{
+			NodeName:       "samplenode",
+			DockerEndpoint: "unix:///var/run/docker.sock",
+		},
 	}, tc)
-
-	if needToPatch, err := b.needToPatch(); err != nil {
-		t.Errorf("needToPatch(): %v", err)
-	} else if !needToPatch {
-		t.Errorf("needToPatch() reports no need to patch for unpatched config")
-	}
 
 	if err := b.obtainKubeletConfig(); err != nil {
 		t.Fatalf("obtainKubeletConfig(): %v", err)
-	}
-
-	if err := b.saveKubeletConfig(); err != nil {
-		t.Fatalf("saveKubeletConfig(): %v", err)
-	}
-
-	savedCfg, err := LoadKubeletConfig(confFileName)
-	if err != nil {
-		t.Fatalf("loadKubeletConfig: %v", err)
 	}
 
 	if b.kubeletReadyAfterPatch() {
@@ -145,16 +125,6 @@ func TestPatchKubeletConfig(t *testing.T) {
 		t.Fatalf("patchKubeletConfig(): %v", err)
 	}
 
-	if string(mustMarshalJson(savedCfg)) != string(mustMarshalJson(kubeCfg)) {
-		t.Fatalf("bad saved kubelet config: %s", spew.Sdump(savedCfg))
-	}
-
-	if dockerEndpoint, err := b.dockerEndpoint(); err != nil {
-		t.Errorf("dockerEndpoint(): %v", err)
-	} else if dockerEndpoint != "unix:///var/run/docker.sock" {
-		t.Errorf("unexpected dockerEndpoint: %q", dockerEndpoint)
-	}
-
 	actions := tc.Fake.Actions()
 	if len(actions) != 1 || actions[0].GetNamespace() != "kube-system" || actions[0].GetVerb() != "create" {
 		t.Fatalf("invalid clientset actions: %s", spew.Sdump(actions))
@@ -162,7 +132,7 @@ func TestPatchKubeletConfig(t *testing.T) {
 	o := actions[0].(testingcore.CreateAction).GetObject()
 	cfgMap, ok := o.(*v1.ConfigMap)
 	if !ok || cfgMap.Name != "kubelet-samplenode" || cfgMap.Namespace != "kube-system" || cfgMap.Data["kubelet.config"] == "" {
-		t.Fatalf("invalid object created: %s", spew.Sdump(o))
+		t.Fatalf("invalid object created [ok: %v]: %s", ok, spew.Sdump(o))
 	}
 
 	var newKubeCfg cfg.KubeletConfiguration
@@ -188,12 +158,6 @@ func TestPatchKubeletConfig(t *testing.T) {
 			t.Fatalf("can't marshal struct diff: %v", err)
 		}
 		t.Errorf("bad kubelet config diff:\n%#v\n--vs--\n%#v", m, mExp)
-	}
-
-	if needToPatch, err := b.needToPatch(); err != nil {
-		t.Errorf("needToPatch(): %v", err)
-	} else if needToPatch {
-		t.Errorf("needToPatch() reports the need to patch for the patched config")
 	}
 
 	kubeCfg = newKubeCfg

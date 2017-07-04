@@ -26,31 +26,42 @@ import (
 
 	"github.com/containernetworking/cni/pkg/ns"
 	"github.com/containernetworking/cni/pkg/types"
+	"github.com/containernetworking/cni/pkg/types/current"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/vishvananda/netlink"
 )
 
-var expectedExtractedLinkInfo = types.Result{
-	IP4: &types.IPConfig{
-		IP: net.IPNet{
-			IP:   net.IP{10, 1, 90, 5},
-			Mask: net.IPMask{255, 255, 255, 0},
+const (
+	innerHwAddr = "42:a4:a6:22:80:2e"
+	outerHwAddr = "42:b5:b7:33:91:3f"
+)
+
+var expectedExtractedLinkInfo = current.Result{
+	Interfaces: []*current.Interface{
+		{
+			Name: "eth0",
+			Mac:  innerHwAddr,
+			// TODO: Sandbox
 		},
-		Gateway: net.IP{169, 254, 1, 1},
-		Routes: []types.Route{
-			{
-				Dst: net.IPNet{
-					IP:   net.IP{0, 0, 0, 0},
-					Mask: net.IPMask{0, 0, 0, 0},
-				},
+	},
+	IPs: []*current.IPConfig{
+		{
+			Version:   "4",
+			Interface: 0,
+			Address: net.IPNet{
+				IP:   net.IP{10, 1, 90, 5},
+				Mask: net.IPMask{255, 255, 255, 0},
 			},
-			{
-				Dst: net.IPNet{
-					IP:   net.IP{169, 254, 1, 1},
-					Mask: net.IPMask{255, 255, 255, 255},
-				},
-				GW: nil,
+			Gateway: net.IP{10, 1, 90, 1},
+		},
+	},
+	Routes: []*types.Route{
+		{
+			Dst: net.IPNet{
+				IP:   net.IP{0, 0, 0, 0},
+				Mask: net.IPMask{0, 0, 0, 0},
 			},
+			GW: net.IP{10, 1, 90, 1},
 		},
 	},
 }
@@ -81,7 +92,7 @@ func inNS(netNS ns.NetNS, name string, toRun func()) {
 	var r interface{}
 	if err := netNS.Do(func(ns.NetNS) error {
 		defer func() {
-			r = recover()
+			//r = recover()
 		}()
 		toRun()
 		return nil
@@ -233,11 +244,35 @@ func withFakeCNIVeth(t *testing.T, toRun func(hostNS, contNS ns.NetNS, origHostV
 		// need to force hostNS here because of side effects of NetNS.Do()
 		// See https://github.com/vishvananda/netns/issues/17
 		inNS(hostNS, "hostNS", func() {
+			hwAddr, err := net.ParseMAC(outerHwAddr)
+			if err != nil {
+				log.Panicf("Error parsing hwaddr %q: %v", hwAddr, err)
+			}
+			err = setHardwareAddr(origHostVeth, hwAddr)
+
+			// re-query attrs (including new mac)
+			origHostVeth, err = netlink.LinkByName(origHostVeth.Attrs().Name)
+			if err != nil {
+				log.Panicf("cannot locate link: %s", origHostVeth.Attrs().Name)
+			}
+
 			if err = netlink.LinkSetUp(origHostVeth); err != nil {
 				log.Panicf("failed to bring up origHostVeth: %v", err)
 			}
 		})
 		inNS(contNS, "contNS", func() {
+			hwAddr, err := net.ParseMAC(innerHwAddr)
+			if err != nil {
+				log.Panicf("Error parsing hwaddr %q: %v", hwAddr, err)
+			}
+			err = setHardwareAddr(origContVeth, hwAddr)
+
+			// re-query attrs (including new mac)
+			origContVeth, err = netlink.LinkByName(origContVeth.Attrs().Name)
+			if err != nil {
+				log.Panicf("cannot locate link: %s", origContVeth.Attrs().Name)
+			}
+
 			if err = netlink.LinkSetUp(origContVeth); err != nil {
 				log.Panicf("failed to bring up origContVeth: %v", err)
 			}
@@ -245,12 +280,7 @@ func withFakeCNIVeth(t *testing.T, toRun func(hostNS, contNS ns.NetNS, origHostV
 				log.Panicf("failed to add addr for origContVeth: %v", err)
 			}
 
-			gwAddr := parseAddr("169.254.1.1/32")
-			addTestRoute(t, &netlink.Route{
-				LinkIndex: origContVeth.Attrs().Index,
-				Dst:       gwAddr.IPNet,
-				Scope:     netlink.SCOPE_LINK,
-			})
+			gwAddr := parseAddr("10.1.90.1/24")
 
 			addTestRoute(t, &netlink.Route{
 				LinkIndex: origContVeth.Attrs().Index,
@@ -312,7 +342,7 @@ func TestExtractLinkInfo(t *testing.T) {
 	})
 }
 
-func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, info *types.Result) {
+func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, info *current.Result) {
 	origHwAddr := origContVeth.Attrs().HardwareAddr
 	csn, err := SetupContainerSideNetwork(info)
 	if err != nil {
@@ -403,7 +433,7 @@ func verifyNoLinks(t *testing.T, linkNames []string) {
 	}
 }
 
-func verifyVethHaveConfiguration(t *testing.T, info *types.Result) {
+func verifyVethHaveConfiguration(t *testing.T, info *current.Result) {
 	contVeth, err := FindVeth()
 	if err != nil {
 		log.Panicf("FindVeth() failed: %v", err)
@@ -417,11 +447,11 @@ func verifyVethHaveConfiguration(t *testing.T, info *types.Result) {
 	if len(addrList) != 1 {
 		t.Errorf("veth should have single address but have: %d", len(addrList))
 	}
-	if !addrList[0].IP.Equal(info.IP4.IP.IP) {
-		t.Errorf("veth has ip %s wherever expected is %s", addrList[0].IP.String(), info.IP4.IP.IP.String())
+	if !addrList[0].IP.Equal(info.IPs[0].Address.IP) {
+		t.Errorf("veth has ip %s wherever expected is %s", addrList[0].IP.String(), info.IPs[0].Address.IP.String())
 	}
 	addrMaskSize := addrList[0].Mask.String()
-	desiredMaskSize := info.IP4.IP.Mask.String()
+	desiredMaskSize := info.IPs[0].Address.Mask.String()
 	if addrMaskSize != desiredMaskSize {
 		t.Errorf("veth has ipmask %s wherever expected is %s", addrMaskSize, desiredMaskSize)
 	}
@@ -432,14 +462,14 @@ func verifyVethHaveConfiguration(t *testing.T, info *types.Result) {
 	}
 
 	for _, route := range routeList {
-		if route.Dst != nil {
-			if route.Dst.String() == info.IP4.Routes[1].Dst.String() {
+		if route.Gw != nil {
+			if route.Gw.String() == info.Routes[0].GW.String() {
 				return
 			}
 		}
 	}
 
-	t.Errorf("not found desired route to: %s", info.IP4.Routes[1].Dst.String())
+	t.Errorf("not found desired route to: %s", info.Routes[0].GW.String())
 }
 
 func TestTeardownContainerSideNetwork(t *testing.T) {

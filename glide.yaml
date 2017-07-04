@@ -13,7 +13,7 @@ import:
   subpackages:
   - dhcp4
 - package: github.com/containernetworking/cni
-  version: 9d5e6e60e79491207834ae8439e80c943db65a69
+  version: v0.5.2
 - package: github.com/vishvananda/netlink
   version: 9dee363ad4abbc3c9a4a24a9f1e33363e224b111
 - package: github.com/pmezard/go-difflib
@@ -25,12 +25,11 @@ import:
 - package: github.com/libvirt/libvirt-go-xml
   version: cc4025ea01eee7c73a7c75b4211b07125a8119ae
 - package: k8s.io/kubernetes
-  version: v1.6.1
+  version: v1.7.0
 - package: k8s.io/apiserver
-  version: fbf5c43dfaa8eb5627bac6058e3bd51db8532cbb
+  version: b74e5942e2a7ef9f73874b7e5a48c030ff7f1189
 - package: k8s.io/client-go
-  version: 76153773eaa3a268131d3d993290a194a1370585
-- package: k8s.io/apimachinery
-  version: 75b8dd260ef0469d96d578705a87cffd0e09dab8
+  version: cc44961f935a644fb82c0f4b6591543704578db7
+  # version: 56fd84210219dbdfe6501fb2085adfb8e61f2bc1
 - package: github.com/jonboulle/clockwork
   version: bcac9884e7502bb2b474c0339d889cb981a2f27f

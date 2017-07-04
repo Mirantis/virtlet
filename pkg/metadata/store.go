@@ -21,7 +21,7 @@ import (
 	"io"
 
 	"github.com/jonboulle/clockwork"
-	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
 // PodSandboxInfo contains metadata information about pod sandbox instance
