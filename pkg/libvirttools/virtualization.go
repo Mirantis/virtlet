@@ -535,7 +535,7 @@ func (v *VirtualizationTool) getVMConfigFromMetadata(containerId string) (*VMCon
 	}
 	if containerInfo == nil {
 		// the vm is already removed
-		return nil, kubeapi.ContainerState_CONTAINER_UNKNOWN,  nil
+		return nil, kubeapi.ContainerState_CONTAINER_UNKNOWN, nil
 	}
 
 	// TODO: here we're using incomplete VMConfig to tear down the volumes
@@ -559,7 +559,7 @@ func (v *VirtualizationTool) getVMConfigFromMetadata(containerId string) (*VMCon
 }
 
 func (v *VirtualizationTool) cleanupVolumes(containerId string) error {
-	config, _,  err := v.getVMConfigFromMetadata(containerId)
+	config, _, err := v.getVMConfigFromMetadata(containerId)
 
 	if err != nil {
 		return err
@@ -579,9 +579,9 @@ func (v *VirtualizationTool) cleanupVolumes(containerId string) error {
 	return nil
 }
 
-func (v *VirtualizationTool) removeDomain(containerId string, config *VMConfig, state kubeapi.ContainerState, doVolumesCleanup bool) error {
+func (v *VirtualizationTool) removeDomain(containerId string, config *VMConfig, state kubeapi.ContainerState, disallowVolumesTeardownFailure bool) error {
 	// Give a chance to gracefully stop domain
-	// TODO: handle errors - there could be e.x. connection errori
+	// TODO: handle errors - there could be e.x. lost connection error
 	domain, err := v.domainConn.LookupDomainByUUIDString(containerId)
 	if err != nil && err != virt.ErrDomainNotFound {
 		return err
@@ -612,15 +612,11 @@ func (v *VirtualizationTool) removeDomain(containerId string, config *VMConfig, 
 		}
 	}
 
-	// Note: volume cleanup in common case is done right after domain has been stopped
-	// due to by the time the ContainerRemove request all flexvolume
-	// data is already removed by kubelet's VolumeManager
-	// For uncommon VM lifecycle sequences (as it doesn't excluded explicitly
-	// by CRI spec), like CreateContainer->RemoveContainer,
-	// should be fixed in https://github.com/Mirantis/virtlet/issues/352
-	if doVolumesCleanup {
-		if err := v.teardownVolumes(config); err != nil {
+	if err := v.teardownVolumes(config); err != nil {
+		if disallowVolumesTeardownFailure {
 			return err
+		} else {
+			glog.Warning("Error during volumes teardown for container %s: %v", containerId, err)
 		}
 	}
 
