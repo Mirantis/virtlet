@@ -8,7 +8,7 @@ set -o errtrace
 NONINTERACTIVE="${NONINTERACTIVE:-}"
 NO_VM_CONSOLE="${NO_VM_CONSOLE:-}"
 INJECT_LOCAL_IMAGE="${INJECT_LOCAL_IMAGE:-}"
-dind_script="dind-cluster-v1.6.sh"
+dind_script="dind-cluster-v1.7.sh"
 kubectl="${HOME}/.kubeadm-dind-cluster/kubectl"
 BASE_LOCATION="${BASE_LOCATION:-https://raw.githubusercontent.com/Mirantis/virtlet/master/}"
 # Convenience setting for local testing:
@@ -98,7 +98,7 @@ function demo::start-dind-cluster {
   if [[ ! ${NONINTERACTIVE} ]]; then
     echo "Cirros ssh connection will be open after Virtlet setup is complete, press Ctrl-D to disconnect." >&2
   fi
-  echo "To clean up the cluster, use './dind-cluster-v1.6.sh clean'" >&2
+  echo "To clean up the cluster, use './dind-cluster-v1.7.sh clean'" >&2
   demo::ask-before-continuing
   "./${dind_script}" clean
   # use zero-worker configuration for faster startup
@@ -266,7 +266,7 @@ can be used to disconnect from it.
 Use 'curl http://nginx.default.svc.cluster.local' from VM console to test
 cluster networking.
 
-To clean up the cluster, use './dind-cluster-v1.6.sh clean'
+To clean up the cluster, use './dind-cluster-v1.7.sh clean'
 [1] https://github.com/Mirantis/virtlet
 [2] https://github.com/Mirantis/kubeadm-dind-cluster
 EOF

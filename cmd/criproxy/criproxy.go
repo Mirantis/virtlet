@@ -17,19 +17,24 @@ limitations under the License.
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/Mirantis/virtlet/pkg/criproxy"
+	"github.com/Mirantis/virtlet/pkg/dockershim"
 	"github.com/golang/glog"
 )
 
 const (
 	// XXX: don't hardcode
-	connectionTimeout = 30 * time.Second
+	connectionTimeout            = 30 * time.Second
+	dockershimExecutableName     = "dockershim"
+	standardDockershimSocketPath = "/var/run/dockershim.sock"
 )
 
 var (
@@ -37,14 +42,55 @@ var (
 		"The unix socket to listen on, e.g. /run/virtlet.sock")
 	connect = flag.String("connect", "/var/run/dockershim.sock",
 		"CRI runtime ids and unix socket(s) to connect to, e.g. /var/run/dockershim.sock,alt:/var/run/another.sock")
-	// TODO: rm
-	kubeletConfigPath = flag.String("kubeletcfg", "/etc/criproxy/kubelet.conf", "path to saved kubelet config file")
-	apiServerHost     = flag.String("apiserver", "", "apiserver URL")
+	nodeInfoPath  = flag.String("nodeinfo", "/etc/criproxy/node.conf", "path to saved node info (bootstrap-only)")
+	apiServerHost = flag.String("apiserver", "", "apiserver URL")
 )
 
-func runCriProxy(connect, listen, savedConfigPath string) error {
+// runCriProxy starts CRI proxy and optionally a dockershim
+func runCriProxy(connect, listen, nodeInfoPath string) error {
+	firstRun := false
+
+	ni, err := criproxy.LoadNodeInfo(nodeInfoPath)
+	if err != nil {
+		return err
+	}
+
+	if ni.FirstRun {
+		firstRun = true
+		ni.FirstRun = false
+		if err := ni.Write(nodeInfoPath); err != nil {
+			return err
+		}
+	}
+
 	addrs := strings.Split(connect, ",")
-	proxy, err := criproxy.NewRuntimeProxy(addrs, connectionTimeout, nil)
+	dockerStarted := false
+
+	for n, addr := range addrs {
+		if addr != "docker" {
+			continue
+		}
+		if dockerStarted {
+			return fmt.Errorf("More than one 'docker' endpoint is specified")
+		}
+
+		kw := dockershim.NewKubeletWrapper(ni.KubeletArgs)
+		addrs[n] = kw.Endpoint()
+		glog.V(1).Infof("Starting dockershim on %q", kw.Endpoint())
+		go kw.RunDockershim()
+		dockerStarted = true
+	}
+
+	shouldClean := firstRun
+	proxy, err := criproxy.NewRuntimeProxy(addrs, connectionTimeout, func() {
+		// must do this after the old kubelet has exited
+		if shouldClean {
+			shouldClean = false
+			if err := criproxy.RemoveKubeDNSContainers(ni.DockerEndpoint); err != nil {
+				glog.Warningf("failed to clean up old containers: %v", err)
+			}
+		}
+	})
 	if err != nil {
 		return fmt.Errorf("Error starting CRI proxy: %v", err)
 	}
@@ -55,13 +101,39 @@ func runCriProxy(connect, listen, savedConfigPath string) error {
 	return nil
 }
 
-func installCriProxy(execPath, savedConfigPath string) error {
+// grabKubeletInfo writes node info file based on the information
+// obtained from running kubelet's command line. This function must be
+// run from the host mount & uts namespaces.
+func grabKubeletInfo(nodeInfoPath string) error {
+	pid, err := criproxy.GetPidFromSocket(standardDockershimSocketPath)
+	if err != nil {
+		return err
+	}
+
+	ni, err := criproxy.NodeInfoFromCommandLine(fmt.Sprintf("/proc/%d/cmdline", pid))
+	if err != nil {
+		return err
+	}
+	kw := dockershim.NewKubeletWrapper(ni.KubeletArgs)
+	ni.NodeName = kw.NodeName()
+	ni.DockerEndpoint = kw.DockerEndpoint()
+	ni.FirstRun = true
+
+	glog.V(1).Infof("Writing node info file %q: %#v", nodeInfoPath, ni)
+	return ni.Write(nodeInfoPath)
+}
+
+// installCriProxy installs CRI proxy on the host. It must be run
+// from within a pod.
+func installCriProxy(execPath, nodeInfoPath string) error {
+	ni, err := criproxy.LoadNodeInfo(nodeInfoPath)
+	if err != nil {
+		return err
+	}
 	bootstrap := criproxy.NewBootstrap(&criproxy.BootstrapConfig{
-		ApiServerHost:   *apiServerHost,
-		ConfigzBaseUrl:  "https://127.0.0.1:10250",
-		StatsBaseUrl:    "http://127.0.0.1:10255",
-		SavedConfigPath: savedConfigPath,
-		ProxyPath:       execPath,
+		ApiServerHost:  *apiServerHost,
+		ConfigzBaseUrl: "https://127.0.0.1:10250",
+		ProxyPath:      execPath,
 		ProxyArgs: []string{
 			// TODO: don't hardcode
 			"-v",
@@ -71,6 +143,7 @@ func installCriProxy(execPath, savedConfigPath string) error {
 			"docker,virtlet:/run/virtlet.sock",
 		},
 		ProxySocketPath: "/run/criproxy.sock",
+		NodeInfo:        ni,
 	}, nil)
 	changed, err := bootstrap.EnsureCRIProxy()
 	if err == nil && !changed {
@@ -80,20 +153,37 @@ func installCriProxy(execPath, savedConfigPath string) error {
 }
 
 func main() {
-	install := flag.Bool("install", false, "install criproxy container")
-	flag.Parse()
-
-	var err error
-	if *install {
-		err = installCriProxy(os.Args[0], *kubeletConfigPath)
-	} else {
-		err = runCriProxy(*connect, *listen, *kubeletConfigPath)
-	}
+	execPath, err := os.Executable()
 	if err != nil {
-		glog.Error(err)
+		glog.Error("Can't get criproxy executable path: %v", err)
 		os.Exit(1)
+	}
+	if filepath.Base(execPath) == dockershimExecutableName {
+		kw := dockershim.NewKubeletWrapper(os.Args)
+		kw.RunDockershim()
+	} else {
+		grab := flag.Bool("grab", false, "grab kubelet command line and node name")
+		install := flag.Bool("install", false, "install criproxy container")
+		flag.Parse()
+
+		var err error
+		switch {
+		case *grab && *install:
+			err = errors.New("can't specify both -grab and -install")
+		case *grab:
+			err = grabKubeletInfo(*nodeInfoPath)
+		case *install:
+			err = installCriProxy(execPath, *nodeInfoPath)
+		default:
+			err = runCriProxy(*connect, *listen, *nodeInfoPath)
+		}
+		if err != nil {
+			glog.Error(err)
+			os.Exit(1)
+		}
 	}
 }
 
 // Testing:
-// /criproxy -alsologtostderr -v 2 -install -apiserver=http://172.30.0.2:8080
+// /dind/criproxy -alsologtostderr -v 20 -grab
+// /dind/criproxy -alsologtostderr -v 20 -install -apiserver=http://kube-master:8080

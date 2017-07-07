@@ -27,4 +27,3 @@ COPY _output/virtlet /usr/local/bin
 COPY _output/vmwrapper /
 COPY _output/criproxy /
 COPY _output/virtlet_log /
-COPY _output/dockershim /
