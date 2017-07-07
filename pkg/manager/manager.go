@@ -342,6 +342,18 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 	glog.V(3).Infof("CreateContainer: %s", spew.Sdump(in))
 	glog.V(3).Infof("CreateContainer config: %s", spew.Sdump(config))
 
+	// Was a container already started in this sandbox?
+	// NOTE: there is no distinction between lack of key and other types of
+	// errors when accessing boltdb. This will be changed when we switch to
+	// storing whole marshaled sandbox metadata as json.
+	if remainingContainerId, _ := v.metadataStore.GetPodSandboxContainerID(podSandboxId); remainingContainerId != "" {
+		glog.V(3).Infof("CreateContainer: there's already a container in the sandbox (id: %s), cleaning it up", remainingContainerId)
+		if err := v.libvirtVirtualizationTool.RemoveContainer(remainingContainerId); err != nil {
+			glog.Errorf("Error cleaning up the old container with id %s: %v", remainingContainerId, err)
+			return nil, err
+		}
+	}
+
 	// TODO: get it as string
 	netAsBytes, err := v.metadataStore.GetPodNetworkConfigurationAsBytes(podSandboxId)
 	if err != nil {
