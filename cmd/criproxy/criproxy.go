@@ -86,7 +86,7 @@ func runCriProxy(connect, listen, nodeInfoPath string) error {
 		// must do this after the old kubelet has exited
 		if shouldClean {
 			shouldClean = false
-			if err := criproxy.RemoveKubeDNSContainers(ni.DockerEndpoint); err != nil {
+			if err := criproxy.RemoveKubernetesContainers(ni.DockerEndpoint); err != nil {
 				glog.Warningf("failed to clean up old containers: %v", err)
 			}
 		}
