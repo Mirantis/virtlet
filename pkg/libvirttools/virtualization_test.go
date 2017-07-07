@@ -175,7 +175,6 @@ func (ct *containerTester) containerStatus(containerId string) *kubeapi.Containe
 		ct.t.Errorf("ContainerStatus(): %v", err)
 	}
 	return status
-
 }
 
 func (ct *containerTester) startContainer(containerId string) {
@@ -196,6 +195,18 @@ func (ct *containerTester) removeContainer(containerId string) {
 	}
 }
 
+func (ct *containerTester) verifyContainerRootfsExists(container *kubeapi.Container) bool {
+	storagePool, err := ct.storageConn.LookupStoragePoolByName("volumes")
+	if err != nil {
+		ct.t.Fatal("Expected to found 'volumes' storage pool but failed with: %v", err)
+	}
+	// TODO: this is third place where rootfs volume name is calculated
+	// so there should be a func which will do it in consistent way there,
+	// in root_volumesource.go and in virtualization.go
+	_, err = storagePool.LookupVolumeByName("root_" + container.PodSandboxId)
+	return err == nil
+}
+
 func TestContainerLifecycle(t *testing.T) {
 	ct := newContainerTester(t, fake.NewToplevelRecorder())
 	defer ct.teardown()
@@ -213,25 +224,25 @@ func TestContainerLifecycle(t *testing.T) {
 	containers = ct.listContainers(nil)
 	if len(containers) != 1 {
 		t.Errorf("Expected single container to be started, but got: %#v", containers)
-	} else {
-		if containers[0].Id != containerId {
-			t.Errorf("Bad container id in response: %q instead of %q", containers[0].Id, containerId)
-		}
-		if containers[0].State != kubeapi.ContainerState_CONTAINER_CREATED {
-			t.Errorf("Bad container state: %v instead of %v", containers[0].State, kubeapi.ContainerState_CONTAINER_CREATED)
-		}
-		if containers[0].Metadata.Name != fakeContainerName {
-			t.Errorf("Bad container name: %q instead of %q", containers[0].Metadata.Name, fakeContainerName)
-		}
-		if containers[0].Metadata.Attempt != fakeContainerAttempt {
-			t.Errorf("Bad container attempt: %d instead of %d", containers[0].Metadata.Attempt, fakeContainerAttempt)
-		}
-		if containers[0].Labels[kubetypes.KubernetesContainerNameLabel] != fakeContainerName {
-			t.Errorf("Bad container name label: %q instead of %q", containers[0].Labels[kubetypes.KubernetesContainerNameLabel], fakeContainerName)
-		}
-		if containers[0].Annotations["foo"] != "bar" {
-			t.Errorf("Bad container annotation value: %q instead of %q", containers[0].Annotations["foo"], "bar")
-		}
+	}
+	container := containers[0]
+	if container.Id != containerId {
+		t.Errorf("Bad container id in response: %q instead of %q", containers[0].Id, containerId)
+	}
+	if container.State != kubeapi.ContainerState_CONTAINER_CREATED {
+		t.Errorf("Bad container state: %v instead of %v", containers[0].State, kubeapi.ContainerState_CONTAINER_CREATED)
+	}
+	if container.Metadata.Name != fakeContainerName {
+		t.Errorf("Bad container name: %q instead of %q", containers[0].Metadata.Name, fakeContainerName)
+	}
+	if container.Metadata.Attempt != fakeContainerAttempt {
+		t.Errorf("Bad container attempt: %d instead of %d", containers[0].Metadata.Attempt, fakeContainerAttempt)
+	}
+	if container.Labels[kubetypes.KubernetesContainerNameLabel] != fakeContainerName {
+		t.Errorf("Bad container name label: %q instead of %q", containers[0].Labels[kubetypes.KubernetesContainerNameLabel], fakeContainerName)
+	}
+	if container.Annotations["foo"] != "bar" {
+		t.Errorf("Bad container annotation value: %q instead of %q", containers[0].Annotations["foo"], "bar")
 	}
 	ct.rec.Rec("container list after the container is created", containers)
 
@@ -269,6 +280,10 @@ func TestContainerLifecycle(t *testing.T) {
 	containers = ct.listContainers(nil)
 	if len(containers) != 0 {
 		t.Errorf("Unexpected containers when no containers are started: %#v", containers)
+	}
+
+	if ct.verifyContainerRootfsExists(container) {
+		t.Errorf("Rootfs volume was not deleted for the container: %#v", container)
 	}
 
 	gm.Verify(t, ct.rec.Content())
