@@ -359,6 +359,148 @@ func TestGenerateDisk(t *testing.T) {
 		"meta-data": "{\"instance-id\":\"foo.default\",\"local-hostname\":\"foo\"}",
 		"user-data": "#cloud-config\n",
 	}) {
-		t.Errorf("bad iso content:\n%s", spew.Sdump(m))
+		t.Errorf("Bad iso content:\n%s", spew.Sdump(m))
+	}
+}
+
+func TestEnvDataGeneration(t *testing.T) {
+	expected := "key=value\n"
+	g := NewCloudInitGenerator(&VMConfig{
+		Environment: []*VMKeyValue{
+			{Key: "key", Value: "value"},
+		},
+	}, nil, "")
+
+	output := g.generateEnvVarsContent()
+	if output != expected {
+		t.Errorf("Bad environment data generated:\n%s\nExpected:\n%s", output, expected)
+	}
+}
+
+func TestAddingSecrets(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatal("Can't create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	location := filepath.Join(tmpDir, "volumes/kubernetes.io~secret/test-volume")
+	if err := os.MkdirAll(location, 0755); err != nil {
+		t.Fatal("Can't create secrets directory in temp dir: %v", err)
+	}
+
+	f, err := os.Create(filepath.Join(location, "file"))
+	if err != nil {
+		t.Fatal("Can't create sample file in temp directory: %v", err)
+	}
+	defer f.Close()
+	if _, err := f.WriteString("test content"); err != nil {
+		t.Fatal("Error during write to test file: %v", err)
+	}
+
+	userData := make(map[string]interface{})
+	g := NewWriteFilesManipulator(userData, []*VMMount{
+		{ContainerPath: "/container", HostPath: location},
+	})
+
+	g.AddSecrets()
+
+	expectedUserData := map[string]interface{}{
+		"write_files": []interface{}{
+			map[string]interface{}{
+				"path":        "/container/file",
+				"content":     "dGVzdCBjb250ZW50",
+				"encoding":    "b64",
+				"permissions": "0600",
+			},
+		},
+	}
+
+	if !reflect.DeepEqual(userData, expectedUserData) {
+		t.Errorf("Bad user-data:\n%s\nExpected:\n%s", spew.Sdump(userData), spew.Sdump(expectedUserData))
+	}
+}
+
+func TestAddingConfigMap(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatal("Can't create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	location := filepath.Join(tmpDir, "volumes/kubernetes.io~configmap/test-volume")
+	if err := os.MkdirAll(location, 0755); err != nil {
+		t.Fatal("Can't create secrets directory in temp dir: %v", err)
+	}
+
+	f, err := os.Create(filepath.Join(location, "file"))
+	if err != nil {
+		t.Fatal("Can't create sample file in temp directory: %v", err)
+	}
+	defer f.Close()
+	if _, err := f.WriteString("test content"); err != nil {
+		t.Fatal("Error during write to test file: %v", err)
+	}
+
+	userData := make(map[string]interface{})
+	g := NewWriteFilesManipulator(userData, []*VMMount{
+		{ContainerPath: "/container", HostPath: location},
+	})
+
+	g.AddConfigMapEntries()
+
+	expectedUserData := map[string]interface{}{
+		"write_files": []interface{}{
+			map[string]interface{}{
+				"path":        "/container/file",
+				"content":     "dGVzdCBjb250ZW50",
+				"encoding":    "b64",
+				"permissions": "0644",
+			},
+		},
+	}
+
+	if !reflect.DeepEqual(userData, expectedUserData) {
+		t.Errorf("Bad user-data:\n%s\nExpected:\n%s", spew.Sdump(userData), spew.Sdump(expectedUserData))
+	}
+}
+
+func TestAddingFileLikeMount(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatal("Can't create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	fname := filepath.Join(tmpDir, "file")
+	f, err := os.Create(fname)
+	if err != nil {
+		t.Fatal("Can't create sample file in temp directory: %v", err)
+	}
+	defer f.Close()
+	if _, err := f.WriteString("test content"); err != nil {
+		t.Fatal("Error during write to test file: %v", err)
+	}
+
+	userData := make(map[string]interface{})
+	g := NewWriteFilesManipulator(userData, []*VMMount{
+		{ContainerPath: "/container", HostPath: fname},
+	})
+
+	g.AddFileLikeMounts()
+
+	expectedUserData := map[string]interface{}{
+		"write_files": []interface{}{
+			map[string]interface{}{
+				"path":        "/container",
+				"content":     "dGVzdCBjb250ZW50",
+				"encoding":    "b64",
+				"permissions": "0644",
+			},
+		},
+	}
+
+	if !reflect.DeepEqual(userData, expectedUserData) {
+		t.Errorf("Bad user-data:\n%s\nExpected:\n%s", spew.Sdump(userData), spew.Sdump(expectedUserData))
 	}
 }
