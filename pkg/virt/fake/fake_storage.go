@@ -66,7 +66,7 @@ func (sc *FakeStorageConnection) CreateStoragePool(def *libvirtxml.StoragePool) 
 	if def.Target != nil {
 		poolPath = def.Target.Path
 	}
-	p := newFakeStoragePool(NewChildRecorder(sc.rec, def.Name), def.Name, poolPath)
+	p := NewFakeStoragePool(NewChildRecorder(sc.rec, def.Name), def.Name, poolPath)
 	sc.pools[def.Name] = p
 	return p, nil
 }
@@ -86,7 +86,7 @@ type FakeStoragePool struct {
 	volumes map[string]*FakeStorageVolume
 }
 
-func newFakeStoragePool(rec Recorder, name, poolPath string) *FakeStoragePool {
+func NewFakeStoragePool(rec Recorder, name, poolPath string) *FakeStoragePool {
 	return &FakeStoragePool{
 		rec:     rec,
 		name:    name,

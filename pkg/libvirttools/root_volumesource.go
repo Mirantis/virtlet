@@ -79,5 +79,3 @@ func (v *rootVolume) Setup(volumeMap map[string]string) (*libvirtxml.DomainDisk,
 func (v *rootVolume) Teardown() error {
 	return v.owner.StoragePool().RemoveVolumeByName(v.cloneName())
 }
-
-// TODO: this file needs a test
