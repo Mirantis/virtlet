@@ -21,6 +21,7 @@ import (
 
 	"github.com/Mirantis/virtlet/pkg/virt"
 	"github.com/Mirantis/virtlet/pkg/virt/fake"
+	"github.com/Mirantis/virtlet/tests/gm"
 )
 
 const (
@@ -89,6 +90,8 @@ func TestRootVolumeLifeCycle(t *testing.T) {
 	if err := rootVol.Teardown(); err != nil {
 		t.Errorf("Teardown returned an error: %v", err)
 	}
+
+	gm.Verify(t, rec.Content())
 }
 
 type fakeVolumeOwner struct {
