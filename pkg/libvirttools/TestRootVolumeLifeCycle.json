@@ -1,0 +1,77 @@
+[
+  {
+    "name": "image: GetImageVolume",
+    "data": "rootfs image name"
+  },
+  {
+    "name": "volumes: CreateStorageVolClone",
+    "data": {
+      "def": {
+        "XMLName": {
+          "Space": "",
+          "Local": ""
+        },
+        "Type": "file",
+        "Name": "root_77f29a0e-46af-4188-a6af-9ff8b8a65224",
+        "Key": "",
+        "Allocation": null,
+        "Capacity": null,
+        "Physical": null,
+        "Target": {
+          "Path": "",
+          "Format": {
+            "Type": "qcow2"
+          },
+          "Permissions": null,
+          "Timestamps": null,
+          "Compat": "",
+          "NoCOW": null,
+          "Features": null,
+          "Encryption": null
+        },
+        "BackingStore": null
+      },
+      "from": "images.fake volume name"
+    }
+  },
+  {
+    "name": "root disk retuned by root_volumesource",
+    "data": {
+      "XMLName": {
+        "Space": "",
+        "Local": ""
+      },
+      "Type": "file",
+      "Device": "disk",
+      "Snapshot": "",
+      "Driver": {
+        "Name": "qemu",
+        "Type": "qcow2",
+        "Cache": "",
+        "IO": "",
+        "ErrorPolicy": ""
+      },
+      "Auth": null,
+      "Source": {
+        "File": "/fake/volumes/pool/root_77f29a0e-46af-4188-a6af-9ff8b8a65224",
+        "Device": "",
+        "Protocol": "",
+        "Name": "",
+        "Pool": "",
+        "Volume": "",
+        "Hosts": null,
+        "StartupPolicy": ""
+      },
+      "Target": null,
+      "Serial": "",
+      "ReadOnly": null,
+      "Shareable": null,
+      "Address": null,
+      "Boot": null
+    }
+  },
+  {
+    "name": "volumes: RemoveVolumeByName",
+    "data": "root_77f29a0e-46af-4188-a6af-9ff8b8a65224"
+  }
+]
