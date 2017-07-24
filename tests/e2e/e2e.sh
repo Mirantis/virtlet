@@ -112,7 +112,7 @@ function vmchat-short {
 
   count=$(../../examples/vmssh.sh "cirros@${vmname}" "ip a" | grep "eth0:" | wc -l)
   if [[ ${count} != 1 ]]; then
-    echo "Executing 'ip a' failed. Expected 1 line but got ${count}" 
+    echo "Executing 'ip a' failed. Expected 1 line but got ${count}"
     exit 1
   fi
 }
@@ -257,52 +257,7 @@ vmchat-short cirros-vm
 
 verify-cpu-count 2
 
-# verify domain memory size settings
-
-function domain_xpath {
-  local domain="${1}"
-  local xpath="${2}"
-  kubectl exec -n kube-system "${virtlet_pod_name}" -c virtlet -- \
-          /bin/sh -c "virsh dumpxml '${domain}' | xmllint --xpath '${xpath}' -"
-}
-
 pod_domain="$("${virsh}" poddomain @cirros-vm)"
-
-# <cputune>
-#    <period>100000</period>
-#    <quota>25000</quota>
-# </cputune>
-expected_dom_quota="25000"
-expected_dom_period="100000"
-
-dom_quota="$(domain_xpath "${pod_domain}" 'string(/domain/cputune/quota)')"
-dom_period="$(domain_xpath "${pod_domain}" 'string(/domain/cputune/period)')"
-
-if [[ ${dom_quota} != ${expected_dom_quota} ]]; then
-  echo "Bad quota value in the domain definition. Expected ${dom_quota}, but got ${expected_dom_quota}" >&2
-  exit 1
-fi
-
-if [[ ${dom_period} != ${expected_dom_period} ]]; then
-  echo "Bad period value in the domain definition. Expected ${dom_period}, but got ${expected_dom_period}" >&2
-  exit 1
-fi
-
-# <memory unit='KiB'>131072</memory>
-dom_mem_size_k="$(domain_xpath "${pod_domain}" 'string(/domain/memory[@unit="KiB"])')"
-expected_dom_mem_size_k="131072"
-if [[ ${dom_mem_size_k} != ${expected_dom_mem_size_k} ]]; then
-  echo "Bad memory size in the domain definition. Expected ${dom_mem_size_k}, but got ${expected_mem_size_k}" >&2
-  exit 1
-fi
-
-# verify <memoryBacking><locked/></memoryBacking> in the domain definition
-# (so the VM memory doesn't get swapped out)
-
-if [[ $(domain_xpath "${pod_domain}" 'count(/domain/memoryBacking/locked)') != 1 ]]; then
-  echo "Didn't find memoryBacking/locked in the domain definition" >&2
-  exit 1
-fi
 
 # verify memory size as reported by Linux kernel inside VM
 
