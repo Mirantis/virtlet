@@ -1,5 +1,5 @@
 /*
-Copyright 2016-2017 Mirantis
+Copyright 2017 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,11 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package bolttools
+package metadata
 
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/jonboulle/clockwork"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
@@ -45,29 +46,66 @@ func TestRemovePodSandbox(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		b, err := NewFakeBoltClient()
+		store, err := NewFakeMetadataStore()
 		if err != nil {
-			t.Fatal(err)
-		}
-
-		if err := b.EnsureSandboxSchema(); err != nil {
 			t.Fatal(err)
 		}
 
 		uid := ""
 		if tc.sandbox != nil {
 			uid = tc.sandbox.GetMetadata().Uid
-			if err := b.SetPodSandbox(tc.sandbox, []byte{}, kubeapi.PodSandboxState_SANDBOX_READY, clockwork.NewRealClock()); err != nil {
+			psi, _ := NewPodSandboxInfo(tc.sandbox, []byte{}, kubeapi.PodSandboxState_SANDBOX_READY, clockwork.NewRealClock())
+			if err := store.PodSandbox(uid).Save(func(c *PodSandboxInfo) (*PodSandboxInfo, error) {
+				return psi, nil
+			}); err != nil {
 				t.Fatal(err)
 			}
+			dumpDB(t, store, "before delete")
 		}
-		dumpDB(t, b.db)
-		if err := b.RemovePodSandbox(uid); err != nil {
+		if err := store.PodSandbox(uid).Save(func(c *PodSandboxInfo) (*PodSandboxInfo, error) {
+			return nil, nil
+		}); err != nil {
 			if tc.error {
+
 				continue
 			}
 
 			t.Fatal(err)
+		} else {
+			_, err = store.PodSandbox(uid).Retrieve()
+			if err == nil {
+				t.Error("Sandbox wasn't deleted")
+			}
+			dumpDB(t, store, "after delete")
+		}
+	}
+}
+
+func TestRetrieve(t *testing.T) {
+	sandboxes := criapi.GetSandboxes(2)
+
+	fakeClock := clockwork.NewFakeClockAt(time.Now())
+	store := setUpTestStore(t, sandboxes, []*criapi.ContainerTestConfig{}, fakeClock)
+
+	for _, sandbox := range sandboxes {
+		expectedSandboxInfo, err := NewPodSandboxInfo(sandbox, "", kubeapi.PodSandboxState_SANDBOX_READY, fakeClock)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if expectedSandboxInfo.podID != "" {
+			t.Error("podID must be empty for new PodSandboxInfo object")
+		}
+		sandboxManager := store.PodSandbox(sandbox.GetMetadata().Uid)
+		actualSandboxInfo, err := sandboxManager.Retrieve()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if actualSandboxInfo.podID != sandboxManager.GetID() {
+			t.Errorf("invalid podID for retrieved PodSandboxInfo: %s != %s", actualSandboxInfo.podID, sandboxManager.GetID())
+		}
+		expectedSandboxInfo.podID = sandboxManager.GetID()
+		if !reflect.DeepEqual(expectedSandboxInfo, actualSandboxInfo) {
+			t.Error("retrieved sandbox info object is not equal to expected value")
 		}
 	}
 }
@@ -75,13 +113,14 @@ func TestRemovePodSandbox(t *testing.T) {
 func TestSetGetPodSandboxStatus(t *testing.T) {
 	sandboxes := criapi.GetSandboxes(2)
 
-	b := SetUpBolt(t, sandboxes, []*criapi.ContainerTestConfig{})
+	store := setUpTestStore(t, sandboxes, []*criapi.ContainerTestConfig{}, nil)
 
 	for _, sandbox := range sandboxes {
-		status, err := b.GetPodSandboxStatus(sandbox.GetMetadata().Uid)
+		sandboxInfo, err := store.PodSandbox(sandbox.GetMetadata().Uid).Retrieve()
 		if err != nil {
 			t.Fatal(err)
 		}
+		status := sandboxInfo.AsPodSandboxStatus()
 
 		if status.State != kubeapi.PodSandboxState_SANDBOX_READY {
 			t.Errorf("Sandbox state not ready")
@@ -181,10 +220,11 @@ func TestListPodSandbox(t *testing.T) {
 		},
 	}
 
-	b := SetUpBolt(t, sandboxConfigs, []*criapi.ContainerTestConfig{})
+	cc := criapi.GetContainersConfig(sandboxConfigs)
+	b := setUpTestStore(t, sandboxConfigs, cc, nil)
 
 	for _, tc := range tests {
-		sandboxes, err := b.ListPodSandbox(tc.filter)
+		sandboxes, err := b.ListPodSandboxes(tc.filter)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -196,7 +236,7 @@ func TestListPodSandbox(t *testing.T) {
 		for _, id := range tc.expectedIds {
 			found := false
 			for _, podSandbox := range sandboxes {
-				if id == podSandbox.Id {
+				if id == podSandbox.GetID() {
 					found = true
 					break
 				}

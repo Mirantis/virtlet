@@ -31,7 +31,6 @@ import (
 	"google.golang.org/grpc"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 
-	"github.com/Mirantis/virtlet/pkg/bolttools"
 	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
 	"github.com/Mirantis/virtlet/pkg/metadata"
@@ -73,7 +72,7 @@ func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, m
 		return nil, err
 	}
 
-	boltClient, err := bolttools.NewBoltClient(metadataPath)
+	metadataStore, err := metadata.NewMetadataStore(metadataPath)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +85,7 @@ func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, m
 		// doesn't produce correct name for cdrom devices
 		libvirttools.GetNocloudVolume)
 	// TODO: pool name should be passed like for imageTool
-	libvirtVirtualizationTool, err := libvirttools.NewVirtualizationTool(conn, conn, libvirtImageTool, boltClient, "volumes", rawDevices, volSrc)
+	libvirtVirtualizationTool, err := libvirttools.NewVirtualizationTool(conn, conn, libvirtImageTool, metadataStore, "volumes", rawDevices, volSrc)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +99,7 @@ func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, m
 		server:                    grpc.NewServer(),
 		libvirtImageTool:          libvirtImageTool,
 		libvirtVirtualizationTool: libvirtVirtualizationTool,
-		metadataStore:             boltClient,
+		metadataStore:             metadataStore,
 		cniClient:                 cniClient,
 	}
 
@@ -170,7 +169,6 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 	}
 
 	state := kubeapi.PodSandboxState_SANDBOX_READY
-	var netConfigAsBytes []byte
 	netConfig, err := v.cniClient.AddSandboxToNetwork(podId, podName, podNs)
 	if err == nil {
 		// Mimic kubelet's method of handling nameservers.
@@ -184,23 +182,9 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 			netConfig.DNS.Search = config.DnsConfig.Searches
 			netConfig.DNS.Options = config.DnsConfig.Options
 		}
-
-		netConfigAsBytes, err = cni.ResultToBytes(netConfig)
-		if err != nil {
-			glog.Errorf("Error during network configuration result marshaling for pod %s (%s): %v", podName, podId, err)
-			if rmErr := v.cniClient.RemoveSandboxFromNetwork(podId, podName, podNs); rmErr != nil {
-				glog.Errorf("Error when removing pod %s (%s) from CNI network: %v", podName, podId, rmErr)
-			}
-		} else {
-			glog.V(3).Infof("CNI configuration for pod %s (%s): %s", podName, podId, string(netConfigAsBytes))
-		}
+		glog.V(3).Infof("CNI configuration for pod %s (%s): %s", podName, podId, spew.Sdump(netConfig))
 	} else {
 		glog.Errorf("Error when adding pod %s (%s) to CNI network: %v", podName, podId, err)
-	}
-
-	if netConfigAsBytes == nil {
-		// FIXME: nil should be ok there
-		netConfigAsBytes = []byte{}
 	}
 
 	if err != nil {
@@ -209,7 +193,18 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 		state = kubeapi.PodSandboxState_SANDBOX_NOTREADY
 	}
 
-	if storeErr := v.metadataStore.SetPodSandbox(config, netConfigAsBytes, state, clockwork.NewRealClock()); storeErr != nil {
+	psi, err := metadata.NewPodSandboxInfo(config, netConfig, state, clockwork.NewRealClock())
+	if err != nil {
+		glog.Errorf("Error serializing bod %q (%q) sandbox configuration: %v", podName, podId, err)
+		return nil, err
+	}
+
+	sandbox := v.metadataStore.PodSandbox(config.Metadata.Uid)
+	if storeErr := sandbox.Save(
+		func(c *metadata.PodSandboxInfo) (*metadata.PodSandboxInfo, error) {
+			return psi, nil
+		},
+	); storeErr != nil {
 		glog.Errorf("Error when creating pod sandbox for pod %s (%s): %v", podName, podId, storeErr)
 		return nil, storeErr
 	}
@@ -234,15 +229,26 @@ func (v *VirtletManager) StopPodSandbox(ctx context.Context, in *kubeapi.StopPod
 	podSandboxId := in.PodSandboxId
 	glog.V(2).Infof("StopPodSandbox called for pod %s", in.PodSandboxId)
 	glog.V(3).Infof("StopPodSandbox: %s", spew.Sdump(in))
-	status, err := v.metadataStore.GetPodSandboxStatus(in.PodSandboxId)
+	sandbox := v.metadataStore.PodSandbox(in.PodSandboxId)
+	sandboxInfo, err := sandbox.Retrieve()
 	if err != nil {
 		glog.Errorf("Error retrieving pod sandbox status for pod %q while stopping it: %v", in.PodSandboxId, err)
 		return nil, err
 	}
+	if sandboxInfo == nil {
+		glog.Errorf("Sandbox %q doesn't exist", in.PodSandboxId)
+		return nil, err
+	}
+	status := sandboxInfo.AsPodSandboxStatus()
 
 	// check if the sandbox is already stopped
 	if status.State != kubeapi.PodSandboxState_SANDBOX_NOTREADY {
-		if err := v.metadataStore.UpdatePodState(in.PodSandboxId, byte(kubeapi.PodSandboxState_SANDBOX_NOTREADY)); err != nil {
+		if err := sandbox.Save(
+			func(c *metadata.PodSandboxInfo) (*metadata.PodSandboxInfo, error) {
+				c.State = kubeapi.PodSandboxState_SANDBOX_NOTREADY
+				return c, nil
+			},
+		); err != nil {
 			glog.Errorf("Error updating pod sandbox status for pod %q while stopping it: %v", in.PodSandboxId, err)
 			return nil, err
 		}
@@ -267,7 +273,11 @@ func (v *VirtletManager) RemovePodSandbox(ctx context.Context, in *kubeapi.Remov
 	glog.V(2).Infof("RemovePodSandbox called for pod %s", podSandboxId)
 	glog.V(3).Infof("RemovePodSandbox: %s", spew.Sdump(in))
 
-	if err := v.metadataStore.RemovePodSandbox(podSandboxId); err != nil {
+	if err := v.metadataStore.PodSandbox(podSandboxId).Save(
+		func(c *metadata.PodSandboxInfo) (*metadata.PodSandboxInfo, error) {
+			return nil, nil
+		},
+	); err != nil {
 		glog.Errorf("Error when removing pod sandbox %q: %v", podSandboxId, err)
 		return nil, err
 	}
@@ -286,29 +296,23 @@ func (v *VirtletManager) PodSandboxStatus(ctx context.Context, in *kubeapi.PodSa
 	glog.V(3).Infof("PodSandboxStatusStatus: %s", spew.Sdump(in))
 	podSandboxId := in.PodSandboxId
 
-	status, err := v.metadataStore.GetPodSandboxStatus(podSandboxId)
+	sandbox := v.metadataStore.PodSandbox(podSandboxId)
+	sandboxInfo, err := sandbox.Retrieve()
 	if err != nil {
 		glog.Errorf("Error when getting pod sandbox '%s': %v", podSandboxId, err)
 		return nil, err
 	}
+	status := sandboxInfo.AsPodSandboxStatus()
 
-	netAsBytes, err := v.metadataStore.GetPodNetworkConfigurationAsBytes(podSandboxId)
+	netResult, err := cni.BytesToResult([]byte(sandboxInfo.CNIConfig))
 	if err != nil {
-		glog.Errorf("Error when retrieving pod network configuration for sandbox '%s': %v", podSandboxId, err)
+		glog.Errorf("Error when unmarshaling pod network configuration for sandbox '%s': %v", podSandboxId, err)
 		return nil, err
 	}
 
-	if len(netAsBytes) != 0 {
-		netResult, err := cni.BytesToResult(netAsBytes)
-		if err != nil {
-			glog.Errorf("Error when unmarshaling pod network configuration for sandbox '%s': %v", podSandboxId, err)
-			return nil, err
-		}
-
-		if netResult.IP4 != nil {
-			ip := netResult.IP4.IP.IP.String()
-			status.Network = &kubeapi.PodSandboxNetworkStatus{Ip: ip}
-		}
+	if netResult != nil && netResult.IP4 != nil {
+		ip := netResult.IP4.IP.IP.String()
+		status.Network = &kubeapi.PodSandboxNetworkStatus{Ip: ip}
 	}
 
 	response := &kubeapi.PodSandboxStatusResponse{Status: status}
@@ -319,10 +323,20 @@ func (v *VirtletManager) PodSandboxStatus(ctx context.Context, in *kubeapi.PodSa
 func (v *VirtletManager) ListPodSandbox(ctx context.Context, in *kubeapi.ListPodSandboxRequest) (*kubeapi.ListPodSandboxResponse, error) {
 	filter := in.GetFilter()
 	glog.V(3).Infof("Listing sandboxes with filter: %s", spew.Sdump(filter))
-	podSandboxList, err := v.metadataStore.ListPodSandbox(filter)
+	sandboxes, err := v.metadataStore.ListPodSandboxes(filter)
 	if err != nil {
 		glog.Errorf("Error when listing (with filter: %s) pod sandboxes: %v", spew.Sdump(filter), err)
 		return nil, err
+	}
+	var podSandboxList []*kubeapi.PodSandbox
+	for _, sandbox := range sandboxes {
+		sandboxInfo, err := sandbox.Retrieve()
+		if err != nil {
+			glog.Errorf("Error retrieving pod sandbox %q", sandbox.GetID())
+		}
+		if sandboxInfo != nil {
+			podSandboxList = append(podSandboxList, sandboxInfo.AsPodSandbox())
+		}
 	}
 	response := &kubeapi.ListPodSandboxResponse{Items: podSandboxList}
 	glog.V(3).Infof("ListPodSandbox response: %s", spew.Sdump(response))
@@ -346,24 +360,27 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 	// NOTE: there is no distinction between lack of key and other types of
 	// errors when accessing boltdb. This will be changed when we switch to
 	// storing whole marshaled sandbox metadata as json.
-	if remainingContainerId, _ := v.metadataStore.GetPodSandboxContainerID(podSandboxId); remainingContainerId != "" {
-		glog.V(3).Infof("CreateContainer: there's already a container in the sandbox (id: %s), cleaning it up", remainingContainerId)
-		if err := v.libvirtVirtualizationTool.RemoveContainer(remainingContainerId); err != nil {
-			glog.Errorf("Error cleaning up the old container with id %s: %v", remainingContainerId, err)
-			return nil, err
+	remainingContainers, err := v.metadataStore.ListPodContainers(podSandboxId)
+	if err != nil {
+		glog.V(3).Infof("Error retrieving pod %q containers", podSandboxId)
+	} else {
+		for _, container := range remainingContainers {
+			glog.V(3).Infof("CreateContainer: there's already a container in the sandbox (id: %s), cleaning it up", container.GetID())
+			if err := v.libvirtVirtualizationTool.RemoveContainer(container.GetID()); err != nil {
+				glog.Errorf("Error cleaning up the old container with id %s: %v", container.GetID(), err)
+				return nil, err
+			}
 		}
 	}
 
-	// TODO: get it as string
-	netAsBytes, err := v.metadataStore.GetPodNetworkConfigurationAsBytes(podSandboxId)
+	sandboxInfo, err := v.metadataStore.PodSandbox(podSandboxId).Retrieve()
 	if err != nil {
 		glog.Errorf("Error when retrieving pod network configuration for sandbox '%s': %v", podSandboxId, err)
 		return nil, err
 	}
-
-	netResult, err := cni.BytesToResult(netAsBytes)
+	netResult, err := cni.BytesToResult([]byte(sandboxInfo.CNIConfig))
 	if err != nil {
-		glog.Errorf("Error when unmarshaling pod network configuration for sandbox '%s': %v", podSandboxId, err)
+		glog.Errorf("Error loading network configuration for sandbox '%s': %v", podSandboxId, err)
 		return nil, err
 	}
 
@@ -377,7 +394,7 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 		return nil, err
 	}
 
-	uuid, err := v.libvirtVirtualizationTool.CreateContainer(vmConfig, netNSPath, string(netAsBytes))
+	uuid, err := v.libvirtVirtualizationTool.CreateContainer(vmConfig, netNSPath, sandboxInfo.CNIConfig)
 	if err != nil {
 		glog.Errorf("Error creating container %s: %v", name, err)
 		return nil, err

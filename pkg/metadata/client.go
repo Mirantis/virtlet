@@ -14,36 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package bolttools
+package metadata
 
 import (
 	"github.com/boltdb/bolt"
 )
 
-type BoltClient struct {
+type boltClient struct {
 	db *bolt.DB
 }
 
-func NewBoltClient(path string) (*BoltClient, error) {
+// NewMetadataStore is a factory function for MetadataStore interface
+func NewMetadataStore(path string) (MetadataStore, error) {
 	db, err := bolt.Open(path, 0600, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	client := &BoltClient{db: db}
-	if err := client.EnsureImageSchema(); err != nil {
-		return nil, err
-	}
-	if err := client.EnsureSandboxSchema(); err != nil {
-		return nil, err
-	}
-	if err := client.EnsureVirtualizationSchema(); err != nil {
-		return nil, err
-	}
-
+	client := &boltClient{db: db}
 	return client, nil
 }
 
-func (b *BoltClient) Close() error {
+// Close releases all database resources
+func (b boltClient) Close() error {
 	return b.db.Close()
 }

@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -156,7 +155,9 @@ type VirtualizationTool struct {
 
 var _ VolumeOwner = &VirtualizationTool{}
 
-func NewVirtualizationTool(domainConn virt.VirtDomainConnection, storageConn virt.VirtStorageConnection, imageManager ImageManager, metadataStore metadata.MetadataStore, volumePoolName, rawDevices string, volumeSource VMVolumeSource) (*VirtualizationTool, error) {
+func NewVirtualizationTool(domainConn virt.VirtDomainConnection, storageConn virt.VirtStorageConnection, imageManager ImageManager,
+	metadataStore metadata.MetadataStore, volumePoolName, rawDevices string, volumeSource VMVolumeSource) (*VirtualizationTool, error) {
+
 	volumePool, err := ensureStoragePool(storageConn, volumePoolName)
 	if err != nil {
 		return nil, err
@@ -384,10 +385,20 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netNSPath, cniCon
 
 	if err == nil {
 		// FIXME: store VMConfig + VMStatus (to be added)
-		err = v.metadataStore.SetContainer(config.Name, settings.domainUUID,
-			config.PodSandboxId, config.Image, cloneName,
-			labels, config.ContainerAnnotations,
-			config.Attempt, v.clock)
+		err = v.metadataStore.Container(settings.domainUUID).Save(
+			func(_ *metadata.ContainerInfo) (*metadata.ContainerInfo, error) {
+				return &metadata.ContainerInfo{
+					SandboxID:           config.PodSandboxId,
+					Name:                config.Name,
+					CreatedAt:           v.clock.Now().UnixNano(),
+					Image:               config.Image,
+					RootImageVolumeName: cloneName,
+					Labels:              labels,
+					Annotations:         config.ContainerAnnotations,
+					Attempt:             config.Attempt,
+					State:               kubeapi.ContainerState_CONTAINER_CREATED,
+				}, nil
+			})
 	}
 	if err != nil {
 		return "", err
@@ -436,15 +447,12 @@ func (v *VirtualizationTool) startContainer(containerId string) error {
 		return err
 	}
 
-	if err = v.metadataStore.UpdateState(containerId, byte(kubeapi.ContainerState_CONTAINER_RUNNING)); err != nil {
-		return fmt.Errorf("failed to update state of the domain %q: %v", containerId, err)
-	}
-
-	if err = v.metadataStore.UpdateStartedAt(containerId, strconv.FormatInt(v.clock.Now().UnixNano(), 10)); err != nil {
-		return fmt.Errorf("Failed to update start time of the domain %q: %v", containerId, err)
-	}
-
-	return nil
+	return v.metadataStore.Container(containerId).Save(
+		func(c *metadata.ContainerInfo) (*metadata.ContainerInfo, error) {
+			c.State = kubeapi.ContainerState_CONTAINER_RUNNING
+			c.StartedAt = v.clock.Now().UnixNano()
+			return c, nil
+		})
 }
 
 func (v *VirtualizationTool) StartContainer(containerId string) error {
@@ -514,7 +522,11 @@ func (v *VirtualizationTool) StopContainer(containerId string, timeout time.Dura
 	}
 
 	if err == nil {
-		err = v.metadataStore.UpdateState(containerId, byte(kubeapi.ContainerState_CONTAINER_EXITED))
+		err = v.metadataStore.Container(containerId).Save(
+			func(c *metadata.ContainerInfo) (*metadata.ContainerInfo, error) {
+				c.State = kubeapi.ContainerState_CONTAINER_EXITED
+				return c, nil
+			})
 	}
 
 	if err == nil {
@@ -528,7 +540,7 @@ func (v *VirtualizationTool) StopContainer(containerId string, timeout time.Dura
 }
 
 func (v *VirtualizationTool) getVMConfigFromMetadata(containerId string) (*VMConfig, kubeapi.ContainerState, error) {
-	containerInfo, err := v.metadataStore.GetContainerInfo(containerId)
+	containerInfo, err := v.metadataStore.Container(containerId).Retrieve()
 	if err != nil {
 		glog.Errorf("Error when retrieving domain %q info from metadata store: %v", containerId, err)
 		return nil, kubeapi.ContainerState_CONTAINER_UNKNOWN, err
@@ -538,14 +550,24 @@ func (v *VirtualizationTool) getVMConfigFromMetadata(containerId string) (*VMCon
 		return nil, kubeapi.ContainerState_CONTAINER_UNKNOWN, nil
 	}
 
+	podAnnotations := map[string]string{}
+	if containerInfo.SandboxID != "" {
+		sandbox, err := v.metadataStore.PodSandbox(containerInfo.SandboxID).Retrieve()
+		if err != nil {
+			glog.Errorf("Error when retrieving sandbox %q info from metadata store: %v", containerInfo.SandboxID, err)
+			return nil, kubeapi.ContainerState_CONTAINER_UNKNOWN, nil
+		}
+		podAnnotations = sandbox.Annotations
+	}
+
 	// TODO: here we're using incomplete VMConfig to tear down the volumes
 	// What actually needs to be done is storing VMConfig and VMStatus (to be added)
 	config := &VMConfig{
-		PodSandboxId:         containerInfo.SandboxId,
+		PodSandboxId:         containerInfo.SandboxID,
 		Name:                 containerInfo.Name,
 		Image:                containerInfo.Image,
 		DomainUUID:           containerId,
-		PodAnnotations:       containerInfo.SandBoxAnnotations,
+		PodAnnotations:       podAnnotations,
 		ContainerAnnotations: containerInfo.Annotations,
 		ContainerLabels:      containerInfo.Labels,
 	}
@@ -643,7 +665,11 @@ func (v *VirtualizationTool) RemoveContainer(containerId string) error {
 		return err
 	}
 
-	if v.metadataStore.RemoveContainer(containerId); err != nil {
+	if v.metadataStore.Container(containerId).Save(
+		func(_ *metadata.ContainerInfo) (*metadata.ContainerInfo, error) {
+			return nil, nil // delete container
+		},
+	); err != nil {
 		glog.Errorf("Error when removing container '%s' from metadata store: %v", containerId, err)
 		return err
 	}
@@ -684,7 +710,7 @@ func virtToKubeState(domainState virt.DomainState, lastState kubeapi.ContainerSt
 }
 
 func (v *VirtualizationTool) getContainerInfo(domain virt.VirtDomain, containerId string) (*metadata.ContainerInfo, error) {
-	containerInfo, err := v.metadataStore.GetContainerInfo(containerId)
+	containerInfo, err := v.metadataStore.Container(containerId).Retrieve()
 	if err != nil {
 		return nil, err
 	}
@@ -699,7 +725,12 @@ func (v *VirtualizationTool) getContainerInfo(domain virt.VirtDomain, containerI
 
 	containerState := virtToKubeState(state, containerInfo.State)
 	if containerInfo.State != containerState {
-		if err := v.metadataStore.UpdateState(containerId, byte(containerState)); err != nil {
+		if err := v.metadataStore.Container(containerId).Save(
+			func(c *metadata.ContainerInfo) (*metadata.ContainerInfo, error) {
+				c.State = containerState
+				return c, nil
+			},
+		); err != nil {
 			return nil, err
 		}
 		containerInfo.State = containerState
@@ -746,7 +777,7 @@ func (v *VirtualizationTool) getContainer(domain virt.VirtDomain) (*kubeapi.Cont
 		return nil, nil
 	}
 
-	podSandboxId := containerInfo.SandboxId
+	podSandboxId := containerInfo.SandboxID
 
 	metadata := &kubeapi.ContainerMetadata{
 		Name:    containerInfo.Name,
@@ -775,7 +806,7 @@ func (v *VirtualizationTool) ListContainers(filter *kubeapi.ContainerFilter) ([]
 	if filter != nil {
 		if filter.Id != "" {
 			// Verify if there is container metadata
-			containerInfo, err := v.metadataStore.GetContainerInfo(filter.Id)
+			containerInfo, err := v.metadataStore.Container(filter.Id).Retrieve()
 			if err != nil {
 				return nil, err
 			}
@@ -804,33 +835,36 @@ func (v *VirtualizationTool) ListContainers(filter *kubeapi.ContainerFilter) ([]
 			}
 			return containers, nil
 		} else if filter.PodSandboxId != "" {
-			domainID, err := v.metadataStore.GetPodSandboxContainerID(filter.PodSandboxId)
+			domainContainers, err := v.metadataStore.ListPodContainers(filter.PodSandboxId)
 			if err != nil {
 				// There's no such sandbox - looks like it's already removed, so return an empty list
 				return containers, nil
 			}
-			// Verify if there is container metadata
-			containerInfo, err := v.metadataStore.GetContainerInfo(domainID)
-			if err != nil {
-				return nil, err
-			}
-			if containerInfo == nil {
-				// There's no such container - looks like it's already removed, but still is mentioned in sandbox
-				return nil, fmt.Errorf("Container metadata not found, but it's still mentioned in sandbox %s", filter.PodSandboxId)
-			}
+			for _, containerMeta := range domainContainers {
+				// TODO: Distinguish lack of domain from other errors
+				domain, err := v.domainConn.LookupDomainByUUIDString(containerMeta.GetID())
+				if err != nil {
+					// There's no such domain - looks like it's already removed, so return an empty list
+					return containers, nil
+				}
 
-			// TODO: Distinguish lack of domain from other errors
-			domain, err := v.domainConn.LookupDomainByUUIDString(domainID)
-			if err != nil {
-				// There's no such domain - looks like it's already removed, so return an empty list
-				return containers, nil
-			}
-			container, err := v.getContainer(domain)
-			if err != nil {
-				return nil, err
-			}
-			if filterContainer(container, filter) {
-				containers = append(containers, container)
+				// Verify if there is container metadata
+				containerInfo, err := containerMeta.Retrieve()
+				if err != nil {
+					return nil, err
+				}
+				if containerInfo == nil {
+					// There's no such container - looks like it's already removed, but still is mentioned in sandbox
+					return nil, fmt.Errorf("Container metadata not found, but it's still mentioned in sandbox %s", filter.PodSandboxId)
+				}
+
+				container, err := v.getContainer(domain)
+				if err != nil {
+					return nil, err
+				}
+				if filterContainer(container, filter) {
+					containers = append(containers, container)
+				}
 			}
 			return containers, nil
 		}

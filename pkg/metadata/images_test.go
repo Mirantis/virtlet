@@ -1,5 +1,5 @@
 /*
-Copyright 2016 Mirantis
+Copyright 2017 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package bolttools
+package metadata
 
 import "testing"
 
@@ -33,21 +33,17 @@ func TestGetImageName(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		b, err := NewFakeBoltClient()
+		store, err := NewFakeMetadataStore()
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if err := b.EnsureImageSchema(); err != nil {
-			t.Fatal(err)
-		}
-
-		err = b.SetImageName(tc.volumeName, tc.imageName)
+		err = store.SetImageName(tc.volumeName, tc.imageName)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		imageName, err := b.GetImageName(tc.volumeName)
+		imageName, err := store.GetImageName(tc.volumeName)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -59,16 +55,12 @@ func TestGetImageName(t *testing.T) {
 }
 
 func TestGetNonExistentImageName(t *testing.T) {
-	b, err := NewFakeBoltClient()
+	store, err := NewFakeMetadataStore()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := b.EnsureImageSchema(); err != nil {
-		t.Fatal(err)
-	}
-
-	imageName, err := b.GetImageName("no-such-volume")
+	imageName, err := store.GetImageName("no-such-volume")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,24 +71,20 @@ func TestGetNonExistentImageName(t *testing.T) {
 }
 
 func TestRemoveImage(t *testing.T) {
-	b, err := NewFakeBoltClient()
+	store, err := NewFakeMetadataStore()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err = b.EnsureImageSchema(); err != nil {
+	if err = store.SetImageName("another-distro", "another.example.com/another-distro"); err != nil {
 		t.Fatal(err)
 	}
 
-	if err = b.SetImageName("another-distro", "another.example.com/another-distro"); err != nil {
+	if err = store.RemoveImage("another-distro"); err != nil {
 		t.Fatal(err)
 	}
 
-	if err = b.RemoveImage("another-distro"); err != nil {
-		t.Fatal(err)
-	}
-
-	imageName, err := b.GetImageName("another-distro")
+	imageName, err := store.GetImageName("another-distro")
 	if err != nil {
 		t.Fatal(err)
 	}
