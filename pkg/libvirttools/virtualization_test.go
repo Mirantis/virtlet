@@ -28,8 +28,8 @@ import (
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 
-	"github.com/Mirantis/virtlet/pkg/bolttools"
 	"github.com/Mirantis/virtlet/pkg/flexvolume"
+	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/Mirantis/virtlet/pkg/virt/fake"
 	"github.com/Mirantis/virtlet/tests/criapi"
@@ -54,7 +54,7 @@ type containerTester struct {
 	rec            *fake.TopLevelRecorder
 	domainConn     *fake.FakeDomainConnection
 	storageConn    *fake.FakeStorageConnection
-	boltClient     *bolttools.BoltClient
+	metadataStore  metadata.MetadataStore
 }
 
 func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTester {
@@ -74,19 +74,9 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 	ct.domainConn = fake.NewFakeDomainConnection(ct.rec.Child("domain conn"))
 	ct.storageConn = fake.NewFakeStorageConnection(ct.rec.Child("storage"))
 
-	ct.boltClient, err = bolttools.NewFakeBoltClient()
+	ct.metadataStore, err = metadata.NewFakeMetadataStore()
 	if err != nil {
 		t.Fatalf("Failed to create fake bolt client: %v", err)
-	}
-	// TODO: uncomment this after moving image metadata handling to ImageTool
-	// if err := boltClient.EnsureImageSchema(); err != nil {
-	// 	t.Fatalf("boltClient: failed to create image schema: %v", err)
-	// }
-	if err := ct.boltClient.EnsureSandboxSchema(); err != nil {
-		t.Fatalf("boltClient: failed to create sandbox schema: %v", err)
-	}
-	if err := ct.boltClient.EnsureVirtualizationSchema(); err != nil {
-		t.Fatalf("boltClient: failed to create virtualization schema: %v", err)
 	}
 
 	imageTool, err := NewImageTool(ct.storageConn, downloader, "default")
@@ -100,7 +90,7 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 		// XXX: GetNocloudVolume must go last because it
 		// doesn't produce correct name for cdrom devices
 		GetNocloudVolume)
-	ct.virtTool, err = NewVirtualizationTool(ct.domainConn, ct.storageConn, imageTool, ct.boltClient, "volumes", "loop*", volSrc)
+	ct.virtTool, err = NewVirtualizationTool(ct.domainConn, ct.storageConn, imageTool, ct.metadataStore, "volumes", "loop*", volSrc)
 	if err != nil {
 		t.Fatalf("failed to create VirtualizationTool: %v", err)
 	}
@@ -125,7 +115,14 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 }
 
 func (ct *containerTester) setPodSandbox(config *kubeapi.PodSandboxConfig) {
-	if err := ct.boltClient.SetPodSandbox(config, []byte(fakeCNIConfig), kubeapi.PodSandboxState_SANDBOX_READY, ct.clock); err != nil {
+	psi, _ := metadata.NewPodSandboxInfo(config, fakeCNIConfig, kubeapi.PodSandboxState_SANDBOX_READY, ct.clock)
+	sandbox := ct.metadataStore.PodSandbox(config.Metadata.Uid)
+	err := sandbox.Save(
+		func(c *metadata.PodSandboxInfo) (*metadata.PodSandboxInfo, error) {
+			return psi, nil
+		},
+	)
+	if err != nil {
 		ct.t.Fatalf("Failed to store pod sandbox: %v", err)
 	}
 }
