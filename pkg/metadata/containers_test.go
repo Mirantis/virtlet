@@ -1,5 +1,5 @@
 /*
-Copyright 2016 Mirantis
+Copyright 2017 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package bolttools
+package metadata
 
 import (
 	"reflect"
@@ -27,16 +27,16 @@ func TestSetGetContainerInfo(t *testing.T) {
 	sandboxes := criapi.GetSandboxes(2)
 	containers := criapi.GetContainersConfig(sandboxes)
 
-	b := SetUpBolt(t, sandboxes, containers)
+	store := setUpTestStore(t, sandboxes, containers)
 
 	for _, container := range containers {
-		containerInfo, err := b.GetContainerInfo(container.ContainerId)
+		containerInfo, err := store.Container(container.ContainerId).Retrieve()
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if containerInfo.SandboxId != container.SandboxId {
-			t.Errorf("Expected %s, instead got %s", container.SandboxId, containerInfo.SandboxId)
+		if containerInfo.SandboxID != container.SandboxId {
+			t.Errorf("Expected %s, instead got %s", container.SandboxId, containerInfo.SandboxID)
 		}
 
 		if containerInfo.Image != container.Image {
@@ -57,25 +57,27 @@ func TestRemoveContainer(t *testing.T) {
 	sandboxes := criapi.GetSandboxes(2)
 	containers := criapi.GetContainersConfig(sandboxes)
 
-	b := SetUpBolt(t, sandboxes, containers)
+	store := setUpTestStore(t, sandboxes, containers)
 
 	for _, container := range containers {
-		contID, err := b.GetPodSandboxContainerID(container.SandboxId)
+		podContainers, err := store.ListPodContainers(container.SandboxId)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if contID != container.ContainerId {
-			t.Errorf("Expected to get containerID: '%s' in ContainerID field: '%s' of PodSandbox:'%s'", container.ContainerId, contID, container.SandboxId)
+		if len(podContainers) != 1 || podContainers[0].GetID() != container.ContainerId {
+			t.Errorf("Unexpected container list length: %d != 1", len(podContainers))
 		}
-		if err := b.RemoveContainer(container.ContainerId); err != nil {
+		if err := store.Container(container.ContainerId).Save(func(c *ContainerInfo) (*ContainerInfo, error) {
+			return nil, nil
+		}); err != nil {
 			t.Fatal(err)
 		}
-		contID, err = b.GetPodSandboxContainerID(container.SandboxId)
+		podContainers, err = store.ListPodContainers(container.SandboxId)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if contID != "" {
-			t.Errorf("Expected to have empty string in ContainerID of PodSandbox after removing of container with id: '%s' but have:'%v'", container.ContainerId, contID)
+		if len(podContainers) != 0 {
+			t.Errorf("Unexpected container list length: %d != 0", len(podContainers))
 		}
 	}
 }
