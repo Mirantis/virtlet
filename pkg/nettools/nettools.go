@@ -499,10 +499,17 @@ func SetupContainerSideNetwork(info *current.Result) (*ContainerSideNetwork, err
 	// config and extract interface config instead. That's the
 	// case with Weave CNI plugin.
 	if info == nil || cni.GetPodIP(info) == "" || len(info.Routes) == 0 {
+		var dnsInfo types.DNS
+		if info != nil {
+			dnsInfo = info.DNS
+		}
 		info, err = ExtractLinkInfo(contVeth)
 		if err != nil {
 			return nil, err
 		}
+		// extracted info doesn't have DNS information, so
+		// still try to extract it from CNI-provided data
+		info.DNS = dnsInfo
 	}
 
 	hwAddr := contVeth.Attrs().HardwareAddr
