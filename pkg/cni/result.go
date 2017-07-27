@@ -22,14 +22,12 @@ import (
 	"github.com/containernetworking/cni/pkg/types"
 )
 
-func ResultToBytes(result *types.Result) ([]byte, error) {
-	return json.Marshal(result)
-}
-
 func BytesToResult(data []byte) (*types.Result, error) {
 	result := types.Result{}
-	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, err
+	if len(data) > 0 {
+		if err := json.Unmarshal(data, &result); err != nil {
+			return nil, err
+		}
 	}
 
 	return &result, nil

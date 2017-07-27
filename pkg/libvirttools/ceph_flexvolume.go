@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strings"
 
-       "github.com/golang/glog"
+	"github.com/golang/glog"
 
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
@@ -46,7 +46,7 @@ type cephFlexvolumeOptions struct {
 type cephVolume struct {
 	volumeBase
 	volumeName string
-	opts *cephFlexvolumeOptions
+	opts       *cephFlexvolumeOptions
 }
 
 func newCephVolume(volumeName, configPath string, config *VMConfig, owner VolumeOwner) (VMVolume, error) {
@@ -81,8 +81,8 @@ func (v *cephVolume) secretDef() *libvirtxml.Secret {
 		// it's more convenient to use it for manipulating secrets
 		// and preserve using UUIDv5 as part of value
 		// UUID value is generated randomly
-		UUID:      utils.NewUuid(),
-		Usage:     &libvirtxml.SecretUsage{Name: v.secretUsageName(), Type: "ceph"},
+		UUID:  utils.NewUuid(),
+		Usage: &libvirtxml.SecretUsage{Name: v.secretUsageName(), Type: "ceph"},
 	}
 }
 
@@ -117,7 +117,7 @@ func (v *cephVolume) Setup(volumeMap map[string]string) (*libvirtxml.DomainDisk,
 		Auth: &libvirtxml.DomainDiskAuth{
 			Username: v.opts.User,
 			Secret: &libvirtxml.DomainDiskSecret{
-				Type: "ceph",
+				Type:  "ceph",
 				Usage: v.secretUsageName(),
 			},
 		},
@@ -139,10 +139,10 @@ func (v *cephVolume) Teardown() error {
 	switch {
 	case err == virt.ErrSecretNotFound:
 		// ok, no need to delete the secret
-               glog.V(3).Infof("No secret with usage name %q for ceph volume was found", v.secretUsageName())
-               return nil
+		glog.V(3).Infof("No secret with usage name %q for ceph volume was found", v.secretUsageName())
+		return nil
 	case err == nil:
-               glog.V(3).Infof("Removing secret with usage name: %q", v.secretUsageName())
+		glog.V(3).Infof("Removing secret with usage name: %q", v.secretUsageName())
 		err = secret.Remove()
 	}
 	if err != nil {

@@ -12,6 +12,6 @@ CFLAGS="$CFLAGS $glib_CFLAGS $libvirt_CFLAGS"
 LDFLAGS="$LDFLAGS"
 LIBS="$LIBS $glib_LIBS $libvirt_LIBS"
 
-AC_CONFIG_FILES([Makefile pkg/bolttools/Makefile pkg/libvirttools/Makefile pkg/manager/Makefile pkg/nettools/Makefile pkg/criproxy/Makefile pkg/flexvolume/Makefile tests/integration/Makefile tests/network/Makefile pkg/log/Makefile])
+AC_CONFIG_FILES([Makefile pkg/libvirttools/Makefile pkg/manager/Makefile pkg/nettools/Makefile pkg/criproxy/Makefile pkg/flexvolume/Makefile tests/integration/Makefile tests/network/Makefile pkg/log/Makefile pkg/metadata/Makefile])
 
 AC_OUTPUT

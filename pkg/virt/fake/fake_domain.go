@@ -30,11 +30,11 @@ import (
 )
 
 type FakeDomainConnection struct {
-	rec                 Recorder
-	domains             map[string]*FakeDomain
-	domainsByUuid       map[string]*FakeDomain
-	secretsByUsageName  map[string]*FakeSecret
-	ignoreShutdown      bool
+	rec                Recorder
+	domains            map[string]*FakeDomain
+	domainsByUuid      map[string]*FakeDomain
+	secretsByUsageName map[string]*FakeSecret
+	ignoreShutdown     bool
 }
 
 var _ virt.VirtDomainConnection = &FakeDomainConnection{}
