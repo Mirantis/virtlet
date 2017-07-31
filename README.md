@@ -2,7 +2,7 @@
 
 Virtlet is a Kubernetes runtime server which allows you to run VM workloads, based on QCOW2 images.
 
-At this stage (pre-alpha), it's possible to run Virtlet by following the instructions from either [Running local environment](docs/devel/running-local-environment.md) or [Deploy using DaemonSets](deploy/README.md) documents. There's also [separate document](deploy/real-cluster.md) describing the process of installing Virtlet on real clusters.
+It is possible to run Virtlet by following the instructions from either [Running local environment](docs/devel/running-local-environment.md) or [Deploy using DaemonSets](deploy/README.md) documents. There's also [separate document](deploy/real-cluster.md) describing the process of installing Virtlet on real clusters.
 
 [See here](docs/architecture.md) for the description of Virtlet architecture.
 
@@ -51,7 +51,7 @@ The demo is based on [kubeadm-dind-cluster](https://github.com/Mirantis/kubeadm-
 You can remove the test cluster with `./dind-cluster-v1.6.sh clean` when you no longer need it.
 
 ## External projects using Virtlet
-Even if Virtlet is in pre-alpha stage at this point, we have some external projects using it already.
+There are some external projects using Virtlet already.
 One interesting usecase is that of [MIKELANGELO project](https://www.mikelangelo-project.eu/) that
 runs [OSv unikernels](http://osv.io) on Kubernetes using Virtlet. Unikernels are special case of VMs
 that are extremely small in size (20MB or so) and can only run a single process each. Nevertheless,
