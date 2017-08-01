@@ -1,17 +1,12 @@
 digraph criproxy {
-        subgraph cluster_0 {
-                criproxy [label="CRI Proxy\nServer"];
-                docker_shim [label="docker-shim\nServer"];       
-                criproxy -> docker_shim [label=" CRI API (gRPC) "];
-                color=black;
-                label="CRI Proxy Process";
-                
-        }
+        criproxy [label="CRI Proxy\nServer"];
+        dockershim [label="dockershim"];       
         kubelet [shape=rectangle];
         docker [shape=rectangle];
         altruntime [shape=rectangle];
         kubelet -> criproxy [label=" CRI API (gRPC)"];
+        criproxy -> dockershim [label=" CRI API (gRPC) "];
         altruntime [label="Secondary Runtime Server\n(e.g. virtlet)"];
         criproxy -> altruntime [label="  CRI API (gRPC)"];
-        docker_shim -> docker [label=" Docker API"];
+        dockershim -> docker [label=" Docker API"];
 }

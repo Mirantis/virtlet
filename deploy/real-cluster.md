@@ -43,7 +43,7 @@ removing `--authorization-mode` option from the kubelet command line.
 
 You may want to make sure that kubelet server is accessible using
 this command on the node:
-```
+```bash
 curl -k https://127.0.0.1:10250/configz
 ```
 
@@ -54,26 +54,63 @@ The process described here must be repeated on each node that will run Virtlet.
 In order to set up Virtlet on a node, first of all you need to get the CRI Proxy binary:
 ```bash
 docker run --rm mirantis/virtlet tar -c /criproxy | tar -C /usr/local/bin -xv
+ln -s criproxy /usr/local/bin/dockershim
 ```
 
-CRI Proxy needs Kubelet config in JSON format to start its internal docker-shim server.
-You can obtain the config using the following commands on a machine with apiserver access
-(this requires `jq` utility which can be installed with `apt-get
-install jq` on Debian derivatives or `dnf install jq` on RPM based systems):
-
+Then you need to create an empty file named `/etc/criproxy/node.conf`
+that will prevent virtlet daemonset from invoking the automatic
+bootstrap procedure:
 ```bash
-kubectl proxy&
-curl http://127.0.0.1:8001/api/v1/proxy/nodes/XXXXXX/configz | jq '.componentconfig' >kubelet.conf
+mkdir /etc/criproxy
+touch /etc/criproxy/node.conf
 ```
 
-Replace `XXXXXX` with the node name and copy the resulting file to
-`/etc/criproxy/kubelet.conf` on the corresponding node. **NOTE:** The
-location of the file is important as it's checked by the init container
-of Virtlet DaemonSet.
+Now you need to create systemd units that will start the `dockershim`
+and CRI Proxy. Here we assume that kubelet is started via
+`kubelet.service` systemd unit.
 
-Now you need to create a systemd unit that will start the CRI Proxy.
-Here we assume that kubelet is started via `kubelet.service` systemd
-unit. Create a file named `/etc/systemd/system/criproxy.service` with
+`dockershim` is a part of kubelet that interfaces with Docker. It's
+built into `criproxy` binary and is run when `criproxy` binary is
+invoked using a symbolic link named `dockershim`. You need to pass
+copy the following flags from kubelet command line to `dockershim`:
+* `--network-plugin`
+* `--hairpin-mode`
+* `--non-masquerade-cidr`
+* `--cni-conf-dir`
+* `--cni-bin-dir`
+* `--docker-endpoint`
+* `--runtime-request-timeout`
+* `--image-pull-progress-deadline`
+* `--streaming-connection-idle-timeout`
+* `--docker-exec-handler`
+* `--seccomp-profile-root`
+* `--pod-infra-container-image`
+* `--runtime-cgroups`
+* `--cgroup-driver`
+* `--network-plugin-mtu`
+Any other flags are ignored, so you can just copy the whole kubelet
+command line there except for kubelet executable itself.
+
+Create a file named `/etc/systemd/system/dockershim.service` with
+the following content (you can also use `systemctl --force edit dockershim.service` for it),
+replacing `......` with kubelet command line arguments (a naive way to get them
+is just to do `ps aux|grep kubelet` if you have `kubelet` service running):
+
+```ini
+[Unit]
+Description=dockershim for criproxy
+
+[Service]
+ExecStart=/usr/local/bin/dockershim ......
+Restart=always
+StartLimitInterval=0
+RestartSec=10
+
+[Install]
+RequiredBy=criproxy.service
+```
+
+Create a file named `/etc/systemd/system/criproxy.service` with
 the following content (you can also use `systemctl --force edit criproxy.service` for it):
 
 ```ini
@@ -81,7 +118,7 @@ the following content (you can also use `systemctl --force edit criproxy.service
 Description=CRI Proxy
 
 [Service]
-ExecStart=/usr/local/bin/criproxy -v 3 -alsologtostderr -connect docker,virtlet:/run/virtlet.sock -kubeletcfg /etc/criproxy/kubelet.conf -listen /run/criproxy.sock
+ExecStart=/usr/local/bin/criproxy -v 3 -alsologtostderr -connect /var/run/dockershim.sock,virtlet:/run/virtlet.sock -listen /run/criproxy.sock
 Restart=always
 StartLimitInterval=0
 RestartSec=10
@@ -92,19 +129,20 @@ WantedBy=kubelet.service
 
 You can remove `-v 3` option to reduce verbosity level of the proxy.
 
-Then enable and start the unit:
+Then enable and start the units after stopping kubelet:
 ```bash
+systemctl stop kubelet
 systemctl daemon-reload
-systemctl enable criproxy
-systemctl start criproxy
+systemctl enable criproxy dockershim
+systemctl start criproxy dockershim
 ```
 
 Then we need to reconfigure kubelet. You need to pass the following extra flags to it
 to make it use CRI Proxy:
 ```bash
 --container-runtime=remote \
---container-runtime-endpoint=/run/criproxy.sock \
---image-service-endpoint=/run/criproxy.sock \
+--container-runtime-endpoint=unix:///run/criproxy.sock \
+--image-service-endpoint=unix:///run/criproxy.sock \
 --enable-controller-attach-detach=false
 ```
 
@@ -118,10 +156,10 @@ following content:
 Environment="KUBELET_EXTRA_ARGS=--container-runtime=remote --container-runtime-endpoint=/run/criproxy.sock --image-service-endpoint=/run/criproxy.sock --enable-controller-attach-detach=false"
 ```
 
-Then you need to restart kubelet:
+Then you need to start dockershim and criproxy services, then restart kubelet:
 ```bash
 systemctl daemon-reload
-systemctl restart kubelet
+systemctl start kubelet
 ```
 
 # Deploying Virtlet DaemonSet
@@ -133,7 +171,7 @@ kubectl label node XXXXXX extraRuntime=virtlet
 
 Then you can deploy Virtlet DaemonSet:
 ```bash
-kubectl create -f -f https://raw.githubusercontent.com/Mirantis/virtlet/master/deploy/virtlet-ds.yaml
+kubectl create -f https://raw.githubusercontent.com/Mirantis/virtlet/master/deploy/virtlet-ds.yaml
 ```
 
 By default it has KVM enabled, but you can patch the DaemonSet
@@ -219,5 +257,4 @@ changes in Kubelet flags, e.g. by removing
 `/etc/systemd/system/kubelet.service.d/20-virtlet.conf` in case of
 kubeadm scenario described above. After this you need to restart
 kubelet and remove the CRI Proxy binary (`/usr/local/bin/criproxy`)
-and its saved kubelet configuration file
-(`/etc/criproxy/kubelet.conf`).
+and its node configuration file (`/etc/criproxy/node.conf`).
