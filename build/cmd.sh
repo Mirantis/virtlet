@@ -188,7 +188,7 @@ function kvm_ok {
 }
 
 function start_dind {
-    kubectl label node kube-master extraRuntime=virtlet
+    kubectl label node --overwrite kube-master extraRuntime=virtlet
     if kvm_ok; then
         kubectl convert -f "${project_dir}/deploy/virtlet-ds-dev.yaml" --local -o json |
             docker exec -i kube-master jq '.items[0].spec.template.spec.containers[0].env|=map(select(.name!="VIRTLET_DISABLE_KVM"))' |
