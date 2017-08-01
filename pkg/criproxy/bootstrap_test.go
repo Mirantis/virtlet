@@ -143,8 +143,8 @@ func TestPatchKubeletConfig(t *testing.T) {
 	enableControllerAttachDetach := false
 	expectedDiff := map[string]interface{}{
 		"ContainerRuntime":             "remote",
-		"RemoteRuntimeEndpoint":        "/run/criproxy.sock",
-		"RemoteImageEndpoint":          "/run/criproxy.sock",
+		"RemoteRuntimeEndpoint":        "unix:///run/criproxy.sock",
+		"RemoteImageEndpoint":          "unix:///run/criproxy.sock",
 		"EnableControllerAttachDetach": &enableControllerAttachDetach,
 	}
 	diff := diffStructs(&kubeCfg, &newKubeCfg)
@@ -157,7 +157,7 @@ func TestPatchKubeletConfig(t *testing.T) {
 		if err != nil {
 			t.Fatalf("can't marshal struct diff: %v", err)
 		}
-		t.Errorf("bad kubelet config diff:\n%#v\n--vs--\n%#v", m, mExp)
+		t.Errorf("bad kubelet config diff:\n%s\n--vs--\n%s", m, mExp)
 	}
 
 	kubeCfg = newKubeCfg
