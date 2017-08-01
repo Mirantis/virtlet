@@ -48,7 +48,7 @@ import (
 const (
 	BusyboxImageName = "busybox:1.26.2"
 	// TODO: use the same constant/setting in different parts of code
-	proxyRuntimeEndpoint             = "/run/criproxy.sock"
+	proxyRuntimeEndpoint             = "unix:///run/criproxy.sock"
 	proxyStopTimeoutSeconds          = 5
 	confFileMode                     = 0600
 	confDirMode                      = 0700
