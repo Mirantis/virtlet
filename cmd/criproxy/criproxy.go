@@ -46,22 +46,12 @@ var (
 	apiServerHost = flag.String("apiserver", "", "apiserver URL")
 )
 
-// runCriProxy starts CRI proxy and optionally a dockershim
+// runCriProxy starts CRI proxy and optionally a dockershim.
+// In case if starting dockershim is requested (via 'docker' entry in
+// 'connect'), nodeInfoPath must point to the node info file
 func runCriProxy(connect, listen, nodeInfoPath string) error {
-	firstRun := false
-
-	ni, err := criproxy.LoadNodeInfo(nodeInfoPath)
-	if err != nil {
-		return err
-	}
-
-	if ni.FirstRun {
-		firstRun = true
-		ni.FirstRun = false
-		if err := ni.Write(nodeInfoPath); err != nil {
-			return err
-		}
-	}
+	var ni *criproxy.NodeInfo
+	shouldClean := false
 
 	addrs := strings.Split(connect, ",")
 	dockerStarted := false
@@ -74,6 +64,20 @@ func runCriProxy(connect, listen, nodeInfoPath string) error {
 			return fmt.Errorf("More than one 'docker' endpoint is specified")
 		}
 
+		var err error
+		ni, err = criproxy.LoadNodeInfo(nodeInfoPath)
+		if err != nil {
+			return err
+		}
+
+		if ni.FirstRun {
+			shouldClean = true
+			ni.FirstRun = false
+			if err := ni.Write(nodeInfoPath); err != nil {
+				return err
+			}
+		}
+
 		kw := dockershim.NewKubeletWrapper(ni.KubeletArgs)
 		addrs[n] = kw.Endpoint()
 		glog.V(1).Infof("Starting dockershim on %q", kw.Endpoint())
@@ -81,7 +85,6 @@ func runCriProxy(connect, listen, nodeInfoPath string) error {
 		dockerStarted = true
 	}
 
-	shouldClean := firstRun
 	proxy, err := criproxy.NewRuntimeProxy(addrs, connectionTimeout, func() {
 		// must do this after the old kubelet has exited
 		if shouldClean {
@@ -153,12 +156,8 @@ func installCriProxy(execPath, nodeInfoPath string) error {
 }
 
 func main() {
-	execPath, err := os.Executable()
-	if err != nil {
-		glog.Error("Can't get criproxy executable path: %v", err)
-		os.Exit(1)
-	}
-	if filepath.Base(execPath) == dockershimExecutableName {
+	cmdPath := os.Args[0]
+	if filepath.Base(cmdPath) == dockershimExecutableName {
 		kw := dockershim.NewKubeletWrapper(os.Args)
 		kw.RunDockershim()
 	} else {
@@ -173,6 +172,11 @@ func main() {
 		case *grab:
 			err = grabKubeletInfo(*nodeInfoPath)
 		case *install:
+			execPath, err := os.Executable()
+			if err != nil {
+				glog.Error("Can't get criproxy executable path: %v", err)
+				os.Exit(1)
+			}
 			err = installCriProxy(execPath, *nodeInfoPath)
 		default:
 			err = runCriProxy(*connect, *listen, *nodeInfoPath)
