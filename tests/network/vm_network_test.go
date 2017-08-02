@@ -29,8 +29,8 @@ import (
 	"time"
 
 	"github.com/containernetworking/cni/pkg/ns"
-	"github.com/containernetworking/cni/pkg/types"
-	"github.com/containernetworking/cni/pkg/types/current"
+	cnitypes "github.com/containernetworking/cni/pkg/types"
+	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
 
@@ -69,15 +69,15 @@ func TestVmNetwork(t *testing.T) {
 		t.Fatalf("Failed to create ns for dhcp client: %v", err)
 	}
 
-	info := &current.Result{
-		Interfaces: []*current.Interface{
+	info := &cnicurrent.Result{
+		Interfaces: []*cnicurrent.Interface{
 			{
 				Name: "eth0",
 				Mac:  "42:a4:a6:22:80:2e",
 				// TODO: Sandbox
 			},
 		},
-		IPs: []*current.IPConfig{
+		IPs: []*cnicurrent.IPConfig{
 			{
 				Version:   "4",
 				Interface: 0,
@@ -88,7 +88,7 @@ func TestVmNetwork(t *testing.T) {
 				Gateway: net.IP{10, 1, 90, 1},
 			},
 		},
-		Routes: []*types.Route{
+		Routes: []*cnitypes.Route{
 			{
 				Dst: net.IPNet{
 					IP:   net.IP{0, 0, 0, 0},

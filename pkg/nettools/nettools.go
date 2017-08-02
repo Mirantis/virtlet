@@ -45,8 +45,8 @@ import (
 	"unsafe"
 
 	"github.com/containernetworking/cni/pkg/ns"
-	"github.com/containernetworking/cni/pkg/types"
-	"github.com/containernetworking/cni/pkg/types/current"
+	cnitypes "github.com/containernetworking/cni/pkg/types"
+	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/vishvananda/netlink"
 
 	"github.com/Mirantis/virtlet/pkg/cni"
@@ -81,7 +81,7 @@ type InterfaceInfo struct {
 }
 
 type ContainerNetwork struct {
-	Info   *current.Result
+	Info   *cnicurrent.Result
 	DhcpNS ns.NetNS
 }
 
@@ -360,7 +360,7 @@ func StripLink(link netlink.Link) error {
 // There must be exactly one veth interface in the namespace
 // and exactly one address associated with veth.
 // Returns interface info struct and error, if any.
-func ExtractLinkInfo(link netlink.Link) (*current.Result, error) {
+func ExtractLinkInfo(link netlink.Link) (*cnicurrent.Result, error) {
 	addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get addresses for link: %v", err)
@@ -369,15 +369,15 @@ func ExtractLinkInfo(link netlink.Link) (*current.Result, error) {
 		return nil, fmt.Errorf("expected exactly one address for link, but got %v", addrs)
 	}
 
-	result := &current.Result{
-		Interfaces: []*current.Interface{
+	result := &cnicurrent.Result{
+		Interfaces: []*cnicurrent.Interface{
 			{
 				Name: link.Attrs().Name,
 				Mac:  link.Attrs().HardwareAddr.String(),
 				// TODO: Sandbox?
 			},
 		},
-		IPs: []*current.IPConfig{
+		IPs: []*cnicurrent.IPConfig{
 			{
 				Version:   "4",
 				Interface: 0,
@@ -398,7 +398,7 @@ func ExtractLinkInfo(link netlink.Link) (*current.Result, error) {
 			// route has only Src
 		case (route.Dst == nil || route.Dst.IP == nil):
 			result.IPs[0].Gateway = route.Gw
-			result.Routes = append(result.Routes, &types.Route{
+			result.Routes = append(result.Routes, &cnitypes.Route{
 				Dst: net.IPNet{
 					IP:   net.IP{0, 0, 0, 0},
 					Mask: net.IPMask{0, 0, 0, 0},
@@ -406,7 +406,7 @@ func ExtractLinkInfo(link netlink.Link) (*current.Result, error) {
 				GW: route.Gw,
 			})
 		default:
-			result.Routes = append(result.Routes, &types.Route{
+			result.Routes = append(result.Routes, &cnitypes.Route{
 				Dst: *route.Dst,
 				GW:  route.Gw,
 			})
@@ -471,7 +471,7 @@ func setHardwareAddr(link netlink.Link, hwaddr net.HardwareAddr) error {
 // namespace properties
 type ContainerSideNetwork struct {
 	// Result contains CNI result object describing the network settings
-	Result *current.Result
+	Result *cnicurrent.Result
 	// TapFile contains an open File object pointing to Tap device inside
 	// the network namespace
 	TapFile *os.File
@@ -490,7 +490,7 @@ type ContainerSideNetwork struct {
 // for dhcp server.
 // The function should be called from within container namespace.
 // Returns container network struct and an error, if any
-func SetupContainerSideNetwork(info *current.Result) (*ContainerSideNetwork, error) {
+func SetupContainerSideNetwork(info *cnicurrent.Result) (*ContainerSideNetwork, error) {
 	contVeth, err := FindVeth()
 	if err != nil {
 		return nil, err
@@ -499,7 +499,7 @@ func SetupContainerSideNetwork(info *current.Result) (*ContainerSideNetwork, err
 	// config and extract interface config instead. That's the
 	// case with Weave CNI plugin.
 	if info == nil || cni.GetPodIP(info) == "" || len(info.Routes) == 0 {
-		var dnsInfo types.DNS
+		var dnsInfo cnitypes.DNS
 		if info != nil {
 			dnsInfo = info.DNS
 		}
@@ -578,7 +578,7 @@ func TeardownBridge(bridge netlink.Link, links []netlink.Link) error {
 }
 
 // ConfigureLink adds to link ip address and routes based on info.
-func ConfigureLink(link netlink.Link, info *current.Result) error {
+func ConfigureLink(link netlink.Link, info *cnicurrent.Result) error {
 	var addr *netlink.Addr
 	for _, ip := range info.IPs {
 		if ip.Version == "4" {

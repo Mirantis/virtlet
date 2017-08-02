@@ -30,7 +30,7 @@ import (
 	"time"
 
 	"github.com/containernetworking/cni/pkg/ns"
-	"github.com/containernetworking/cni/pkg/types/current"
+	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/golang/glog"
 
 	"github.com/Mirantis/virtlet/pkg/dhcp"
@@ -181,7 +181,7 @@ func parent(exitEOF chan bool, sigTERM chan os.Signal) {
 }
 
 func child(exitEOF chan bool, sigTERM chan os.Signal) {
-	var info *current.Result
+	var info *cnicurrent.Result
 
 	go catchParentKilled(exitEOF)
 

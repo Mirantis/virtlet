@@ -25,8 +25,8 @@ import (
 	"testing"
 
 	"github.com/containernetworking/cni/pkg/ns"
-	"github.com/containernetworking/cni/pkg/types"
-	"github.com/containernetworking/cni/pkg/types/current"
+	cnitypes "github.com/containernetworking/cni/pkg/types"
+	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/vishvananda/netlink"
 )
@@ -36,15 +36,15 @@ const (
 	outerHwAddr = "42:b5:b7:33:91:3f"
 )
 
-var expectedExtractedLinkInfo = current.Result{
-	Interfaces: []*current.Interface{
+var expectedExtractedLinkInfo = cnicurrent.Result{
+	Interfaces: []*cnicurrent.Interface{
 		{
 			Name: "eth0",
 			Mac:  innerHwAddr,
 			// TODO: Sandbox
 		},
 	},
-	IPs: []*current.IPConfig{
+	IPs: []*cnicurrent.IPConfig{
 		{
 			Version:   "4",
 			Interface: 0,
@@ -55,7 +55,7 @@ var expectedExtractedLinkInfo = current.Result{
 			Gateway: net.IP{10, 1, 90, 1},
 		},
 	},
-	Routes: []*types.Route{
+	Routes: []*cnitypes.Route{
 		{
 			Dst: net.IPNet{
 				IP:   net.IP{0, 0, 0, 0},
@@ -342,7 +342,7 @@ func TestExtractLinkInfo(t *testing.T) {
 	})
 }
 
-func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, info *current.Result) {
+func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, info *cnicurrent.Result) {
 	origHwAddr := origContVeth.Attrs().HardwareAddr
 	csn, err := SetupContainerSideNetwork(info)
 	if err != nil {
@@ -433,7 +433,7 @@ func verifyNoLinks(t *testing.T, linkNames []string) {
 	}
 }
 
-func verifyVethHaveConfiguration(t *testing.T, info *current.Result) {
+func verifyVethHaveConfiguration(t *testing.T, info *cnicurrent.Result) {
 	contVeth, err := FindVeth()
 	if err != nil {
 		log.Panicf("FindVeth() failed: %v", err)

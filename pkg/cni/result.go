@@ -17,24 +17,24 @@ limitations under the License.
 package cni
 
 import (
-	"github.com/containernetworking/cni/pkg/types/current"
+	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 )
 
-func BytesToResult(data []byte) (*current.Result, error) {
+func BytesToResult(data []byte) (*cnicurrent.Result, error) {
 	if len(data) == 0 {
 		return nil, nil
 	}
-	r, err := current.NewResult(data)
+	r, err := cnicurrent.NewResult(data)
 	if err != nil {
 		return nil, err
 	}
-	return r.(*current.Result), err
+	return r.(*cnicurrent.Result), err
 }
 
 // GetPodIP retrieves the IP address of the pod as a string. It uses
 // the first IPv4 address if finds. If it fails to determine the pod
 // IP or the result argument is nil, it returns an empty string.
-func GetPodIP(result *current.Result) string {
+func GetPodIP(result *cnicurrent.Result) string {
 	if result == nil {
 		return ""
 	}

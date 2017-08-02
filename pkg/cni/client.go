@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/containernetworking/cni/libcni"
-	"github.com/containernetworking/cni/pkg/types/current"
+	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 )
@@ -56,7 +56,7 @@ func (c *Client) cniRuntimeConf(podId, podName, podNs string) *libcni.RuntimeCon
 	}
 }
 
-func (c *Client) AddSandboxToNetwork(podId, podName, podNs string) (*current.Result, error) {
+func (c *Client) AddSandboxToNetwork(podId, podName, podNs string) (*cnicurrent.Result, error) {
 	cniConf := c.cniRuntimeConf(podId, podName, podNs)
 	glog.V(3).Infof("AddSandboxToNetwork: podId %q, podName %q, podNs %q, config:\n%s",
 		podId, podName, podNs, spew.Sdump(cniConf))
@@ -68,7 +68,7 @@ func (c *Client) AddSandboxToNetwork(podId, podName, podNs string) (*current.Res
 		glog.V(3).Infof("AddSandboxToNetwork: podId %q, podName %q, podNs %q: error: %v",
 			podId, podName, podNs, err)
 	}
-	r, err := current.NewResultFromResult(result)
+	r, err := cnicurrent.NewResultFromResult(result)
 	if err != nil {
 		return nil, fmt.Errorf("error converting CNI result to the current version: %v", err)
 	}

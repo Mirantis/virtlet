@@ -23,8 +23,8 @@ import (
 	"time"
 
 	"github.com/containernetworking/cni/pkg/ns"
-	"github.com/containernetworking/cni/pkg/types"
-	"github.com/containernetworking/cni/pkg/types/current"
+	cnitypes "github.com/containernetworking/cni/pkg/types"
+	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/vishvananda/netlink"
 
 	"github.com/Mirantis/virtlet/pkg/dhcp"
@@ -32,22 +32,22 @@ import (
 )
 
 type dhcpTestCase struct {
-	info               current.Result
+	info               cnicurrent.Result
 	expectedSubstrings []string
 }
 
 func TestDhcpServer(t *testing.T) {
 	testCases := []*dhcpTestCase{
 		{
-			info: current.Result{
-				Interfaces: []*current.Interface{
+			info: cnicurrent.Result{
+				Interfaces: []*cnicurrent.Interface{
 					{
 						Name: "eth0",
 						Mac:  "42:a4:a6:22:80:2e",
 						// TODO: Sandbox
 					},
 				},
-				IPs: []*current.IPConfig{
+				IPs: []*cnicurrent.IPConfig{
 					{
 						Version:   "4",
 						Interface: 0,
@@ -58,7 +58,7 @@ func TestDhcpServer(t *testing.T) {
 						Gateway: net.IP{10, 1, 90, 1},
 					},
 				},
-				Routes: []*types.Route{
+				Routes: []*cnitypes.Route{
 					{
 						Dst: net.IPNet{
 							IP:   net.IP{0, 0, 0, 0},

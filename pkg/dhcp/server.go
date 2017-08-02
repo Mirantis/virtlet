@@ -26,7 +26,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/containernetworking/cni/pkg/types/current"
+	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/golang/glog"
 	"go.universe.tf/netboot/dhcp4"
 )
@@ -147,7 +147,7 @@ func (s *Server) prepareResponse(pkt *dhcp4.Packet, serverIP net.IP, mt dhcp4.Me
 		return nil, fmt.Errorf("unexpected packet from %v", pkt.HardwareAddr)
 	}
 
-	var cfg *current.IPConfig
+	var cfg *cnicurrent.IPConfig
 	for _, curCfg := range s.config.CNIResult.IPs {
 		if curCfg.Version == "4" {
 			cfg = curCfg
@@ -249,7 +249,7 @@ func (s *Server) getStaticRoutes() (router, routes []byte, err error) {
 		gw := route.GW
 		if gw == nil {
 			// FIXME: this should not be really needed for newer CNI
-			var cfg *current.IPConfig
+			var cfg *cnicurrent.IPConfig
 			for _, curCfg := range s.config.CNIResult.IPs {
 				if curCfg.Version == "4" {
 					cfg = curCfg
