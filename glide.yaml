@@ -23,7 +23,7 @@ import:
 - package: github.com/libvirt/libvirt-go
   version: c3209e4ba8b8dda65c85ca0ac04302e55895caf7
 - package: github.com/libvirt/libvirt-go-xml
-  version: cc4025ea01eee7c73a7c75b4211b07125a8119ae
+  version: 83a754119fc7239caffd1f50e08cb13b1b3825ef
 - package: k8s.io/kubernetes
   version: v1.7.0
 - package: k8s.io/apiserver

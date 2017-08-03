@@ -140,11 +140,11 @@ func (ds *domainSettings) createDomain() *libvirtxml.Domain {
 		},
 		MemoryBacking: &libvirtxml.DomainMemoryBacking{Locked: &libvirtxml.DomainMemoryBackingLocked{}},
 
-		CMDLine: &libvirtxml.DomainCMDLine{
-			Envs: []libvirtxml.QemuEnv{
-				libvirtxml.QemuEnv{Name: "VIRTLET_EMULATOR", Value: emulator},
-				libvirtxml.QemuEnv{Name: "VIRTLET_NS", Value: ds.netNSPath},
-				libvirtxml.QemuEnv{Name: "VIRTLET_CNI_CONFIG", Value: ds.cniConfig},
+		QEMUCommandline: &libvirtxml.DomainQEMUCommandline{
+			Envs: []libvirtxml.DomainQEMUCommandlineEnv{
+				libvirtxml.DomainQEMUCommandlineEnv{Name: "VIRTLET_EMULATOR", Value: emulator},
+				libvirtxml.DomainQEMUCommandlineEnv{Name: "VIRTLET_NS", Value: ds.netNSPath},
+				libvirtxml.DomainQEMUCommandlineEnv{Name: "VIRTLET_CNI_CONFIG", Value: ds.cniConfig},
 			},
 		},
 	}

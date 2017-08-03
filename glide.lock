@@ -1,5 +1,5 @@
-hash: 84efe2eff9ba1012d0a62ae9adb195b38aa588872ef1ebfa8c04e725bfd689c3
-updated: 2017-07-07T19:33:46.322269832+03:00
+hash: 4dbb56bd2f62c42b2e4b8a0030bf68c43814678defb0afeed48a08e1f2660e7e
+updated: 2017-08-04T09:14:47.288882682+02:00
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
@@ -146,7 +146,6 @@ imports:
 - name: github.com/coreos/pkg
   version: fa29b1d70f0beaddd4c7021607cc3c3be8ce94b8
   subpackages:
-  - capnslog
   - dlopen
   - health
   - httputil
@@ -319,7 +318,7 @@ imports:
 - name: github.com/libvirt/libvirt-go
   version: c3209e4ba8b8dda65c85ca0ac04302e55895caf7
 - name: github.com/libvirt/libvirt-go-xml
-  version: cc4025ea01eee7c73a7c75b4211b07125a8119ae
+  version: 83a754119fc7239caffd1f50e08cb13b1b3825ef
 - name: github.com/mailru/easyjson
   version: d5b7844b561a7bc640052f1b935f7b800330d7e0
   subpackages:
