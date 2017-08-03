@@ -32,7 +32,7 @@ import (
 	"github.com/golang/glog"
 )
 
-func removeContainersByLabels(ctx context.Context, client *dockerclient.Client, labels ...string) error {
+func removeContainersByLabels(ctx context.Context, client *dockerclient.Client, labels []string, filter func(c dockertypes.Container) bool) error {
 	filterArgs := dockerfilters.NewArgs()
 	for _, label := range labels {
 		filterArgs.Add("label", label)
@@ -46,11 +46,12 @@ func removeContainersByLabels(ctx context.Context, client *dockerclient.Client, 
 	}
 	if len(containers) > 0 {
 		for _, container := range containers {
-			glog.V(1).Infof("Removing old CRI proxy container %s", container.ID)
-			if err := client.ContainerRemove(ctx, container.ID, dockertypes.ContainerRemoveOptions{
-				Force: true,
-			}); err != nil {
-				return fmt.Errorf("failed to remove old container: %v", err)
+			if filter != nil && !filter(container) {
+				continue
+			}
+			glog.V(1).Infof("Stopping docker container %s (labels: %#v)", container.ID, container.Labels)
+			if err := client.ContainerStop(ctx, container.ID, 1); err != nil {
+				return fmt.Errorf("failed to stop container: %v", err)
 			}
 		}
 	}

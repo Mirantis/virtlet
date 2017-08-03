@@ -34,20 +34,22 @@ limitations under the License.
 package nettools
 
 import (
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"log"
-	"math/rand"
 	"net"
 	"os"
 	"os/exec"
 	"syscall"
 	"unsafe"
 
-	"github.com/containernetworking/cni/pkg/ip"
 	"github.com/containernetworking/cni/pkg/ns"
-	"github.com/containernetworking/cni/pkg/types"
+	cnitypes "github.com/containernetworking/cni/pkg/types"
+	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/vishvananda/netlink"
+
+	"github.com/Mirantis/virtlet/pkg/cni"
 )
 
 const (
@@ -79,7 +81,7 @@ type InterfaceInfo struct {
 }
 
 type ContainerNetwork struct {
-	Info   *types.Result
+	Info   *cnicurrent.Result
 	DhcpNS ns.NetNS
 }
 
@@ -106,6 +108,111 @@ func OpenTAP(devName string) (*os.File, error) {
 	return tapFile, nil
 }
 
+func makeVethPair(name, peer string, mtu int) (netlink.Link, error) {
+	veth := &netlink.Veth{
+		LinkAttrs: netlink.LinkAttrs{
+			Name:  name,
+			Flags: net.FlagUp,
+			MTU:   mtu,
+		},
+		PeerName: peer,
+	}
+	if err := netlink.LinkAdd(veth); err != nil {
+		return nil, err
+	}
+
+	return veth, nil
+}
+
+func peerExists(name string) bool {
+	if _, err := netlink.LinkByName(name); err != nil {
+		return false
+	}
+	return true
+}
+
+func makeVeth(name string, mtu int) (peerName string, veth netlink.Link, err error) {
+	for i := 0; i < 10; i++ {
+		peerName, err = RandomVethName()
+		if err != nil {
+			return
+		}
+
+		veth, err = makeVethPair(name, peerName, mtu)
+		switch {
+		case err == nil:
+			return
+
+		case os.IsExist(err):
+			if peerExists(peerName) {
+				continue
+			}
+			err = fmt.Errorf("container veth name provided (%v) already exists", name)
+			return
+
+		default:
+			err = fmt.Errorf("failed to make veth pair: %v", err)
+			return
+		}
+	}
+
+	// should really never be hit
+	err = fmt.Errorf("failed to find a unique veth name")
+	return
+}
+
+// RandomVethName returns string "veth" with random prefix (hashed from entropy)
+func RandomVethName() (string, error) {
+	entropy := make([]byte, 4)
+	_, err := rand.Reader.Read(entropy)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate random veth name: %v", err)
+	}
+
+	// NetworkManager (recent versions) will ignore veth devices that start with "veth"
+	return fmt.Sprintf("veth%x", entropy), nil
+}
+
+// SetupVeth sets up a pair of virtual ethernet devices.
+// Call SetupVeth from inside the container netns.  It will create both veth
+// devices and move the host-side veth into the provided hostNS namespace.
+// On success, SetupVeth returns (hostVeth, containerVeth, nil)
+func SetupVeth(contVethName string, mtu int, hostNS ns.NetNS) (netlink.Link, netlink.Link, error) {
+	hostVethName, contVeth, err := makeVeth(contVethName, mtu)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if err = netlink.LinkSetUp(contVeth); err != nil {
+		return nil, nil, fmt.Errorf("failed to set %q up: %v", contVethName, err)
+	}
+
+	hostVeth, err := netlink.LinkByName(hostVethName)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to lookup %q: %v", hostVethName, err)
+	}
+
+	if err = netlink.LinkSetNsFd(hostVeth, int(hostNS.Fd())); err != nil {
+		return nil, nil, fmt.Errorf("failed to move veth to host netns: %v", err)
+	}
+
+	err = hostNS.Do(func(_ ns.NetNS) error {
+		hostVeth, err = netlink.LinkByName(hostVethName)
+		if err != nil {
+			return fmt.Errorf("failed to lookup %q in %q: %v", hostVethName, hostNS.Path(), err)
+		}
+
+		if err = netlink.LinkSetUp(hostVeth); err != nil {
+			return fmt.Errorf("failed to set %q up: %v", hostVethName, err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return hostVeth, contVeth, nil
+}
+
 // CreateEscapeVethPair creates a veth pair with innerVeth residing in
 // the specified network namespace innerNS and outerVeth residing in
 // the 'outer' (current) namespace.
@@ -115,7 +222,7 @@ func CreateEscapeVethPair(innerNS ns.NetNS, ifName string, mtu int) (outerVeth, 
 
 	err = innerNS.Do(func(outerNS ns.NetNS) error {
 		// create the veth pair in the inner ns and move outer end into the outer netns
-		outerVeth, innerVeth, err = ip.SetupVeth(ifName, mtu, outerNS)
+		outerVeth, innerVeth, err = SetupVeth(ifName, mtu, outerNS)
 		if err != nil {
 			return err
 		}
@@ -253,7 +360,7 @@ func StripLink(link netlink.Link) error {
 // There must be exactly one veth interface in the namespace
 // and exactly one address associated with veth.
 // Returns interface info struct and error, if any.
-func ExtractLinkInfo(link netlink.Link) (*types.Result, error) {
+func ExtractLinkInfo(link netlink.Link) (*cnicurrent.Result, error) {
 	addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get addresses for link: %v", err)
@@ -262,9 +369,20 @@ func ExtractLinkInfo(link netlink.Link) (*types.Result, error) {
 		return nil, fmt.Errorf("expected exactly one address for link, but got %v", addrs)
 	}
 
-	result := &types.Result{
-		IP4: &types.IPConfig{
-			IP: *addrs[0].IPNet,
+	result := &cnicurrent.Result{
+		Interfaces: []*cnicurrent.Interface{
+			{
+				Name: link.Attrs().Name,
+				Mac:  link.Attrs().HardwareAddr.String(),
+				// TODO: Sandbox?
+			},
+		},
+		IPs: []*cnicurrent.IPConfig{
+			{
+				Version:   "4",
+				Interface: 0,
+				Address:   *addrs[0].IPNet,
+			},
 		},
 	}
 
@@ -279,15 +397,16 @@ func ExtractLinkInfo(link netlink.Link) (*types.Result, error) {
 		case (route.Dst == nil || route.Dst.IP == nil) && route.Gw == nil:
 			// route has only Src
 		case (route.Dst == nil || route.Dst.IP == nil):
-			result.IP4.Gateway = route.Gw
-			result.IP4.Routes = append(result.IP4.Routes, types.Route{
+			result.IPs[0].Gateway = route.Gw
+			result.Routes = append(result.Routes, &cnitypes.Route{
 				Dst: net.IPNet{
 					IP:   net.IP{0, 0, 0, 0},
 					Mask: net.IPMask{0, 0, 0, 0},
 				},
+				GW: route.Gw,
 			})
 		default:
-			result.IP4.Routes = append(result.IP4.Routes, types.Route{
+			result.Routes = append(result.Routes, &cnitypes.Route{
 				Dst: *route.Dst,
 				GW:  route.Gw,
 			})
@@ -352,7 +471,7 @@ func setHardwareAddr(link netlink.Link, hwaddr net.HardwareAddr) error {
 // namespace properties
 type ContainerSideNetwork struct {
 	// Result contains CNI result object describing the network settings
-	Result *types.Result
+	Result *cnicurrent.Result
 	// TapFile contains an open File object pointing to Tap device inside
 	// the network namespace
 	TapFile *os.File
@@ -371,7 +490,7 @@ type ContainerSideNetwork struct {
 // for dhcp server.
 // The function should be called from within container namespace.
 // Returns container network struct and an error, if any
-func SetupContainerSideNetwork(info *types.Result) (*ContainerSideNetwork, error) {
+func SetupContainerSideNetwork(info *cnicurrent.Result) (*ContainerSideNetwork, error) {
 	contVeth, err := FindVeth()
 	if err != nil {
 		return nil, err
@@ -379,11 +498,18 @@ func SetupContainerSideNetwork(info *types.Result) (*ContainerSideNetwork, error
 	// If there are no routes provided, we consider it a broken
 	// config and extract interface config instead. That's the
 	// case with Weave CNI plugin.
-	if info == nil || info.IP4 == nil || len(info.IP4.Routes) == 0 {
+	if info == nil || cni.GetPodIP(info) == "" || len(info.Routes) == 0 {
+		var dnsInfo cnitypes.DNS
+		if info != nil {
+			dnsInfo = info.DNS
+		}
 		info, err = ExtractLinkInfo(contVeth)
 		if err != nil {
 			return nil, err
 		}
+		// extracted info doesn't have DNS information, so
+		// still try to extract it from CNI-provided data
+		info.DNS = dnsInfo
 	}
 
 	hwAddr := contVeth.Attrs().HardwareAddr
@@ -452,12 +578,21 @@ func TeardownBridge(bridge netlink.Link, links []netlink.Link) error {
 }
 
 // ConfigureLink adds to link ip address and routes based on info.
-func ConfigureLink(link netlink.Link, info *types.Result) error {
-	if err := netlink.AddrAdd(link, mustParseAddr(info.IP4.IP.String())); err != nil {
+func ConfigureLink(link netlink.Link, info *cnicurrent.Result) error {
+	var addr *netlink.Addr
+	for _, ip := range info.IPs {
+		if ip.Version == "4" {
+			addr = &netlink.Addr{IPNet: &ip.Address}
+		}
+	}
+	if addr == nil {
+		return fmt.Errorf("can't get IP from cni result: %v", info)
+	}
+	if err := netlink.AddrAdd(link, addr); err != nil {
 		return err
 	}
 
-	for _, route := range info.IP4.Routes {
+	for _, route := range info.Routes {
 		err := netlink.RouteAdd(&netlink.Route{
 			LinkIndex: link.Attrs().Index,
 			Scope:     netlink.SCOPE_UNIVERSE,
@@ -534,7 +669,7 @@ func GenerateMacAddress() (net.HardwareAddr, error) {
 		0, 0, 0, // bytes to randomly overwrite
 	}
 
-	_, err := rand.Read(mac[3:6])
+	_, err := rand.Reader.Read(mac[3:6])
 	if err != nil {
 		return nil, fmt.Errorf("cannot generate random mac address: %v", err)
 	}

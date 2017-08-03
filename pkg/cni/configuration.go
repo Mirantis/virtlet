@@ -24,7 +24,7 @@ import (
 )
 
 func ReadConfiguration(configsDir string) (*libcni.NetworkConfig, error) {
-	confFileNames, err := libcni.ConfFiles(configsDir)
+	confFileNames, err := libcni.ConfFiles(configsDir, []string{".conf", ".conflist", ".json"})
 	if err != nil {
 		return nil, err
 	}
@@ -35,5 +35,7 @@ func ReadConfiguration(configsDir string) (*libcni.NetworkConfig, error) {
 
 	sort.Strings(confFileNames)
 
+	// TODO: read all the conf files
+	// see pkg/kubelet/network/cni/cni.go in k8s
 	return libcni.ConfFromFile(confFileNames[0])
 }

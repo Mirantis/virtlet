@@ -65,6 +65,8 @@ spec:
         # for ensuring that /var/lib/libvirt/images exists on node
         - name: var-lib
           mountPath: /host-var-lib
+        securityContext:
+          privileged: true
 
       containers:
       - name: virtlet
@@ -192,6 +194,33 @@ rules:
       - configmaps
     verbs:
       - create
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: configmap-reader
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: kubelet-node-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: configmap-reader
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: system:nodes
 ---
 apiVersion: v1
 kind: ServiceAccount

@@ -1,10 +1,10 @@
 # CRI Proxy
 
 CRI Proxy makes it possible to run several CRI implementations on the
-same node. It also includes in-process docker-shim which is currently
-imported from k8s 1.6 code. CRI Proxy isn't tied to Virtlet in the
-sense that it can be used with other runtimes, too. Docker-shim usage
-is also optional.
+same node. It also includes `dockershim` (CRI->docker interface) which
+is currently imported from Kubernetes code. CRI Proxy isn't tied to
+Virtlet in the sense that it can be used with other runtimes,
+too. `dockershim` usage is also optional.
 
 ## How CRI Proxy works
 
@@ -27,9 +27,11 @@ CRI request going through it, including any errors and the result.
 runtimes that the proxy passes requests to.
 
 The `docker` part is a special case, meaning that `criproxy` must
-start in-process `docker-shim` and use it as the primary (prefixless)
-runtime.  It's also possible to specify other primary runtime instead,
-e.g. `/run/some-other-runtime.sock`.
+start in-process `dockershim` and use it as the primary (prefixless)
+runtime (this is used by the bootstrap procedure, in normal
+installations `dockershim` runs as a separate process, although using
+same `criproxy` binary).  It's also possible to specify other primary
+runtime instead, e.g. `/run/some-other-runtime.sock`.
 
 `virtlet:/run/virtlet.sock` denotes an alternative runtime
 socket. This means that image service requests that include image
@@ -111,7 +113,7 @@ means, e.g. by installing a package on the node or adding
 a service to systemd that starts CRI proxy in a container.
 
 Here's step-by-step description of CRI proxy bootstrap procedure
-in case of virtlet.
+in case of Virtlet.
 
 1. Kubelets on the nodes that are going to be used with CRI proxy
    must have `--feature-gates=DynamicKubeletConfig` command line flag.
@@ -130,41 +132,42 @@ in case of virtlet.
    ```
    The yaml file includes Virtlet DaemonSet and a ServiceAccount object used by
    CRI proxy bootstrap procedure to access apiserver.
-4. DaemonSet's init container checks for saved kubelet configuration
-   file, `/etc/criproxy/kubelet.conf`. If this file exists, the
-   bootstrap procedure is already done so the rest of this sequence is
-   skipped, init container exits with status 0 and Virtlet pod starts
-   on the node.
+4. DaemonSet's init container checks for saved node info file file,
+   `/etc/criproxy/node.conf`. If this file exists, the bootstrap
+   procedure is already done (or is not required) so the rest of this
+   sequence is skipped, init container exits with status 0 and Virtlet
+   pod starts on the node.
 5. DaemonSet's init container drops `criproxy` binary under
    `/opt/criproxy/bin` on the host and starts it with `-install` flag,
    starting the proxy installer.
-6. CRI proxy installer loads kubelet config from kubelet's configz
-   server using `https://127.0.0.1:10250/configz` url and saves it as
-   `/etc/criproxy/kubelet.conf`. This file is in JSON format.
-7. The installer patches kubelet config to enable CRI and use CRI proxy
+6. DaemonSet's init container invokes `criproxy` binary with `-grab`
+   flag. In this mode `criproxy` determines PID of kubelet by looking
+   at the process which currently listens on Unix domain socket named
+   `/var/run/dockershim.sock`. It then gets command line arguments
+   from `/proc/NNN/cmdline` where `NNN` is PID of kubelet. It then
+   stores kubelet command line together with other info (node name and
+   docker endpoint) as `/etc/criproxy/node.conf`.
+7. DaemonSet's init container starts invokes `criproxy` binary in
+   installer mode (with `-install` flag).
+8. The installer patches kubelet config to enable CRI and use CRI proxy
    RuntimeService and ImageService endpoints. This is equivalent to
    adding the following options to kubelet:
    ```
    --experimental-cri --container-runtime=remote \
-   --container-runtime-endpoint=/run/criproxy.sock \
-   --image-service-endpoint=/run/criproxy.sock
+   --container-runtime-endpoint=unix:///run/criproxy.sock \
+   --image-service-endpoint=unix:///run/criproxy.sock
    ```
-8. The installer starts CRI proxy container with 'Always' restart
+9. The installer starts CRI proxy container with 'Always' restart
    policy, so it will be restarted in case if docker daemon gets
    restarted or the machine gets rebooted. It then waits for
    `/run/criproxy.sock` Unix domain socket to become connectable.
    Note that the container uses nsenter to break out of
    its namespaces, so Docker is being used as poor man's
    process manager here in order to avoid systemd dependency.
-9. The installer extracts node name from the data available from kubelet
-   under `http://127.0.0.1:10255/stats/summary` URL. It's also
-   possible to infer node name based on kubelet config and hostname
-   but summary-based method is likely more reliable.
-10. The installer creates configmap named `kubelet-NODENAME` containing a
-    JSON object with patched kubelet config under `kubelet.config`
+10. The installer creates configmap named `kubelet-NODENAME` containing
+    a JSON object with patched kubelet config under `kubelet.config`
     key. This causes kubelet to restart and pick up the new config.
 11. When the new kubelet process makes its first request to CRI proxy,
-    the proxy scans Docker for stale containers that were started by
-    kubelet in CRI-less mode. As of now, it relies upon the fact
-    that these containers have `io.kubernetes.container.hash` label
-    that's not used by docker-shim.
+    the proxy scans Docker for containers that were started by kubelet
+    before switching to CRI proxy and removes them, because some
+    containers may be affected by the transition.

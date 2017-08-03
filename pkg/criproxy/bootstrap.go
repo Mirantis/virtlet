@@ -43,14 +43,12 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
-
-	cfg "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 )
 
 const (
 	BusyboxImageName = "busybox:1.26.2"
 	// TODO: use the same constant/setting in different parts of code
-	proxyRuntimeEndpoint             = "/run/criproxy.sock"
+	proxyRuntimeEndpoint             = "unix:///run/criproxy.sock"
 	proxyStopTimeoutSeconds          = 5
 	confFileMode                     = 0600
 	confDirMode                      = 0700
@@ -60,7 +58,6 @@ const (
 
 var kubeletSettingsForCriProxy map[string]interface{} = map[string]interface{}{
 	"containerRuntime":      "remote",
-	"enableCRI":             true,
 	"remoteRuntimeEndpoint": proxyRuntimeEndpoint,
 	"remoteImageEndpoint":   proxyRuntimeEndpoint,
 	// NOTE: this setting is only needed by Virtlet to make flexvolume
@@ -116,13 +113,13 @@ func kubeletConfigUpdated(kubeletCfg map[string]interface{}) bool {
 }
 
 type BootstrapConfig struct {
-	ApiServerHost   string
+	ApiServerHost string
+	// TODO: remove this
 	ConfigzBaseUrl  string
-	StatsBaseUrl    string
-	SavedConfigPath string
 	ProxyPath       string
 	ProxyArgs       []string
 	ProxySocketPath string
+	NodeInfo        *NodeInfo
 }
 
 type Bootstrap struct {
@@ -140,6 +137,7 @@ func NewBootstrap(config *BootstrapConfig, cs kubernetes.Interface) *Bootstrap {
 }
 
 func (b *Bootstrap) retrieveKubeletConfig() (map[string]interface{}, error) {
+	// TODO: as we know node name, use k8s API for this
 	cfg, err := loadJson(b.config.ConfigzBaseUrl, "/configz")
 	if err != nil {
 		return nil, err
@@ -177,22 +175,6 @@ func (b *Bootstrap) updateKubeletConfig() {
 	}
 }
 
-func (b *Bootstrap) getNodeNameFromKubelet() (string, error) {
-	stats, err := loadJson(b.config.StatsBaseUrl, "/stats/summary")
-	if err != nil {
-		return "", err
-	}
-	nodeProps, ok := stats["node"].(map[string]interface{})
-	if !ok {
-		return "", errors.New("couldn't get node properties /stats/summary")
-	}
-	nodeName, _ := nodeProps["nodeName"].(string)
-	if nodeName == "" {
-		return "", errors.New("couldn't get node name via /stats/summary")
-	}
-	return nodeName, nil
-}
-
 func (b *Bootstrap) buildConfigMap(nodeName string) *v1.ConfigMap {
 	text, err := json.Marshal(b.kubeletCfg)
 	if err != nil {
@@ -215,52 +197,14 @@ func (b *Bootstrap) putConfigMap(configMap *v1.ConfigMap) error {
 	return err
 }
 
-func (b *Bootstrap) needToPatch() (bool, error) {
-	_, err := os.Stat(b.config.SavedConfigPath)
-	if err == nil {
-		glog.V(1).Infof("Config file already exists: %q", b.config.SavedConfigPath)
-		return false, nil
-	}
-	if os.IsNotExist(err) {
-		return true, nil
-	}
-	return false, fmt.Errorf("failed to check for existing config: %v", err)
-}
-
-func (b *Bootstrap) dockerEndpoint() (string, error) {
-	dockerEp, ok := b.kubeletCfg["dockerEndpoint"].(string)
-	if !ok {
-		return "", errors.New("failed to retrieve docker endpoint from kubelet config")
-	}
-	glog.V(1).Infof("Using docker endpoint %q", dockerEp)
-	return dockerEp, nil
-}
-
-func (b *Bootstrap) saveKubeletConfig() error {
-	return writeJson(b.kubeletCfg, b.config.SavedConfigPath)
-}
-
-func (b *Bootstrap) deleteSavedKubeletConfig() {
-	if b.config.SavedConfigPath == "" {
-		return
-	}
-	if err := os.Remove(b.config.SavedConfigPath); err != nil {
-		glog.Errorf("Failed to remove saved kubelet config: %q", b.config.SavedConfigPath)
-	}
-}
-
 func (b *Bootstrap) patchKubeletConfig() error {
 	if kubeletConfigUpdated(b.kubeletCfg) {
 		return fmt.Errorf("kubelet already configured for CRI, but no saved config")
 	}
 	b.updateKubeletConfig()
 
-	nodeName, err := b.getNodeNameFromKubelet()
-	if err != nil {
-		return err
-	}
-	glog.V(1).Infof("Node name: %q", nodeName)
-	if err := b.putConfigMap(b.buildConfigMap(nodeName)); err != nil {
+	glog.V(1).Infof("Node name: %q", b.config.NodeInfo.NodeName)
+	if err := b.putConfigMap(b.buildConfigMap(b.config.NodeInfo.NodeName)); err != nil {
 		return fmt.Errorf("failed to put ConfigMap: %v", err)
 	}
 	return nil
@@ -353,7 +297,7 @@ func (b *Bootstrap) initClientset() error {
 // EnsureCRIProxy checks whether kubelet configuration file exists
 // and performs CRI proxy bootstrap procedure if it doesn't.
 func (b *Bootstrap) EnsureCRIProxy() (bool, error) {
-	if b.config.ConfigzBaseUrl == "" || b.config.StatsBaseUrl == "" || b.config.ProxyPath == "" || b.config.ProxySocketPath == "" {
+	if b.config.ConfigzBaseUrl == "" || b.config.ProxyPath == "" || b.config.ProxySocketPath == "" {
 		return false, errors.New("invalid BootstrapConfig")
 	}
 
@@ -361,46 +305,17 @@ func (b *Bootstrap) EnsureCRIProxy() (bool, error) {
 		return false, fmt.Errorf("proxy socket path %q not under /run", b.config.ProxySocketPath)
 	}
 
-	if needToPatch, err := b.needToPatch(); !needToPatch || err != nil {
-		glog.V(1).Infof("Kubelet configuration already patched, exiting")
-		return false, err
-	}
-
 	if err := b.obtainKubeletConfig(); err != nil {
 		return false, err
 	}
 
-	// Work around the problem with serialization of enforceNodeAllocatable option.
-	// See https://github.com/kubernetes/kubernetes/pull/44606 for more details.
-	if b.kubeletCfg["enforceNodeAllocatable"] == nil {
-		cgroupsPerQOS, ok := b.kubeletCfg["cgroupsPerQOS"].(bool)
-		if ok && !cgroupsPerQOS {
-			b.kubeletCfg["enforceNodeAllocatable"] = []string{}
-		}
-	}
-
-	// Need to have kubelet config saved at this point
-	// so it can be used by the container below.
-	if err := b.saveKubeletConfig(); err != nil {
+	dockerEndpoint := b.config.NodeInfo.DockerEndpoint
+	glog.V(1).Infof("Using docker endpoint %q", dockerEndpoint)
+	if _, err := b.installCriProxyContainer(dockerEndpoint, dockerEndpoint); err != nil {
 		return false, err
 	}
 
-	ok := false
-	defer func() {
-		if !ok {
-			b.deleteSavedKubeletConfig()
-		}
-	}()
-
-	dockerEndpoint, err := b.dockerEndpoint()
-	if err != nil {
-		return false, err
-	}
-	if _, err = b.installCriProxyContainer(dockerEndpoint, dockerEndpoint); err != nil {
-		return false, err
-	}
-
-	if err = waitForSocket(b.config.ProxySocketPath, waitForCriProxySocketNumAttempts, nil); err != nil {
+	if err := waitForSocket(b.config.ProxySocketPath, waitForCriProxySocketNumAttempts, nil); err != nil {
 		return false, err
 	}
 
@@ -422,19 +337,5 @@ func (b *Bootstrap) EnsureCRIProxy() (bool, error) {
 	}
 
 	glog.V(1).Info("CRI proxy bootstrap complete")
-	ok = true
 	return true, nil
-}
-
-// LoadKubeletConfig loads kubelet configuration from a json file
-func LoadKubeletConfig(path string) (*cfg.KubeletConfiguration, error) {
-	bs, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	var cfg cfg.KubeletConfiguration
-	if err := json.Unmarshal(bs, &cfg); err != nil {
-		return nil, fmt.Errorf("failed to load kubelet config from %q: %v", path, err)
-	}
-	return &cfg, err
 }

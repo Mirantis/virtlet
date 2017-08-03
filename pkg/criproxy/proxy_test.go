@@ -30,7 +30,7 @@ import (
 	"github.com/pmezard/go-difflib/difflib"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	proxytest "github.com/Mirantis/virtlet/pkg/criproxy/testing"
 )

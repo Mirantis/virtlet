@@ -19,11 +19,12 @@ limitations under the License.
 package testing
 
 import (
+	"errors"
 	"sort"
 	"sync"
 
 	"golang.org/x/net/context"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
 type FakeImageServer struct {
@@ -142,4 +143,14 @@ func (r *FakeImageServer) RemoveImage(ctx context.Context, in *runtimeapi.Remove
 	delete(r.Images, image.Image)
 
 	return &runtimeapi.RemoveImageResponse{}, nil
+}
+
+func (r *FakeImageServer) ImageFsInfo(ctx context.Context, in *runtimeapi.ImageFsInfoRequest) (*runtimeapi.ImageFsInfoResponse, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.journal.Record("ImageFsInfo")
+
+	// TODO: implement this
+	return nil, errors.New("ImageFsInfo() not implemented")
 }

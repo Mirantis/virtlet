@@ -9,6 +9,7 @@ if [[ ${1:-} != -novirtlet ]]; then
   novirtlet=1
 fi
 
+# TODO: remove this (done in prepare-node.sh)
 mkdir -p /var/lib/virtlet/volumes
 
 if [[ -f /dind/virtlet ]]; then

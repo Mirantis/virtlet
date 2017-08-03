@@ -73,7 +73,9 @@ spec:
                 echo "Master setup complete." >&2
               else
                 # worker node
-                kubeadm join --token adcb82.4eae29627dc4c5a6 k8s-0:6443
+                # FIXME: it should work without --node-name, but it doesn't
+                # (complains about empty node name)
+                kubeadm join --token adcb82.4eae29627dc4c5a6 --node-name=$(hostname) k8s-0:6443
                 echo "Node setup complete." >&2
               fi
           users:
@@ -110,4 +112,4 @@ spec:
           driver: "virtlet/flexvolume_driver"
           options:
             type: qcow2
-            capacity: 2048MB
+            capacity: 4096MB

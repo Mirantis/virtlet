@@ -34,13 +34,14 @@ limitations under the License.
 package testing
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"sync"
 	"time"
 
 	"golang.org/x/net/context"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
 var (
@@ -405,4 +406,24 @@ func (r *FakeRuntimeServer) PortForward(ctx context.Context, in *runtimeapi.Port
 func (r *FakeRuntimeServer) UpdateRuntimeConfig(ctx context.Context, in *runtimeapi.UpdateRuntimeConfigRequest) (*runtimeapi.UpdateRuntimeConfigResponse, error) {
 	r.journal.Record("UpdateRuntimeConfig")
 	return &runtimeapi.UpdateRuntimeConfigResponse{}, nil
+}
+
+func (r *FakeRuntimeServer) ListContainerStats(ctx context.Context, in *runtimeapi.ListContainerStatsRequest) (*runtimeapi.ListContainerStatsResponse, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.journal.Record("ListContainerStats")
+
+	// TODO: implement this
+	return nil, errors.New("ListContainerStats() not implemented")
+}
+
+func (r *FakeRuntimeServer) ContainerStats(ctx context.Context, in *runtimeapi.ContainerStatsRequest) (*runtimeapi.ContainerStatsResponse, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.journal.Record("ContainerStats")
+
+	// TODO: implement this
+	return nil, errors.New("ContainerStats() not implemented")
 }

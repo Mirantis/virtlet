@@ -27,7 +27,7 @@ import (
 	"github.com/jonboulle/clockwork"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 	"k8s.io/apimachinery/pkg/fields"
-	kubeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 
 	"github.com/Mirantis/virtlet/pkg/metadata"
@@ -103,6 +103,23 @@ func (ds *domainSettings) createDomain() *libvirtxml.Domain {
 				{Dev: "hd"},
 			},
 		},
+
+		// The following enables nested virtualization.
+		// The plan is to enable it via an annotation at some point.
+		// It commonly requires kvm_intel module to be loaded like this:
+		// modprobe kvm_intel nested=1
+		// CPU: &libvirtxml.DomainCPU{
+		// 	Mode: "host-model",
+		// 	Model: &libvirtxml.DomainCPUModel{
+		// 		Fallback: "forbid",
+		// 	},
+		// 	Features: []libvirtxml.DomainCPUFeature{
+		// 		{
+		// 			Policy: "require",
+		// 			Name:   "vmx",
+		// 		},
+		// 	},
+		// },
 
 		Features: &libvirtxml.DomainFeatureList{ACPI: &libvirtxml.DomainFeature{}},
 
