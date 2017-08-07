@@ -35,7 +35,7 @@ func TestRootVolumeNaming(t *testing.T) {
 			nil,
 		},
 	}
-	expected := "root_" + testUuid
+	expected := "virtlet_root_" + testUuid
 
 	cloneName := v.cloneName()
 
@@ -48,7 +48,7 @@ func TestRootVolumeLifeCycle(t *testing.T) {
 	rec := fake.NewToplevelRecorder()
 
 	volumesPoolPath := "/fake/volumes/pool"
-	expectedRootVolumePath := volumesPoolPath + "/root_" + testUuid
+	expectedRootVolumePath := volumesPoolPath + "/virtlet_root_" + testUuid
 	spool := fake.NewFakeStoragePool(rec.Child("volumes"), "volumes", volumesPoolPath)
 	ipool := fake.NewFakeStoragePool(rec.Child("images"), "images", "/fake/images/pool")
 
@@ -85,7 +85,7 @@ func TestRootVolumeLifeCycle(t *testing.T) {
 		t.Errorf("Expected '%s' as root volume path, received: %s", vol.Source.File)
 	}
 
-	rec.Rec("root disk retuned by root_volumesource", vol)
+	rec.Rec("root disk retuned by virtlet_root_volumesource", vol)
 
 	if err := rootVol.Teardown(); err != nil {
 		t.Errorf("Teardown returned an error: %v", err)

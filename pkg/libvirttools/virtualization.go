@@ -344,7 +344,7 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netNSPath, cniCon
 		vmLogLocation: vmLogLocation(),
 	}
 
-	cloneName := "root_" + settings.domainUUID
+	cloneName := "virtlet_root_" + settings.domainUUID
 	settings.vcpuNum = config.ParsedAnnotations.VCPUCount
 	settings.memory = int(config.MemoryLimitInBytes)
 	settings.cpuShares = uint(config.CpuShares)

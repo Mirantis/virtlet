@@ -201,8 +201,8 @@ func (ct *containerTester) verifyContainerRootfsExists(container *kubeapi.Contai
 	}
 	// TODO: this is third place where rootfs volume name is calculated
 	// so there should be a func which will do it in consistent way there,
-	// in root_volumesource.go and in virtualization.go
-	_, err = storagePool.LookupVolumeByName("root_" + container.PodSandboxId)
+	// in virtlet_root_volumesource.go and in virtualization.go
+	_, err = storagePool.LookupVolumeByName("virtlet_root_" + container.PodSandboxId)
 	return err == nil
 }
 

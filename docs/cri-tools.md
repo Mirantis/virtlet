@@ -162,7 +162,7 @@ download.cirros-cloud.net/0.3.5/cirros-0.3.5-x86_64-disk.img
 # virsh vol-list --pool volumes
  Name                 Path
 ------------------------------------------------------------------------------
- root_264e1739-7b6a-5a3d-564c-baae69b5bdb0 /var/lib/virtlet/root_264e1739-7b6a-5a3d-564c-baae69b5bdb0
+ virtlet_root_264e1739-7b6a-5a3d-564c-baae69b5bdb0 /var/lib/virtlet/virtlet_root_264e1739-7b6a-5a3d-564c-baae69b5bdb0
 
 root@3ef5de7d492b:/go/src/github.com/Mirantis/virtlet# virsh list --all
  Id    Name                           State

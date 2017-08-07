@@ -84,7 +84,7 @@
           "Local": ""
         },
         "Type": "file",
-        "Name": "root_231700d5-c9a6-5a49-738d-99a954c51550",
+        "Name": "virtlet_root_231700d5-c9a6-5a49-738d-99a954c51550",
         "Key": "",
         "Allocation": null,
         "Capacity": null,
@@ -224,7 +224,7 @@
             },
             "Auth": null,
             "Source": {
-              "File": "/var/lib/virtlet/volumes/root_231700d5-c9a6-5a49-738d-99a954c51550",
+              "File": "/var/lib/virtlet/volumes/virtlet_root_231700d5-c9a6-5a49-738d-99a954c51550",
               "Device": "",
               "Protocol": "",
               "Name": "",
@@ -412,6 +412,6 @@
   },
   {
     "name": "storage: volumes: RemoveVolumeByName",
-    "data": "root_231700d5-c9a6-5a49-738d-99a954c51550"
+    "data": "virtlet_root_231700d5-c9a6-5a49-738d-99a954c51550"
   }
 ]
