@@ -212,6 +212,7 @@
         "SMM": null
       },
       "CPU": null,
+      "Clock": null,
       "OnPoweroff": "destroy",
       "OnReboot": "restart",
       "OnCrash": "restart",
@@ -243,7 +244,8 @@
               "Type": "qcow2",
               "Cache": "",
               "IO": "",
-              "ErrorPolicy": ""
+              "ErrorPolicy": "",
+              "Discard": ""
             },
             "Auth": null,
             "Source": {
@@ -260,6 +262,7 @@
               "Dev": "sda",
               "Bus": "scsi"
             },
+            "IOTune": null,
             "Serial": "",
             "ReadOnly": null,
             "Shareable": null,
@@ -274,7 +277,8 @@
               "Target": 0,
               "Unit": 0
             },
-            "Boot": null
+            "Boot": null,
+            "WWN": ""
           },
           {
             "XMLName": {
@@ -289,7 +293,8 @@
               "Type": "raw",
               "Cache": "",
               "IO": "",
-              "ErrorPolicy": ""
+              "ErrorPolicy": "",
+              "Discard": ""
             },
             "Auth": {
               "Username": "libvirt",
@@ -320,6 +325,7 @@
               "Dev": "sdb",
               "Bus": "scsi"
             },
+            "IOTune": null,
             "Serial": "",
             "ReadOnly": null,
             "Shareable": null,
@@ -334,7 +340,8 @@
               "Target": 0,
               "Unit": 1
             },
-            "Boot": null
+            "Boot": null,
+            "WWN": ""
           },
           {
             "XMLName": {
@@ -349,7 +356,8 @@
               "Type": "raw",
               "Cache": "",
               "IO": "",
-              "ErrorPolicy": ""
+              "ErrorPolicy": "",
+              "Discard": ""
             },
             "Auth": null,
             "Source": {
@@ -366,6 +374,7 @@
               "Dev": "sdc",
               "Bus": "scsi"
             },
+            "IOTune": null,
             "Serial": "",
             "ReadOnly": {},
             "Shareable": null,
@@ -380,7 +389,8 @@
               "Target": 0,
               "Unit": 2
             },
-            "Boot": null
+            "Boot": null,
+            "WWN": ""
           }
         ],
         "Filesystems": null,
@@ -430,6 +440,10 @@
         ],
         "Graphics": [
           {
+            "XMLName": {
+              "Space": "",
+              "Local": ""
+            },
             "Type": "vnc",
             "AutoPort": "",
             "Port": -1,
@@ -469,9 +483,14 @@
         ],
         "Channels": null,
         "MemBalloon": null,
-        "Sounds": null
+        "Sounds": null,
+        "RNGs": null
       },
-      "CMDLine": {
+      "QEMUCommandline": {
+        "XMLName": {
+          "Space": "",
+          "Local": ""
+        },
         "Args": null,
         "Envs": [
           {
