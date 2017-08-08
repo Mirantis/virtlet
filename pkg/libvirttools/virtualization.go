@@ -338,7 +338,7 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netNSPath, cniCon
 	config.DomainUUID = domainUUID
 	settings := domainSettings{
 		domainUUID:    domainUUID,
-		domainName:    domainUUID + "-" + config.Name,
+		domainName:    "virtlet-" + domainUUID + "-" + config.Name,
 		netNSPath:     netNSPath,
 		cniConfig:     cniConfig,
 		vmLogLocation: vmLogLocation(),

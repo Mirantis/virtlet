@@ -40,7 +40,7 @@ fi
 
 for ((n=0; n < ${#args[@]}; n++)); do
   if [[ ${args[${n}]} =~ ^@ ]]; then
-    args[${n}]="$(get_pod_domain_id "${args[${n}]}")"
+    args[${n}]="virtlet-$(get_pod_domain_id "${args[${n}]}")"
   fi
 done
 

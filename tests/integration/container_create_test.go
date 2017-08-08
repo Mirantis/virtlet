@@ -128,7 +128,7 @@ func TestContainerCleanup(t *testing.T) {
 
 	// 2. Failure on defining domain in libvirt
 	// Define dummy VM with the same name but other id to cause error on CreateContainer "Domain <name> already exists with uuid <uuid>".
-	domainName := uuid + "-" + container.Name
+	domainName := "virtlet-" + uuid + "-" + container.Name
 	if err := defineDummyDomainWithName(domainName); err != nil {
 		t.Errorf("Failed to define dummy domain to test cleanup: %v", err)
 	}
