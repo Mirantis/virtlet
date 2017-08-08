@@ -181,6 +181,10 @@ func (domain *LibvirtDomain) UUIDString() (string, error) {
 	return domain.d.GetUUIDString()
 }
 
+func (domain *LibvirtDomain) Name() (string, error) {
+	return domain.d.GetName()
+}
+
 type LibvirtSecret struct {
 	s *libvirt.Secret
 }

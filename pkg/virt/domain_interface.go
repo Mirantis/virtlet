@@ -101,4 +101,6 @@ type VirtDomain interface {
 	State() (DomainState, error)
 	// UUIDString() returns UUID string for this domain
 	UUIDString() (string, error)
+	// Name() returns the name of this domain
+	Name() (string, error)
 }

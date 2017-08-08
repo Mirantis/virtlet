@@ -247,6 +247,10 @@ func (d *FakeDomain) UUIDString() (string, error) {
 	return d.uuid, nil
 }
 
+func (d *FakeDomain) Name() (string, error) {
+	return d.name, nil
+}
+
 type FakeSecret struct {
 	rec       Recorder
 	dc        *FakeDomainConnection
