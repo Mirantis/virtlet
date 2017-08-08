@@ -112,7 +112,7 @@ func TestContainerCleanup(t *testing.T) {
 	uuid := getDomainUUID(sandbox.Metadata.Uid)
 	// 1. Failure during adding/processing ephemerial and flexolumes
 	// Define in advance the volume name of one of described to cause error on CreateContainer "Storage volume already exists".
-	volumeName := uuid + "-vol3"
+	volumeName := "virtlet-" + uuid + "-vol3"
 	rmDummyVolume, err := defineDummyVolume("volumes", volumeName)
 	if err != nil {
 		t.Fatalf("Failed to define dummy volume to test cleanup: %v", err)
@@ -128,7 +128,7 @@ func TestContainerCleanup(t *testing.T) {
 
 	// 2. Failure on defining domain in libvirt
 	// Define dummy VM with the same name but other id to cause error on CreateContainer "Domain <name> already exists with uuid <uuid>".
-	domainName := "virtlet-" + uuid + "-" + container.Name
+	domainName := "virtlet-" + uuid[:13] + "-" + container.Name
 	if err := defineDummyDomainWithName(domainName); err != nil {
 		t.Errorf("Failed to define dummy domain to test cleanup: %v", err)
 	}
@@ -192,7 +192,7 @@ func TestContainerVolumes(t *testing.T) {
 		createResp := ct.createContainer(sandbox, ct.containers[idx], ct.imageSpecs[idx], mounts)
 		ct.startContainer(createResp.ContainerId)
 
-		vmName := createResp.ContainerId + "-" + ct.containers[idx].Name
+		vmName := "virtlet-" + createResp.ContainerId[:13] + "-" + ct.containers[idx].Name
 		cmd := fmt.Sprintf("virsh domblklist '%s' | grep '%s-vol.*' | wc -l", vmName, createResp.ContainerId)
 		verifyUsingShell(t, cmd, "attached ephemeral volumes", strconv.Itoa(volumeCounts[idx]))
 	}

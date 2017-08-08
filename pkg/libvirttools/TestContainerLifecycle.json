@@ -125,7 +125,7 @@
         "Local": ""
       },
       "Type": "kvm",
-      "Name": "virtlet-231700d5-c9a6-5a49-738d-99a954c51550-container1",
+      "Name": "virtlet-231700d5-c9a6-container1",
       "UUID": "231700d5-c9a6-5a49-738d-99a954c51550",
       "Memory": {
         "Value": 1024,
@@ -414,7 +414,7 @@
   {
     "name": "domain conn: ListDomains",
     "data": [
-      "virtlet-231700d5-c9a6-5a49-738d-99a954c51550-container1"
+      "virtlet-231700d5-c9a6-container1"
     ]
   },
   {
@@ -445,7 +445,7 @@
     ]
   },
   {
-    "name": "domain conn: virtlet-231700d5-c9a6-5a49-738d-99a954c51550-container1: Create"
+    "name": "domain conn: virtlet-231700d5-c9a6-container1: Create"
   },
   {
     "name": "container status after the container is started",
@@ -474,7 +474,7 @@
     }
   },
   {
-    "name": "domain conn: virtlet-231700d5-c9a6-5a49-738d-99a954c51550-container1: Shutdown"
+    "name": "domain conn: virtlet-231700d5-c9a6-container1: Shutdown"
   },
   {
     "name": "storage: volumes: RemoveVolumeByName",
@@ -507,7 +507,7 @@
     }
   },
   {
-    "name": "domain conn: virtlet-231700d5-c9a6-5a49-738d-99a954c51550-container1: Undefine"
+    "name": "domain conn: virtlet-231700d5-c9a6-container1: Undefine"
   },
   {
     "name": "storage: volumes: RemoveVolumeByName",

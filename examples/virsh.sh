@@ -25,8 +25,11 @@ function get_pod_domain_id {
   if [[ ${namespace} ]]; then
       namespace_opts="-n ${namespace}"
   fi
-  kubectl get pod ${namespace_opts} "${pod_name}" \
-          -o 'jsonpath={.status.containerStatuses[0].containerID}-{.status.containerStatuses[0].name}'|sed 's/.*__//'
+  container_id=$(kubectl get pod ${namespace_opts} "${pod_name}" \
+	  -o 'jsonpath={.status.containerStatuses[0].containerID}'|sed 's/.*__//')
+  container_name=$(kubectl get pod ${namespace_opts} "${pod_name}" \
+	  -o 'jsonpath={.status.containerStatuses[0].name}'|sed 's/.*__//')
+  echo "virtlet-${container_id:0:13}-${container_name}"
 }
 
 if [[ ${1:-} = "poddomain" ]]; then
@@ -40,7 +43,7 @@ fi
 
 for ((n=0; n < ${#args[@]}; n++)); do
   if [[ ${args[${n}]} =~ ^@ ]]; then
-    args[${n}]="virtlet-$(get_pod_domain_id "${args[${n}]}")"
+    args[${n}]="$(get_pod_domain_id "${args[${n}]}")"
   fi
 done
 
