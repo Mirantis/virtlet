@@ -1,7 +1,6 @@
 FROM ubuntu:16.04
 # TODO: try to go back to alpine
-MAINTAINER Ivan Shvedunov <ivan4th@gmail.com>
-LABEL Name="virtlet" Version="0.1"
+MAINTAINER Ivan Shvedunov <ishvedunov@mirantis.com>
 
 ENV DEBIAN_FRONTEND noninteractive
 
