@@ -84,7 +84,7 @@
           "Local": ""
         },
         "Type": "file",
-        "Name": "root_231700d5-c9a6-5a49-738d-99a954c51550",
+        "Name": "virtlet_root_231700d5-c9a6-5a49-738d-99a954c51550",
         "Key": "",
         "Allocation": null,
         "Capacity": null,
@@ -114,7 +114,7 @@
         "Local": ""
       },
       "Type": "",
-      "Name": "231700d5-c9a6-5a49-738d-99a954c51550-vol1",
+      "Name": "virtlet-231700d5-c9a6-5a49-738d-99a954c51550-vol1",
       "Key": "",
       "Allocation": {
         "Unit": "",
@@ -141,7 +141,7 @@
     }
   },
   {
-    "name": "storage: volumes: 231700d5-c9a6-5a49-738d-99a954c51550-vol1: Format"
+    "name": "storage: volumes: virtlet-231700d5-c9a6-5a49-738d-99a954c51550-vol1: Format"
   },
   {
     "name": "storage: volumes: CreateStorageVol",
@@ -151,7 +151,7 @@
         "Local": ""
       },
       "Type": "",
-      "Name": "231700d5-c9a6-5a49-738d-99a954c51550-vol2",
+      "Name": "virtlet-231700d5-c9a6-5a49-738d-99a954c51550-vol2",
       "Key": "",
       "Allocation": {
         "Unit": "",
@@ -178,7 +178,7 @@
     }
   },
   {
-    "name": "storage: volumes: 231700d5-c9a6-5a49-738d-99a954c51550-vol2: Format"
+    "name": "storage: volumes: virtlet-231700d5-c9a6-5a49-738d-99a954c51550-vol2: Format"
   },
   {
     "name": "storage: volumes: CreateStorageVol",
@@ -188,7 +188,7 @@
         "Local": ""
       },
       "Type": "",
-      "Name": "231700d5-c9a6-5a49-738d-99a954c51550-vol3",
+      "Name": "virtlet-231700d5-c9a6-5a49-738d-99a954c51550-vol3",
       "Key": "",
       "Allocation": {
         "Unit": "",
@@ -215,7 +215,7 @@
     }
   },
   {
-    "name": "storage: volumes: 231700d5-c9a6-5a49-738d-99a954c51550-vol3: Format"
+    "name": "storage: volumes: virtlet-231700d5-c9a6-5a49-738d-99a954c51550-vol3: Format"
   },
   {
     "name": "domain conn: iso image",
@@ -232,7 +232,7 @@
         "Local": ""
       },
       "Type": "kvm",
-      "Name": "231700d5-c9a6-5a49-738d-99a954c51550-container1",
+      "Name": "virtlet-231700d5-c9a6-container1",
       "UUID": "231700d5-c9a6-5a49-738d-99a954c51550",
       "Memory": {
         "Value": 1024,
@@ -337,7 +337,7 @@
             },
             "Auth": null,
             "Source": {
-              "File": "/var/lib/virtlet/volumes/root_231700d5-c9a6-5a49-738d-99a954c51550",
+              "File": "/var/lib/virtlet/volumes/virtlet_root_231700d5-c9a6-5a49-738d-99a954c51550",
               "Device": "",
               "Protocol": "",
               "Name": "",
@@ -386,7 +386,7 @@
             },
             "Auth": null,
             "Source": {
-              "File": "/var/lib/virtlet/volumes/231700d5-c9a6-5a49-738d-99a954c51550-vol1",
+              "File": "/var/lib/virtlet/volumes/virtlet-231700d5-c9a6-5a49-738d-99a954c51550-vol1",
               "Device": "",
               "Protocol": "",
               "Name": "",
@@ -435,7 +435,7 @@
             },
             "Auth": null,
             "Source": {
-              "File": "/var/lib/virtlet/volumes/231700d5-c9a6-5a49-738d-99a954c51550-vol2",
+              "File": "/var/lib/virtlet/volumes/virtlet-231700d5-c9a6-5a49-738d-99a954c51550-vol2",
               "Device": "",
               "Protocol": "",
               "Name": "",
@@ -484,7 +484,7 @@
             },
             "Auth": null,
             "Source": {
-              "File": "/var/lib/virtlet/volumes/231700d5-c9a6-5a49-738d-99a954c51550-vol3",
+              "File": "/var/lib/virtlet/volumes/virtlet-231700d5-c9a6-5a49-738d-99a954c51550-vol3",
               "Device": "",
               "Protocol": "",
               "Name": "",
@@ -682,22 +682,22 @@
     }
   },
   {
-    "name": "domain conn: 231700d5-c9a6-5a49-738d-99a954c51550-container1: Undefine"
+    "name": "domain conn: virtlet-231700d5-c9a6-container1: Undefine"
   },
   {
     "name": "storage: volumes: RemoveVolumeByName",
-    "data": "root_231700d5-c9a6-5a49-738d-99a954c51550"
+    "data": "virtlet_root_231700d5-c9a6-5a49-738d-99a954c51550"
   },
   {
     "name": "storage: volumes: RemoveVolumeByName",
-    "data": "231700d5-c9a6-5a49-738d-99a954c51550-vol1"
+    "data": "virtlet-231700d5-c9a6-5a49-738d-99a954c51550-vol1"
   },
   {
     "name": "storage: volumes: RemoveVolumeByName",
-    "data": "231700d5-c9a6-5a49-738d-99a954c51550-vol2"
+    "data": "virtlet-231700d5-c9a6-5a49-738d-99a954c51550-vol2"
   },
   {
     "name": "storage: volumes: RemoveVolumeByName",
-    "data": "231700d5-c9a6-5a49-738d-99a954c51550-vol3"
+    "data": "virtlet-231700d5-c9a6-5a49-738d-99a954c51550-vol3"
   }
 ]

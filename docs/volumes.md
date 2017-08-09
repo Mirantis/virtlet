@@ -287,7 +287,7 @@ spec:
 # virsh domblklist 2
 Target     Source
 ------------------------------------------------
-sda        /var/lib/virtlet/root_de0ae972-4154-4f8f-70ff-48335987b5ce
+sda        /var/lib/virtlet/virtlet_root_de0ae972-4154-4f8f-70ff-48335987b5ce
 sdb        libvirt-pool/rbd-test-image
 ```
 

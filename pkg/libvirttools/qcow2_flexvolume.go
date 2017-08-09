@@ -74,12 +74,12 @@ func newQCOW2Volume(volumeName, configPath string, config *VMConfig, owner Volum
 }
 
 func (v *qcow2Volume) volumeName() string {
-	return v.config.DomainUUID + "-" + v.name
+	return "virtlet-" + v.config.DomainUUID + "-" + v.name
 }
 
-func (v *qcow2Volume) createQCOW2Volume(name string, capacity uint64, capacityUnit string) (virt.VirtStorageVolume, error) {
+func (v *qcow2Volume) createQCOW2Volume(capacity uint64, capacityUnit string) (virt.VirtStorageVolume, error) {
 	return v.owner.StoragePool().CreateStorageVol(&libvirtxml.StorageVolume{
-		Name:       name,
+		Name:       v.volumeName(),
 		Allocation: &libvirtxml.StorageVolumeSize{Value: 0},
 		Capacity:   &libvirtxml.StorageVolumeSize{Unit: capacityUnit, Value: capacity},
 		Target:     &libvirtxml.StorageVolumeTarget{Format: &libvirtxml.StorageVolumeTargetFormat{Type: "qcow2"}},
@@ -91,7 +91,7 @@ func (v *qcow2Volume) Uuid() string {
 }
 
 func (v *qcow2Volume) Setup(volumeMap map[string]string) (*libvirtxml.DomainDisk, error) {
-	vol, err := v.createQCOW2Volume(v.volumeName(), uint64(v.capacity), v.capacityUnit)
+	vol, err := v.createQCOW2Volume(uint64(v.capacity), v.capacityUnit)
 	if err != nil {
 		return nil, fmt.Errorf("error during creation of volume '%s' with virtlet description %s: %v", v.volumeName(), v.name, err)
 	}

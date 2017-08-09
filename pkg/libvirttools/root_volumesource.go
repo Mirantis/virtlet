@@ -38,7 +38,7 @@ func GetRootVolume(config *VMConfig, owner VolumeOwner) ([]VMVolume, error) {
 }
 
 func (v *rootVolume) cloneName() string {
-	return "root_" + v.config.DomainUUID
+	return "virtlet_root_" + v.config.DomainUUID
 }
 
 func (v *rootVolume) cloneVolume(name string, from virt.VirtStorageVolume) (virt.VirtStorageVolume, error) {

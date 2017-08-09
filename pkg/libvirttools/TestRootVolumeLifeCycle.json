@@ -12,7 +12,7 @@
           "Local": ""
         },
         "Type": "file",
-        "Name": "root_77f29a0e-46af-4188-a6af-9ff8b8a65224",
+        "Name": "virtlet_root_77f29a0e-46af-4188-a6af-9ff8b8a65224",
         "Key": "",
         "Allocation": null,
         "Capacity": null,
@@ -35,7 +35,7 @@
     }
   },
   {
-    "name": "root disk retuned by root_volumesource",
+    "name": "root disk retuned by virtlet_root_volumesource",
     "data": {
       "XMLName": {
         "Space": "",
@@ -54,7 +54,7 @@
       },
       "Auth": null,
       "Source": {
-        "File": "/fake/volumes/pool/root_77f29a0e-46af-4188-a6af-9ff8b8a65224",
+        "File": "/fake/volumes/pool/virtlet_root_77f29a0e-46af-4188-a6af-9ff8b8a65224",
         "Device": "",
         "Protocol": "",
         "Name": "",
@@ -75,6 +75,6 @@
   },
   {
     "name": "volumes: RemoveVolumeByName",
-    "data": "root_77f29a0e-46af-4188-a6af-9ff8b8a65224"
+    "data": "virtlet_root_77f29a0e-46af-4188-a6af-9ff8b8a65224"
   }
 ]

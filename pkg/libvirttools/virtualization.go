@@ -337,14 +337,16 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netNSPath, cniCon
 	// FIXME: this field should be moved to VMStatus struct (to be added)
 	config.DomainUUID = domainUUID
 	settings := domainSettings{
-		domainUUID:    domainUUID,
-		domainName:    domainUUID + "-" + config.Name,
+		domainUUID: domainUUID,
+		// Note: using only first 13 characters because libvirt has an issue with handling
+		// long path names for qemu monitor socket
+		domainName:    "virtlet-" + domainUUID[:13] + "-" + config.Name,
 		netNSPath:     netNSPath,
 		cniConfig:     cniConfig,
 		vmLogLocation: vmLogLocation(),
 	}
 
-	cloneName := "root_" + settings.domainUUID
+	cloneName := "virtlet_root_" + settings.domainUUID
 	settings.vcpuNum = config.ParsedAnnotations.VCPUCount
 	settings.memory = int(config.MemoryLimitInBytes)
 	settings.cpuShares = uint(config.CpuShares)
