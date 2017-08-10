@@ -100,6 +100,7 @@ func doRunDockershim(c *componentconfig.KubeletConfiguration, r *options.Contain
 		MTU:               int(r.NetworkPluginMTU),
 		LegacyRuntimeHost: nh,
 	}
+	glog.V(3).Infof("Docker plugin settings: %s", spew.Sdump(pluginSettings))
 
 	// Initialize streaming configuration. (Not using TLS now)
 	streamingConfig := &streaming.Config{
@@ -154,6 +155,8 @@ func NewKubeletWrapper(arguments []string) *KubeletWrapper {
 func (k *KubeletWrapper) RunDockershim() {
 	logs.InitLogs()
 	defer logs.FlushLogs()
+	glog.V(3).Infof("RunDockershim(): Kubelet config: %s", spew.Sdump(k.s.KubeletConfiguration))
+
 	if err := doRunDockershim(&k.s.KubeletConfiguration, &k.s.ContainerRuntimeOptions); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
