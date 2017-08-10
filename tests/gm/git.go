@@ -39,7 +39,7 @@ func GitDiff(path string) (string, error) {
 	}
 	defer func() {
 		if err := os.Chdir(origWd); err != nil {
-			glog.Warning("can't chdir back to the old work dir: %v", err)
+			glog.Warningf("Can't chdir back to the old work dir: %v", err)
 		}
 	}()
 	fileDir := filepath.Dir(absPath)

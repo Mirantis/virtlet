@@ -90,7 +90,7 @@ func runCriProxy(connect, listen, nodeInfoPath string) error {
 		if shouldClean {
 			shouldClean = false
 			if err := criproxy.RemoveKubernetesContainers(ni.DockerEndpoint); err != nil {
-				glog.Warningf("failed to clean up old containers: %v", err)
+				glog.Warningf("Failed to clean up old containers: %v", err)
 			}
 		}
 	})
@@ -174,7 +174,7 @@ func main() {
 		case *install:
 			execPath, err := os.Executable()
 			if err != nil {
-				glog.Error("Can't get criproxy executable path: %v", err)
+				glog.Errorf("Can't get criproxy executable path: %v", err)
 				os.Exit(1)
 			}
 			err = installCriProxy(execPath, *nodeInfoPath)

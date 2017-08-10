@@ -239,7 +239,7 @@ func (v *VirtualizationTool) setupVolumes(config *VMConfig, domainDef *libvirtxm
 			// try to tear down volumes that were already set up
 			for _, vmVol := range vmVols[:n] {
 				if err := vmVol.Teardown(); err != nil {
-					glog.Warning("failed to tear down a volume on error: %v", err)
+					glog.Warningf("Failed to tear down a volume on error: %v", err)
 				}
 			}
 			return err
@@ -482,7 +482,7 @@ func (v *VirtualizationTool) StartContainer(containerId string) error {
 		// and cleaning it all up upon failure, but for now we just remove the VM
 		// so the next `CreateContainer()` call succeeds.
 		if rmErr := v.RemoveContainer(containerId); rmErr != nil {
-			return fmt.Errorf("Container start error: %v \n+ container removal error: %v", err, rmErr)
+			return fmt.Errorf("container start error: %v \n+ container removal error: %v", err, rmErr)
 		}
 
 		return err
@@ -657,7 +657,7 @@ func (v *VirtualizationTool) removeDomain(containerId string, config *VMConfig, 
 		if disallowVolumesTeardownFailure {
 			return err
 		} else {
-			glog.Warning("Error during volumes teardown for container %s: %v", containerId, err)
+			glog.Warningf("Error during volumes teardown for container %s: %v", containerId, err)
 		}
 	}
 
@@ -874,7 +874,7 @@ func (v *VirtualizationTool) ListContainers(filter *kubeapi.ContainerFilter) ([]
 				}
 				if containerInfo == nil {
 					// There's no such container - looks like it's already removed, but still is mentioned in sandbox
-					return nil, fmt.Errorf("Container metadata not found, but it's still mentioned in sandbox %s", filter.PodSandboxId)
+					return nil, fmt.Errorf("container metadata not found, but it's still mentioned in sandbox %s", filter.PodSandboxId)
 				}
 
 				container, err := v.getContainer(domain)

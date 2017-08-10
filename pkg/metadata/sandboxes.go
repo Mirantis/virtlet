@@ -126,7 +126,7 @@ func getSandboxBucket(tx *bolt.Tx, podID string, create, optional bool) (*bolt.B
 	}
 	bucket := tx.Bucket([]byte(key))
 	if bucket == nil && !optional {
-		return nil, fmt.Errorf("Pod sandbox %q does not exist", podID)
+		return nil, fmt.Errorf("pod sandbox %q does not exist", podID)
 	}
 	return bucket, nil
 }

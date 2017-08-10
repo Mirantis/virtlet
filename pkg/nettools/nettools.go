@@ -103,7 +103,7 @@ func OpenTAP(devName string) (*os.File, error) {
 	copy(req.Name[:15], "tap0")
 	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, tapFile.Fd(), uintptr(syscall.TUNSETIFF), uintptr(unsafe.Pointer(&req)))
 	if errno != 0 {
-		return nil, fmt.Errorf("Tuntap IOCTL TUNSETIFF failed, errno %v", errno)
+		return nil, fmt.Errorf("tuntap IOCTL TUNSETIFF failed, errno %v", errno)
 	}
 	return tapFile, nil
 }
