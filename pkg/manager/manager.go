@@ -90,8 +90,11 @@ func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, m
 		return nil, err
 	}
 
-	if err := libvirtVirtualizationTool.GarbageCollect(); err != nil {
-		glog.Warningf("Failure during garbage collection: %v", err)
+	if errors := libvirtVirtualizationTool.GarbageCollect(); errors != nil {
+		glog.Warning("During garbage collecting encountered above errors:")
+		for _, err := range errors {
+			glog.Warningf("* %q", err)
+		}
 	}
 
 	cniClient, err := cni.NewClient(cniPluginsDir, cniConfigsDir)

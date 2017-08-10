@@ -17,55 +17,63 @@ limitations under the License.
 package libvirttools
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
-func (v *VirtualizationTool) GarbageCollect() error {
-	ids, err := v.retrieveListOfContainerIDs()
-	if err != nil {
-		return err
+const (
+	nocloudFilenameTemplate = "nocloud-*.iso"
+)
+
+func (v *VirtualizationTool) GarbageCollect() (allErrors []error) {
+	ids, fatal, errors := v.retrieveListOfContainerIDs()
+	if errors != nil {
+		allErrors = append(allErrors, errors...)
+	}
+	if fatal {
+		return
 	}
 
-	if err := v.removeOrphanDomains(ids); err != nil {
-		return err
-	}
+	allErrors = append(allErrors, v.removeOrphanDomains(ids)...)
+	allErrors = append(allErrors, v.removeOrphanRootVolumes(ids)...)
+	allErrors = append(allErrors, v.removeOrphanQcow2Volumes(ids)...)
+	allErrors = append(allErrors, v.removeOrphanQcow2Volumes(ids)...)
 
-	if err := v.removeOrphanRootVolumes(ids); err != nil {
-		return err
-	}
-
-	if err := v.removeOrphanQcow2Volumes(ids); err != nil {
-		return err
-	}
-
-	if err := v.removeOrphanNoCloudImages(ids); err != nil {
-		return err
-	}
-
-	return nil
+	return
 }
 
-func (v *VirtualizationTool) retrieveListOfContainerIDs() ([]string, error) {
+func (v *VirtualizationTool) retrieveListOfContainerIDs() ([]string, bool, []error) {
 	var containerIDs []string
 
 	sandboxes, err := v.metadataStore.ListPodSandboxes(nil)
 	if err != nil {
-		return nil, err
+		return nil, true, []error{
+			fmt.Errorf("cannot list pod sandboxes: %v", err),
+		}
 	}
 
+	var allErrors []error
 	for _, sandbox := range sandboxes {
 		containers, err := v.metadataStore.ListPodContainers(sandbox.GetID())
 		if err != nil {
-			return nil, err
+			allErrors = append(
+				allErrors,
+				fmt.Errorf(
+					"cannot list containers for pod %s: %v",
+					sandbox.GetID(),
+					err,
+				),
+			)
+			continue
 		}
 		for _, container := range containers {
 			containerIDs = append(containerIDs, container.GetID())
 		}
 	}
 
-	return containerIDs, nil
+	return containerIDs, false, allErrors
 }
 
 func inList(list []string, filter func(string) bool) bool {
@@ -77,16 +85,20 @@ func inList(list []string, filter func(string) bool) bool {
 	return false
 }
 
-func (v *VirtualizationTool) removeOrphanDomains(ids []string) error {
+func (v *VirtualizationTool) removeOrphanDomains(ids []string) []error {
 	domains, err := v.domainConn.ListDomains()
 	if err != nil {
-		return err
+		return []error{fmt.Errorf("cannot list domains: %v", err)}
 	}
 
+	var allErrors []error
 	for _, domain := range domains {
 		name, err := domain.Name()
 		if err != nil {
-			return err
+			allErrors = append(
+				allErrors,
+				fmt.Errorf("cannot retrieve domain name: %v", err),
+			)
 		}
 
 		filter := func(id string) bool {
@@ -96,30 +108,50 @@ func (v *VirtualizationTool) removeOrphanDomains(ids []string) error {
 		if !inList(ids, filter) {
 			d, err := v.DomainConnection().LookupDomainByName(name)
 			if err != nil {
-				return err
+				allErrors = append(
+					allErrors,
+					fmt.Errorf(
+						"cannot lookup domain '%s' by name: %v",
+						name,
+						err,
+					),
+				)
+				continue
 			}
 
-			// ignore errors from stopping domain
+			// ignore errors from stopping domain - it can be (and probably is) already stopped
 			d.Destroy()
 			if err := d.Undefine(); err != nil {
-				return err
+				allErrors = append(
+					allErrors,
+					fmt.Errorf(
+						"cannot undefine domain '%s': %v",
+						name,
+						err,
+					),
+				)
 			}
 		}
 	}
 
-	return nil
+	return allErrors
 }
 
-func (v *VirtualizationTool) removeOrphanRootVolumes(ids []string) error {
+func (v *VirtualizationTool) removeOrphanRootVolumes(ids []string) []error {
 	volumes, err := v.volumePool.ListAllVolumes()
 	if err != nil {
-		return err
+		return []error{fmt.Errorf("cannot list libvirt volumes: %v", err)}
 	}
 
+	var allErrors []error
 	for _, volume := range volumes {
 		path, err := volume.Path()
 		if err != nil {
-			return err
+			allErrors = append(
+				allErrors,
+				fmt.Errorf("cannot retrieve volume path: %v", err),
+			)
+			continue
 		}
 
 		filename := filepath.Base(path)
@@ -129,24 +161,36 @@ func (v *VirtualizationTool) removeOrphanRootVolumes(ids []string) error {
 
 		if !inList(ids, filter) {
 			if err := volume.Remove(); err != nil {
-				return err
+				allErrors = append(
+					allErrors,
+					fmt.Errorf(
+						"cannot remove volume with path '%s': %v",
+						path,
+						err,
+					),
+				)
 			}
 		}
 	}
 
-	return nil
+	return allErrors
 }
 
-func (v *VirtualizationTool) removeOrphanQcow2Volumes(ids []string) error {
+func (v *VirtualizationTool) removeOrphanQcow2Volumes(ids []string) []error {
 	volumes, err := v.volumePool.ListAllVolumes()
 	if err != nil {
-		return err
+		return []error{fmt.Errorf("cannot list domains: %v", err)}
 	}
 
+	var allErrors []error
 	for _, volume := range volumes {
 		path, err := volume.Path()
 		if err != nil {
-			return err
+			allErrors = append(
+				allErrors,
+				fmt.Errorf("cannot retrieve volume path: %v", err),
+			)
+			continue
 		}
 
 		filename := filepath.Base(path)
@@ -156,20 +200,35 @@ func (v *VirtualizationTool) removeOrphanQcow2Volumes(ids []string) error {
 
 		if !inList(ids, filter) {
 			if err := volume.Remove(); err != nil {
-				return err
+				allErrors = append(
+					allErrors,
+					fmt.Errorf(
+						"cannot remove volume with path '%s': %v",
+						path,
+						err,
+					),
+				)
 			}
 		}
 	}
 
-	return nil
+	return allErrors
 }
 
-func (v *VirtualizationTool) removeOrphanNoCloudImages(ids []string) error {
-	files, err := filepath.Glob(filepath.Join(nocloudIsoDir, "nocloud-*.iso"))
+func (v *VirtualizationTool) removeOrphanNoCloudImages(ids []string) []error {
+	files, err := filepath.Glob(filepath.Join(nocloudIsoDir, nocloudFilenameTemplate))
 	if err != nil {
-		return err
+		return []error{
+			fmt.Errorf(
+				"error while globbing '%s' files in '%s' directory: %v",
+				nocloudFilenameTemplate,
+				nocloudIsoDir,
+				err,
+			),
+		}
 	}
 
+	var allErrors []error
 	for _, path := range files {
 		filename := filepath.Base(path)
 
@@ -179,10 +238,17 @@ func (v *VirtualizationTool) removeOrphanNoCloudImages(ids []string) error {
 
 		if !inList(ids, filter) {
 			if err := os.Remove(path); err != nil {
-				return err
+				allErrors = append(
+					allErrors,
+					fmt.Errorf(
+						"cannot remove volume with path '%s': %v",
+						path,
+						err,
+					),
+				)
 			}
 		}
 	}
 
-	return nil
+	return allErrors
 }
