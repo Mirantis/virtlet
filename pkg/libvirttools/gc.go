@@ -27,6 +27,9 @@ const (
 	nocloudFilenameTemplate = "nocloud-*.iso"
 )
 
+// GarbageCollect retrieves from metadata store list of container ids,
+// passes it to all GC submodules, collecting from them list of
+// possible errors, which is returned to outer scope
 func (v *VirtualizationTool) GarbageCollect() (allErrors []error) {
 	ids, fatal, errors := v.retrieveListOfContainerIDs()
 	if errors != nil {
