@@ -57,7 +57,7 @@ func (v *nocloudVolume) Teardown() error {
 	isoPath := NewCloudInitGenerator(v.config, nil, nocloudIsoDir).IsoPath()
 	// don't fail to remove the pod if the file cannot be removed, just warn
 	if err := os.Remove(isoPath); err != nil {
-		glog.Warning("Cannot remove temporary nocloud file %q: %v", isoPath, err)
+		glog.Warningf("Cannot remove temporary nocloud file %q: %v", isoPath, err)
 	}
 	return nil
 }

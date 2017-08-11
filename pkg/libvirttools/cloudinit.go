@@ -136,7 +136,7 @@ func (g *CloudInitGenerator) GenerateDisk() (*libvirtxml.DomainDisk, error) {
 
 	if err := utils.GenIsoImage(g.IsoPath(), "cidata", tmpDir); err != nil {
 		if rmErr := os.Remove(g.IsoPath()); rmErr != nil {
-			glog.Warning("Error removing iso file %s: %v", g.IsoPath(), rmErr)
+			glog.Warningf("Error removing iso file %s: %v", g.IsoPath(), rmErr)
 		}
 		return nil, fmt.Errorf("error generating iso image: %v", err)
 	}
@@ -173,7 +173,7 @@ func (g *CloudInitGenerator) addEnvVarsFileToWriteFiles(userData map[string]inte
 		var ok bool
 		oldWriteFiles, ok = oldWriteFilesRaw.([]interface{})
 		if !ok {
-			glog.Warning("malformed write_files entry in user-data, can't add env vars")
+			glog.Warning("Malformed write_files entry in user-data, can't add env vars")
 			return
 		}
 	}

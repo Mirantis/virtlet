@@ -72,7 +72,7 @@ func DataFileDiffers(filename string, v interface{}) (bool, error) {
 
 	var curData interface{}
 	if err := json.Unmarshal(content, &curData); err != nil {
-		glog.Warning("failed to unmarshal %q to JSON: %v", filename, err)
+		glog.Warningf("Failed to unmarshal %q to JSON: %v", filename, err)
 		return true, nil
 	}
 
