@@ -43,6 +43,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 
@@ -100,6 +101,7 @@ func doRunDockershim(c *componentconfig.KubeletConfiguration, r *options.Contain
 		MTU:               int(r.NetworkPluginMTU),
 		LegacyRuntimeHost: nh,
 	}
+	glog.V(3).Infof("Docker plugin settings: %s", spew.Sdump(pluginSettings))
 
 	// Initialize streaming configuration. (Not using TLS now)
 	streamingConfig := &streaming.Config{
@@ -130,12 +132,11 @@ func doRunDockershim(c *componentconfig.KubeletConfiguration, r *options.Contain
 	return http.ListenAndServe(streamingConfig.Addr, ds)
 }
 
-// InitFlags normalizes, parses, then logs the command line flags
+// initFlags normalizes, parses, then logs the command line flags
 func initFlags(arguments []string) {
 	pflag.CommandLine.SetNormalizeFunc(flag.WordSepNormalizeFunc)
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	pflag.CommandLine.Parse(arguments)
-	pflag.Parse()
 	pflag.VisitAll(func(flag *pflag.Flag) {
 		glog.V(4).Infof("FLAG: --%s=%q", flag.Name, flag.Value)
 	})
@@ -148,12 +149,15 @@ type KubeletWrapper struct {
 func NewKubeletWrapper(arguments []string) *KubeletWrapper {
 	s := options.NewKubeletServer()
 	s.AddFlags(pflag.CommandLine)
+	initFlags(arguments)
 	return &KubeletWrapper{s}
 }
 
 func (k *KubeletWrapper) RunDockershim() {
 	logs.InitLogs()
 	defer logs.FlushLogs()
+	glog.V(3).Infof("RunDockershim(): Kubelet config: %s", spew.Sdump(k.s.KubeletConfiguration))
+
 	if err := doRunDockershim(&k.s.KubeletConfiguration, &k.s.ContainerRuntimeOptions); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
