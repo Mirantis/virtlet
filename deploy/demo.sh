@@ -11,9 +11,14 @@ INJECT_LOCAL_IMAGE="${INJECT_LOCAL_IMAGE:-}"
 dind_script="dind-cluster-v1.7.sh"
 kubectl="${HOME}/.kubeadm-dind-cluster/kubectl"
 BASE_LOCATION="${BASE_LOCATION:-https://raw.githubusercontent.com/Mirantis/virtlet/master/}"
+RELEASE_LOCATION="${RELEASE_LOCATION:-https://github.com/Mirantis/virtlet/releases/download/}"
+VIRTLET_DEMO_RELEASE="${VIRTLET_DEMO_RELEASE:-}"
 # Convenience setting for local testing:
 # BASE_LOCATION="${HOME}/work/kubernetes/src/github.com/Mirantis/virtlet"
 cirros_key="demo-cirros-private-key"
+# just initialize it
+declare virtlet_release
+declare virtlet_docker_tag
 
 function demo::step {
   local OPTS=""
@@ -89,7 +94,7 @@ function demo::get-cirros-ssh-keys {
     return 0
   fi
   demo::step "Will download ${cirros_key} into current directory"
-  wget -O ${cirros_key} "https://raw.githubusercontent.com/Mirantis/virtlet/master/examples/vmkey"
+  wget -O ${cirros_key} "https://raw.githubusercontent.com/Mirantis/virtlet/${virtlet_release}/examples/vmkey"
   chmod 600 ${cirros_key}
 }
 
@@ -217,20 +222,53 @@ function demo::kvm-ok {
   # The check is done inside kube-master container because it has proper /lib/modules
   # from the docker host. Also, it'll have to use mirantis/virtlet image
   # later anyway.
-  if ! docker exec kube-master docker run --privileged --rm -v /lib/modules:/lib/modules mirantis/virtlet kvm-ok; then
+  if ! docker exec kube-master docker run --privileged --rm -v /lib/modules:/lib/modules "mirantis/virtlet:${virtlet_docker_tag}" kvm-ok; then
     return 1
   fi
 }
 
+
+function demo::get-correct-virtlet-release {
+  # will use most recently published virtlet release
+  # (virtlet releases are prerelease now so not returned in /latest)
+  local  __resultvar=$1
+  local jq_filter=".[0].tag_name"
+  local last_release
+  last_release=$(curl --silent https://api.github.com/repos/Mirantis/virtlet/releases | docker exec -i kube-master jq "${jq_filter}" | sed 's/^\"\(.*\)\"$/\1/')
+  if [[ "$__resultvar" ]]; then
+    eval $__resultvar="'$last_release'"
+  else
+    echo "$last_release"
+  fi
+}
+
+
 function demo::start-virtlet {
   local jq_filter='.items[0].spec.template.spec.containers[0].env|=.+[{"name": "VIRTLET_DOWNLOAD_PROTOCOL","value":"http"}]'
+  local ds_location
+  if [[ "${VIRTLET_DEMO_RELEASE}" = "master" ]]; then
+      virtlet_release="master"
+      virtlet_docker_tag="latest"
+      ds_location="${BASE_LOCATION}/deploy/virtlet-ds.yaml"
+  else
+    if [[ ! -z "${VIRTLET_DEMO_RELEASE}" ]]; then
+      virtlet_release="${VIRTLET_DEMO_RELEASE}"
+    else
+      demo::get-correct-virtlet-release virtlet_release
+    fi
+    # set correct urls and names
+    virtlet_docker_tag="${virtlet_release}"
+    ds_location="${RELEASE_LOCATION}/${virtlet_release}/virtlet-ds.yaml"
+    BASE_LOCATION="https://raw.githubusercontent.com/Mirantis/virtlet/${virtlet_release}/"
+  fi
+  echo "Will run demo using Virtlet:${virtlet_release} for demo and ${virtlet_docker_tag} as docker tag"
   if demo::kvm-ok; then
     demo::step "Deploying Virtlet DaemonSet with KVM support"
   else
     demo::step "Deploying Virtlet DaemonSet *without* KVM support"
     jq_filter="${jq_filter}"'|.items[0].spec.template.spec.containers[0].env|=.+[{"name": "VIRTLET_DISABLE_KVM","value":"y"}]'
   fi
-  "${kubectl}" convert -f "${BASE_LOCATION}/deploy/virtlet-ds.yaml" --local -o json |
+  "${kubectl}" convert -f "${ds_location}" --local -o json |
       docker exec -i kube-master jq "${jq_filter}" |
       "${kubectl}" create -f -
   demo::wait-for "Virtlet DaemonSet" demo::pods-ready runtime=virtlet
