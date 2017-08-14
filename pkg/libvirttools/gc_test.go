@@ -69,3 +69,45 @@ func TestDomainCleanup(t *testing.T) {
 
 	gm.Verify(t, ct.rec.Content())
 }
+
+func TestRootVolumesCleanup(t *testing.T) {
+	ct := newContainerTester(t, fake.NewToplevelRecorder())
+	defer ct.teardown()
+
+	pool, err := ct.storageConn.LookupStoragePoolByName("volumes")
+	if err != nil {
+		t.Fatalf("LookupStoragePoolByName did not find 'volumes': %v", err)
+	}
+
+	for _, uuid := range randomUUIDs {
+		if _, err := pool.CreateStorageVol(&libvirtxml.StorageVolume{
+			Name:   "root for " + uuid,
+			Target: &libvirtxml.StorageVolumeTarget{Path: "/some/path/virtlet_root_" + uuid},
+		}); err != nil {
+			t.Fatalf("Cannot define new fake volume: %v", err)
+		}
+	}
+	if _, err := pool.CreateStorageVol(&libvirtxml.StorageVolume{
+		Name:   "some other volume",
+		Target: &libvirtxml.StorageVolumeTarget{Path: "/path/with/different/prefix"},
+	}); err != nil {
+		t.Fatalf("Cannot define new fake volume: %v", err)
+	}
+
+	if volumes, _ := pool.ListAllVolumes(); len(volumes) != 4 {
+		t.Errorf("Defined 4 fake volumes but ListAllVolumes() returned %d of them", len(volumes))
+	}
+
+	// this should remove only root volumes for two first elements of randomUUIDs slice
+	// keeping intact other
+	errors := ct.virtTool.removeOrphanRootVolumes(randomUUIDs[2:])
+	if errors != nil {
+		t.Errorf("removeOrphanRootVolumes returned errors: %v", errors)
+	}
+
+	if volumes, _ := pool.ListAllVolumes(); len(volumes) != 2 {
+		t.Errorf("After calling removeOrphanRootVolumes expected two remaining volumes, ListAllVolumes() returned %d of them", len(volumes))
+	}
+
+	gm.Verify(t, ct.rec.Content())
+}

@@ -162,7 +162,7 @@ func (v *VirtualizationTool) removeOrphanRootVolumes(ids []string) []error {
 			return "virtlet_root_"+id == filename
 		}
 
-		if !inList(ids, filter) {
+		if strings.HasPrefix(filename, "virtlet_root_") && !inList(ids, filter) {
 			if err := volume.Remove(); err != nil {
 				allErrors = append(
 					allErrors,
@@ -201,7 +201,7 @@ func (v *VirtualizationTool) removeOrphanQcow2Volumes(ids []string) []error {
 			return strings.HasPrefix(filename, "virtlet-"+id)
 		}
 
-		if !inList(ids, filter) {
+		if strings.HasPrefix(filename, "virtlet-") && !inList(ids, filter) {
 			if err := volume.Remove(); err != nil {
 				allErrors = append(
 					allErrors,
