@@ -17,6 +17,9 @@ limitations under the License.
 package libvirttools
 
 import (
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"testing"
 
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
@@ -106,7 +109,7 @@ func TestRootVolumesCleanup(t *testing.T) {
 	}
 
 	if volumes, _ := pool.ListAllVolumes(); len(volumes) != 2 {
-		t.Errorf("After calling removeOrphanRootVolumes expected two remaining volumes, ListAllVolumes() returned %d of them", len(volumes))
+		t.Errorf("Expected two remaining volumes, ListAllVolumes() returned %d of them", len(volumes))
 	}
 
 	gm.Verify(t, ct.rec.Content())
@@ -148,8 +151,82 @@ func TestQcow2VolumesCleanup(t *testing.T) {
 	}
 
 	if volumes, _ := pool.ListAllVolumes(); len(volumes) != 2 {
-		t.Errorf("After calling removeOrphanQcow2Volumes expected two remaining volumes, ListAllVolumes() returned %d of them", len(volumes))
+		t.Errorf("Expected two remaining volumes, ListAllVolumes() returned %d of them", len(volumes))
 	}
 
 	gm.Verify(t, ct.rec.Content())
+}
+
+func TestNocloudISOsCleanup(t *testing.T) {
+	ct := newContainerTester(t, fake.NewToplevelRecorder())
+	defer ct.teardown()
+
+	directory, err := ioutil.TempDir("", "virtlet-tests-")
+	if err != nil {
+		t.Fatalf("TempDir() returned: %v", err)
+	}
+	defer os.RemoveAll(directory)
+
+	for _, uuid := range randomUUIDs {
+		fname := filepath.Join(directory, "nocloud-"+uuid+".iso")
+		if file, err := os.Create(fname); err != nil {
+			t.Fatalf("Cannot create fake iso with name '%s': %v", fname, err)
+		} else {
+			file.Close()
+		}
+	}
+	fname := filepath.Join(directory, "some other.iso")
+	if file, err := os.Create(fname); err != nil {
+		t.Fatalf("Cannot create fake iso with name '%s': %v", fname, err)
+	} else {
+		file.Close()
+	}
+
+	preCallFileNames, err := filepath.Glob(filepath.Join(directory, "*"))
+	if err != nil {
+		t.Fatalf("Error globbing names in temporary directory: %v", err)
+	}
+	if len(preCallFileNames) != 4 {
+		t.Fatalf("Expected 4 files in temporary directory, found: %d", len(preCallFileNames))
+	}
+
+	// this should remove olny nocloud iso file for first element of randomUUIDs slice
+	// keeping intact rest of files
+	errors := ct.virtTool.removeOrphanNoCloudImages(randomUUIDs[1:], directory)
+	if errors != nil {
+		t.Errorf("removeOrphanNoCloudImages returned errors: %v", errors)
+	}
+
+	postCallFileNames, err := filepath.Glob(filepath.Join(directory, "*"))
+	if err != nil {
+		t.Fatalf("Error globbing names in temporary directory: %v", err)
+	}
+
+	diff := difference(preCallFileNames, postCallFileNames)
+	if len(diff) != 1 {
+		t.Fatalf("Expected that removeOrphanNoCloudImages will remove single file, but it removed: %d", len(diff))
+	}
+
+	expectedPath := filepath.Join(directory, "nocloud-"+randomUUIDs[0]+".iso")
+	if diff[0] != expectedPath {
+		t.Fatalf("Expected that removeOrphanNoCloudImages will remove only '%s' file, but there is missing: %q", expectedPath, diff[0])
+	}
+
+	// no gm validation, because we are testing only file operations in this test
+}
+
+// https://stackoverflow.com/a/45428032
+// difference returns the elements in a that aren't in b
+func difference(a, b []string) []string {
+	mb := map[string]bool{}
+	for _, x := range b {
+		mb[x] = true
+	}
+	ab := []string{}
+	for _, x := range a {
+		if _, ok := mb[x]; !ok {
+			ab = append(ab, x)
+		}
+	}
+	return ab
 }

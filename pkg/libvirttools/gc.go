@@ -42,7 +42,7 @@ func (v *VirtualizationTool) GarbageCollect() (allErrors []error) {
 	allErrors = append(allErrors, v.removeOrphanDomains(ids)...)
 	allErrors = append(allErrors, v.removeOrphanRootVolumes(ids)...)
 	allErrors = append(allErrors, v.removeOrphanQcow2Volumes(ids)...)
-	allErrors = append(allErrors, v.removeOrphanQcow2Volumes(ids)...)
+	allErrors = append(allErrors, v.removeOrphanNoCloudImages(ids, nocloudIsoDir)...)
 
 	return
 }
@@ -218,8 +218,8 @@ func (v *VirtualizationTool) removeOrphanQcow2Volumes(ids []string) []error {
 	return allErrors
 }
 
-func (v *VirtualizationTool) removeOrphanNoCloudImages(ids []string) []error {
-	files, err := filepath.Glob(filepath.Join(nocloudIsoDir, nocloudFilenameTemplate))
+func (v *VirtualizationTool) removeOrphanNoCloudImages(ids []string, directory string) []error {
+	files, err := filepath.Glob(filepath.Join(directory, nocloudFilenameTemplate))
 	if err != nil {
 		return []error{
 			fmt.Errorf(
@@ -239,7 +239,7 @@ func (v *VirtualizationTool) removeOrphanNoCloudImages(ids []string) []error {
 			return filename == "nocloud-"+id+".iso"
 		}
 
-		if !inList(ids, filter) {
+		if strings.HasPrefix(filename, "nocloud-") && strings.HasSuffix(filename, ".iso") && !inList(ids, filter) {
 			if err := os.Remove(path); err != nil {
 				allErrors = append(
 					allErrors,
