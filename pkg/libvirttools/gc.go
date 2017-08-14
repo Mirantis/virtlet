@@ -105,7 +105,7 @@ func (v *VirtualizationTool) removeOrphanDomains(ids []string) []error {
 		}
 
 		filter := func(id string) bool {
-			return strings.HasPrefix("virtlet-"+id, name)
+			return strings.HasPrefix(name, "virtlet-"+id[:13])
 		}
 
 		if !inList(ids, filter) {
@@ -198,7 +198,7 @@ func (v *VirtualizationTool) removeOrphanQcow2Volumes(ids []string) []error {
 
 		filename := filepath.Base(path)
 		filter := func(id string) bool {
-			return strings.HasPrefix("virtlet-"+id, filename)
+			return strings.HasPrefix(filename, "virtlet-"+id)
 		}
 
 		if !inList(ids, filter) {
