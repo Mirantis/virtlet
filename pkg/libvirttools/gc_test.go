@@ -60,14 +60,14 @@ func TestDomainCleanup(t *testing.T) {
 	}
 
 	// this should remove all domains (including other than virlet defined)
-	// with exception of last listed in randomUUIDs slice
+	// with an exception of the last listed in randomUUIDs slice
 	errors := ct.virtTool.removeOrphanDomains(randomUUIDs[2:])
 	if errors != nil {
 		t.Errorf("removeOrphanDomains returned errors: %v", errors)
 	}
 
 	if domains, _ := ct.domainConn.ListDomains(); len(domains) != 1 {
-		t.Errorf("After calling removeOrphanDomains expected single remaining domain, ListDomains() returned %d of them", len(domains))
+		t.Errorf("Expected a single remaining domain, ListDomains() returned %d of them", len(domains))
 	}
 
 	gm.Verify(t, ct.rec.Content())
@@ -101,15 +101,15 @@ func TestRootVolumesCleanup(t *testing.T) {
 		t.Errorf("Defined 4 fake volumes but ListAllVolumes() returned %d of them", len(volumes))
 	}
 
-	// this should remove only root volumes for two first elements of randomUUIDs slice
-	// keeping intact other
+	// this should remove only root volumes corresponding to the two first
+	// elements of randomUUIDs slice, keeping others
 	errors := ct.virtTool.removeOrphanRootVolumes(randomUUIDs[2:])
 	if errors != nil {
 		t.Errorf("removeOrphanRootVolumes returned errors: %v", errors)
 	}
 
 	if volumes, _ := pool.ListAllVolumes(); len(volumes) != 2 {
-		t.Errorf("Expected two remaining volumes, ListAllVolumes() returned %d of them", len(volumes))
+		t.Errorf("Expected 2 volumes to remain, but ListAllVolumes() returned %d of them", len(volumes))
 	}
 
 	gm.Verify(t, ct.rec.Content())
@@ -143,8 +143,8 @@ func TestQcow2VolumesCleanup(t *testing.T) {
 		t.Errorf("Defined 4 fake volumes but ListAllVolumes() returned %d of them", len(volumes))
 	}
 
-	// this should remove only qcow2 volumes for two first elements of randomUUIDs slice
-	// keeping intact other
+	// this should remove only ephemeral qcow2 volumes corresponding to
+	// the two first elements of randomUUIDs slice, keeping others
 	errors := ct.virtTool.removeOrphanQcow2Volumes(randomUUIDs[2:])
 	if errors != nil {
 		t.Errorf("removeOrphanRootVolumes returned errors: %v", errors)
@@ -170,14 +170,14 @@ func TestNocloudISOsCleanup(t *testing.T) {
 	for _, uuid := range randomUUIDs {
 		fname := filepath.Join(directory, "nocloud-"+uuid+".iso")
 		if file, err := os.Create(fname); err != nil {
-			t.Fatalf("Cannot create fake iso with name '%s': %v", fname, err)
+			t.Fatalf("Cannot create fake iso with name %q: %v", fname, err)
 		} else {
 			file.Close()
 		}
 	}
 	fname := filepath.Join(directory, "some other.iso")
 	if file, err := os.Create(fname); err != nil {
-		t.Fatalf("Cannot create fake iso with name '%s': %v", fname, err)
+		t.Fatalf("Cannot create fake iso with name %q: %v", fname, err)
 	} else {
 		file.Close()
 	}
@@ -190,8 +190,8 @@ func TestNocloudISOsCleanup(t *testing.T) {
 		t.Fatalf("Expected 4 files in temporary directory, found: %d", len(preCallFileNames))
 	}
 
-	// this should remove olny nocloud iso file for first element of randomUUIDs slice
-	// keeping intact rest of files
+	// this should remove only nocloud iso file corresponding to the first
+	// element of randomUUIDs slice, keeping other files
 	errors := ct.virtTool.removeOrphanNoCloudImages(randomUUIDs[1:], directory)
 	if errors != nil {
 		t.Errorf("removeOrphanNoCloudImages returned errors: %v", errors)
@@ -199,17 +199,17 @@ func TestNocloudISOsCleanup(t *testing.T) {
 
 	postCallFileNames, err := filepath.Glob(filepath.Join(directory, "*"))
 	if err != nil {
-		t.Fatalf("Error globbing names in temporary directory: %v", err)
+		t.Fatalf("Error globbing names in the temporary directory: %v", err)
 	}
 
 	diff := difference(preCallFileNames, postCallFileNames)
 	if len(diff) != 1 {
-		t.Fatalf("Expected that removeOrphanNoCloudImages will remove single file, but it removed: %d", len(diff))
+		t.Fatalf("Expected removeOrphanNoCloudImages to remove single file, but it removed %d files", len(diff))
 	}
 
 	expectedPath := filepath.Join(directory, "nocloud-"+randomUUIDs[0]+".iso")
 	if diff[0] != expectedPath {
-		t.Fatalf("Expected that removeOrphanNoCloudImages will remove only '%s' file, but there is missing: %q", expectedPath, diff[0])
+		t.Fatalf("Expected removeOrphanNoCloudImages to remove only %q file, but it also removed: %q", expectedPath, diff[0])
 	}
 
 	// no gm validation, because we are testing only file operations in this test
