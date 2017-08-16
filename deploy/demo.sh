@@ -13,12 +13,18 @@ kubectl="${HOME}/.kubeadm-dind-cluster/kubectl"
 BASE_LOCATION="${BASE_LOCATION:-https://raw.githubusercontent.com/Mirantis/virtlet/master/}"
 RELEASE_LOCATION="${RELEASE_LOCATION:-https://github.com/Mirantis/virtlet/releases/download/}"
 VIRTLET_DEMO_RELEASE="${VIRTLET_DEMO_RELEASE:-}"
+VIRTLET_ON_MASTER="${VIRTLET_ON_MASTER:-}"
 # Convenience setting for local testing:
 # BASE_LOCATION="${HOME}/work/kubernetes/src/github.com/Mirantis/virtlet"
 cirros_key="demo-cirros-private-key"
 # just initialize it
 declare virtlet_release
 declare virtlet_docker_tag
+
+virtlet_node=kube-node-1
+if [[ ${VIRTLET_ON_MASTER} ]]; then
+  virtlet_node=kube-master
+fi
 
 function demo::step {
   local OPTS=""
@@ -110,13 +116,19 @@ function demo::start-dind-cluster {
 }
 
 function demo::inject-local-image {
-  demo::step "Copying local mirantis/virtlet image into kube-node-1 container"
-  docker save mirantis/virtlet | docker exec -i kube-node-1 docker load
+  demo::step "Copying local mirantis/virtlet image into ${virtlet_node} container"
+  docker save mirantis/virtlet | docker exec -i "${virtlet_node}" docker load
 }
 
-function demo::label-node {
-  demo::step "Applying label to kube-node-1:" "extraRuntime=virtlet"
-  "${kubectl}" label node kube-node-1 extraRuntime=virtlet
+function demo::label-and-untaint-node {
+  demo::step "Applying label to ${virtlet_node}:" "extraRuntime=virtlet"
+  "${kubectl}" label node "${virtlet_node}" extraRuntime=virtlet
+  if [[ ${VIRTLET_ON_MASTER} ]]; then
+      demo::step "Checking/removing master taint from ${virtlet_node}"
+    if [[ $(kubectl get node kube-master -o jsonpath='{.spec.taints[?(@.key=="node-role.kubernetes.io/master")]}') ]]; then
+      kubectl taint nodes kube-master node-role.kubernetes.io/master-
+    fi
+  fi
 }
 
 function demo::pods-ready {
@@ -218,10 +230,10 @@ function demo::vm-ready {
 
 function demo::kvm-ok {
   demo::step "Checking for KVM support..."
-  # The check is done inside node-1 container because it has proper /lib/modules
+  # The check is done inside the node container because it has proper /lib/modules
   # from the docker host. Also, it'll have to use mirantis/virtlet image
   # later anyway.
-  if ! docker exec kube-node-1 docker run --privileged --rm -v /lib/modules:/lib/modules "mirantis/virtlet:${virtlet_docker_tag}" kvm-ok; then
+  if ! docker exec "${virtlet_node}" docker run --privileged --rm -v /lib/modules:/lib/modules "mirantis/virtlet:${virtlet_docker_tag}" kvm-ok; then
     return 1
   fi
 }
@@ -315,7 +327,7 @@ demo::start-dind-cluster
 if [[ ${INJECT_LOCAL_IMAGE:-} ]]; then
   demo::inject-local-image
 fi
-demo::label-node
+demo::label-and-untaint-node
 demo::start-virtlet
 demo::start-nginx
 demo::start-image-server
