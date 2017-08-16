@@ -44,6 +44,13 @@ By default, CNI bridge plugin is used for cluster networking. It's also possible
 CNI_PLUGIN=flannel ./demo.sh
 ```
 
+There's also an option to deploy Virtlet on master node of the DIND
+cluster, which can be handy e.g. if you don't want to use worker nodes
+(i.e. start the cluster with `NUM_NODES=0`):
+```
+VIRTLET_ON_MASTER=1 ./demo.sh
+```
+
 The demo script will check for KVM support on the host and will make Virtlet use KVM if it's available on Docker host. If KVM is not available, plain QEMU will be used.
 
 The demo is based on [kubeadm-dind-cluster](https://github.com/Mirantis/kubeadm-dind-cluster) project. **Docker btrfs storage driver is currently unsupported.** Please refer to `kubeadm-dind-cluster` documentation for more info.

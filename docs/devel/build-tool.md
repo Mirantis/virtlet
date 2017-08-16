@@ -36,14 +36,17 @@ current directory.
 
 ## copy-dind
 
-Copies the binaries into kube-node-1 of `kubeadm-dind-cluster`. You need to
-do `dind-cluster...sh up` to be able to use this command.
+Copies the binaries into kube-node-1 of `kubeadm-dind-cluster` (or
+kube-master if `VIRTLET_ON_MASTER` environment variable is set to a
+non-empty value). You need to do `dind-cluster...sh up` to be able to
+use this command.
 
 ## start-dind
 
-Copies the binaries into kube-node-1 of `kubeadm-dind-cluster`. You
-need to do `dind-cluster...sh up` and `build/cmd.sh copy-dind` to be
-able to use this command.
+Starts Virtlet on kube-node-1 of `kubeadm-dind-cluster` (or
+kube-master if `VIRTLET_ON_MASTER` environment variable is set to a
+non-empty value). You need to do `dind-cluster...sh up` and
+`build/cmd.sh copy-dind` to be able to use this command.
 
 ## vsh
 
