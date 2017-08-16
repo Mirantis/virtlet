@@ -106,18 +106,17 @@ function demo::start-dind-cluster {
   echo "To clean up the cluster, use './dind-cluster-v1.7.sh clean'" >&2
   demo::ask-before-continuing
   "./${dind_script}" clean
-  # use zero-worker configuration for faster startup
-  NUM_NODES=0 "./${dind_script}" up
+  "./${dind_script}" up
 }
 
 function demo::inject-local-image {
-  demo::step "Copying local mirantis/virtlet image into kube-master container"
-  docker save mirantis/virtlet | docker exec -i kube-master docker load
+  demo::step "Copying local mirantis/virtlet image into kube-node-1 container"
+  docker save mirantis/virtlet | docker exec -i kube-node-1 docker load
 }
 
 function demo::label-node {
-  demo::step "Applying label to kube-master:" "extraRuntime=virtlet"
-  "${kubectl}" label node kube-master extraRuntime=virtlet
+  demo::step "Applying label to kube-node-1:" "extraRuntime=virtlet"
+  "${kubectl}" label node kube-node-1 extraRuntime=virtlet
 }
 
 function demo::pods-ready {
@@ -219,10 +218,10 @@ function demo::vm-ready {
 
 function demo::kvm-ok {
   demo::step "Checking for KVM support..."
-  # The check is done inside kube-master container because it has proper /lib/modules
+  # The check is done inside node-1 container because it has proper /lib/modules
   # from the docker host. Also, it'll have to use mirantis/virtlet image
   # later anyway.
-  if ! docker exec kube-master docker run --privileged --rm -v /lib/modules:/lib/modules "mirantis/virtlet:${virtlet_docker_tag}" kvm-ok; then
+  if ! docker exec kube-node-1 docker run --privileged --rm -v /lib/modules:/lib/modules "mirantis/virtlet:${virtlet_docker_tag}" kvm-ok; then
     return 1
   fi
 }
