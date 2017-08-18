@@ -33,3 +33,5 @@ import:
   # version: 56fd84210219dbdfe6501fb2085adfb8e61f2bc1
 - package: github.com/jonboulle/clockwork
   version: bcac9884e7502bb2b474c0339d889cb981a2f27f
+- package: github.com/onsi/ginkgo
+- package: github.com/onsi/gomega

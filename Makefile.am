@@ -33,11 +33,12 @@ all:
 		patch -d vendor/github.com/libvirt/libvirt-go-xml -p1 -b -i $(CURDIR)/libvirt-xml-go.patch; \
 	fi
 	mkdir -p $(builddir)/_output $(builddir)/contrib/images/libvirt/_output
-	go build -o $(builddir)/_output/virtlet ./cmd/virtlet
-	go build -o $(builddir)/_output/vmwrapper ./cmd/vmwrapper
-	go build -o $(builddir)/_output/criproxy ./cmd/criproxy
-	go build -o $(builddir)/_output/flexvolume_driver ./cmd/flexvolume_driver
-	go build -o $(builddir)/_output/virtlet_log ./cmd/virtlet_log
+	go build -i -o $(builddir)/_output/virtlet ./cmd/virtlet
+	go build -i -o $(builddir)/_output/vmwrapper ./cmd/vmwrapper
+	go build -i -o $(builddir)/_output/criproxy ./cmd/criproxy
+	go build -i -o $(builddir)/_output/flexvolume_driver ./cmd/flexvolume_driver
+	go build -i -o $(builddir)/_output/virtlet_log ./cmd/virtlet_log
+	go test -i -c -o $(builddir)/_output/virtlet-e2e-tests ./tests/e2e
 
 verify-glide-installation:
 	@which glide || go get github.com/Masterminds/glide

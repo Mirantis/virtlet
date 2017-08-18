@@ -74,3 +74,10 @@ jobs:
         command: |
           build/portforward.sh 8080&
           tests/e2e/e2e.sh
+
+    - run:
+        name: Run new e2e tests
+        command: |
+          build/portforward.sh 8080&
+          _output/virtlet-e2e-tests -test.v
+
