@@ -26,7 +26,7 @@ shift
 
 namespace_opts=""
 if [[ ${namespace} ]]; then
-  namespace_opts="-o ${namespace}"
+  namespace_opts="-n ${namespace}"
 fi
 
 read pod_ip node_name pod_namespace <<<$(kubectl get pod ${namespace_opts} "${pod_name}" -o jsonpath="{.status.podIP} {.spec.nodeName} {.metadata.namespace}")

@@ -5,12 +5,14 @@ set -o pipefail
 set -o errtrace
 
 opts=
-if [[ ${1:-} = "console" ]]; then
+if [[ ${1:-} = "console" || $# == 0 ]]; then
   # using -it with `virsh list` causes it to use \r\n as line endings,
   # which makes it less useful
   opts="-it"
 fi
 args=("$@")
+
+pod_output=""
 
 function get_pod_domain_id {
   # @pod[:namespace]
@@ -25,11 +27,21 @@ function get_pod_domain_id {
   if [[ ${namespace} ]]; then
       namespace_opts="-n ${namespace}"
   fi
-  container_id=$(kubectl get pod ${namespace_opts} "${pod_name}" \
-	  -o 'jsonpath={.status.containerStatuses[0].containerID}'|sed 's/.*__//')
-  container_name=$(kubectl get pod ${namespace_opts} "${pod_name}" \
-	  -o 'jsonpath={.status.containerStatuses[0].name}'|sed 's/.*__//')
-  echo "virtlet-${container_id:0:13}-${container_name}"
+  info=$(kubectl get pod ${namespace_opts} "${pod_name}" -o jsonpath="{.status.containerStatuses[0].containerID} {.status.containerStatuses[0].name} {.spec.nodeName}")
+  if [[ $? > 0 ]]; then
+    exit 1
+  fi
+
+  read container_id container_name node_name <<<"${info}"
+  container_id=$(echo ${container_id} | sed 's/.*__//' | cut -c1-13)
+
+  new_pod_output=jsonpath="{.items[?(.spec.nodeName==\"${node_name}\")]..metadata.name}"
+  if [[ "${pod_output}" && "${new_pod_output}" != "${pod_output}" ]]; then
+    echo "Cannot refer to several domains hosted on different nodes" >&2
+    exit 1
+  fi
+  pod_output=${new_pod_output}
+  domain="virtlet-${container_id}-${container_name}"
 }
 
 if [[ ${1:-} = "poddomain" ]]; then
@@ -38,14 +50,33 @@ if [[ ${1:-} = "poddomain" ]]; then
     exit 1
   fi
   get_pod_domain_id "${2}"
+  echo "${domain}"
   exit 0
 fi
 
 for ((n=0; n < ${#args[@]}; n++)); do
   if [[ ${args[${n}]} =~ ^@ ]]; then
-    args[${n}]="$(get_pod_domain_id "${args[${n}]}")"
+    get_pod_domain_id "${args[${n}]}"
+    args[${n}]="${domain}"
   fi
 done
 
-pod=$(kubectl get pods -n kube-system -l runtime=virtlet -o name|head -1|sed 's@.*/@@')
-kubectl exec ${opts} -n kube-system "${pod}" -c virtlet -- virsh ${args[@]+"${args[@]}"}
+pods=($(kubectl get pods -n kube-system -l runtime=virtlet -o "${pod_output:-name}" | sed 's@.*/@@'))
+
+if [[ ! ${pods+x} ]]; then
+  if [[ ${pod_output} ]]; then
+    echo "No virtlet pod for specified domain can be found" >&2
+  else
+    echo "No virtlet pod found " >&2
+  fi
+  exit 1
+elif [[ ${#pods[*]} > 1 ]]; then
+  printf "WARNING: More than one virtlet pod found. Executing command in all instances\n\n"
+fi
+
+for pod in ${pods[*]}; do
+  if [[ ${#pods[*]} > 1 ]]; then
+    printf "${pod} ($(kubectl get pod -nkube-system "${pod}" -o jsonpath="{.spec.nodeName}")):\n\n"
+  fi
+  kubectl exec ${opts} -n kube-system "${pod}" -c virtlet -- virsh ${args[@]+"${args[@]}"}
+done
