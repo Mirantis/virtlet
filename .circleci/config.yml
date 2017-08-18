@@ -66,6 +66,7 @@ jobs:
           NONINTERACTIVE=1 \
             NO_VM_CONSOLE=1 \
             INJECT_LOCAL_IMAGE=1 \
+            VIRTLET_DEMO_RELEASE=master \
             BASE_LOCATION="$PWD" \
             deploy/demo.sh
 
@@ -73,4 +74,4 @@ jobs:
         name: Run e2e tests
         command: |
           build/portforward.sh 8080&
-          tests/e2e/e2e.sh
+          _output/virtlet-e2e-tests -test.v

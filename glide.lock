@@ -1,5 +1,5 @@
-hash: 4dbb56bd2f62c42b2e4b8a0030bf68c43814678defb0afeed48a08e1f2660e7e
-updated: 2017-08-04T09:14:47.288882682+02:00
+hash: e04d6be0b6326f064beccc605e1b1ca51cfa784ff2fd66c3d96fc1384de3d510
+updated: 2017-08-20T03:59:07.425226591-07:00
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
@@ -300,6 +300,8 @@ imports:
   version: a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4
   subpackages:
   - simplelru
+- name: github.com/howeyc/gopass
+  version: bf9dde6d0d2c004a008c27aaee91170c786f6db8
 - name: github.com/hpcloud/tail
   version: faf842bde7ed83bbc3c65a2c454fae39bc29a95f
   subpackages:
@@ -307,6 +309,8 @@ imports:
   - util
   - watch
   - winfile
+- name: github.com/imdario/mergo
+  version: 6633656539c1639d9d78127b7d47c622b5d7b6dc
 - name: github.com/jmespath/go-jmespath
   version: 3433f3ea46d9f8019119e7dd41274e112a2359a9
 - name: github.com/jonboulle/clockwork
@@ -337,6 +341,37 @@ imports:
   version: ad45545899c7b13c020ea92b2072220eefad42b8
 - name: github.com/nu7hatch/gouuid
   version: 179d4d0c4d8d407a32af483c2354df1d2c91e6c3
+- name: github.com/onsi/ginkgo
+  version: 7f8ab55aaf3b86885aa55b762e803744d1674700
+  subpackages:
+  - config
+  - internal/codelocation
+  - internal/containernode
+  - internal/failer
+  - internal/leafnodes
+  - internal/remote
+  - internal/spec
+  - internal/specrunner
+  - internal/suite
+  - internal/testingtproxy
+  - internal/writer
+  - reporters
+  - reporters/stenographer
+  - types
+- name: github.com/onsi/gomega
+  version: 2152b45fa28a361beba9aab0885972323a444e28
+  subpackages:
+  - format
+  - internal/assertion
+  - internal/asyncassertion
+  - internal/oraclematcher
+  - internal/testingtsupport
+  - matchers
+  - matchers/support/goraph/bipartitegraph
+  - matchers/support/goraph/edge
+  - matchers/support/goraph/node
+  - matchers/support/goraph/util
+  - types
 - name: github.com/opencontainers/runc
   version: d223e2adae83f62d58448a799a5da05730228089
   subpackages:
@@ -415,6 +450,14 @@ imports:
   version: 03efcb870d84809319ea509714dd6d19a1498483
   subpackages:
   - errorutil
+- name: golang.org/x/crypto
+  version: d172538b2cfce0c13cee31e647d0367aa8cd2486
+  subpackages:
+  - curve25519
+  - ed25519
+  - ed25519/internal/edwards25519
+  - ssh
+  - ssh/terminal
 - name: golang.org/x/exp
   version: 292a51b8d262487dab23a588950e8052d63d9113
   subpackages:
@@ -648,8 +691,12 @@ imports:
   - rest
   - rest/watch
   - testing
+  - tools/auth
   - tools/cache
+  - tools/clientcmd
   - tools/clientcmd/api
+  - tools/clientcmd/api/latest
+  - tools/clientcmd/api/v1
   - tools/metrics
   - tools/record
   - tools/remotecommand
@@ -657,6 +704,7 @@ imports:
   - util/cert
   - util/exec
   - util/flowcontrol
+  - util/homedir
   - util/integer
   - util/workqueue
 - name: k8s.io/kubernetes
