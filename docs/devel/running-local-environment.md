@@ -24,7 +24,7 @@ $ build/cmd.sh build
 $ # start DIND cluster
 $ ~/dind-cluster-v1.6.sh up
 
-$ # copy binaries to kube-master
+$ # copy binaries to kube-node-1
 $ build/cmd.sh copy-dind
 
 $ # start Virtlet daemonset
@@ -46,7 +46,7 @@ $ build/cmd.sh copy
 $ docker build -t mirantis/virtlet .
 
 $ # copy the image to the DIND node
-$ docker save mirantis/virtlet | docker exec -i kube-master docker load
+$ docker save mirantis/virtlet | docker exec -i kube-node-1 docker load
 ```
 
 You may use [flannel](https://github.com/coreos/flannel) instead of
