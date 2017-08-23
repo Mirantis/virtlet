@@ -66,7 +66,7 @@ type domainSettings struct {
 	cpuPeriod        uint64
 	cpuQuota         int64
 	rootDiskFilepath string
-	netNSPath        string
+	netFdKey         string
 	cniConfig        string
 	vmLogLocation    string
 }
@@ -143,8 +143,7 @@ func (ds *domainSettings) createDomain() *libvirtxml.Domain {
 		QEMUCommandline: &libvirtxml.DomainQEMUCommandline{
 			Envs: []libvirtxml.DomainQEMUCommandlineEnv{
 				libvirtxml.DomainQEMUCommandlineEnv{Name: "VIRTLET_EMULATOR", Value: emulator},
-				libvirtxml.DomainQEMUCommandlineEnv{Name: "VIRTLET_NS", Value: ds.netNSPath},
-				libvirtxml.DomainQEMUCommandlineEnv{Name: "VIRTLET_CNI_CONFIG", Value: ds.cniConfig},
+				libvirtxml.DomainQEMUCommandlineEnv{Name: "VIRTLET_NET_KEY", Value: ds.netFdKey},
 			},
 		},
 	}
@@ -328,7 +327,7 @@ func (v *VirtualizationTool) addSerialDevicesToDomain(sandboxId, containerName s
 	return nil
 }
 
-func (v *VirtualizationTool) CreateContainer(config *VMConfig, netNSPath, cniConfig string) (string, error) {
+func (v *VirtualizationTool) CreateContainer(config *VMConfig, netFdKey, cniConfig string) (string, error) {
 	if err := config.LoadAnnotations(); err != nil {
 		return "", err
 	}
@@ -341,7 +340,7 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netNSPath, cniCon
 		// Note: using only first 13 characters because libvirt has an issue with handling
 		// long path names for qemu monitor socket
 		domainName:    "virtlet-" + domainUUID[:13] + "-" + config.Name,
-		netNSPath:     netNSPath,
+		netFdKey:      netFdKey,
 		cniConfig:     cniConfig,
 		vmLogLocation: vmLogLocation(),
 	}

@@ -613,6 +613,7 @@ func ConfigureLink(link netlink.Link, info *cnicurrent.Result) error {
 // The end result is the same network configuration in the container network namespace
 // as it was before SetupContainerSideNetwork() call.
 func (csn *ContainerSideNetwork) Teardown() error {
+	csn.TapFile.Close()
 	contVeth, err := FindVeth()
 	if err != nil {
 		return err

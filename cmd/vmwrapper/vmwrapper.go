@@ -17,31 +17,28 @@ limitations under the License.
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"math/rand"
+	"net"
 	"os"
 	"os/exec"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/containernetworking/cni/pkg/ns"
-	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/golang/glog"
 
-	"github.com/Mirantis/virtlet/pkg/dhcp"
-	"github.com/Mirantis/virtlet/pkg/nettools"
+	"github.com/Mirantis/virtlet/pkg/tapmanager"
 )
 
 const (
+	fdSocketPath    = "/var/lib/virtlet/tapfdserver.sock"
 	defaultEmulator = "/usr/bin/qemu-system-x86_64" // FIXME
 	emulatorVar     = "VIRTLET_EMULATOR"
-	nsEnvVar        = "VIRTLET_NS"
-	cniConfigEnvVar = "VIRTLET_CNI_CONFIG"
+	netKeyEnvVar    = "VIRTLET_NET_KEY"
 )
 
 // Spawn child process and wait for its termination.
@@ -156,10 +153,9 @@ func catchParentKilled(exitEOF chan bool) {
 
 func parent(exitEOF chan bool, sigTERM chan os.Signal) {
 	emulator := os.Getenv(emulatorVar)
-	nsPath := os.Getenv(nsEnvVar)
 	emulatorArgs := os.Args[1:]
 
-	if emulator == "" || nsPath == "" {
+	if emulator == "" {
 		// this happens during qemu -help invocation by virtlet
 		// (capability check)
 		// TODO: only do this when *all* above vars are empty
@@ -181,8 +177,6 @@ func parent(exitEOF chan bool, sigTERM chan os.Signal) {
 }
 
 func child(exitEOF chan bool, sigTERM chan os.Signal) {
-	var info *cnicurrent.Result
-
 	go catchParentKilled(exitEOF)
 
 	emulatorArgs := os.Args[2:]
@@ -192,11 +186,11 @@ func child(exitEOF chan bool, sigTERM chan os.Signal) {
 	flag.Parse()
 
 	emulator := os.Getenv(emulatorVar)
-	nsPath := os.Getenv(nsEnvVar)
+	netFdKey := os.Getenv(netKeyEnvVar)
 
 	// TODO: use cleaner way to do this
 	runHook := func(name string) {
-		err, procTerminated := runCommandIfExists(name, append([]string{emulator, nsPath, os.Getenv(cniConfigEnvVar)}, emulatorArgs...), exitEOF, sigTERM, nil)
+		err, procTerminated := runCommandIfExists(name, append([]string{emulator, netFdKey}, emulatorArgs...), exitEOF, sigTERM, nil)
 		if err != nil {
 			glog.Errorf("Hook %q: %v", name, err)
 			if procTerminated {
@@ -211,93 +205,36 @@ func child(exitEOF chan bool, sigTERM chan os.Signal) {
 
 	runHook("/vmwrapper-entry.sh")
 
-	vmNS, err := ns.GetNS(nsPath)
+	c := tapmanager.NewFDClient(fdSocketPath)
+	if err := c.Connect(); err != nil {
+		glog.Errorf("Can't connect to fd server: %v", err)
+		os.Exit(1)
+	}
+	tapFd, hwAddr, err := c.GetFD(netFdKey)
 	if err != nil {
-		glog.Errorf("Failed to open network namespace at %q: %v", nsPath, err)
+		glog.Errorf("Failed to obtain tap fd for key %q: %v", netFdKey, err)
 		os.Exit(1)
 	}
 
-	cniConfig := os.Getenv(cniConfigEnvVar)
-	if cniConfig != "" {
-		if err := json.Unmarshal([]byte(cniConfig), &info); err != nil {
-			glog.Errorf("Failed to unmarshal cni config: %v", err)
-			os.Exit(1)
-		}
+	tapFile := os.NewFile(uintptr(tapFd), "acquired-fd")
+	defer tapFile.Close()
+
+	netArgs := []string{
+		"-netdev",
+		// Qemu process is started with 3d FD set to already opened TAP device
+		"tap,id=tap0,fd=3",
+		"-device",
+		"virtio-net-pci,netdev=tap0,id=net0,mac=" + net.HardwareAddr(hwAddr).String(),
 	}
 
-	virtletNS, err := ns.GetCurrentNS()
+	// On domain's shutdown/destroy libvirt terminates corresponding qemu process using SIGTERM or SIGKILL.
+	// SIGKILL is detected by catching EOF on a pipe from parent process.
+	// On catching SIGTERM just forward it to qemu process and wait for it to exit.
+
+	err, _ = runCommand(emulator, append(emulatorArgs, netArgs...), exitEOF, sigTERM, tapFile)
+	runHook("/vmwrapper-after-qemu.sh")
 	if err != nil {
-		glog.Errorf("Failed to get current net namespace: %v", err)
-		os.Exit(1)
-	}
-
-	if err := vmNS.Do(func(ns.NetNS) error {
-		csn, err := nettools.SetupContainerSideNetwork(info)
-		if err != nil {
-			return err
-		}
-		dhcpConfg := &dhcp.Config{
-			CNIResult:           *csn.Result,
-			PeerHardwareAddress: csn.HardwareAddr,
-		}
-		dhcpServer := dhcp.NewServer(dhcpConfg)
-		if err := dhcpServer.SetupListener("0.0.0.0"); err != nil {
-			return fmt.Errorf("Failed to set up dhcp listener: %v", err)
-		}
-
-		runHook("/vmwrapper-pre-qemu.sh")
-
-		errCh := make(chan error)
-		go func() {
-			// FIXME: do this cleaner
-			errCh <- vmNS.Do(func(ns.NetNS) error {
-				return dhcpServer.Serve()
-			})
-		}()
-
-		netArgs := []string{
-			"-netdev",
-			// Qemu process is started with 3d FD set to already opened TAP device
-			"tap,id=tap0,fd=3",
-			"-device",
-			"virtio-net-pci,netdev=tap0,id=net0,mac=" + csn.HardwareAddr.String(),
-		}
-
-		// Running qemu process inside virtlet' net namespace
-		// On domain's shutdown/destroy libvirt terminates corresponding qemu process using SIGTERM or SIGKILL.
-		// SIGKILL is detected by catching EOF on a pipe from parent process.
-		// On catching SIGTERM just forward it to qemu process and wait for it to exit.
-
-		if err = virtletNS.Do(func(ns.NetNS) error {
-			err, _ := runCommand(emulator, append(emulatorArgs, netArgs...), exitEOF, sigTERM, csn.TapFile)
-			return err
-		}); err != nil {
-			glog.Errorf("Error occurred while starting subprocess in Virtlet base network namespace: %v", err)
-		}
-
-		select {
-		case dhcpErr := <-errCh:
-			if dhcpErr == nil {
-				glog.Errorf("DHCP server self-exited with nil error")
-			} else {
-				glog.Errorf("DHCP server failed: %v", dhcpErr)
-			}
-		default:
-		}
-
-		if err := csn.Teardown(); err != nil {
-			return err
-		}
-
-		runHook("/vmwrapper-after-qemu.sh")
-
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}); err != nil {
-		glog.Errorf("Error occurred while in VM network namespace: %v", err)
+		glog.Errorf("Error occurred while starting subprocess in Virtlet base network namespace: %v", err)
 		os.Exit(1)
 	}
 }
@@ -315,3 +252,5 @@ func main() {
 		parent(exitEOF, sigTERM)
 	}
 }
+
+// TODO: convert to syscall.Exec

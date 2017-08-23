@@ -24,6 +24,7 @@ import (
 	"syscall"
 	"time"
 
+	cnitypes "github.com/containernetworking/cni/pkg/types"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 	"github.com/jonboulle/clockwork"
@@ -34,6 +35,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
 	"github.com/Mirantis/virtlet/pkg/metadata"
+	"github.com/Mirantis/virtlet/pkg/tapmanager"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/Mirantis/virtlet/pkg/virt"
 )
@@ -52,11 +54,10 @@ type VirtletManager struct {
 	libvirtVirtualizationTool *libvirttools.VirtualizationTool
 	// metadata
 	metadataStore metadata.MetadataStore
-	// cni
-	cniClient *cni.Client
+	fdManager     tapmanager.FDManager
 }
 
-func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, metadataPath, cniPluginsDir, cniConfigsDir, rawDevices string) (*VirtletManager, error) {
+func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, metadataPath, rawDevices string, fdManager tapmanager.FDManager) (*VirtletManager, error) {
 	if downloadProtocol == "" {
 		downloadProtocol = defaultDownloadProtocol
 	}
@@ -97,17 +98,12 @@ func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, m
 		}
 	}
 
-	cniClient, err := cni.NewClient(cniPluginsDir, cniConfigsDir)
-	if err != nil {
-		return nil, err
-	}
-
 	virtletManager := &VirtletManager{
 		server:                    grpc.NewServer(),
 		libvirtImageTool:          libvirtImageTool,
 		libvirtVirtualizationTool: libvirtVirtualizationTool,
 		metadataStore:             metadataStore,
-		cniClient:                 cniClient,
+		fdManager:                 fdManager,
 	}
 
 	kubeapi.RegisterRuntimeServiceServer(virtletManager.server, virtletManager)
@@ -165,42 +161,39 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 	glog.V(3).Infof("RunPodSandbox: %s", spew.Sdump(in))
 	glog.V(2).Infof("Sandbox config annotations: %v", config.GetAnnotations())
 
-	if err := cni.CreateNetNS(podId); err != nil {
-		glog.Errorf("Error when creating new netns for pod %s (%s): %v", podName, podId, err)
-		return nil, err
-	}
-
 	if err := validatePodSandboxConfig(config); err != nil {
 		glog.Errorf("Invalid pod config while creating pod sandbox for pod %s (%s): %v", podName, podId, err)
 		return nil, err
 	}
 
 	state := kubeapi.PodSandboxState_SANDBOX_READY
-	netConfig, err := v.cniClient.AddSandboxToNetwork(podId, podName, podNs)
-	if err == nil {
-		// Mimic kubelet's method of handling nameservers.
-		// As of k8s 1.5.2, kubelet doesn't use any nameserver information from CNI.
-		// (TODO: recheck this for 1.6)
-		// CNI is used just to configure the network namespace and CNI DNS
-		// info is ignored. Instead of this, DnsConfig from PodSandboxConfig
-		// is used to configure container's resolv.conf.
-		if config.DnsConfig != nil {
-			netConfig.DNS.Nameservers = config.DnsConfig.Servers
-			netConfig.DNS.Search = config.DnsConfig.Searches
-			netConfig.DNS.Options = config.DnsConfig.Options
-		}
-		glog.V(3).Infof("CNI configuration for pod %s (%s): %s", podName, podId, spew.Sdump(netConfig))
-	} else {
-		glog.Errorf("Error when adding pod %s (%s) to CNI network: %v", podName, podId, err)
+	pnd := &tapmanager.PodNetworkDesc{
+		PodId:   podId,
+		PodNs:   podNs,
+		PodName: podName,
 	}
-
+	// Mimic kubelet's method of handling nameservers.
+	// As of k8s 1.5.2, kubelet doesn't use any nameserver information from CNI.
+	// (TODO: recheck this for 1.6)
+	// CNI is used just to configure the network namespace and CNI DNS
+	// info is ignored. Instead of this, DnsConfig from PodSandboxConfig
+	// is used to configure container's resolv.conf.
+	if config.DnsConfig != nil {
+		pnd.DNS = &cnitypes.DNS{
+			Nameservers: config.DnsConfig.Servers,
+			Search:      config.DnsConfig.Searches,
+			Options:     config.DnsConfig.Options,
+		}
+	}
+	netConfigBytes, err := v.fdManager.AddFD(podId, pnd)
 	if err != nil {
 		// this will cause kubelet to delete the pod sandbox and then retry
 		// its creation
 		state = kubeapi.PodSandboxState_SANDBOX_NOTREADY
+		glog.Errorf("Error when adding pod %s (%s) to CNI network: %v", podName, podId, err)
 	}
 
-	psi, err := metadata.NewPodSandboxInfo(config, netConfig, state, clockwork.NewRealClock())
+	psi, err := metadata.NewPodSandboxInfo(config, netConfigBytes, state, clockwork.NewRealClock())
 	if err != nil {
 		glog.Errorf("Error serializing bod %q (%q) sandbox configuration: %v", podName, podId, err)
 		return nil, err
@@ -233,7 +226,6 @@ func validatePodSandboxConfig(config *kubeapi.PodSandboxConfig) error {
 }
 
 func (v *VirtletManager) StopPodSandbox(ctx context.Context, in *kubeapi.StopPodSandboxRequest) (*kubeapi.StopPodSandboxResponse, error) {
-	podSandboxId := in.PodSandboxId
 	glog.V(2).Infof("StopPodSandbox called for pod %s", in.PodSandboxId)
 	glog.V(3).Infof("StopPodSandbox: %s", spew.Sdump(in))
 	sandbox := v.metadataStore.PodSandbox(in.PodSandboxId)
@@ -260,14 +252,8 @@ func (v *VirtletManager) StopPodSandbox(ctx context.Context, in *kubeapi.StopPod
 			return nil, err
 		}
 
-		if err := v.cniClient.RemoveSandboxFromNetwork(in.PodSandboxId, status.Metadata.Name, status.Metadata.Namespace); err != nil {
-			glog.Errorf("Error when removing pod sandbox %q from CNI network: %v", in.PodSandboxId, err)
-			return nil, err
-		}
-
-		if err := cni.DestroyNetNS(podSandboxId); err != nil {
-			glog.Errorf("Error when removing network namespace for pod sandbox %q: %v", in.PodSandboxId, err)
-			return nil, err
+		if err := v.fdManager.ReleaseFD(in.PodSandboxId); err != nil {
+			glog.Errorf("Error releasing tap fd for the pod %q: %v", in.PodSandboxId, err)
 		}
 	}
 
@@ -385,14 +371,6 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 		glog.Errorf("Error when retrieving pod network configuration for sandbox '%s': %v", podSandboxId, err)
 		return nil, err
 	}
-	netResult, err := cni.BytesToResult([]byte(sandboxInfo.CNIConfig))
-	if err != nil {
-		glog.Errorf("Error loading network configuration for sandbox '%s': %v", podSandboxId, err)
-		return nil, err
-	}
-
-	netNSPath := cni.PodNetNSPath(podSandboxId)
-	glog.V(2).Infof("CreateContainer: imageName %q, ip %q, network namespace %q", config.GetImage().Image, cni.GetPodIP(netResult), netNSPath)
 
 	// TODO: use network configuration by CreateContainer
 	vmConfig, err := libvirttools.GetVMConfig(in)
@@ -401,7 +379,7 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 		return nil, err
 	}
 
-	uuid, err := v.libvirtVirtualizationTool.CreateContainer(vmConfig, netNSPath, sandboxInfo.CNIConfig)
+	uuid, err := v.libvirtVirtualizationTool.CreateContainer(vmConfig, podSandboxId, sandboxInfo.CNIConfig)
 	if err != nil {
 		glog.Errorf("Error creating container %s: %v", name, err)
 		return nil, err
