@@ -69,10 +69,12 @@ spec:
           privileged: true
 
       containers:
-      - name: virtlet
+      - name: libvirt
         image: mirantis/virtlet
         # In case we inject local virtlet image we want to use it not officially available one
         imagePullPolicy: IfNotPresent
+        command:
+        - /libvirt.sh
         volumeMounts:
         - mountPath: /sys/fs/cgroup
           name: cgroup
@@ -82,6 +84,25 @@ spec:
         - mountPath: /boot
           name: boot
           readOnly: true
+        - mountPath: /run
+          name: run
+        - mountPath: /var/lib/virtlet
+          name: virtlet
+        - mountPath: /var/lib/libvirt
+          name: libvirt
+        - mountPath: /dind
+          name: dind
+        securityContext:
+          privileged: true
+        env:
+        # comment out the following to enable KVM
+        - name: VIRTLET_DISABLE_KVM
+          value: "y"
+      - name: virtlet
+        image: mirantis/virtlet
+        # In case we inject local virtlet image we want to use it not officially available one
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
         - mountPath: /run
           name: run
         - mountPath: /var/lib/virtlet
@@ -98,9 +119,8 @@ spec:
           name: dind
         - mountPath: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
           name: k8s-flexvolume-plugins-dir
-          # below `:shared` is unofficial way to pass this option docker
-          # which then will allow virtlet to see what kubelet mounts in
-          # underlaying directories, after virtlet container is created
+          # `:shared` suffix below is an unofficial way to pass this option to docker
+          # so as to make virtlet to see what kubelet mounts in the underlying directories
         - mountPath: /var/lib/kubelet/pods:shared
           name: k8s-pods-dir
         securityContext:
@@ -110,9 +130,6 @@ spec:
           value: "3"
         - name: VIRTLET_DOWNLOAD_PROTOCOL
           value: "http"
-        # comment out the following to enable KVM
-        - name: VIRTLET_DISABLE_KVM
-          value: "y"
       volumes:
       - hostPath:
           path: /sys/fs/cgroup

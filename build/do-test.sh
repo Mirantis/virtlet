@@ -3,7 +3,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 set -o errtrace
-VIRTLET_DISABLE_KVM=1 /start.sh -novirtlet
+VIRTLET_DISABLE_KVM=1 /libvirt.sh -novirtlet
 
 ./autogen.sh
 ./configure

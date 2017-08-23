@@ -255,7 +255,7 @@ function demo::get-correct-virtlet-release {
 
 
 function demo::start-virtlet {
-  local jq_filter='.items[0].spec.template.spec.containers[0].env|=.+[{"name": "VIRTLET_DOWNLOAD_PROTOCOL","value":"http"}]'
+  local jq_filter='.items[0].spec.template.spec.containers[1].env|=.+[{"name": "VIRTLET_DOWNLOAD_PROTOCOL","value":"http"}]'
   local ds_location
   if [[ ${VIRTLET_DEMO_RELEASE} = "master" ]]; then
       virtlet_release="master"
