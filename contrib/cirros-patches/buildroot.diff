@@ -1,0 +1,286 @@
+diff --git a/package/Config.in b/package/Config.in
+index deff0fe..4049a91 100644
+--- a/package/Config.in
++++ b/package/Config.in
+@@ -656,6 +656,7 @@ menu "External python modules"
+ 	source "package/python-backports-abc/Config.in"
+ 	source "package/python-beautifulsoup4/Config.in"
+ 	source "package/python-bitstring/Config.in"
++	source "package/python-boto/Config.in"
+ 	source "package/python-bottle/Config.in"
+ 	source "package/python-can/Config.in"
+ 	source "package/python-cbor/Config.in"
+@@ -666,6 +667,7 @@ menu "External python modules"
+ 	source "package/python-cheetah/Config.in"
+ 	source "package/python-cherrypy/Config.in"
+ 	source "package/python-click/Config.in"
++	source "package/python-cloud-init/Config.in"
+ 	source "package/python-coherence/Config.in"
+ 	source "package/python-configobj/Config.in"
+ 	source "package/python-configshell-fb/Config.in"
+@@ -714,6 +716,8 @@ menu "External python modules"
+ 	source "package/python-ipython/Config.in"
+ 	source "package/python-itsdangerous/Config.in"
+ 	source "package/python-jinja2/Config.in"
++	source "package/python-jsonpatch/Config.in"
++	source "package/python-jsonpointer/Config.in"
+ 	source "package/python-jsonschema/Config.in"
+ 	source "package/python-json-schema-validator/Config.in"
+ 	source "package/python-keyring/Config.in"
+@@ -739,6 +743,7 @@ menu "External python modules"
+ 	source "package/python-networkmanager/Config.in"
+ 	source "package/python-nfc/Config.in"
+ 	source "package/python-numpy/Config.in"
++	source "package/python-oauthlib/Config.in"
+ 	source "package/python-paho-mqtt/Config.in"
+ 	source "package/python-pam/Config.in"
+ 	source "package/python-paramiko/Config.in"
+@@ -748,6 +753,7 @@ menu "External python modules"
+ 	source "package/python-pexpect/Config.in"
+ 	source "package/python-pillow/Config.in"
+ 	source "package/python-posix-ipc/Config.in"
++	source "package/python-prettytable/Config.in"
+ 	source "package/python-prompt-toolkit/Config.in"
+ 	source "package/python-protobuf/Config.in"
+ 	source "package/python-psutil/Config.in"
+diff --git a/package/python-boto/Config.in b/package/python-boto/Config.in
+new file mode 100644
+index 0000000..d34b627
+--- /dev/null
++++ b/package/python-boto/Config.in
+@@ -0,0 +1,6 @@
++config BR2_PACKAGE_PYTHON_BOTO
++	bool "python-boto"
++	help
++	  Amazon Web Services Library
++
++	  https://github.com/boto/boto/
+diff --git a/package/python-boto/python-boto.hash b/package/python-boto/python-boto.hash
+new file mode 100644
+index 0000000..524f18d
+--- /dev/null
++++ b/package/python-boto/python-boto.hash
+@@ -0,0 +1,3 @@
++# md5 and sha256 locally computed
++md5	ce4589dd9c1d7f5d347363223ae1b970  boto-2.48.0.tar.gz
++sha256	deb8925b734b109679e3de65856018996338758f4b916ff4fe7bb62b6d7000d1  boto-2.48.0.tar.gz
+diff --git a/package/python-boto/python-boto.mk b/package/python-boto/python-boto.mk
+new file mode 100644
+index 0000000..f328b6a
+--- /dev/null
++++ b/package/python-boto/python-boto.mk
+@@ -0,0 +1,13 @@
++################################################################################
++#
++# python-boto
++#
++################################################################################
++
++PYTHON_BOTO_VERSION = 2.48.0
++PYTHON_BOTO_SOURCE = boto-$(PYTHON_BOTO_VERSION).tar.gz
++PYTHON_BOTO_SITE = https://pypi.python.org/packages/66/e7/fe1db6a5ed53831b53b8a6695a8f134a58833cadb5f2740802bc3730ac15
++PYTHON_BOTO_LICENSE = MIT
++PYTHON_BOTO_SETUP_TYPE = setuptools
++
++$(eval $(python-package))
+diff --git a/package/python-cloud-init/Config.in b/package/python-cloud-init/Config.in
+new file mode 100644
+index 0000000..ba524b7
+--- /dev/null
++++ b/package/python-cloud-init/Config.in
+@@ -0,0 +1,16 @@
++config BR2_PACKAGE_PYTHON_CLOUD_INIT
++	bool "python-cloud-init"
++	select BR2_PACKAGE_PYTHON_PYTABLEWRITER # runtime
++	select BR2_PACKAGE_PYTHON_JINJA2 # runtime
++	select BR2_PACKAGE_PYTHON_SIMPLEJSON # runtime
++	select BR2_PACKAGE_PYTHON_REQUESTS # runtime
++	select BR2_PACKAGE_PYTHON_CONFIGOBJ # runtime
++	select BR2_PACKAGE_PYTHON_PYYAML # runtime
++	select BR2_PACKAGE_PYTHON_BOTO # runtime
++	select BR2_PACKAGE_PYTHON_OAUTHLIB # runtime
++	select BR2_PACKAGE_PYTHON_SIX # runtime
++	select BR2_PACKAGE_PYTHON_JSONPATCH # runtime
++	help
++	  CloudInit python packages
++
++	  http://cloudinit.readthedocs.io
+diff --git a/package/python-cloud-init/python-cloud-init.mk b/package/python-cloud-init/python-cloud-init.mk
+new file mode 100644
+index 0000000..6734a3b
+--- /dev/null
++++ b/package/python-cloud-init/python-cloud-init.mk
+@@ -0,0 +1,13 @@
++################################################################################
++#
++# python-cloud-init
++#
++################################################################################
++
++PYTHON_CLOUD_INIT_VERSION = d5f855dd96ccbea77f61b0515b574ad2c43d116d
++ZYRE_SITE = 
++PYTHON_CLOUD_INIT_SITE = $(call github,number5,cloud-init,$(PYTHON_CLOUD_INIT_VERSION))
++PYTHON_CLOUD_INIT_SETUP_TYPE = setuptools
++PYTHON_CLOUD_INIT_LICENSE = Apache2
++
++$(eval $(python-package))
+diff --git a/package/python-jsonpatch/Config.in b/package/python-jsonpatch/Config.in
+new file mode 100644
+index 0000000..368eaba
+--- /dev/null
++++ b/package/python-jsonpatch/Config.in
+@@ -0,0 +1,6 @@
++config BR2_PACKAGE_PYTHON_JSONPATCH
++	bool "python-jsonpatch"
++	help
++	  Apply JSON-Patches (RFC 6902)
++
++	  https://github.com/stefankoegl/python-json-patch
+diff --git a/package/python-jsonpatch/python-jsonpath.hash b/package/python-jsonpatch/python-jsonpath.hash
+new file mode 100644
+index 0000000..06f43b1
+--- /dev/null
++++ b/package/python-jsonpatch/python-jsonpath.hash
+@@ -0,0 +1,3 @@
++# md5 and sha256 locally computed
++md5	8ef1ceb00dcf992c9e43611f698f9279  jsonpatch-1.16.tar.gz
++sha256	f025c28a08ce747429ee746bb21796c3b6417ec82288f8fe6514db7398f2af8a  jsonpatch-1.16.tar.gz
+diff --git a/package/python-jsonpatch/python-jsonpath.mk b/package/python-jsonpatch/python-jsonpath.mk
+new file mode 100644
+index 0000000..0acde88
+--- /dev/null
++++ b/package/python-jsonpatch/python-jsonpath.mk
+@@ -0,0 +1,13 @@
++################################################################################
++#
++# python-jsonpatch
++#
++################################################################################
++
++PYTHON_JSONPATCH_VERSION = 1.16
++PYTHON_JSONPATCH_SOURCE = jsonpatch-$(PYTHON_JSONPATCH_VERSION).tar.gz
++PYTHON_JSONPATCH_SITE = https://pypi.python.org/packages/36/de/499bea7aac917f86eb5be148f631c3ddced4e60c8d119d63939c53a5ab5b
++PYTHON_JSONPATCH_LICENSE = bsd
++PYTHON_JSONPATCH_SETUP_TYPE = setuptools
++
++$(eval $(python-package))
+diff --git a/package/python-jsonpointer/Config.in b/package/python-jsonpointer/Config.in
+new file mode 100644
+index 0000000..e61462f
+--- /dev/null
++++ b/package/python-jsonpointer/Config.in
+@@ -0,0 +1,6 @@
++config BR2_PACKAGE_PYTHON_JSONPOINTER
++	bool "python-jsonpointer"
++	help
++	  Identify specific nodes in a JSON document (RFC 6901)
++
++	  https://github.com/stefankoegl/python-json-pointer
+diff --git a/package/python-jsonpointer/python-jsonpointer.hash b/package/python-jsonpointer/python-jsonpointer.hash
+new file mode 100644
+index 0000000..42db723
+--- /dev/null
++++ b/package/python-jsonpointer/python-jsonpointer.hash
+@@ -0,0 +1,3 @@
++# md5 and sha256 locally computed
++md5	d68c0c6ad6889e9c94ec0feba719e45e  jsonpointer-1.10.tar.gz
++sha256	9fa5dcac35eefd53e25d6cd4c310d963c9f0b897641772cd6e5e7b89df7ee0b1  jsonpointer-1.10.tar.gz
+diff --git a/package/python-jsonpointer/python-jsonpointer.mk b/package/python-jsonpointer/python-jsonpointer.mk
+new file mode 100644
+index 0000000..bcfa0a2
+--- /dev/null
++++ b/package/python-jsonpointer/python-jsonpointer.mk
+@@ -0,0 +1,13 @@
++################################################################################
++#
++# python-jsonpointer
++#
++################################################################################
++
++PYTHON_JSONPOINTER_VERSION = 1.10
++PYTHON_JSONPOINTER_SOURCE = jsonpointer-$(PYTHON_JSONPOINTER_VERSION).tar.gz
++PYTHON_JSONPOINTER_SITE = https://pypi.python.org/packages/f6/36/6bdd302303e8bc7c25102dbc1eabb3e3d97f57b0f8f414f4da7ea7ab9dd8
++PYTHON_JSONPOINTER_LICENSE = bsd
++PYTHON_JSONPOINTER_SETUP_TYPE = setuptools
++
++$(eval $(python-package))
+diff --git a/package/python-oauthlib/Config.in b/package/python-oauthlib/Config.in
+new file mode 100644
+index 0000000..38b22f0
+--- /dev/null
++++ b/package/python-oauthlib/Config.in
+@@ -0,0 +1,6 @@
++config BR2_PACKAGE_PYTHON_OAUTHLIB
++	bool "python-oauthlib"
++	help
++	  Generic oauth lib
++
++	  https://github.com/idan/oauthlib
+diff --git a/package/python-oauthlib/python-oauthlib.hash b/package/python-oauthlib/python-oauthlib.hash
+new file mode 100644
+index 0000000..a6682ca
+--- /dev/null
++++ b/package/python-oauthlib/python-oauthlib.hash
+@@ -0,0 +1,3 @@
++# md5 and sha256 locally computed
++md5	f59b448a30684347e00f369bc3542abc  oauthlib-2.0.2.tar.gz
++sha256	b3b9b47f2a263fe249b5b48c4e25a5bce882ff20a0ac34d553ce43cff55b53ac  oauthlib-2.0.2.tar.gz
+diff --git a/package/python-oauthlib/python-oauthlib.mk b/package/python-oauthlib/python-oauthlib.mk
+new file mode 100644
+index 0000000..46eb994
+--- /dev/null
++++ b/package/python-oauthlib/python-oauthlib.mk
+@@ -0,0 +1,13 @@
++################################################################################
++#
++# python-oauthlib
++#
++################################################################################
++
++PYTHON_OAUTHLIB_VERSION = 2.0.2
++PYTHON_OAUTHLIB_SOURCE = oauthlib-$(PYTHON_OAUTHLIB_VERSION).tar.gz
++PYTHON_OAUTHLIB_SITE = https://pypi.python.org/packages/fa/2e/25f25e6c69d97cf921f0a8f7d520e0ef336dd3deca0142c0b634b0236a90
++PYTHON_OAUTHLIB_LICENSE = BSD
++PYTHON_OAUTHLIB_SETUP_TYPE = setuptools
++
++$(eval $(python-package))
+diff --git a/package/python-prettytable/Config.in b/package/python-prettytable/Config.in
+new file mode 100644
+index 0000000..d0aa0fb
+--- /dev/null
++++ b/package/python-prettytable/Config.in
+@@ -0,0 +1,6 @@
++config BR2_PACKAGE_PYTHON_PRETTYTABLE
++	bool "python-prettytable"
++	help
++	  A simple Python library for easily displaying tabular data in a visually appealing ASCII table format.
++
++	  http://code.google.com/p/prettytable/
+diff --git a/package/python-prettytable/python-prettytable.hash b/package/python-prettytable/python-prettytable.hash
+new file mode 100644
+index 0000000..a88a656
+--- /dev/null
++++ b/package/python-prettytable/python-prettytable.hash
+@@ -0,0 +1,3 @@
++# md5 and sha256 locally computed
++md5	a6b80afeef286ce66733d54a0296b13b  prettytable-0.7.2.tar.gz
++sha256	2d5460dc9db74a32bcc8f9f67de68b2c4f4d2f01fa3bd518764c69156d9cacd9  prettytable-0.7.2.tar.gz
+diff --git a/package/python-prettytable/python-prettytable.mk b/package/python-prettytable/python-prettytable.mk
+new file mode 100644
+index 0000000..0c26a0c
+--- /dev/null
++++ b/package/python-prettytable/python-prettytable.mk
+@@ -0,0 +1,13 @@
++################################################################################
++#
++# python-prettytable
++#
++################################################################################
++
++PYTHON_PRETTYTABLE_VERSION = 0.7.2
++PYTHON_PRETTYTABLE_SOURCE = prettytable-$(PYTHON_PRETTYTABLE_VERSION).tar.gz
++PYTHON_PRETTYTABLE_SITE = https://pypi.python.org/packages/e0/a1/36203205f77ccf98f3c6cf17cf068c972e6458d7e58509ca66da949ca347
++PYTHON_PRETTYTABLE_LICENSE = BSD
++PYTHON_PRETTYTABLE_SETUP_TYPE = setuptools
++
++$(eval $(python-package))

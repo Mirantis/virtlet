@@ -6,3 +6,4 @@ development.
 * [Virtlet guidelines](guidelines.md)
 * [Build tool usage](build-tool.md)
 * [VM logging](vm-logging.md)
+* [Building custom CirrOS image](building-cirros-with-cloud-init.md) which includes fully python based cloud init package
