@@ -262,10 +262,10 @@ pod_domain="$("${virsh}" poddomain @cirros-vm)"
 # verify memory size as reported by Linux kernel inside VM
 
 # The boot message is:
-# [    0.000000] Memory: 109112k/130944k available (6576k kernel code, 452k absent, 21380k reserved, 6620k data, 928k init)
+# [    0.000000] Memory: 139828k/163712k available (6576k kernel code, 452k absent, 23432k reserved, 6620k data, 928k init)
 
 mem_size_k="$("${vmssh}" cirros@cirros-vm dmesg|grep 'Memory:'|sed 's@.*/\|k .*@@g')"
-expected_mem_size_k=130944
+expected_mem_size_k=163712
 
 if [[ ${mem_size_k} != ${expected_mem_size_k} ]]; then
   echo "Bad memory size (inside VM). Expected ${expected_mem_size_k}, but got ${mem_size_k}" >&2
