@@ -45,13 +45,15 @@ if [[ -e /var/lib/libvirt/qemu ]]; then
   mv /var/lib/libvirt/qemu.ok /var/lib/libvirt/qemu
 fi
 
-if [[ ! ${novirtlet} ]]; then
+daemon=
+if [[ ${novirtlet} ]]; then
   # leftover socket prevents libvirt from initializing correctly
   rm -f /var/lib/libvirt/qemu/capabilities.monitor.sock
+  daemon="--daemon"  
 fi
 
 if [[ ! ${VIRTLET_DISABLE_KVM:-} ]]; then
   chown root:kvm /dev/kvm
 fi
 
-/usr/sbin/libvirtd --listen
+/usr/sbin/libvirtd --listen $daemon

@@ -327,7 +327,7 @@ func (v *VirtualizationTool) addSerialDevicesToDomain(sandboxId, containerName s
 	return nil
 }
 
-func (v *VirtualizationTool) CreateContainer(config *VMConfig, netFdKey, cniConfig string) (string, error) {
+func (v *VirtualizationTool) CreateContainer(config *VMConfig, netFdKey string) (string, error) {
 	if err := config.LoadAnnotations(); err != nil {
 		return "", err
 	}
@@ -341,7 +341,6 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netFdKey, cniConf
 		// long path names for qemu monitor socket
 		domainName:    "virtlet-" + domainUUID[:13] + "-" + config.Name,
 		netFdKey:      netFdKey,
-		cniConfig:     cniConfig,
 		vmLogLocation: vmLogLocation(),
 	}
 

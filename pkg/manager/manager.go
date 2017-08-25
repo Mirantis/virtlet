@@ -124,6 +124,10 @@ func (v *VirtletManager) Serve(addr string) error {
 	return v.server.Serve(ln)
 }
 
+func (v *VirtletManager) Stop() {
+	v.server.Stop()
+}
+
 func (v *VirtletManager) Version(ctx context.Context, in *kubeapi.VersionRequest) (*kubeapi.VersionResponse, error) {
 	vRuntimeAPIVersion := runtimeAPIVersion
 	vRuntimeName := runtimeName
@@ -372,14 +376,17 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 		return nil, err
 	}
 
-	// TODO: use network configuration by CreateContainer
+	fdKey := podSandboxId
 	vmConfig, err := libvirttools.GetVMConfig(in)
 	if err != nil {
 		glog.Errorf("Error getting vm config for container %s: %v", name, err)
 		return nil, err
 	}
+	if len(sandboxInfo.CNIConfig) == 0 {
+		fdKey = ""
+	}
 
-	uuid, err := v.libvirtVirtualizationTool.CreateContainer(vmConfig, podSandboxId, sandboxInfo.CNIConfig)
+	uuid, err := v.libvirtVirtualizationTool.CreateContainer(vmConfig, fdKey)
 	if err != nil {
 		glog.Errorf("Error creating container %s: %v", name, err)
 		return nil, err

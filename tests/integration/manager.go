@@ -17,89 +17,77 @@ limitations under the License.
 package integration
 
 import (
-	"fmt"
-	"os"
-	"os/exec"
-	"path"
-	"syscall"
+	"testing"
 
 	"google.golang.org/grpc"
 
+	"github.com/Mirantis/virtlet/pkg/manager"
+	"github.com/Mirantis/virtlet/pkg/tapmanager"
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 const (
-	virtletSocket = "/tmp/virtlet.sock"
+	virtletSocket   = "/tmp/virtlet.sock"
+	localLibvirtUri = "qemu+tcp://localhost/system"
 )
 
-type VirtletManager struct {
-	libvirtUri string
-	pid        int
-	conn       *grpc.ClientConn
-	boltDbPath string
+type fakeFDManager struct{}
+
+var fdManager tapmanager.FDManager
+
+func (m *fakeFDManager) AddFD(key string, data interface{}) ([]byte, error) {
+	return nil, nil
 }
 
-func NewVirtletManager() *VirtletManager {
-	return &VirtletManager{
-		libvirtUri: "qemu+tcp://localhost/system",
-	}
-}
-
-func (v *VirtletManager) Run() error {
-	filename, err := utils.Tempfile()
-	if err != nil {
-		return err
-	}
-
-	boltPathParam := fmt.Sprintf("-bolt-path=%s", filename)
-	libvirtUriParam := fmt.Sprintf("-libvirt-uri=%s", v.libvirtUri)
-	listenParam := fmt.Sprintf("-listen=%s", virtletSocket)
-
-	virtletPath, err := exec.LookPath("virtlet")
-	if err != nil {
-		return err
-	}
-	virtletDir := path.Dir(virtletPath)
-
-	v.boltDbPath = filename
-
-	pid, err := syscall.ForkExec(virtletPath, []string{
-		virtletPath,
-		boltPathParam,
-		libvirtUriParam,
-		listenParam,
-		"-v=3",
-		"-logtostderr=true",
-		"-image-download-protocol=http",
-	}, &syscall.ProcAttr{
-		Dir:   virtletDir,
-		Env:   os.Environ(),
-		Files: []uintptr{0, 1, 2},
-		Sys:   &syscall.SysProcAttr{},
-	})
-	if err != nil {
-		return err
-	}
-
-	if err := waitForSocket(virtletSocket); err != nil {
-		return err
-	}
-
-	conn, err := grpc.Dial(virtletSocket, grpc.WithInsecure(), grpc.WithDialer(utils.Dial))
-	if err != nil {
-		return err
-	}
-
-	v.pid = pid
-	v.conn = conn
-
+func (m *fakeFDManager) ReleaseFD(key string) error {
 	return nil
 }
 
+type VirtletManager struct {
+	t       *testing.T
+	manager *manager.VirtletManager
+	conn    *grpc.ClientConn
+	doneCh  chan struct{}
+}
+
+func NewVirtletManager(t *testing.T) *VirtletManager {
+	return &VirtletManager{t: t}
+}
+
+func (v *VirtletManager) Run() {
+	if v.manager != nil {
+		v.t.Fatalf("virtlet manager already started")
+	}
+
+	dbFilename, err := utils.Tempfile()
+	if err != nil {
+		v.t.Fatalf("Can't create temp file: %v", err)
+	}
+
+	v.manager, err = manager.NewVirtletManager(localLibvirtUri, "default", "http", "dir", dbFilename, "loop*", &fakeFDManager{})
+	v.doneCh = make(chan struct{})
+	go func() {
+		if err := v.manager.Serve(virtletSocket); err != nil {
+			v.t.Logf("VirtletManager result (expect closed network connection error): %v", err)
+		}
+		v.manager = nil
+		close(v.doneCh)
+	}()
+
+	if err := waitForSocket(virtletSocket); err != nil {
+		v.t.Fatalf("Couldn't connect to virtlet socket: %v", err)
+	}
+
+	v.conn, err = grpc.Dial(virtletSocket, grpc.WithInsecure(), grpc.WithDialer(utils.Dial))
+	if err != nil {
+		v.t.Fatalf("Couldn't connect to virtlet socket: %v", err)
+	}
+}
+
 func (v *VirtletManager) Close() {
-	v.conn.Close()
-	syscall.Kill(v.pid, syscall.SIGTERM)
-	os.Remove(virtletSocket)
-	var ws syscall.WaitStatus
-	syscall.Wait4(v.pid, &ws, 0, nil)
+	if v.manager == nil {
+		v.t.Fatalf("virtlet manager not started")
+	}
+	v.manager.Stop()
+	<-v.doneCh
 }

@@ -49,22 +49,24 @@ func main() {
 	} else {
 		netFdKey := os.Getenv(netKeyEnvVar)
 
-		c := tapmanager.NewFDClient(fdSocketPath)
-		if err := c.Connect(); err != nil {
-			glog.Errorf("Can't connect to fd server: %v", err)
-			os.Exit(1)
-		}
-		tapFd, hwAddr, err := c.GetFD(netFdKey)
-		if err != nil {
-			glog.Errorf("Failed to obtain tap fd for key %q: %v", netFdKey, err)
-			os.Exit(1)
-		}
+		if netFdKey != "" {
+			c := tapmanager.NewFDClient(fdSocketPath)
+			if err := c.Connect(); err != nil {
+				glog.Errorf("Can't connect to fd server: %v", err)
+				os.Exit(1)
+			}
+			tapFd, hwAddr, err := c.GetFD(netFdKey)
+			if err != nil {
+				glog.Errorf("Failed to obtain tap fd for key %q: %v", netFdKey, err)
+				os.Exit(1)
+			}
 
-		netArgs = []string{
-			"-netdev",
-			fmt.Sprintf("tap,id=tap0,fd=%d", tapFd),
-			"-device",
-			"virtio-net-pci,netdev=tap0,id=net0,mac=" + net.HardwareAddr(hwAddr).String(),
+			netArgs = []string{
+				"-netdev",
+				fmt.Sprintf("tap,id=tap0,fd=%d", tapFd),
+				"-device",
+				"virtio-net-pci,netdev=tap0,id=net0,mac=" + net.HardwareAddr(hwAddr).String(),
+			}
 		}
 	}
 

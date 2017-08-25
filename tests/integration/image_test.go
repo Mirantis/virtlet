@@ -34,10 +34,8 @@ type imageTester struct {
 }
 
 func newImageTester(t *testing.T) *imageTester {
-	manager := NewVirtletManager()
-	if err := manager.Run(); err != nil {
-		t.Fatal(err)
-	}
+	manager := NewVirtletManager(t)
+	manager.Run()
 	imageServiceClient := kubeapi.NewImageServiceClient(manager.conn)
 	return &imageTester{t, manager, imageServiceClient}
 }

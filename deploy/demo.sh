@@ -274,9 +274,9 @@ function demo::start-virtlet {
   fi
   echo "Will run demo using Virtlet:${virtlet_release} for demo and ${virtlet_docker_tag} as docker tag"
   if demo::kvm-ok; then
-    demo::step "Deploying Virtlet DaemonSet with KVM support"
+    demo::step "Deploying Virtlet DaemonSet with KVM support from ${ds_location}"
   else
-    demo::step "Deploying Virtlet DaemonSet *without* KVM support"
+    demo::step "Deploying Virtlet DaemonSet *without* KVM support from ${ds_location}"
     jq_filter="${jq_filter}"'|.items[0].spec.template.spec.containers[0].env|=.+[{"name": "VIRTLET_DISABLE_KVM","value":"y"}]'
   fi
   "${kubectl}" convert -f "${ds_location}" --local -o json |
