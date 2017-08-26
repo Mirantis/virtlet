@@ -7,7 +7,7 @@ ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get update && \
     apt-get install -y libvirt-bin libguestfs0 libguestfs-tools genisoimage \
                        openssl qemu-kvm qemu-system-x86 python-libvirt \
-                       netbase iproute2 iptables ebtables && \
+                       netbase iproute2 iptables ebtables vncsnapshot && \
     apt-get clean
 
 RUN mkdir -p /var/lib/virtlet/volumes /opt/cni/bin && \
