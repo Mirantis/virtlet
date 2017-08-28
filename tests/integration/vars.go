@@ -20,5 +20,5 @@ var (
 	imageCirrosUrl     = "localhost/cirros.img"
 	imageCopyCirrosUrl = "localhost/copy/cirros.img"
 	imageCirrosId      = "localhost/cirros.img"
-	cirrosVolumeSize   = 41126400
+	cirrosVolumeSize   = 146800640
 )
