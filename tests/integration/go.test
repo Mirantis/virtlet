@@ -14,8 +14,7 @@ trap cleanup EXIT
 
 mkdir -p /tmp/image_store
 pushd /tmp/image_store
-curl http://download.cirros-cloud.net/0.3.3/cirros-0.3.3-x86_64-disk.img -o cirros-0.3.3-x86_64-disk.img
-curl http://download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img -o cirros-0.3.4-x86_64-disk.img
+curl -L https://github.com/Mirantis/virtlet/releases/download/v0.8.2/cirros.img -o cirros.img
 rm -rf copy
 ln -s . copy
 python -m SimpleHTTPServer 80 >/tmp/http_server.log &
