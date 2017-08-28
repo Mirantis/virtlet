@@ -67,7 +67,7 @@ func newContainerTester(t *testing.T) *containerTester {
 		containers:           criapi.GetContainersConfig(sandboxes),
 		imageSpecs: []*kubeapi.ImageSpec{
 			{Image: imageCirrosUrl},
-			{Image: imageCirrosUrl2},
+			{Image: imageCopyCirrosUrl},
 		},
 		fv: flexvolume.NewFlexVolumeDriver(utils.NewUuid, flexvolume.NewLinuxMounter()),
 	}
