@@ -45,7 +45,8 @@ type podNetwork struct {
 	doneCh     chan error
 }
 
-// TODO: add test & doc
+// TapFDSource sets up and tears down Virtlet VM network.
+// It implements FDSource interface
 type TapFDSource struct {
 	cniClient *cni.Client
 	fdMap     map[string]*podNetwork
@@ -53,6 +54,8 @@ type TapFDSource struct {
 
 var _ FDSource = &TapFDSource{}
 
+// NewTapFDSource returns a TapFDSource for the specified CNI plugin &
+// config dir
 func NewTapFDSource(cniPluginsDir, cniConfigsDir string) (*TapFDSource, error) {
 	cniClient, err := cni.NewClient(cniPluginsDir, cniConfigsDir)
 	if err != nil {
@@ -65,6 +68,7 @@ func NewTapFDSource(cniPluginsDir, cniConfigsDir string) (*TapFDSource, error) {
 	}, nil
 }
 
+// GetFD implements GetFD method of FDSource interface
 func (s *TapFDSource) GetFD(key string, data []byte) (int, []byte, error) {
 	var pnd PodNetworkDesc
 	if err := json.Unmarshal(data, &pnd); err != nil {
@@ -143,6 +147,7 @@ func (s *TapFDSource) GetFD(key string, data []byte) (int, []byte, error) {
 	return int(csn.TapFile.Fd()), respData, nil
 }
 
+// Release implements Release method of FDSource interface
 func (s *TapFDSource) Release(key string) error {
 	pn, found := s.fdMap[key]
 	if !found {
@@ -181,6 +186,7 @@ func (s *TapFDSource) Release(key string) error {
 	return nil
 }
 
+// GetInfo implements GetInfo method of FDSource interface
 func (s *TapFDSource) GetInfo(key string) ([]byte, error) {
 	pn, found := s.fdMap[key]
 	if !found {

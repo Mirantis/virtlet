@@ -46,6 +46,8 @@ const (
 	fdError             = 0xff
 )
 
+// FDManager denotes an object that provides 'master'-side
+// functionality of FDClient
 type FDManager interface {
 	AddFD(key string, data interface{}) ([]byte, error)
 	ReleaseFD(key string) error
@@ -59,7 +61,7 @@ type fdHeader struct {
 	Key      [64]byte
 }
 
-func (hdr *fdHeader) GetKey() string {
+func (hdr *fdHeader) getKey() string {
 	return strings.TrimSpace(string(hdr.Key[:]))
 }
 
@@ -75,12 +77,32 @@ func fdKey(key string) [64]byte {
 	return r
 }
 
+// FDSource denotes an 'executive' part for FDServer which
+// creates and destroys (closes) the file descriptors and
+// associated resources
 type FDSource interface {
+	// GetFD sets up a file descriptor based on key
+	// and extra data. It should return the file descriptor,
+	// any data that should be passed back to the client
+	// invoking AddFD() and an error, if any.
 	GetFD(key string, data []byte) (int, []byte, error)
+	// Release destroys (closes) the file descriptor and
+	// any associated resources
 	Release(key string) error
+	// GetInfo returns the information which needs to be
+	// propagated back the FDClient upon GetFD() call
 	GetInfo(key string) ([]byte, error)
 }
 
+// FDServer listens on a Unix domain socket, serving requests to
+// create, destroy and obtain file descriptors. It serves the purpose
+// of sending the file descriptors across mount namespace boundaries,
+// as well as making it easier to work around the Go namespace problem
+// (to be fixed in Go 1.10):
+// https://www.weave.works/blog/linux-namespaces-and-go-don-t-mix When
+// the Go namespace problem is resolved, it should be possible to dumb
+// down FDServer by making it only serve GetFD() requests, performing
+// other actions within the process boundary.
 type FDServer struct {
 	sync.Mutex
 	l          *net.UnixListener
@@ -90,6 +112,8 @@ type FDServer struct {
 	stopCh     chan struct{}
 }
 
+// NewFDServer returns an FDServer for the specified socket path and
+// an FDSource
 func NewFDServer(socketPath string, source FDSource) *FDServer {
 	return &FDServer{
 		socketPath: socketPath,
@@ -124,6 +148,8 @@ func (s *FDServer) getFD(key string) (int, error) {
 	return fd, nil
 }
 
+// Serve makes FDServer listen on its socket in a new goroutine.
+// It returns immediately. Use Stop() to stop listening.
 func (s *FDServer) Serve() error {
 	s.Lock()
 	defer s.Unlock()
@@ -192,7 +218,7 @@ func (s *FDServer) serveAdd(c *net.UnixConn, hdr *fdHeader) (*fdHeader, []byte, 
 			return nil, nil, fmt.Errorf("error reading payload: %v", err)
 		}
 	}
-	key := hdr.GetKey()
+	key := hdr.getKey()
 	fd, respData, err := s.source.GetFD(key, data)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error getting fd: %v", err)
@@ -209,7 +235,7 @@ func (s *FDServer) serveAdd(c *net.UnixConn, hdr *fdHeader) (*fdHeader, []byte, 
 }
 
 func (s *FDServer) serveRelease(c *net.UnixConn, hdr *fdHeader) (*fdHeader, error) {
-	s.removeFD(hdr.GetKey())
+	s.removeFD(hdr.getKey())
 	return &fdHeader{
 		Magic:   fdMagic,
 		Command: fdReleaseResponse,
@@ -218,7 +244,7 @@ func (s *FDServer) serveRelease(c *net.UnixConn, hdr *fdHeader) (*fdHeader, erro
 }
 
 func (s *FDServer) serveGet(c *net.UnixConn, hdr *fdHeader) (*fdHeader, []byte, []byte, error) {
-	key := hdr.GetKey()
+	key := hdr.getKey()
 	fd, err := s.getFD(key)
 	if err != nil {
 		return nil, nil, nil, err
@@ -290,13 +316,11 @@ func (s *FDServer) serveConn(c *net.UnixConn) error {
 				return fmt.Errorf("error writing payload: %v", err)
 			}
 		}
-		// } else if len(data) > 0 {
-		// 	err = binary.Write(c, binary.BigEndian, data)
-		// }
 	}
 	return nil
 }
 
+// Stop makes FDServer stop listening and close its socket
 func (s *FDServer) Stop() {
 	s.Lock()
 	defer s.Unlock()
@@ -307,6 +331,8 @@ func (s *FDServer) Stop() {
 	}
 }
 
+// FDClient can be used to connect to an FDServer listening on a Unix
+// domain socket
 type FDClient struct {
 	socketPath string
 	c          *net.UnixConn
@@ -314,10 +340,13 @@ type FDClient struct {
 
 var _ FDManager = &FDClient{}
 
+// NewFDClient returns an FDClient for specified socket path
 func NewFDClient(socketPath string) *FDClient {
 	return &FDClient{socketPath: socketPath}
 }
 
+// Connect makes FDClient connect to its socket. You must call
+// Connect() method to be able to use the FDClient
 func (c *FDClient) Connect() error {
 	if c.c != nil {
 		return nil
@@ -336,6 +365,7 @@ func (c *FDClient) Connect() error {
 	return nil
 }
 
+// Close closes the connection to FDServer
 func (c *FDClient) Close() error {
 	var err error
 	if c.c != nil {
@@ -396,6 +426,9 @@ func (c *FDClient) request(hdr *fdHeader, data []byte) (*fdHeader, []byte, []byt
 	return &respHdr, respData, oobData, nil
 }
 
+// AddFD requests the FDServer to add a new file descriptor
+// using its FDSource. It returns the info which is returned
+// by FDSource's GetFD() call
 func (c *FDClient) AddFD(key string, data interface{}) ([]byte, error) {
 	bs, ok := data.([]byte)
 	if !ok {
@@ -413,12 +446,14 @@ func (c *FDClient) AddFD(key string, data interface{}) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if respHdr.GetKey() != key {
+	if respHdr.getKey() != key {
 		return nil, fmt.Errorf("fd key mismatch in the server response")
 	}
 	return respData, nil
 }
 
+// ReleaseFD makes FDServer to close the file descriptor and destroy
+// any associated resources
 func (c *FDClient) ReleaseFD(key string) error {
 	_, _, _, err := c.request(&fdHeader{
 		Command: fdRelease,
@@ -427,6 +462,9 @@ func (c *FDClient) ReleaseFD(key string) error {
 	return err
 }
 
+// GetFD requests a file descriptor from the FDServer. It returns a
+// file descriptor which is valid for current process and any
+// associated data that was returned from FDSource's GetInfo() call
 func (c *FDClient) GetFD(key string) (int, []byte, error) {
 	_, respData, oobData, err := c.request(&fdHeader{
 		Command: fdGet,

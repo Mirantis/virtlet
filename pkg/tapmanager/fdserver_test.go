@@ -184,21 +184,3 @@ func TestFDServer(t *testing.T) {
 		t.Errorf("fd source is not empty (but it should be)")
 	}
 }
-
-// TODO: use separate process for the server in this test (later) -- a-la TestPassFD in https://golang.org/src/syscall/syscall_unix_test.go
-// TODO: add a note about Go namespace bug & future Go version
-// TODO: add a test that uses FDServer in conjunction with SetupContainerSideNetwork() and virtlet's dhcp server
-// TODO: add docs
-// TODO: extra task: restart dhcp / pick up netns upon virtlet restart
-
-// LockOSThread wires the calling goroutine to its current operating system thread.
-// Until the calling goroutine exits or calls UnlockOSThread, it will always
-// execute in that thread, and no other goroutine can.
-
-// The problem is spawning new threads and goroutines -- but if we lock all the threads we're good.
-
-// https://www.weave.works/blog/linux-namespaces-and-go-don-t-mix
-
-// exec problem -- there's chance exec will happen in wrong netns. must use nsenter
-// or see if LockOSThread() is enough for syscall.Exec. But in our case (container separation)
-// this will no longer be the problem, as vmwrapper will not be switching namespaces.
