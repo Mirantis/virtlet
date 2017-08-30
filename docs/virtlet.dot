@@ -15,19 +15,23 @@ digraph criproxy {
                 label="Virtlet container";
                 labeljust="r";
                 virtlet [label=" Virtlet process",shape=rectangle];
+                virtlet -> tapmanager [label="Request set up /\n tear down net\nby pod ID"];
+        }
+        subgraph cluster_2 {
+                label="libvirt container";
+                labeljust="r";
                 libvirt [shape=rectangle];
                 vmwrapper [shape=rectangle, label="vmwrapper\n0..n"];
                 qemu_kvm [shape=rectangle, label="qemu-kvm\n0..n"];
-                virtlet -> libvirt [label=" libvirt API"];
-                virtlet -> vmwrapper [label="Network namespace\n & config"];
                 libvirt -> vmwrapper [label="Runs"];
-                vmwrapper -> qemu_kvm [label=" Runs", shape=rectangle];
-                {rank=same virtlet libvirt}
+                vmwrapper -> qemu_kvm [label=" Execs", shape=rectangle];
+                vmwrapper -> tapmanager [label="Request tap FD\nby pod ID"];
+                virtlet -> libvirt [label="libvirt API"];
                 {rank=same vmwrapper qemu_kvm}
         }
         kubelet [shape=rectangle];
         docker [shape=rectangle];
-        virtlet -> cni [label=" Uses                             \nfor VM pod                             \nnetwork                             \n configuration                             "];
+        tapmanager -> cni [label=" Uses                             \nfor VM pod                             \nnetwork                             \n configuration                             "];
         kubelet -> cni [label=" Uses for pod\n network configuration"];
         kubelet -> criproxy [label=" CRI API (gRPC)"];
         criproxy -> virtlet [label="     CRI API (gRPC)"];

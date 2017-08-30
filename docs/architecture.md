@@ -8,7 +8,8 @@ Virtlet consists of the following components:
 
 * [Virtlet manager](../cmd/virtlet) - implements CRI interface for virtualization and image handling
 * [libvirt](http://libvirt.org) instance
-* [vmwrapper](../cmd/vmwrapper) which is responsible for preparing environment for emulator
+* [tapmanager](../pkg/tapmanager) which is responsible for managing VM networking
+* [vmwrapper](../cmd/vmwrapper) which is responsible for setting up the environment for emulator
 * emulator, currently [qemu](http://www.qemu-project.org/) with KVM support (with possibility to disable KVM)
 
 In addition to the above, our example setup provides the following:
@@ -22,22 +23,36 @@ The main binary is responsible for providing API fullfiling
 [CRI specification](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/container-runtime-interface-v1.md).
 It serves the requests from kubelet by doing the following:
 
-* controlling the preparation of libvirt VM environment (virtual
-  drives, network interfaces, trimming resources like RAM, CPU),
-* calling [CNI plugins](https://kubernetes.io/docs/admin/network-plugins/#cni) to setup network environment for virtual machines,
+* setting up libvirt VM environment (virtual drives, network
+  interfaces, trimming resources like RAM, CPU)
+* requesting CNI setup from tapmanager (see below)
 * telling libvirt to call vmwrapper instead of using emulator directly
-* querying libvirt for VM statuses,
-* instructing libvirt to stop VMs,
+* querying libvirt for VM statuses
+* instructing libvirt to stop VMs
+* requesting CNI teardown from tapmanager (see below)
 * and finally calling libvirt to tear down VM environment.
+
+## tapmanager
+
+`tapmanger` is a process that controls the setup of VM networking
+using CNI which is started by `virtlet` command (it uses the same
+`virtlet` binary). It has the following responsibilities:
+* takes setup requests from Virtlet manager and sets up networking
+  for a VM, producing an open fd corresponding to the tap device
+* runs DHCP server for each active VM
+* serves requests from `vmwrapper` (see below) sending it the file
+  descriptor over a Unix domain socket so that it can be used in
+  another container (more precisely, another mount namespace) without
+  the need for shared access to the directory containing network
+  namespaces
+* tears down the VM network upon Virtlet manager requests
 
 ## vmwrapper
 
-vmrapper is responsibile for:
-* passing the network configuration prepared by CNI plugins to the VM by means of built-in DHCP server
-* spawning emulator (currently qemu-kvm),
-* responding to DHCP queries from VM,
-* signaling emulator to stop VM,
-* reconstructing network interfaces to initial state for CNI teardown procedure.
+`vmrapper` is run by libvirt and wraps the emulator (QEMU/KVM).  It
+requests tap file descriptor from `tapmanager`, adds command line
+arguments needed by the emulator to use the tap device and then
+`exec`s the emulator.
 
 ## CRI Proxy
 
