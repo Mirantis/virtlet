@@ -126,10 +126,24 @@ spec:
         securityContext:
           privileged: true
         env:
-        - name: VIRTLET_LOGLEVEL
-          value: "3"
         - name: VIRTLET_DOWNLOAD_PROTOCOL
-          value: "http"
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: download_protocol
+              optional: true
+        - name: VIRTLET_DISABLE_KVM
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: disable_kvm
+              optional: true
+        - name: VIRTLET_LOGLEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: loglevel
+              optional: true
       volumes:
       - hostPath:
           path: /sys/fs/cgroup

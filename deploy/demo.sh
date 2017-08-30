@@ -125,8 +125,8 @@ function demo::label-and-untaint-node {
   "${kubectl}" label node "${virtlet_node}" extraRuntime=virtlet
   if [[ ${VIRTLET_ON_MASTER} ]]; then
       demo::step "Checking/removing master taint from ${virtlet_node}"
-    if [[ $(kubectl get node kube-master -o jsonpath='{.spec.taints[?(@.key=="node-role.kubernetes.io/master")]}') ]]; then
-      kubectl taint nodes kube-master node-role.kubernetes.io/master-
+    if [[ $("${kubectl}" get node kube-master -o jsonpath='{.spec.taints[?(@.key=="node-role.kubernetes.io/master")]}') ]]; then
+      "${kubectl}" taint nodes kube-master node-role.kubernetes.io/master-
     fi
   fi
 }
@@ -189,7 +189,7 @@ function demo::ssh {
 
   if [[ ! ${cirros_ip} ]]; then
     while true; do
-      cirros_ip=$(kubectl get pod cirros-vm -o jsonpath="{.status.podIP}")
+      cirros_ip=$("${kubectl}" get pod cirros-vm -o jsonpath="{.status.podIP}")
       if [[ ! ${cirros_ip} ]]; then
         echo "Waiting for cirros IP..."
         sleep 1
@@ -238,7 +238,6 @@ function demo::kvm-ok {
   fi
 }
 
-
 function demo::get-correct-virtlet-release {
   # will use most recently published virtlet release
   # (virtlet releases are pre-releases now so not returned in /latest)
@@ -253,9 +252,8 @@ function demo::get-correct-virtlet-release {
   fi
 }
 
-
 function demo::start-virtlet {
-  local jq_filter='.items[0].spec.template.spec.containers[1].env|=.+[{"name": "VIRTLET_DOWNLOAD_PROTOCOL","value":"http"}]'
+  local -a virtlet_config=(--from-literal=download_protocol=http)
   local ds_location
   if [[ ${VIRTLET_DEMO_RELEASE} = "master" ]]; then
       virtlet_release="master"
@@ -274,14 +272,14 @@ function demo::start-virtlet {
   fi
   echo "Will run demo using Virtlet:${virtlet_release} for demo and ${virtlet_docker_tag} as docker tag"
   if demo::kvm-ok; then
-    demo::step "Deploying Virtlet DaemonSet with KVM support from ${ds_location}"
+    demo::step "Setting up Virtlet configuration with KVM support"
   else
-    demo::step "Deploying Virtlet DaemonSet *without* KVM support from ${ds_location}"
-    jq_filter="${jq_filter}"'|.items[0].spec.template.spec.containers[0].env|=.+[{"name": "VIRTLET_DISABLE_KVM","value":"y"}]'
+    demo::step "Setting up Virtlet configuration *without* KVM support"
+    virtlet_config+=(--from-literal=disable_kvm=y)
   fi
-  "${kubectl}" convert -f "${ds_location}" --local -o json |
-      docker exec -i kube-master jq "${jq_filter}" |
-      "${kubectl}" create -f -
+  "${kubectl}" create configmap -n kube-system virtlet-config "${virtlet_config[@]}"
+  demo::step "Deploying Virtlet DaemonSet from ${ds_location}"
+  "${kubectl}" create -f "${ds_location}"
   demo::wait-for "Virtlet DaemonSet" demo::pods-ready runtime=virtlet
 }
 
