@@ -24,10 +24,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/golang/glog"
+
+	"github.com/Mirantis/virtlet/pkg/libvirttools"
 	"github.com/Mirantis/virtlet/pkg/manager"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
-
-	"github.com/golang/glog"
 )
 
 var (
@@ -96,6 +97,9 @@ func runTapManager() {
 	if err = s.Serve(); err != nil {
 		glog.Errorf("FD server returned error: %v", err)
 		os.Exit(1)
+	}
+	if err := libvirttools.ChownForEmulator(*fdServerSocketPath); err != nil {
+		glog.Warningf("couldn't set tapmanager socket permissions: %v", err)
 	}
 	for {
 		time.Sleep(1000 * time.Hour)
