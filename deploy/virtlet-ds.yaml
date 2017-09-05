@@ -176,6 +176,20 @@ spec:
           value: "/virtlet-log"
         - name: KUBERNETES_POD_LOGS
           value: "/kubernetes-log"
+      - name: vms
+        image: mirantis/virtlet
+        imagePullPolicy: IfNotPresent
+        command:
+        - /vms.sh
+        volumeMounts:
+        - mountPath: /var/lib/virtlet
+          name: virtlet
+        - mountPath: /var/lib/libvirt
+          name: libvirt
+        - name: vms-log
+          mountPath: /var/log/vms
+        - name: dev
+          mountPath: /dev
       volumes:
       # /dev is needed for host raw device access
       - hostPath:

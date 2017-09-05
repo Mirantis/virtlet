@@ -158,6 +158,18 @@ spec:
               name: virtlet-config
               key: loglevel
               optional: true
+      - name: vms
+        image: mirantis/virtlet
+        imagePullPolicy: IfNotPresent
+        command:
+        - /vms.sh
+        volumeMounts:
+        - mountPath: /var/lib/virtlet
+          name: virtlet
+        - mountPath: /var/lib/libvirt
+          name: libvirt
+        - name: dev
+          mountPath: /dev
       volumes:
       # /dev is needed for host raw device access.
       # In case of 'logless' mode, it's also used

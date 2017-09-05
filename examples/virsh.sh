@@ -78,5 +78,5 @@ for pod in ${pods[*]}; do
   if [[ ${#pods[*]} > 1 ]]; then
     printf "${pod} ($(kubectl get pod -nkube-system "${pod}" -o jsonpath="{.spec.nodeName}")):\n\n"
   fi
-  kubectl exec ${opts} -n kube-system "${pod}" -c virtlet -- virsh ${args[@]+"${args[@]}"}
+  kubectl exec ${opts} -n kube-system "${pod}" -c libvirt -- virsh ${args[@]+"${args[@]}"}
 done
