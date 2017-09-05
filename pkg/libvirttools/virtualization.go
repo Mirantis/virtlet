@@ -299,8 +299,11 @@ func (v *VirtualizationTool) addSerialDevicesToDomain(sandboxId, containerName s
 
 		// Prepare directory where libvirt will store log file to.
 		if _, err := os.Stat(logDir); os.IsNotExist(err) {
-			if err := os.Mkdir(logDir, 0644); err != nil {
-				return fmt.Errorf("failed to create vmLogDir '%s': %s", logDir, err.Error())
+			if err := os.Mkdir(logDir, 0755); err != nil {
+				return fmt.Errorf("failed to create vmLogDir %q: %v", logDir, err)
+			}
+			if err := ChownForEmulator(logDir); err != nil {
+				return fmt.Errorf("failed to chown vmLogDir %q: %v", err)
 			}
 		}
 
