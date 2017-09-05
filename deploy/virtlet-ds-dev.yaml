@@ -93,6 +93,8 @@ spec:
           name: libvirt
         - mountPath: /dind
           name: dind
+        - name: dev
+          mountPath: /dev
         securityContext:
           privileged: true
         env:
@@ -110,6 +112,13 @@ spec:
         volumeMounts:
         - mountPath: /run
           name: run
+        # /boot and /lib/modules are required by supermin
+        - mountPath: /lib/modules
+          name: modules
+          readOnly: true
+        - mountPath: /boot
+          name: boot
+          readOnly: true
         - mountPath: /var/lib/virtlet
           name: virtlet
         - mountPath: /var/lib/libvirt
@@ -150,6 +159,12 @@ spec:
               key: loglevel
               optional: true
       volumes:
+      # /dev is needed for host raw device access.
+      # In case of 'logless' mode, it's also used
+      # for /dev/pts by `virsh console`
+      - hostPath:
+          path: /dev
+        name: dev
       - hostPath:
           path: /sys/fs/cgroup
         name: cgroup
