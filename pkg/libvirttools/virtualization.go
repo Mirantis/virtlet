@@ -138,7 +138,15 @@ func (ds *domainSettings) createDomain() *libvirtxml.Domain {
 			Period: &libvirtxml.DomainCPUTunePeriod{Value: ds.cpuPeriod},
 			Quota:  &libvirtxml.DomainCPUTuneQuota{Value: ds.cpuQuota},
 		},
-		MemoryBacking: &libvirtxml.DomainMemoryBacking{Locked: &libvirtxml.DomainMemoryBackingLocked{}},
+		// This causes '"qemu: qemu_thread_create: Resource temporarily unavailable"' QEMU errors
+		// when Virtlet is run as a non-privileged user.
+		// Under strace, it looks like a bunch of mmap()s failing with EAGAIN
+		// which happens due to mlockall() call somewhere above that.
+		// This could be worked around using setrlimit() but really
+		// swap handling is not needed here because it's incorrect
+		// to have swap enabled on the nodes of a real Kubernetes cluster.
+
+		// MemoryBacking: &libvirtxml.DomainMemoryBacking{Locked: &libvirtxml.DomainMemoryBackingLocked{}},
 
 		QEMUCommandline: &libvirtxml.DomainQEMUCommandline{
 			Envs: []libvirtxml.DomainQEMUCommandlineEnv{
