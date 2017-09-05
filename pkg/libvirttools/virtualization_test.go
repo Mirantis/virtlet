@@ -153,7 +153,7 @@ func (ct *containerTester) createContainer(sandbox *kubeapi.PodSandboxConfig, mo
 	if err != nil {
 		ct.t.Fatalf("GetVMConfig(): %v", err)
 	}
-	containerId, err := ct.virtTool.CreateContainer(vmConfig, "/tmp/fakenetns", fakeCNIConfig)
+	containerId, err := ct.virtTool.CreateContainer(vmConfig, "/tmp/fakenetns")
 	if err != nil {
 		ct.t.Fatalf("CreateContainer: %v", err)
 	}
@@ -508,7 +508,7 @@ func TestDomainResourceConstraints(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetVMConfig(): %v", err)
 	}
-	_, err = ct.virtTool.CreateContainer(vmConfig, "/tmp/fakenetns", fakeCNIConfig)
+	_, err = ct.virtTool.CreateContainer(vmConfig, "/tmp/fakenetns")
 	if err != nil {
 		t.Fatalf("CreateContainer: %v", err)
 	}

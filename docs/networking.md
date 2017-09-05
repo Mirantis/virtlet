@@ -1,9 +1,15 @@
 # Networking
 
-For now the only supported configuration is the use of [CNI plugins](https://github.com/containernetworking/cni). To use custom CNI configuration, mount your `/etc/cni` and optionally `/opt/cni` into the virtlet container.
-Virtlet have the same behavior and default values for `--cni-bin-dir` and `--cni-conf-dir` as described in kubelet network plugins [documentation](http://kubernetes.io/docs/admin/network-plugins/).
+For now the only supported configuration is the use of
+[CNI plugins](https://github.com/containernetworking/cni). To use
+custom CNI configuration, mount your `/etc/cni` and optionally
+`/opt/cni` into the virtlet container.
 
-## Netwoking scheme
+Virtlet have the same behavior and default values for `--cni-bin-dir`
+and `--cni-conf-dir` as described in kubelet network plugins
+[documentation](http://kubernetes.io/docs/admin/network-plugins/).
+
+## VM Network Setup Diagram
 
 ```
 +--------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -35,39 +41,43 @@ Virtlet have the same behavior and default values for `--cni-bin-dir` and `--cni
 +--------------------------------------------------------------------------------------------------------------------------------------------------------------+
 ```
 
-Current workflow using CNI plugin which is expected to create veth pair with one end belongs to pod network namespace:
+Virtlet uses the specified CNI plugin which is expected to create veth
+pair with one end belonging to the pod network namespace.
+1. On `RunPodSandBox` request Virtlet requests `tapmanager` process to
+   set up the networking for the VM by sending it a command over its
+   Unix domain socket
+2. `tapmanager` sets up the network according to the above diagram
+   (see below for more details)
+3. When the VM is started, Virtlet wraps the emulator using `vmwrapper` program
+   which it passes `VIRTLET_NET_KEY` environment variable containing the key
+   the was used by `tapmanager` to set up the network.
+4. `vmwrapper` uses the key to ask `tapmanager` to send it the file
+   descriptor for the tap interface over `tapmanager`'s Unix domain
+   socket. It then extends emulator command line arguments to make it
+   use the tap device and then `exec`s the emulator.
+5. Upon `StopPodSandbox`, Virtlet requests `tapmanager` to tear down
+   the VM network.
 
- - On RunPodSandBox request virtlet creates ne netns with name equal to PodId and calls CNI plugin to create veth pair and allocate ips
- - On StartContainer request virtlet prepares domain xml definition with emulator set to VMWrapper (separate binary to prepare network for VM using CNI veth pair and ips) and several env vars set thru qemu commandline
-```
-....
-    <devices>
-        <emulator>/vmwrapper</emulator>
-...
-<commandline xmlns='http://libvirt.org/schemas/domain/qemu/1.0'>
-      <env name='VIRTLET_EMULATOR' value='%s'/>
-      <env name='VIRTLET_NS' value='%s'/>
-      <env name='VIRTLET_CNI_CONFIG' value='%s'/>
-</commandline>
-...
+The rationale for having separate `tapmanager` process is
+[the well-known Go namespace problem](https://www.weave.works/blog/linux-namespaces-and-go-don-t-mix).
+It's expected that the problem will be fixed by Go 1.10 release, after
+which it will be possible to dumb down `tapmanager` request processing
+and run it as a goroutine (so it can use channels etc. to communicate
+with Virtlet side). Currently `tapmanager` is starting automatically
+by `virtlet` command using the same `virtlet` binary.
 
-where
-- VIRTLET_EMULATOR - the fully qualified path to the device model emulator binary, ex: /usr/bin/kvm.
-- VIRTLET_NS - the fully qualified path to the netns, ex: /var/run/netns/8d6f7a19-c865-11e6-ae2c-02424d6b591d
-- VIRTLET_CNI_CONFIG - json sting with CNI settings, ex: {"ip4":{"ip":"10.1.91.2/24","gateway":"10.1.91.1","routes":[{"dst":"0.0.0.0/0"}]},"dns":{}}
-```
- - On CreateContainer request virlet calls libvirt api to start domain, which in its turn leads to running VMwrapper with all qemu args. Using info from set env vars VMWrapper sets up networking and runs dhcp-server inside pod's netns. The qemu-kvm process of running VM is started inside virtlet's base netns to provide inbound and outbound connectivity.
-In more details, VMWrapper inside pod's netns performs the following:
-    1. creates tap0 for domain and br0, strips ip and routes from veth end inside netns
-    2. opens tap0 device and keeps its FD
-    3. runs dhcp-server to pass ip to VM's eth stipped from veth and default routes
+`tapmanager` performs the network setup by creating a bridge in which
+it plugs CNI-provided veth (which is stripped of IP address & routes)
+and a newly created tap interface. It then starts dhcp server that
+listens for DHCP requests coming from tap interface, cutting the DHCP
+server from the outside world with ebtables.  The dhcp server passes
+CNI-provided IP, routing and DNS information to the VM so it can join
+the cluster using the pod IP.
 
-Finally vmwrapper spawns qemu-kvm (or qemu, if KVM is disabled) inside original virtlet's netns and passes to it file descriptor corresponding to tap0 device.
+Using the scheme based on passing file descriptors over a Unix domain
+socket makes it possible to have all the network related code outside
+`vmwrapper` and have `vmwrapper` just `exec` the emulator instead of
+spawning it as a child process.
 
-**NOTE:** Currently we ignore hostNetwork setting, i.e. on RunPodSandBox request from kubelet new network namespace will be created by virtlet with name=PodId regardless of hostNetwork setting. As it's kubelet's work to decide when and which api request should be called, if hostNetwork setting will be changed for the running VM, kubelet SyncPod workflow will kill and re-create everything despite of fact that it won't change networking for VM.
-
-In containers world hostNetwok=true means pods with such setting will have the same host ip and it's the responsibility of user then to watch for port overlapping of processes run inside containers.
-
-In VM world we can't have two VM-pods with the same ip, so it means we need to have bridge binded to host interface for outbound VM's traffic (in other world the same as libvirt NAT-based network). But such model isin't sufficient for providing node-to-Pod connectivity for which we still need overlay network.
-
-As a possible enhancement we could try to detect hostNetwork change setting case and emulate activity for kubelet not touching deployed VM (corresponding issue: https://github.com/Mirantis/virtlet/issues/184).
+**NOTE:** Virtlet doesn't support `hostNetwork` pod setting because it
+cannot be impelemnted for VM in a meaningful way.

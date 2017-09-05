@@ -174,13 +174,12 @@ Then you can deploy Virtlet DaemonSet:
 kubectl create -f https://raw.githubusercontent.com/Mirantis/virtlet/master/deploy/virtlet-ds.yaml
 ```
 
-By default it has KVM enabled, but you can patch the DaemonSet
-definition with `jq` to disable it. In order to do so, run the following
-instead of the above `kubectl create` command:
+By default it has KVM enabled, but you can configure Virtlet to
+disable it.  In order to do so, create a configmap named
+`virtlet-config` in `kube-system` prior to creating Virtlet DaemonSet
+that contains key-value pair `disable_kvm=y`:
 ```bash
-kubectl convert -f https://raw.githubusercontent.com/Mirantis/virtlet/master/deploy/virtlet-ds.yaml --local -o json |
-  jq '.items[0].spec.template.spec.containers[0].env|=.+[{"name": "VIRTLET_DISABLE_KVM","value":"y"}]' |
-  kubectl create -f -
+kubectl create configmap -n kube-system virtlet-config --from-literal=disable_kvm=y
 ```
 
 If you're using CRI Proxy bootstrap, you can watch it progress via the following command on the target node once `/var/log/criproxy-bootstrap.log` appears there:

@@ -199,13 +199,10 @@ function start_dind {
         fi
     fi
     kubectl label node --overwrite "${virtlet_node}" extraRuntime=virtlet
-    if kvm_ok; then
-        kubectl convert -f "${project_dir}/deploy/virtlet-ds-dev.yaml" --local -o json |
-            docker exec -i kube-master jq '.items[0].spec.template.spec.containers[0].env|=map(select(.name!="VIRTLET_DISABLE_KVM"))' |
-            kubectl create -f -
-    else
-        kubectl create -f "${project_dir}/deploy/virtlet-ds-dev.yaml"
+    if ! kvm_ok; then
+        kubectl create configmap -n kube-system virtlet-config --from-literal=disable_kvm=y
     fi
+    kubectl create -f "${project_dir}/deploy/virtlet-ds-dev.yaml"
 }
 
 function virtlet_subdir {

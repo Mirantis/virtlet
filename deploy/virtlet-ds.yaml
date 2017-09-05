@@ -67,10 +67,12 @@ spec:
           privileged: true
 
       containers:
-      - name: virtlet
+      - name: libvirt
         image: mirantis/virtlet
         # In case we inject local virtlet image we want to use it not officially available one
         imagePullPolicy: IfNotPresent
+        command:
+        - /libvirt.sh
         volumeMounts:
         - mountPath: /sys/fs/cgroup
           name: cgroup
@@ -82,6 +84,40 @@ spec:
           readOnly: true
         - mountPath: /run
           name: run
+        - mountPath: /var/lib/virtlet
+          name: virtlet
+        - mountPath: /var/lib/libvirt
+          name: libvirt
+        # the log dir is needed here because otherwise libvirt will produce errors
+        # like this:
+        # Unable to pre-create chardev file '/var/log/vms/afd75bbb-8e97-11e7-9561-02420ac00002/cirros-vm_0.log': No such file or directory
+        - name: vms-log
+          mountPath: /var/log/vms
+        - name: dev
+          mountPath: /dev
+        securityContext:
+          privileged: true
+        env:
+        - name: VIRTLET_DISABLE_KVM
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: disable_kvm
+              optional: true
+      - name: virtlet
+        image: mirantis/virtlet
+        # In case we inject local virtlet image we want to use it not officially available one
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - mountPath: /run
+          name: run
+        # /boot and /lib/modules are required by supermin
+        - mountPath: /lib/modules
+          name: modules
+          readOnly: true
+        - mountPath: /boot
+          name: boot
+          readOnly: true
         - mountPath: /var/lib/virtlet
           name: virtlet
         - mountPath: /var/lib/libvirt
@@ -104,13 +140,24 @@ spec:
         securityContext:
           privileged: true
         env:
-        - name: VIRTLET_LOGLEVEL
-          value: "3"
+        - name: VIRTLET_DISABLE_KVM
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: disable_kvm
+              optional: true
         - name: VIRTLET_DOWNLOAD_PROTOCOL
-          value: "https"
-        # Uncomment the following to disable KVM:
-        # - name: VIRTLET_DISABLE_KVM
-        #   value: "y"
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: download_protocol
+              optional: true
+        - name: VIRTLET_LOGLEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: loglevel
+              optional: true
         # Uncomment the following to redirect VM logs to file /var/log/vms/<sandboxId>/<containerId>_<attemptIdx>.log:
         - name: VIRTLET_VM_LOG_LOCATION
           value: "/var/log/vms"
@@ -130,6 +177,10 @@ spec:
         - name: KUBERNETES_POD_LOGS
           value: "/kubernetes-log"
       volumes:
+      # /dev is needed for host raw device access
+      - hostPath:
+          path: /dev
+        name: dev
       - hostPath:
           path: /sys/fs/cgroup
         name: cgroup

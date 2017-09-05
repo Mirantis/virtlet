@@ -69,10 +69,13 @@ spec:
           privileged: true
 
       containers:
-      - name: virtlet
+      - name: libvirt
         image: mirantis/virtlet
-        # In case we inject local virtlet image we want to use it not officially available one
+        # In case we inject local virtlet image we want to use it instead of
+        # pulling the "real" one
         imagePullPolicy: IfNotPresent
+        command:
+        - /libvirt.sh
         volumeMounts:
         - mountPath: /sys/fs/cgroup
           name: cgroup
@@ -88,6 +91,38 @@ spec:
           name: virtlet
         - mountPath: /var/lib/libvirt
           name: libvirt
+        - mountPath: /dind
+          name: dind
+        - name: dev
+          mountPath: /dev
+        securityContext:
+          privileged: true
+        env:
+        # comment out the following to enable KVM
+        - name: VIRTLET_DISABLE_KVM
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: disable_kvm
+              optional: true
+      - name: virtlet
+        image: mirantis/virtlet
+        # In case we inject local virtlet image we want to use it not officially available one
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - mountPath: /run
+          name: run
+        # /boot and /lib/modules are required by supermin
+        - mountPath: /lib/modules
+          name: modules
+          readOnly: true
+        - mountPath: /boot
+          name: boot
+          readOnly: true
+        - mountPath: /var/lib/virtlet
+          name: virtlet
+        - mountPath: /var/lib/libvirt
+          name: libvirt
         - mountPath: /etc/cni
           name: cniconf
         - mountPath: /opt/cni/bin
@@ -98,22 +133,38 @@ spec:
           name: dind
         - mountPath: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
           name: k8s-flexvolume-plugins-dir
-          # below `:shared` is unofficial way to pass this option docker
-          # which then will allow virtlet to see what kubelet mounts in
-          # underlaying directories, after virtlet container is created
+          # `:shared` suffix below is an unofficial way to pass this option to docker
+          # so as to make virtlet to see what kubelet mounts in the underlying directories
         - mountPath: /var/lib/kubelet/pods:shared
           name: k8s-pods-dir
         securityContext:
           privileged: true
         env:
-        - name: VIRTLET_LOGLEVEL
-          value: "3"
         - name: VIRTLET_DOWNLOAD_PROTOCOL
-          value: "http"
-        # comment out the following to enable KVM
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: download_protocol
+              optional: true
         - name: VIRTLET_DISABLE_KVM
-          value: "y"
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: disable_kvm
+              optional: true
+        - name: VIRTLET_LOGLEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: loglevel
+              optional: true
       volumes:
+      # /dev is needed for host raw device access.
+      # In case of 'logless' mode, it's also used
+      # for /dev/pts by `virsh console`
+      - hostPath:
+          path: /dev
+        name: dev
       - hostPath:
           path: /sys/fs/cgroup
         name: cgroup

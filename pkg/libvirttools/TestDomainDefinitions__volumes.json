@@ -670,12 +670,8 @@
             "Value": "/usr/bin/kvm"
           },
           {
-            "Name": "VIRTLET_NS",
+            "Name": "VIRTLET_NET_KEY",
             "Value": "/tmp/fakenetns"
-          },
-          {
-            "Name": "VIRTLET_CNI_CONFIG",
-            "Value": "{\"noCniForNow\":true}"
           }
         ]
       }

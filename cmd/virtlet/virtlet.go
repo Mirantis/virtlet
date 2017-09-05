@@ -20,9 +20,12 @@ import (
 	"flag"
 	"math/rand"
 	"os"
+	"os/exec"
+	"syscall"
 	"time"
 
 	"github.com/Mirantis/virtlet/pkg/manager"
+	"github.com/Mirantis/virtlet/pkg/tapmanager"
 
 	"github.com/golang/glog"
 )
@@ -46,14 +49,31 @@ var (
 		"Image download protocol. Can be https (default) or http.")
 	rawDevices = flag.String("raw-devices", "loop*",
 		"Comma separated list of raw device glob patterns to which VM can have an access (with skipped /dev/ prefix)")
+	fdServerSocketPath = flag.String("fd-server-socket-path", "/var/lib/virtlet/tapfdserver.sock",
+		"Path to fd server socket")
 )
 
-func main() {
-	flag.Parse()
+const (
+	WantTapManagerEnv         = "WANT_TAP_MANAGER"
+	TapManagerConnectInterval = 200 * time.Millisecond
+	TapManagerAttemptCount    = 50
+)
 
-	rand.Seed(time.Now().UnixNano())
+func runVirtlet() {
+	c := tapmanager.NewFDClient(*fdServerSocketPath)
+	var err error
+	for i := 0; i < TapManagerAttemptCount; i++ {
+		time.Sleep(TapManagerConnectInterval)
 
-	server, err := manager.NewVirtletManager(*libvirtUri, *pool, *imageDownloadProtocol, *storageBackend, *boltPath, *cniPluginsDir, *cniConfigsDir, *rawDevices)
+		if err = c.Connect(); err == nil {
+			break
+		}
+	}
+	if err != nil {
+		glog.Errorf("Failed to connect to tapmanager: %v", err)
+		os.Exit(1)
+	}
+	server, err := manager.NewVirtletManager(*libvirtUri, *pool, *imageDownloadProtocol, *storageBackend, *boltPath, *rawDevices, c)
 	if err != nil {
 		glog.Errorf("Initializing server failed: %v", err)
 		os.Exit(1)
@@ -62,5 +82,50 @@ func main() {
 	if err = server.Serve(*listen); err != nil {
 		glog.Errorf("Serving failed: %v", err)
 		os.Exit(1)
+	}
+}
+
+func runTapManager() {
+	src, err := tapmanager.NewTapFDSource(*cniPluginsDir, *cniConfigsDir)
+	if err != nil {
+		glog.Errorf("Error creating tap fd source: %v", err)
+		os.Exit(1)
+	}
+	os.Remove(*fdServerSocketPath) // FIXME
+	s := tapmanager.NewFDServer(*fdServerSocketPath, src)
+	if err = s.Serve(); err != nil {
+		glog.Errorf("FD server returned error: %v", err)
+		os.Exit(1)
+	}
+	for {
+		time.Sleep(1000 * time.Hour)
+	}
+}
+
+func startTapManagerProcess() {
+	cmd := exec.Command(os.Args[0], os.Args[1:]...)
+	cmd.Env = append(os.Environ(), WantTapManagerEnv+"=1")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	// Here we make this process die with the main Virtlet process.
+	// Note that this is Linux-specific, and also it may fail if virtlet is PID 1:
+	// https://github.com/golang/go/issues/9263
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Pdeathsig: syscall.SIGTERM,
+	}
+	if err := cmd.Start(); err != nil {
+		glog.Errorf("error starting tapmanager process: %v", err)
+		os.Exit(1)
+	}
+}
+
+func main() {
+	flag.Parse()
+	rand.Seed(time.Now().UnixNano())
+	if os.Getenv(WantTapManagerEnv) == "" {
+		startTapManagerProcess()
+		runVirtlet()
+	} else {
+		runTapManager()
 	}
 }

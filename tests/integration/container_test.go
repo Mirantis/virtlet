@@ -52,10 +52,8 @@ type containerTester struct {
 }
 
 func newContainerTester(t *testing.T) *containerTester {
-	manager := NewVirtletManager()
-	if err := manager.Run(); err != nil {
-		t.Fatal(err)
-	}
+	manager := NewVirtletManager(t)
+	manager.Run()
 
 	sandboxes := criapi.GetSandboxes(2)
 	return &containerTester{
