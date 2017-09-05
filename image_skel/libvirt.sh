@@ -49,7 +49,7 @@ daemon=
 if [[ ${novirtlet} ]]; then
   # leftover socket prevents libvirt from initializing correctly
   rm -f /var/lib/libvirt/qemu/capabilities.monitor.sock
-  daemon="--daemon"  
+  daemon="--daemon"
 fi
 
 if [[ ! ${VIRTLET_DISABLE_KVM:-} ]]; then

@@ -105,7 +105,7 @@ type FDSource interface {
 // other actions within the process boundary.
 type FDServer struct {
 	sync.Mutex
-	l          *net.UnixListener
+	lst        *net.UnixListener
 	socketPath string
 	source     FDSource
 	fds        map[string]int
@@ -234,7 +234,7 @@ func (s *FDServer) serveAdd(c *net.UnixConn, hdr *fdHeader) (*fdHeader, []byte, 
 	}, respData, nil
 }
 
-func (s *FDServer) serveRelease(c *net.UnixConn, hdr *fdHeader) (*fdHeader, error) {
+func (s *FDServer) serveRelease(hdr *fdHeader) (*fdHeader, error) {
 	s.removeFD(hdr.getKey())
 	return &fdHeader{
 		Magic:   fdMagic,
@@ -284,7 +284,7 @@ func (s *FDServer) serveConn(c *net.UnixConn) error {
 		case fdAdd:
 			respHdr, data, err = s.serveAdd(c, &hdr)
 		case fdRelease:
-			respHdr, err = s.serveRelease(c, &hdr)
+			respHdr, err = s.serveRelease(&hdr)
 		case fdGet:
 			respHdr, data, oobData, err = s.serveGet(c, &hdr)
 		default:
@@ -326,7 +326,7 @@ func (s *FDServer) Stop() {
 	defer s.Unlock()
 	if s.stopCh != nil {
 		close(s.stopCh)
-		s.l.Close()
+		s.lst.Close()
 		s.stopCh = nil
 	}
 }
@@ -335,7 +335,7 @@ func (s *FDServer) Stop() {
 // domain socket
 type FDClient struct {
 	socketPath string
-	c          *net.UnixConn
+	conn       *net.UnixConn
 }
 
 var _ FDManager = &FDClient{}
@@ -348,7 +348,7 @@ func NewFDClient(socketPath string) *FDClient {
 // Connect makes FDClient connect to its socket. You must call
 // Connect() method to be able to use the FDClient
 func (c *FDClient) Connect() error {
-	if c.c != nil {
+	if c.conn != nil {
 		return nil
 	}
 
@@ -361,38 +361,38 @@ func (c *FDClient) Connect() error {
 	if err != nil {
 		return fmt.Errorf("can't connect to %q: %v", c.socketPath, err)
 	}
-	c.c = conn
+	c.conn = conn
 	return nil
 }
 
 // Close closes the connection to FDServer
 func (c *FDClient) Close() error {
 	var err error
-	if c.c != nil {
-		err = c.c.Close()
-		c.c = nil
+	if c.conn != nil {
+		err = c.conn.Close()
+		c.conn = nil
 	}
 	return err
 }
 
 func (c *FDClient) request(hdr *fdHeader, data []byte) (*fdHeader, []byte, []byte, error) {
 	hdr.Magic = fdMagic
-	if c.c == nil {
+	if c.conn == nil {
 		return nil, nil, nil, errors.New("not connected")
 	}
 
-	if err := binary.Write(c.c, binary.BigEndian, hdr); err != nil {
+	if err := binary.Write(c.conn, binary.BigEndian, hdr); err != nil {
 		return nil, nil, nil, fmt.Errorf("error writing request header: %v", err)
 	}
 
 	if len(data) > 0 {
-		if err := binary.Write(c.c, binary.BigEndian, data); err != nil {
+		if err := binary.Write(c.conn, binary.BigEndian, data); err != nil {
 			return nil, nil, nil, fmt.Errorf("error writing request payload: %v", err)
 		}
 	}
 
 	var respHdr fdHeader
-	if err := binary.Read(c.c, binary.BigEndian, &respHdr); err != nil {
+	if err := binary.Read(c.conn, binary.BigEndian, &respHdr); err != nil {
 		return nil, nil, nil, fmt.Errorf("error reading response header: %v", err)
 	}
 	if respHdr.Magic != fdMagic {
@@ -402,7 +402,7 @@ func (c *FDClient) request(hdr *fdHeader, data []byte) (*fdHeader, []byte, []byt
 	respData := make([]byte, respHdr.DataSize)
 	oobData := make([]byte, respHdr.OobSize)
 	if len(respData) > 0 || len(oobData) > 0 {
-		n, oobn, _, _, err := c.c.ReadMsgUnix(respData, oobData)
+		n, oobn, _, _, err := c.conn.ReadMsgUnix(respData, oobData)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("error reading the message: %v", err)
 		}

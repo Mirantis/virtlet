@@ -70,10 +70,10 @@ func main() {
 		}
 	}
 
-	glog.V(0).Infof("executing emulator %q: args %#v", emulator, emulatorArgs)
+	glog.V(0).Infof("Executing emulator %q: args %#v", emulator, emulatorArgs)
 	args := append([]string{emulator}, emulatorArgs...)
 	if err := syscall.Exec(emulator, append(args, netArgs...), os.Environ()); err != nil {
-		glog.Errorf("can't exec emulator %q: %v", emulator, err)
+		glog.Errorf("Can't exec emulator %q: %v", emulator, err)
 		os.Exit(1)
 	}
 }

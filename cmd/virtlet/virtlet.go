@@ -49,7 +49,8 @@ var (
 		"Image download protocol. Can be https (default) or http.")
 	rawDevices = flag.String("raw-devices", "loop*",
 		"Comma separated list of raw device glob patterns to which VM can have an access (with skipped /dev/ prefix)")
-	fdServerSocketPath = flag.String("fd-server-socket-path", "/var/lib/virtlet/tapfdserver.sock", "path to fd server socket")
+	fdServerSocketPath = flag.String("fd-server-socket-path", "/var/lib/virtlet/tapfdserver.sock",
+		"Path to fd server socket")
 )
 
 const (

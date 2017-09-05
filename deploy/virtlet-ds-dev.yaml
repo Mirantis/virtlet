@@ -71,7 +71,8 @@ spec:
       containers:
       - name: libvirt
         image: mirantis/virtlet
-        # In case we inject local virtlet image we want to use it not officially available one
+        # In case we inject local virtlet image we want to use it instead of
+        # pulling the "real" one
         imagePullPolicy: IfNotPresent
         command:
         - /libvirt.sh

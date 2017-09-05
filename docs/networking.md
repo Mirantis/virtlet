@@ -50,14 +50,14 @@ pair with one end belonging to the pod network namespace.
    (see below for more details)
 3. When the VM is started, Virtlet wraps the emulator using `vmwrapper` program
    which it passes `VIRTLET_NET_KEY` environment variable containing the key
-   the was used for `tapmanager` network setup.
+   the was used by `tapmanager` to set up the network.
 4. `vmwrapper` uses the key to ask `tapmanager` to send it the file
    descriptor for the tap interface over `tapmanager`'s Unix domain
    socket. It then extends emulator command line arguments to make it
    use the tap device and then `exec`s the emulator.
 5. Upon `StopPodSandbox`, Virtlet requests `tapmanager` to tear down
    the VM network.
- 
+
 The rationale for having separate `tapmanager` process is
 [the well-known Go namespace problem](https://www.weave.works/blog/linux-namespaces-and-go-don-t-mix).
 It's expected that the problem will be fixed by Go 1.10 release, after
@@ -79,5 +79,5 @@ socket makes it possible to have all the network related code outside
 `vmwrapper` and have `vmwrapper` just `exec` the emulator instead of
 spawning it as a child process.
 
-**NOTE:** currently Virtlet doesn't support `hostNetwork` pod setting
-because it cannot be impelemnted for VM in a meaningful way.
+**NOTE:** Virtlet doesn't support `hostNetwork` pod setting because it
+cannot be impelemnted for VM in a meaningful way.
