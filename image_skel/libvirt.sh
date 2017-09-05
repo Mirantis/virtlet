@@ -56,4 +56,13 @@ if [[ ! ${VIRTLET_DISABLE_KVM:-} ]]; then
   chown root:kvm /dev/kvm
 fi
 
+# Set up sudoers file only in libvirt container so as to
+# avoid introducing a vulnerability
+
+mkdir -p /etc/sudoers.d/
+echo -e "Defaults closefrom_override\nlibvirt-qemu\tALL=(ALL)\tNOPASSWD: ALL" >/etc/sudoers.d/virtlet-qemu
+
+# export LIBVIRT_LOG_FILTERS="1:qemu.qemu_process 1:qemu.qemu_command 1:qemu.qemu_domain"
+# export LIBVIRT_DEBUG=1
+
 /usr/sbin/libvirtd --listen $daemon

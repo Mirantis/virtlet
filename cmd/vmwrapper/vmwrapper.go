@@ -21,11 +21,13 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"syscall"
 
 	"github.com/golang/glog"
 
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 const (
@@ -33,11 +35,20 @@ const (
 	defaultEmulator = "/usr/bin/qemu-system-x86_64" // FIXME
 	emulatorVar     = "VIRTLET_EMULATOR"
 	netKeyEnvVar    = "VIRTLET_NET_KEY"
+	vmsProcFile     = "/var/lib/virtlet/vms.procfile"
 )
 
 func main() {
 	// configure glog (apparently no better way to do it ...)
 	flag.CommandLine.Parse([]string{"-v=3", "-alsologtostderr=true"})
+
+	// XXX: make this optional so it can be switched off for integration tests
+	glog.V(0).Infof("Obtaining PID of the VM container process...")
+	pid, err := utils.WaitForProcess(vmsProcFile)
+	if err != nil {
+		glog.Errorf("Can't obtain PID of the VM container process")
+		os.Exit(1)
+	}
 
 	emulator := os.Getenv(emulatorVar)
 	emulatorArgs := os.Args[1:]
@@ -71,8 +82,11 @@ func main() {
 	}
 
 	glog.V(0).Infof("Executing emulator %q: args %#v", emulator, emulatorArgs)
-	args := append([]string{emulator}, emulatorArgs...)
-	if err := syscall.Exec(emulator, append(args, netArgs...), os.Environ()); err != nil {
+	args := append([]string{
+		"/qemu.sh", strconv.Itoa(pid),
+		emulator,
+	}, emulatorArgs...)
+	if err := syscall.Exec(args[0], append(args, netArgs...), os.Environ()); err != nil {
 		glog.Errorf("Can't exec emulator %q: %v", emulator, err)
 		os.Exit(1)
 	}
