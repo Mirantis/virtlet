@@ -152,9 +152,7 @@
       },
       "CurrentMemory": null,
       "MaximumMemory": null,
-      "MemoryBacking": {
-        "Locked": {}
-      },
+      "MemoryBacking": null,
       "VCPU": {
         "Placement": "",
         "CPUSet": "",
