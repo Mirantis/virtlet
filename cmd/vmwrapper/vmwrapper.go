@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/golang/glog"
@@ -38,16 +39,25 @@ const (
 	vmsProcFile     = "/var/lib/virtlet/vms.procfile"
 )
 
+func shouldUseWrapperScript() bool {
+	// emulator being run as root means we're running inside
+	// the build container
+	return os.Getuid() != 0
+}
+
 func main() {
 	// configure glog (apparently no better way to do it ...)
 	flag.CommandLine.Parse([]string{"-v=3", "-alsologtostderr=true"})
 
-	// XXX: make this optional so it can be switched off for integration tests
-	glog.V(0).Infof("Obtaining PID of the VM container process...")
-	pid, err := utils.WaitForProcess(vmsProcFile)
-	if err != nil {
-		glog.Errorf("Can't obtain PID of the VM container process")
-		os.Exit(1)
+	var pid int
+	var err error
+	if shouldUseWrapperScript() {
+		glog.V(0).Infof("Obtaining PID of the VM container process...")
+		pid, err = utils.WaitForProcess(vmsProcFile)
+		if err != nil {
+			glog.Errorf("Can't obtain PID of the VM container process")
+			os.Exit(1)
+		}
 	}
 
 	emulator := os.Getenv(emulatorVar)
@@ -81,13 +91,15 @@ func main() {
 		}
 	}
 
-	glog.V(0).Infof("Executing emulator %q: args %#v", emulator, emulatorArgs)
-	args := append([]string{
-		"/qemu.sh", strconv.Itoa(pid),
-		emulator,
-	}, emulatorArgs...)
+	args := append([]string{emulator}, emulatorArgs...)
+	if shouldUseWrapperScript() {
+		args = append([]string{
+			"/qemu.sh", strconv.Itoa(pid),
+		}, args...)
+	}
+	glog.V(0).Infof("Executing emulator: %s", strings.Join(args, " "))
 	if err := syscall.Exec(args[0], append(args, netArgs...), os.Environ()); err != nil {
-		glog.Errorf("Can't exec emulator %q: %v", emulator, err)
+		glog.Errorf("Can't exec emulator: %v", err)
 		os.Exit(1)
 	}
 }
