@@ -65,6 +65,9 @@ func (v *VirtletManager) Run() {
 	}
 
 	v.manager, err = manager.NewVirtletManager(localLibvirtUri, "default", "http", "dir", dbFilename, "loop*", &fakeFDManager{})
+	if err != nil {
+		v.t.Fatalf("Failed to create VirtletManager: %v", err)
+	}
 	v.doneCh = make(chan struct{})
 	go func() {
 		if err := v.manager.Serve(virtletSocket); err != nil {

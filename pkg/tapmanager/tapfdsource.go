@@ -31,11 +31,17 @@ import (
 	"github.com/Mirantis/virtlet/pkg/nettools"
 )
 
+// PodNetworkDesc contains the data that are required by TapFDSource
+// to set up a tap device for a VM
 type PodNetworkDesc struct {
-	PodId   string `json:"podId"`
-	PodNs   string `json:"podNs"`
+	// PodId specifies the id of the pod
+	PodId string `json:"podId"`
+	// PodNs specifies the namespace of the pod
+	PodNs string `json:"podNs"`
+	// PodName specifies the name of the pod
 	PodName string `json:"podName"`
-	DNS     *cnitypes.DNS
+	// DNS specifies DNS settings for the pod
+	DNS *cnitypes.DNS
 }
 
 type podNetwork struct {
@@ -179,7 +185,7 @@ func (s *TapFDSource) Release(key string) error {
 	}
 
 	if err := cni.DestroyNetNS(pn.pnd.PodId); err != nil {
-		return fmt.Errorf("Error when removing network namespace for pod sandbox %q: %v", pn.pnd.PodId, err)
+		return fmt.Errorf("error when removing network namespace for pod sandbox %q: %v", pn.pnd.PodId, err)
 	}
 
 	delete(s.fdMap, key)

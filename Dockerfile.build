@@ -60,3 +60,6 @@ RUN mkdir -p ~/.ssh && \
     ln -s /go/src/github.com/Mirantis/virtlet/_output/vmwrapper /vmwrapper
 
 COPY image_skel /.
+# this conf file runs the emulator as root which is ok for
+# testing purposes
+COPY qemu-build.conf /etc/libvirt/qemu.conf

@@ -549,10 +549,4 @@ func TestDomainResourceConstraints(t *testing.T) {
 	} else if domain.Memory.Value != uint(memoryLimit) || domain.Memory.Unit != "b" {
 		t.Errorf("unexpected memory limitvalue: expected %vb, got %v%s", memoryLimit, domain.Memory.Value, domain.Memory.Unit)
 	}
-
-	if domain.MemoryBacking == nil {
-		t.Error("Memory backing is not set")
-	} else if domain.MemoryBacking.Locked == nil {
-		t.Error("Domain memory is not locked")
-	}
 }
