@@ -88,6 +88,8 @@ spec:
           name: virtlet
         - mountPath: /var/lib/libvirt
           name: libvirt
+        - mountPath: /var/run/libvirt
+          name: libvirt-sockets
         # the log dir is needed here because otherwise libvirt will produce errors
         # like this:
         # Unable to pre-create chardev file '/var/log/vms/afd75bbb-8e97-11e7-9561-02420ac00002/cirros-vm_0.log': No such file or directory
@@ -126,6 +128,8 @@ spec:
           name: cniconf
         - mountPath: /opt/cni/bin
           name: cnibin
+        - mountPath: /var/run/libvirt
+          name: libvirt-sockets
         - mountPath: /var/lib/cni
           name: cnidata
         - mountPath: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
@@ -249,6 +253,9 @@ spec:
       - hostPath:
           path: /var/log/virtlet/vms
         name: vms-log
+      - hostPath:
+          path: /var/run/libvirt
+        name: libvirt-sockets
       - hostPath:
           path: /var/log/pods
         name: pods-log

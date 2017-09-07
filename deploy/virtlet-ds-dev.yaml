@@ -91,10 +91,12 @@ spec:
           name: virtlet
         - mountPath: /var/lib/libvirt
           name: libvirt
+        - mountPath: /var/run/libvirt
+          name: libvirt-sockets
         - mountPath: /dind
           name: dind
-        - name: dev
-          mountPath: /dev
+        - mountPath: /dev
+          name: dev
         securityContext:
           privileged: true
         env:
@@ -123,6 +125,8 @@ spec:
           name: virtlet
         - mountPath: /var/lib/libvirt
           name: libvirt
+        - mountPath: /var/run/libvirt
+          name: libvirt-sockets
         - mountPath: /etc/cni
           name: cniconf
         - mountPath: /opt/cni/bin
@@ -201,6 +205,9 @@ spec:
       - hostPath:
           path: /var/lib/libvirt
         name: libvirt
+      - hostPath:
+          path: /var/run/libvirt
+        name: libvirt-sockets
       - hostPath:
           path: /etc/cni
         name: cniconf
