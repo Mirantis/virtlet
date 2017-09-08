@@ -31,7 +31,7 @@ import (
 
 const (
 	maxTime    = 60
-	libvirtUri = "qemu+tcp://localhost/system"
+	libvirtUri = "qemu:///system"
 )
 
 func waitForSocket(filepath string) error {
