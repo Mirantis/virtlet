@@ -23,7 +23,7 @@ if [ ! -d ${FLEXVOLUME_DIR}/virtlet~flexvolume_driver ]; then
 fi
 
 
-while ! nc -z -v -w1 localhost 16509 >& /dev/null; do
+while [ ! -S /var/run/libvirt/libvirt-sock ] ; do
   echo >&1 "Waiting for libvirt..."
   sleep 0.3
 done
