@@ -67,6 +67,7 @@ func (c *Client) AddSandboxToNetwork(podId, podName, podNs string) (*cnicurrent.
 	} else {
 		glog.V(3).Infof("AddSandboxToNetwork: podId %q, podName %q, podNs %q: error: %v",
 			podId, podName, podNs, err)
+		return nil, err
 	}
 	r, err := cnicurrent.NewResultFromResult(result)
 	if err != nil {
