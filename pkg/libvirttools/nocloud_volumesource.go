@@ -45,7 +45,12 @@ func GetNocloudVolume(config *VMConfig, owner VolumeOwner) ([]VMVolume, error) {
 func (v *nocloudVolume) Uuid() string { return "" }
 
 func (v *nocloudVolume) Setup(volumeMap map[string]string) (*libvirtxml.DomainDisk, error) {
-	g := NewCloudInitGenerator(v.config, volumeMap, nocloudIsoDir)
+	podSandboxInfo, err := v.owner.MetadataStore().PodSandbox(v.config.PodSandboxId).Retrieve()
+	if err != nil {
+		return nil, err
+	}
+
+	g := NewCloudInitGenerator(v.config, volumeMap, nocloudIsoDir, podSandboxInfo)
 	nocloudDiskDef, err := g.GenerateDisk()
 	if err != nil {
 		return nil, err
@@ -54,7 +59,7 @@ func (v *nocloudVolume) Setup(volumeMap map[string]string) (*libvirtxml.DomainDi
 }
 
 func (v *nocloudVolume) Teardown() error {
-	isoPath := NewCloudInitGenerator(v.config, nil, nocloudIsoDir).IsoPath()
+	isoPath := NewCloudInitGenerator(v.config, nil, nocloudIsoDir, nil).IsoPath()
 	// don't fail to remove the pod if the file cannot be removed, just warn
 	if err := os.Remove(isoPath); err != nil {
 		glog.Warningf("Cannot remove temporary nocloud file %q: %v", isoPath, err)
