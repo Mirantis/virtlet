@@ -253,7 +253,7 @@ function demo::get-correct-virtlet-release {
 }
 
 function demo::start-virtlet {
-  local -a virtlet_config=(--from-literal=download_protocol=http)
+  local -a virtlet_config=(--from-literal=download_protocol=http --from-literal=image_regexp_translation="$IMAGE_REGEXP_TRANSLATION")
   local ds_location
   if [[ ${VIRTLET_DEMO_RELEASE} = "master" ]]; then
       virtlet_release="master"
@@ -278,6 +278,7 @@ function demo::start-virtlet {
     virtlet_config+=(--from-literal=disable_kvm=y)
   fi
   "${kubectl}" create configmap -n kube-system virtlet-config "${virtlet_config[@]}"
+  "${kubectl}" create configmap -n kube-system virtlet-image-translations --from-file "${BASE_LOCATION}/deploy/images.yaml"
   demo::step "Deploying Virtlet DaemonSet from ${ds_location}"
   "${kubectl}" create -f "${ds_location}"
   demo::wait-for "Virtlet DaemonSet" demo::pods-ready runtime=virtlet

@@ -141,6 +141,8 @@ spec:
           # so as to make virtlet to see what kubelet mounts in the underlying directories
         - mountPath: /var/lib/kubelet/pods:shared
           name: k8s-pods-dir
+        - mountPath: /etc/virtlet/images
+          name: image-name-translations
         securityContext:
           privileged: true
         env:
@@ -161,6 +163,12 @@ spec:
             configMapKeyRef:
               name: virtlet-config
               key: loglevel
+              optional: true
+        - name: IMAGE_REGEXP_TRANSLATION
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: image_regexp_translation
               optional: true
       - name: vms
         image: mirantis/virtlet
@@ -238,6 +246,9 @@ spec:
       - hostPath:
           path: /var/lib
         name: var-lib
+      - configMap:
+          name: virtlet-image-translations
+        name: image-name-translations
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding

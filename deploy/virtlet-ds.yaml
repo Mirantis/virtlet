@@ -141,6 +141,8 @@ spec:
           name: k8s-pods-dir
         - name: vms-log
           mountPath: /var/log/vms
+        - mountPath: /etc/virtlet/images
+          name: image-name-translations
         securityContext:
           privileged: true
         env:
@@ -161,6 +163,12 @@ spec:
             configMapKeyRef:
               name: virtlet-config
               key: loglevel
+              optional: true
+        - name: IMAGE_REGEXP_TRANSLATION
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: image_regexp_translation
               optional: true
         # Uncomment the following to redirect VM logs to file /var/log/vms/<sandboxId>/<containerId>_<attemptIdx>.log:
         - name: VIRTLET_VM_LOG_LOCATION
@@ -259,6 +267,9 @@ spec:
       - hostPath:
           path: /var/log/pods
         name: pods-log
+      - configMap:
+          name: virtlet-image-translations
+        name: image-name-translations
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding
