@@ -199,9 +199,12 @@ function start_dind {
         fi
     fi
     kubectl label node --overwrite "${virtlet_node}" extraRuntime=virtlet
+    local -a virtlet_config=(--from-literal=image_regexp_translation="$IMAGE_REGEXP_TRANSLATION")
     if ! kvm_ok; then
-        kubectl create configmap -n kube-system virtlet-config --from-literal=disable_kvm=y
+        virtlet_config+=(--from-literal=disable_kvm=y)
     fi
+    kubectl create configmap -n kube-system virtlet-config "${virtlet_config[@]}"
+    kubectl create configmap -n kube-system virtlet-image-translations --from-file "${project_dir}/deploy/images.yaml"
     kubectl create -f "${project_dir}/deploy/virtlet-ds-dev.yaml"
 }
 
