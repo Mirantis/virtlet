@@ -18,7 +18,11 @@ package tapmanager
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/ioutil"
+	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -31,6 +35,10 @@ import (
 	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/dhcp"
 	"github.com/Mirantis/virtlet/pkg/nettools"
+)
+
+const (
+	podIpFile = "/pod-ip"
 )
 
 // PodNetworkDesc contains the data that are required by TapFDSource
@@ -121,6 +129,50 @@ func (s *TapFDSource) GetFD(key string, data []byte) (int, []byte, error) {
 
 	netConfig := payload.CNIConfig
 
+	// serialize the original config before modifying it
+	// (in case if dummyGateway is set)
+	respData, err := json.Marshal(netConfig)
+	if err != nil {
+		return 0, nil, fmt.Errorf("error marshalling net config: %v", err)
+	}
+
+	// TODO: do this upon startup
+	var dummyGateway net.IP
+	// TODO: detect Calico here
+	// TODO: get pod IP address from an env var set by cmd/virtlet/virtlet.go
+	// TODO: add descriptive comments why that's needed
+	// (incl. the fact that Virtlet runs in host network ns so it can't just grab
+	ipBytes, err := ioutil.ReadFile(podIpFile)
+	if err == nil {
+		ipStr := strings.TrimSpace(string(ipBytes))
+		dummyGateway = net.ParseIP(ipStr)
+		if dummyGateway == nil {
+			return 0, nil, fmt.Errorf("error parsing pod IP: %q", ipStr)
+		}
+	}
+
+	if dummyGateway != nil {
+		// TODO: better diagnostics
+		if len(netConfig.IPs) != 1 {
+			return 0, nil, errors.New("didn't expect more than one IP config")
+		}
+		if netConfig.IPs[0].Version != "4" {
+			return 0, nil, errors.New("IPv4 config was expected")
+		}
+		// TODO: calculate network mask based on the pod IP and the gateway IP
+		netConfig.IPs[0].Address.Mask = net.IPv4Mask(255, 255, 255, 0)
+		netConfig.IPs[0].Gateway = dummyGateway
+		netConfig.Routes = []*cnitypes.Route{
+			{
+				Dst: net.IPNet{
+					IP:   net.IP{0, 0, 0, 0},
+					Mask: net.IPMask{0, 0, 0, 0},
+				},
+				GW: dummyGateway,
+			},
+		}
+	}
+
 	netNSPath := cni.PodNetNSPath(pnd.PodId)
 	vmNS, err := ns.GetNS(netNSPath)
 	if err != nil {
@@ -174,11 +226,6 @@ func (s *TapFDSource) GetFD(key string, data []byte) (int, []byte, error) {
 		return nil
 	}); err != nil {
 		return 0, nil, err
-	}
-
-	respData, err := json.Marshal(netConfig)
-	if err != nil {
-		return 0, nil, fmt.Errorf("error marshalling net config: %v", err)
 	}
 
 	s.Lock()
