@@ -29,10 +29,37 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ghodss/yaml"
 
+	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 )
+
+var dummyPodSandboxInfoWithFakeNetConf metadata.PodSandboxInfo
+
+func init() {
+	dummyPodSandboxInfoWithFakeNetConf.CNIConfig = `{
+  "cniVersion": "0.3.1",
+  "interfaces": [
+      {
+          "name": "cni0",
+	  "mac": "00:11:22:33:44:55",
+      }
+  ],
+  "ips": [
+      {
+          "version": "4",
+          "address": "<ip-and-prefix-in-CIDR>",
+          "gateway": "<ip-address-of-the-gateway>",
+          "interface": 0
+      },
+  ],
+  "dns": {
+    "nameservers": ["1.2.3.4"]
+    "search": ["some", "search"]
+  }
+}`
+}
 
 type fakeFlexvolume struct {
 	uuid string
@@ -287,7 +314,7 @@ func TestCloudInitGenerator(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// we're not invoking actual iso generation here so "/foobar"
 			// as isoDir will do
-			g := NewCloudInitGenerator(tc.config, tc.volumeMap, "/foobar")
+			g := NewCloudInitGenerator(tc.config, tc.volumeMap, "/foobar", nil)
 
 			metaDataBytes, err := g.generateMetaData()
 			if err != nil {
@@ -337,7 +364,7 @@ func TestGenerateDisk(t *testing.T) {
 		PodName:           "foo",
 		PodNamespace:      "default",
 		ParsedAnnotations: &VirtletAnnotations{},
-	}, nil, tmpDir)
+	}, nil, tmpDir, &dummyPodSandboxInfoWithFakeNetConf)
 	diskDef, err := g.GenerateDisk()
 	if err != nil {
 		t.Fatalf("GenerateDisk(): %v", err)
@@ -369,7 +396,7 @@ func TestEnvDataGeneration(t *testing.T) {
 		Environment: []*VMKeyValue{
 			{Key: "key", Value: "value"},
 		},
-	}, nil, "")
+	}, nil, "", nil)
 
 	output := g.generateEnvVarsContent()
 	if output != expected {
