@@ -113,6 +113,12 @@ func (s *TapFDSource) GetFD(key string, data []byte) (int, []byte, error) {
 		if err != nil {
 			return err
 		}
+		// NOTE: we have info about interface hardware address, which
+		// is needed by Cloud Init support, but old cni plugins do not
+		// return it in `Result` - so we can fix it.
+		if len(netConfig.Interfaces) == 0 {
+			fixNetConfigForOldCNIPlugins(netConfig, csn)
+		}
 		dhcpConfg := &dhcp.Config{
 			CNIResult:           *csn.Result,
 			PeerHardwareAddress: csn.HardwareAddr,
@@ -199,4 +205,18 @@ func (s *TapFDSource) GetInfo(key string) ([]byte, error) {
 		return nil, fmt.Errorf("bad fd key: %q", key)
 	}
 	return pn.csn.HardwareAddr, nil
+}
+
+func fixNetConfigForOldCNIPlugins(netConfig *cnicurrent.Result, csn *nettools.ContainerSideNetwork) {
+	// If there is no info about interfaces, we can assume that this is
+	// old style cni plugin, which support just one interface
+	iface := &cnicurrent.Interface{
+		Name: "cni0",
+		Mac:  csn.HardwareAddr.String(),
+	}
+	netConfig.Interfaces = []*cnicurrent.Interface{iface}
+
+	for _, IP := range netConfig.IPs {
+		IP.Interface = 0
+	}
 }
