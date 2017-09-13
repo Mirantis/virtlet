@@ -119,18 +119,22 @@ func (g *CloudInitGenerator) generateNetworkConfiguration() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	if cniResult == nil {
+		// This can only happen during integration tests
+		// where a dummy sandbox is used
+		return []byte("version: 1\n"), nil
+	}
+
 	var config []map[string]interface{}
 
-	if len(cniResult.Interfaces) > 0 {
-		for i, iface := range cniResult.Interfaces {
-			interfaceConf := map[string]interface{}{
-				"type":        "physical",
-				"name":        iface.Name,
-				"mac_address": iface.Mac,
-				"subnets":     g.getSubnetsForNthInterface(i, cniResult),
-			}
-			config = append(config, interfaceConf)
+	for i, iface := range cniResult.Interfaces {
+		interfaceConf := map[string]interface{}{
+			"type":        "physical",
+			"name":        iface.Name,
+			"mac_address": iface.Mac,
+			"subnets":     g.getSubnetsForNthInterface(i, cniResult),
 		}
+		config = append(config, interfaceConf)
 	}
 
 	r, err := yaml.Marshal(map[string]interface{}{
