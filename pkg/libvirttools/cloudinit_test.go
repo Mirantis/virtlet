@@ -43,19 +43,19 @@ func init() {
   "interfaces": [
       {
           "name": "cni0",
-	  "mac": "00:11:22:33:44:55",
+	  "mac": "00:11:22:33:44:55"
       }
   ],
   "ips": [
       {
           "version": "4",
-          "address": "<ip-and-prefix-in-CIDR>",
-          "gateway": "<ip-address-of-the-gateway>",
+          "address": "1.1.1.1/8",
+          "gateway": "1.2.3.4",
           "interface": 0
-      },
+      }
   ],
   "dns": {
-    "nameservers": ["1.2.3.4"]
+    "nameservers": ["1.2.3.4"],
     "search": ["some", "search"]
   }
 }`
@@ -383,8 +383,9 @@ func TestGenerateDisk(t *testing.T) {
 		t.Fatalf("IsoToMap(): %v", err)
 	}
 	if !reflect.DeepEqual(m, map[string]interface{}{
-		"meta-data": "{\"instance-id\":\"foo.default\",\"local-hostname\":\"foo\"}",
-		"user-data": "#cloud-config\n",
+		"meta-data":      "{\"instance-id\":\"foo.default\",\"local-hostname\":\"foo\"}",
+		"network-config": "version: 1\nconfig:\n- mac_address: \"00:11:22:33:44:55\"\n  name: cni0\n  subnets:\n  - address: 1.1.1.1/8\n    dns_nameservers:\n    - 1.2.3.4\n    dns_search:\n    - some\n    - search\n    gateway: 1.2.3.4\n    type: static\n  type: physical\n",
+		"user-data":      "#cloud-config\n",
 	}) {
 		t.Errorf("Bad iso content:\n%s", spew.Sdump(m))
 	}
