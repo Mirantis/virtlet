@@ -128,10 +128,10 @@ jobs:
     - persist_to_workspace:
         root: _output
         paths:
-        - _output/virtlet.tar
-        - _output/virtlet-e2e-tests
+        - virtlet.tar
+        - virtlet-e2e-tests
         # needed by integration tests
-        - _output/vmwrapper
+        - vmwrapper
 
   test:
     <<: *defaults
