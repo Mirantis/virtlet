@@ -180,7 +180,6 @@ jobs:
         name: Run e2e tests
         command: |
           build/portforward.sh 8080&
-          build/cmd.sh copy
           _output/virtlet-e2e-tests -test.v
 
 workflows:
