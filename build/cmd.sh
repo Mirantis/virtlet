@@ -15,6 +15,7 @@ DOCKER_SOCKET_PATH="${DOCKER_SOCKET_PATH:-/var/run/docker.sock}"
 project_dir="$(cd "$(dirname "${BASH_SOURCE}")/.." && pwd)"
 build_base_image="$(awk '/^FROM /{print $2}' "${project_dir}/images/Dockerfile.build")"
 virtlet_base_image="$(awk '/^FROM /{print $2}' "${project_dir}/images/Dockerfile.virtlet")"
+virtlet_image="mirantis/virtlet"
 remote_project_dir="/go/src/github.com/Mirantis/virtlet"
 build_name="virtlet_build"
 tmp_container_name="${build_name}-$(openssl rand -hex 16)"
@@ -276,7 +277,7 @@ function gobuild {
 
 function build_image_internal {
     tar -c _output -C "${project_dir}/images" image_skel/ Dockerfile.virtlet |
-        docker build -t "${build_image}" -f Dockerfile.virtlet -
+        docker build -t "${virtlet_image}" -f Dockerfile.virtlet -
 }
 
 # curl "https://get.docker.com/builds/`uname -s`/`uname -m`/docker-latest.tgz" | tar -xvz
