@@ -182,7 +182,7 @@ function vcmd {
 
 function vcmd_simple {
     local cmd="${1}"
-    docker exec virtlet-build bash -c "${cmd}"
+    docker exec -i virtlet-build bash -c "${cmd}"
 }
 
 function stop {
@@ -196,6 +196,12 @@ function copy_output {
     ensure_build_container
     cd "${project_dir}"
     vcmd_simple "tar -C '${remote_project_dir}' -cz \$(find . -path '*/_output/*' -type f)" | tar -xvz
+}
+
+function copy_back {
+    ensure_build_container
+    cd "${project_dir}"
+    tar -cz $(find . -path '*/_output/*' -type f | grep -v rsync) | vcmd_simple "tar -C '${remote_project_dir}' -xvz"
 }
 
 function copy_dind_internal {
@@ -280,8 +286,26 @@ function build_image_internal {
         docker build -t "${virtlet_image}" -f Dockerfile.virtlet -
 }
 
-# curl "https://get.docker.com/builds/`uname -s`/`uname -m`/docker-latest.tgz" | tar -xvz
-# TODO: invoke image build from 'build'
+function run_tests_internal {
+    local -a failed=()
+    find . -name 'go.test' \( -path ./tests/integration/go.test -o -print \) |
+        sort |
+        while read test_path; do
+            test_dir="$(dirname "${test_path}")"
+            echo >&2 "*** Running tests: ${test_dir}"
+            if ! ( cd "${test_dir}" && ./go.test ); then
+                failed+=("${test_dir}")
+            fi
+        done
+    if [[ ${#failed[@]} > 0 ]]; then
+        echo >&2 "*** Tests failed for ${failed[@]}"
+        exit 1
+    fi
+}
+
+function run_integration_internal {
+    ( cd tests/integration && ./go.test )
+}
 
 function usage {
     echo >&2 "Usage:"
@@ -324,7 +348,16 @@ case "${cmd}" in
         build_image_internal "$@"
         ;;
     test)
-        ( vcmd 'VIRTLET_DISABLE_KVM=y build/do-test.sh' )
+        ( vcmd './autogen.sh && ./configure && make install-vendor && build/cmd.sh run-tests-internal' )
+        ;;
+    integration)
+        ( vcmd './autogen.sh && ./configure && make install-vendor && build/cmd.sh run-integration-internal' )
+        ;;
+    run-tests-internal)
+        run_tests_internal
+        ;;
+    run-integration-internal)
+        run_integration_internal
         ;;
     run)
         vcmd "$*"
@@ -340,6 +373,9 @@ case "${cmd}" in
         ;;
     copy)
         copy_output
+        ;;
+    copy-back)
+        copy_back
         ;;
     copy-dind)
         VIRTLET_SKIP_RSYNC=y vcmd "build/cmd.sh copy-dind-internal"
@@ -357,3 +393,7 @@ case "${cmd}" in
         usage
         ;;
 esac
+
+# TODO: make it possible to run e2e from within the build container, too
+# (although we don't need to use that for CircleCI)
+# TODO: fix indentation in this file (use 2 spaces)

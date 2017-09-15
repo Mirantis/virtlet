@@ -12,6 +12,12 @@ cleanup() {
 
 trap cleanup EXIT
 
+export VIRTLET_DISABLE_KVM=1
+
+if [[ ! -f /var/run/libvirtd.pid ]]; then
+    /libvirt.sh -novirtlet
+fi
+
 mkdir -p /tmp/image_store
 pushd /tmp/image_store
 curl -L https://github.com/Mirantis/virtlet/releases/download/v0.8.2/cirros.img -o cirros.img
@@ -21,8 +27,18 @@ python -m SimpleHTTPServer 80 >/tmp/http_server.log &
 HTTP_SERVER_PID=$!
 popd
 
+success=1
 if [ $# -ne 0 ] ; then
-  go test -test.v -run $*
+  go test -test.v -run $* || success=
 else
-  go test -v .
+  go test -test.v . -args -v 3 -logtostderr true || success=
+fi
+
+if [[ ! ${success} ]]; then
+    find . -name test-suite.log | xargs cat >&2
+
+    echo >&2 "***** libvirtd.log *****"
+    cat /var/log/libvirt/libvirtd.log >&2
+
+    exit 1
 fi

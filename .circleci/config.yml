@@ -152,6 +152,29 @@ jobs:
           build/portforward.sh 18730&
           build/cmd.sh test
 
+  integration:
+    <<: *defaults
+    steps:
+    - checkout
+    - setup_remote_docker
+    - run:
+        <<: *setup_env
+    - restore_cache:
+        <<: *restore_image_cache
+    - restore_cache:
+        <<: *restore_vendor_cache
+    - run:
+        <<: *restore_images_and_vendor
+    - attach_workspace:
+        at: _output
+    - run:
+        name: Run tests
+        command: |
+          build/portforward.sh 18730&
+          rm -f _output/*.tar
+          build/cmd.sh copy-back
+          build/cmd.sh integration
+
   e2e:
     <<: *defaults
     steps:
@@ -194,13 +217,9 @@ workflows:
     - test:
         requires:
         - prepare_build
+    - integration:
+        requires:
+        - build
     - e2e:
         requires:
         - build
-
-# TODO: add a job that just ensures the cache for the base images
-# (does just build/cmd.sh ensure-build-image)
-# TODO: make it possible to run e2e from within the build container, too
-# (although we don't need to use that for CircleCI)
-# TODO: separate job for integration/unit tests
-# TODO: reindent cmd.sh

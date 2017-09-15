@@ -25,10 +25,7 @@ TESTS = $(check_SCRIPTS)
 
 .PHONY: all vendor
 
-all:
-	if [ ! -d vendor ]; then \
-		$(MAKE) install-vendor; \
-	fi
+all: install-vendor
 	mkdir -p $(builddir)/_output $(builddir)/contrib/images/libvirt/_output
 	go build -i -o $(builddir)/_output/virtlet ./cmd/virtlet
 	go build -i -o $(builddir)/_output/vmwrapper ./cmd/vmwrapper
@@ -41,7 +38,9 @@ verify-glide-installation:
 	@which glide || go get github.com/Masterminds/glide
 
 install-vendor: verify-glide-installation
-	glide install --strip-vendor
+	if [ ! -d vendor ]; then \
+		glide install --strip-vendor; \
+	fi
 	if [ ! -f ./vendor/github.com/libvirt/libvirt-go-xml/domain.go.orig ]; then \
 		patch -d vendor/github.com/libvirt/libvirt-go-xml -p1 -b -i $(CURDIR)/libvirt-xml-go.patch; \
 	fi
