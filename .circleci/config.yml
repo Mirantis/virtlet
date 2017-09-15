@@ -49,7 +49,7 @@ restore_images_and_vendor: &restore_images_and_vendor
       docker exec -i virtlet-build tar -C /go/src/github.com/Mirantis/virtlet -xv <_output/vendor.tar
     fi
 
-    
+
 # - run:
 #     name: Generate cache key file
 #     command: |
@@ -74,7 +74,6 @@ jobs:
           if [[ ! -f _output/images.tar || ! -f _output/vendor.tar ]]; then
             build/cmd.sh prepare-vendor
           fi
-
     - run:
         name: Store base images
         command: |
@@ -84,13 +83,11 @@ jobs:
             virtlet_base_image="$(docker images -q -f label=virtlet.image=virtlet-base --format '{{.Repository}}:{{.Tag}}')"
             docker save "${build_base_image}" "${virtlet_base_image}" >_output/images.tar
           fi
-
     - save_cache:
         name: Save image cache
         key: tst-images-v2-{{ checksum "images/Dockerfile.build-base" }}-{{ checksum "images/Dockerfile.virtlet-base" }}
         paths:
         - _output/images.tar
-
     - run:
         name: Store vendor archive
         command: |
@@ -98,7 +95,6 @@ jobs:
             mkdir -p _output
             docker exec virtlet-build tar -C /go/src/github.com/Mirantis/virtlet -c vendor >_output/vendor.tar
           fi
-
     - save_cache:
         name: Save vendor cache
         key: tst-vendor-v2-{{ checksum "glide.yaml" }}-{{ checksum "glide.lock" }}
@@ -125,6 +121,17 @@ jobs:
           build/portforward.sh 18730&
           build/cmd.sh build
           build/cmd.sh copy
+    - run:
+        name: Save image
+        command: |
+          docker save mirantis/virtlet >_output/virtlet.tar
+    - persist_to_workspace:
+        root: _output
+        paths:
+        - _output/virtlet.tar
+        - _output/virtlet-e2e-tests
+        # needed by integration tests
+        - _output/vmwrapper
 
   test:
     <<: *defaults
@@ -145,38 +152,36 @@ jobs:
           build/portforward.sh 18730&
           build/cmd.sh test
 
-  # e2e:
-  #   <<: *defaults
-  #   steps:
-  #   - checkout
-  #   - setup_remote_docker
-  #   - run:
-  #       <<: *setup_env
-  #   - restore_cache:
-  #       <<: *restore_image_cache
-  #   - restore_cache:
-  #       <<: *restore_vendor_cache
-  #   - run:
-  #       <<: *restore_images_and_vendor
-
-  #   - run:
-  #       name: Start the demo
-  #       command: |
-  #         build/portforward.sh 8080&
-  #         VIRTLET_DEMO_RELEASE=master \
-  #           NONINTERACTIVE=1 \
-  #           NO_VM_CONSOLE=1 \
-  #           INJECT_LOCAL_IMAGE=1 \
-  #           VIRTLET_DEMO_RELEASE=master \
-  #           BASE_LOCATION="$PWD" \
-  #           deploy/demo.sh
-
-  #   - run:
-  #       name: Run e2e tests
-  #       command: |
-  #         build/portforward.sh 8080&
-  #         build/cmd.sh copy
-  #         _output/virtlet-e2e-tests -test.v
+  e2e:
+    <<: *defaults
+    steps:
+    - checkout
+    - setup_remote_docker
+    - run:
+        <<: *setup_env
+    - attach_workspace:
+        at: _output
+    - run:
+        name: Restore virtlet image
+        command: |
+          docker load -i _output/virtlet.tar
+    - run:
+        name: Start the demo
+        command: |
+          build/portforward.sh 8080&
+          VIRTLET_DEMO_RELEASE=master \
+            NONINTERACTIVE=1 \
+            NO_VM_CONSOLE=1 \
+            INJECT_LOCAL_IMAGE=1 \
+            VIRTLET_DEMO_RELEASE=master \
+            BASE_LOCATION="$PWD" \
+            deploy/demo.sh
+    - run:
+        name: Run e2e tests
+        command: |
+          build/portforward.sh 8080&
+          build/cmd.sh copy
+          _output/virtlet-e2e-tests -test.v
 
 workflows:
   version: 2
@@ -189,9 +194,13 @@ workflows:
     - test:
         requires:
         - prepare_build
+    - e2e:
+        requires:
+        - build
 
 # TODO: add a job that just ensures the cache for the base images
 # (does just build/cmd.sh ensure-build-image)
-# TODO: run e2e from within the build container, too
+# TODO: make it possible to run e2e from within the build container, too
+# (although we don't need to use that for CircleCI)
 # TODO: separate job for integration/unit tests
 # TODO: reindent cmd.sh
