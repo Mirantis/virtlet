@@ -170,6 +170,7 @@ jobs:
         command: |
           build/portforward.sh 8080&
           VIRTLET_DEMO_RELEASE=master \
+            SKIP_SNAPSHOT=1 \
             NONINTERACTIVE=1 \
             NO_VM_CONSOLE=1 \
             INJECT_LOCAL_IMAGE=1 \
