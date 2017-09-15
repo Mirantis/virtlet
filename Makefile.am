@@ -29,9 +29,6 @@ all:
 	if [ ! -d vendor ]; then \
 		$(MAKE) install-vendor; \
 	fi
-	if [ ! -f ./vendor/github.com/libvirt/libvirt-go-xml/domain.go.orig ]; then \
-		patch -d vendor/github.com/libvirt/libvirt-go-xml -p1 -b -i $(CURDIR)/libvirt-xml-go.patch; \
-	fi
 	mkdir -p $(builddir)/_output $(builddir)/contrib/images/libvirt/_output
 	go build -i -o $(builddir)/_output/virtlet ./cmd/virtlet
 	go build -i -o $(builddir)/_output/vmwrapper ./cmd/vmwrapper
@@ -45,6 +42,9 @@ verify-glide-installation:
 
 install-vendor: verify-glide-installation
 	glide install --strip-vendor
+	if [ ! -f ./vendor/github.com/libvirt/libvirt-go-xml/domain.go.orig ]; then \
+		patch -d vendor/github.com/libvirt/libvirt-go-xml -p1 -b -i $(CURDIR)/libvirt-xml-go.patch; \
+	fi
 
 update-vendor: verify-glide-installation
 	glide update --strip-vendor

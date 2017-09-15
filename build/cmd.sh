@@ -312,6 +312,9 @@ case "${cmd}" in
         rsync_git=
         gobuild "$@"
         ;;
+    prepare-vendor)
+        ( vcmd "./autogen.sh && ./configure && make install-vendor" )
+        ;;
     build)
         ( vcmd "./autogen.sh && ./configure && make && build/cmd.sh build-image-internal" )
         ;;
@@ -348,9 +351,6 @@ case "${cmd}" in
         ;;
     start-build-container)
         ensure_build_container
-        ;;
-    ensure-build-image)
-        ensure_build_image
         ;;
     *)
         usage

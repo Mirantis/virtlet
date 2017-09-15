@@ -38,7 +38,7 @@ restore_vendor_cache: &restore_vendor_cache
   - tst-vendor-v2-{{ checksum "glide.yaml" }}-{{ checksum "glide.lock" }}
 
 restore_images_and_vendor: &restore_images_and_vendor
-  name: Restore build image & vendor dir
+  name: Prepare build image & vendor dir
   command: |
     if [[ -f _output/images.tar ]]; then
       docker load -i _output/images.tar
@@ -57,6 +57,54 @@ restore_images_and_vendor: &restore_images_and_vendor
 
 version: 2
 jobs:
+  prepare_build:
+    <<: *defaults
+    steps:
+    - checkout
+    - setup_remote_docker
+    - run:
+        <<: *setup_env
+    - restore_cache:
+        <<: *restore_image_cache
+    - restore_cache:
+        <<: *restore_vendor_cache
+    - run:
+        name: Prepare images and the vendor dir
+        command: |
+          if [[ ! -f _output/images.tar || ! -f _output/vendor.tar ]]; then
+            build/cmd.sh prepare-vendor
+          fi
+
+    - run:
+        name: Store base images
+        command: |
+          if [[ ! -f _output/images.tar ]]; then
+            mkdir -p _output
+            build_base_image="$(docker images -q -f label=virtlet.image=build-base --format '{{.Repository}}:{{.Tag}}')"
+            virtlet_base_image="$(docker images -q -f label=virtlet.image=virtlet-base --format '{{.Repository}}:{{.Tag}}')"
+            docker save "${build_base_image}" "${virtlet_base_image}" >_output/images.tar
+          fi
+
+    - save_cache:
+        name: Save image cache
+        key: tst-images-v2-{{ checksum "images/Dockerfile.build-base" }}-{{ checksum "images/Dockerfile.virtlet-base" }}
+        paths:
+        - _output/images.tar
+
+    - run:
+        name: Store vendor archive
+        command: |
+          if [[ ! -f _output/vendor.tar ]]; then
+            mkdir -p _output
+            docker exec virtlet-build tar -C /go/src/github.com/Mirantis/virtlet -c vendor >_output/vendor.tar
+          fi
+
+    - save_cache:
+        name: Save vendor cache
+        key: tst-vendor-v2-{{ checksum "glide.yaml" }}-{{ checksum "glide.lock" }}
+        paths:
+        - _output/vendor.tar
+
   build:
     <<: *defaults
     steps:
@@ -77,36 +125,6 @@ jobs:
           build/portforward.sh 18730&
           build/cmd.sh build
           build/cmd.sh copy
-
-    - run:
-        name: Store vendor archive
-        command: |
-          if [[ ! -f _output/vendor.tar ]]; then
-            mkdir -p _output
-            docker exec virtlet-build tar -C /go/src/github.com/Mirantis/virtlet -c vendor >_output/vendor.tar
-          fi
-
-    - save_cache:
-        name: Save vendor cache
-        key: tst-vendor-v2-{{ checksum "glide.yaml" }}-{{ checksum "glide.lock" }}
-        paths:
-        - _output/vendor.tar
-
-    - run:
-        name: Store base images
-        command: |
-          if [[ ! -f _output/images.tar ]]; then
-            mkdir -p _output
-            build_base_image="$(docker images -q -f label=virtlet.image=build-base --format '{{.Repository}}:{{.Tag}}')"
-            virtlet_base_image="$(docker images -q -f label=virtlet.image=virtlet-base --format '{{.Repository}}:{{.Tag}}')"
-            docker save "${build_base_image}" "${virtlet_base_image}" >_output/images.tar
-          fi
-
-    - save_cache:
-        name: Save image cache
-        key: tst-images-v2-{{ checksum "images/Dockerfile.build-base" }}-{{ checksum "images/Dockerfile.virtlet-base" }}
-        paths:
-        - _output/images.tar
 
   test:
     <<: *defaults
@@ -164,13 +182,16 @@ workflows:
   version: 2
   build-and-test:
     jobs:
-    - build
+    - prepare_build
+    - build:
+        requires:
+        - prepare_build
     - test:
         requires:
-        - build
+        - prepare_build
 
-# TODO: derive virtlet-build from virtlet-base
-#       (make sure that 'docker save' works for this as expected)
 # TODO: add a job that just ensures the cache for the base images
+# (does just build/cmd.sh ensure-build-image)
 # TODO: run e2e from within the build container, too
 # TODO: separate job for integration/unit tests
+# TODO: reindent cmd.sh
