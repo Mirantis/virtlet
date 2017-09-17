@@ -1,0 +1,20 @@
+# TODO: generate this tag. unfortunately can't use ARG:
+# https://docs.docker.com/engine/reference/builder/#understand-how-arg-and-from-interact
+# (but add a note about it here for the future)
+FROM mirantis/virtlet-base:v1-0e9910bc
+MAINTAINER Ivan Shvedunov <ishvedunov@mirantis.com>
+
+LABEL virtlet.image="virtlet"
+
+COPY image_skel /.
+COPY _output/flexvolume_driver /
+# Integration tests look for virtlet in $PATH
+# and we want it to be located in the same place both
+# in build/test image and production one
+COPY _output/virtlet /usr/local/bin
+COPY _output/vmwrapper /
+COPY _output/criproxy /
+COPY _output/virtlet_log /
+COPY _output/virtlet-e2e-tests /
+
+CMD ["/start.sh"]

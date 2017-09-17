@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# TODO: only include this script in the build image
+
 # based on build/rsync.sh from Kubernetes. Original copyright follows:
 
 # Copyright 2016 The Kubernetes Authors.
@@ -30,12 +32,13 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+port="${1:-8730}"
+if [[ $# > 0 ]]; then
+  shift
+fi
+
 # The directory that gets sync'd
 VOLUME=/go/src/github.com/Mirantis/virtlet
-
-# Assume that this is running in Docker on a bridge.  Allow connections from
-# anything on the local subnet.
-ALLOW=$(ip route | awk  '/^default via/ { reg = "^[0-9./]+ dev "$5 } ; $0 ~ reg { print $1 }')
 
 CONFDIR="/tmp/rsync.virtlet"
 PIDFILE="${CONFDIR}/rsyncd.pid"
@@ -69,12 +72,11 @@ use chroot = no
 log file = /dev/stdout
 reverse lookup = no
 munge symlinks = no
-port = 8730
+port = ${port}
+address = 127.0.0.1
 [virtlet]
   numeric ids = true
   $USER_CONFIG
-  hosts deny = *
-  hosts allow = ${ALLOW}
   auth users = virtlet
   secrets file = ${SECRETS}
   read only = false

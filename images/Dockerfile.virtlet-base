@@ -1,0 +1,13 @@
+FROM ubuntu:16.04
+# TODO: try to go back to alpine
+MAINTAINER Ivan Shvedunov <ishvedunov@mirantis.com>
+
+LABEL virtlet.image="virtlet-base"
+
+ENV DEBIAN_FRONTEND noninteractive
+
+RUN apt-get update && \
+    apt-get install -y libvirt-bin libguestfs0 libguestfs-tools genisoimage \
+                       openssl qemu-kvm qemu-system-x86 \
+                       netbase iproute2 iptables ebtables vncsnapshot sudo && \
+    apt-get clean
