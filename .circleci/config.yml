@@ -5,12 +5,15 @@ defaults: &defaults
   environment:
     DOCKER_VERSION: "17.03.0-ce"
 
+prereqs: &prereqs
+  name: Install prerequisites
+  command: |
+    apt-get -qq update
+    apt-get install -y curl ca-certificates openssh-client rsync socat wget git
+
 setup_env: &setup_env
   name: Set up the environment
   command: |
-    apt-get -qq update
-    apt-get install -y curl ca-certificates openssh-client rsync socat wget
-
     # Install Docker client
     curl -sSL -o "/tmp/docker-${DOCKER_VERSION}.tgz" "https://get.docker.com/builds/Linux/x86_64/docker-${DOCKER_VERSION}.tgz"
     tar -xz -C /tmp -f "/tmp/docker-${DOCKER_VERSION}.tgz"
@@ -49,17 +52,56 @@ restore_images_and_vendor: &restore_images_and_vendor
       docker exec -i virtlet-build tar -C /go/src/github.com/Mirantis/virtlet -xv <_output/vendor.tar
     fi
 
-
-# - run:
-#     name: Generate cache key file
-#     command: |
-#       tar -c images/Dockerfile.build-base images/Dockerfile.build-base glide.yaml glide.lock | sha1sum >cache.key
+push_images: &push_images
+  <<: *defaults
+  steps:
+  - run:
+      <<: *prereqs
+  # the checkout is needed for getting cache key from dockerfiles
+  - checkout
+  - setup_remote_docker
+  - run:
+      name: Install Docker client
+      command: |
+        apt-get -qq update
+        apt-get install -y curl ca-certificates
+        curl -sSL -o "/tmp/docker-${DOCKER_VERSION}.tgz" "https://get.docker.com/builds/Linux/x86_64/docker-${DOCKER_VERSION}.tgz"
+        tar -xz -C /tmp -f "/tmp/docker-${DOCKER_VERSION}.tgz"
+        mv /tmp/docker/* /usr/bin
+  - restore_cache:
+      <<: *restore_image_cache
+  - attach_workspace:
+      at: _output
+  - run:
+      name: Restore images
+      command: |
+        docker load -i _output/virtlet.tar
+        if [[ -f _output/images.tar ]]; then
+          docker load -i _output/images.tar
+        fi
+  - run:
+      name: Retag the image
+      command: |
+        docker tag mirantis/virtlet:latest mirantis/virtlet:"$(echo "${CIRCLE_TAG:-${CIRCLE_BRANCH}}"|tr / _)"
+        docker rmi mirantis/virtlet:latest
+  - run:
+      name: Push the images
+      command: |
+        docker login -u $DOCKER_USER -p $DOCKER_PASS
+        for img in build-base virtlet-base virtlet; do
+          docker images -q -f label=virtlet.image="${img}" --format '{{.Repository}}:{{.Tag}}'
+        done | grep '^mirantis/virtlet' | while read img; do
+          echo >&2 "*** Pushing: ${img}"
+          docker push "${img}"
+        done
 
 version: 2
 jobs:
   prepare_build:
     <<: *defaults
     steps:
+    - run:
+        <<: *prereqs
     - checkout
     - setup_remote_docker
     - run:
@@ -104,6 +146,8 @@ jobs:
   build:
     <<: *defaults
     steps:
+    - run:
+        <<: *prereqs
     - checkout
     - setup_remote_docker
     - run:
@@ -136,6 +180,8 @@ jobs:
   test:
     <<: *defaults
     steps:
+    - run:
+        <<: *prereqs
     - checkout
     - setup_remote_docker
     - run:
@@ -155,6 +201,8 @@ jobs:
   integration:
     <<: *defaults
     steps:
+    - run:
+        <<: *prereqs
     - checkout
     - setup_remote_docker
     - run:
@@ -178,6 +226,8 @@ jobs:
   e2e:
     <<: *defaults
     steps:
+    - run:
+        <<: *prereqs
     - checkout
     - setup_remote_docker
     - run:
@@ -206,20 +256,64 @@ jobs:
           build/portforward.sh 8080&
           _output/virtlet-e2e-tests -test.v
 
+  push_branch:
+    <<: *push_images
+
+  push_tested:
+    <<: *push_images
+
 workflows:
   version: 2
   build-and-test:
     jobs:
-    - prepare_build
+    - prepare_build:
+        filters:
+          tags:
+            only:
+              - /^v[0-9].*/
     - build:
         requires:
         - prepare_build
+        filters:
+          tags:
+            only:
+              - /^v[0-9].*/
     - test:
         requires:
         - prepare_build
+        filters:
+          tags:
+            only:
+              - /^v[0-9].*/
     - integration:
         requires:
         - build
+        filters:
+          tags:
+            only:
+              - /^v[0-9].*/
     - e2e:
         requires:
         - build
+        filters:
+          tags:
+            only:
+              - /^v[0-9].*/
+    - push_branch:
+        requires:
+        - build
+        filters:
+          branches:
+            ignore:
+              master
+    - push_tested:
+        requires:
+        - test
+        - e2e
+        - integration
+        filters:
+          branches:
+            only: master
+          tags:
+            only:
+              - /^v[0-9].*/
