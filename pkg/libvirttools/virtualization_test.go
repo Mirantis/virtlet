@@ -36,6 +36,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/virt/fake"
 	"github.com/Mirantis/virtlet/tests/criapi"
 	"github.com/Mirantis/virtlet/tests/gm"
+	"github.com/Mirantis/virtlet/pkg/imagetranslation"
 )
 
 const (
@@ -109,7 +110,7 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 		t.Fatalf("Error getting volume name for image %q: %v", fakeImageName, err)
 	}
 
-	if _, err := imageTool.PullRemoteImageToVolume(fakeImageName, imageVolumeName); err != nil {
+	if _, err := imageTool.PullRemoteImageToVolume(fakeImageName, imageVolumeName, imagetranslation.NewImageNameTranslator()); err != nil {
 		t.Fatalf("Error pulling image %q to volume %q: %v", fakeImageName, imageVolumeName, err)
 	}
 

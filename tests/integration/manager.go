@@ -24,6 +24,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/manager"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
 	"github.com/Mirantis/virtlet/pkg/utils"
+	"os"
 )
 
 const (
@@ -63,7 +64,8 @@ func (v *VirtletManager) Run() {
 		v.t.Fatalf("Can't create temp file: %v", err)
 	}
 
-	v.manager, err = manager.NewVirtletManager(libvirtUri, "default", "http", "dir", dbFilename, "loop*", &fakeFDManager{})
+	os.Setenv("KUBERNETES_CLUSTER_URL", "")
+	v.manager, err = manager.NewVirtletManager(libvirtUri, "default", "http", "dir", dbFilename, "loop*", "", &fakeFDManager{})
 	if err != nil {
 		v.t.Fatalf("Failed to create VirtletManager: %v", err)
 	}

@@ -42,4 +42,4 @@ spec:
     resources:
       limits:
         # This memory limit is applied to the libvirt domain definition
-        memory: 128Mi
+        memory: 160Mi
