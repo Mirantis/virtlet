@@ -52,6 +52,8 @@ var (
 		"Comma separated list of raw device glob patterns to which VM can have an access (with skipped /dev/ prefix)")
 	fdServerSocketPath = flag.String("fd-server-socket-path", "/var/lib/virtlet/tapfdserver.sock",
 		"Path to fd server socket")
+	imageTranslationConfigsDir = flag.String("image-translations-dir", "",
+		"Image name translation configs directory")
 )
 
 const (
@@ -74,7 +76,7 @@ func runVirtlet() {
 		glog.Errorf("Failed to connect to tapmanager: %v", err)
 		os.Exit(1)
 	}
-	server, err := manager.NewVirtletManager(*libvirtUri, *pool, *imageDownloadProtocol, *storageBackend, *boltPath, *rawDevices, c)
+	server, err := manager.NewVirtletManager(*libvirtUri, *pool, *imageDownloadProtocol, *storageBackend, *boltPath, *imageTranslationConfigsDir, *rawDevices, c)
 	if err != nil {
 		glog.Errorf("Initializing server failed: %v", err)
 		os.Exit(1)

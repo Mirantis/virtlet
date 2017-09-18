@@ -170,6 +170,8 @@ spec:
               name: virtlet-config
               key: image_regexp_translation
               optional: true
+        - name: IMAGE_TRANSLATIONS_DIR
+          value: /etc/virtlet/images
       - name: vms
         image: mirantis/virtlet
         imagePullPolicy: IfNotPresent

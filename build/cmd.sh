@@ -7,6 +7,7 @@ set -o errtrace
 VIRTLET_SKIP_RSYNC="${VIRTLET_SKIP_RSYNC:-}"
 VIRTLET_RSYNC_PORT="${VIRTLET_RSYNC_PORT:-18730}"
 VIRTLET_ON_MASTER="${VIRTLET_ON_MASTER:-}"
+IMAGE_REGEXP_TRANSLATION="${IMAGE_REGEXP_TRANSLATION:-}"
 
 # Note that project_dir must not end with slash
 project_dir="$(cd "$(dirname "${BASH_SOURCE}")/.." && pwd)"
@@ -199,7 +200,7 @@ function start_dind {
         fi
     fi
     kubectl label node --overwrite "${virtlet_node}" extraRuntime=virtlet
-    local -a virtlet_config=(--from-literal=image_regexp_translation="$IMAGE_REGEXP_TRANSLATION")
+    local -a virtlet_config=(--from-literal=image_regexp_translation="${IMAGE_REGEXP_TRANSLATION}")
     if ! kvm_ok; then
         virtlet_config+=(--from-literal=disable_kvm=y)
     fi

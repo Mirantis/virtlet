@@ -63,7 +63,7 @@ func (v *VirtletManager) Run() {
 		v.t.Fatalf("Can't create temp file: %v", err)
 	}
 
-	v.manager, err = manager.NewVirtletManager(libvirtUri, "default", "http", "dir", dbFilename, "loop*", &fakeFDManager{})
+	v.manager, err = manager.NewVirtletManager(libvirtUri, "default", "http", "dir", dbFilename, "loop*", "", &fakeFDManager{})
 	if err != nil {
 		v.t.Fatalf("Failed to create VirtletManager: %v", err)
 	}

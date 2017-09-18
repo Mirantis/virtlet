@@ -17,165 +17,43 @@ limitations under the License.
 package imagetranslation
 
 import (
-	"io/ioutil"
 	"os"
-	"path"
 	"regexp"
 	"strings"
-	"sync"
-	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
-	yaml "gopkg.in/yaml.v2"
+
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
-type Endpoint struct {
-	Url string `yaml:"url,omitempty"`
-}
-
-type TranslationRule struct {
-	Name     string `yaml:"name,omitempty"`
-	Regex    string `yaml:"regexp,omitempty"`
-	Endpoint `yaml:",inline"`
-}
-type ImageTranslation struct {
-	Prefix string            `yaml:"prefix,omitempty"`
-	Rules  []TranslationRule `yaml:"translations"`
-
-	timestamp time.Time
-}
-
-type TranslationConfig interface {
-	Name() string
-	Timestamp() (time.Time, error)
-	Body() (ImageTranslation, error)
-}
-
-type ConfigSource interface {
-	Configs() ([]TranslationConfig, error)
-}
-
-type fileConfigSource struct {
-	configDirectory string
-}
-
-type fileConfig struct {
-	name string
-}
-
-func (cs fileConfigSource) Configs() ([]TranslationConfig, error) {
-	var result []TranslationConfig
-	r, err := ioutil.ReadDir(cs.configDirectory)
-	if err != nil {
-		return nil, err
-	}
-	for _, f := range r {
-		if f.IsDir() {
-			continue
-		}
-		result = append(result, fileConfig{name: path.Join(cs.configDirectory, f.Name())})
-	}
-	return result, nil
-}
-
-func (c fileConfig) Name() string {
-	return c.name
-}
-
-func (c fileConfig) Body() (ImageTranslation, error) {
-	data, err := ioutil.ReadFile(c.name)
-	var tr ImageTranslation
-	if err != nil {
-		return tr, err
-	}
-	err = yaml.Unmarshal(data, &tr)
-	return tr, err
-}
-
-func (c fileConfig) Timestamp() (time.Time, error) {
-	var result time.Time
-	stat, err := os.Stat(c.name)
-	if err != nil {
-		return result, err
-	}
-	return stat.ModTime(), nil
-}
-
-func NewFileConfigSource(configDirectory string) ConfigSource {
-	return fileConfigSource{configDirectory: configDirectory}
-}
-
-type ImageNameTranslator struct {
+type imageNameTranslator struct {
 	AllowRegexp bool
 
-	configSource          ConfigSource
-	translations          map[string]*ImageTranslation
-	lock                  sync.RWMutex
-	stopBackgroundUpdates chan struct{}
+	translations map[string]*ImageTranslation
 }
 
-func (t *ImageNameTranslator) load(config TranslationConfig) error {
-	timestamp, err := config.Timestamp()
-	if err != nil {
-		return err
-	}
-
-	t.lock.RLock()
-	currentTranslation := t.translations[config.Name()]
-	t.lock.RUnlock()
-
-	if currentTranslation != nil && currentTranslation.timestamp == timestamp {
-		return nil
-	}
-
-	glog.Info("Loading image name translations from ", config.Name())
-	tr, err := config.Body()
-	tr.timestamp = timestamp
-
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	t.translations[config.Name()] = &tr
-	glog.V(3).Infof("Loaded image translation config: %s", spew.Sdump(tr))
-	return nil
-}
-
-func (t *ImageNameTranslator) LoadConfigs() error {
-	configs, err := t.configSource.Configs()
-	if err != nil {
-		return err
-	}
-
-	unusedNames := map[string]bool{}
-	t.lock.RLock()
-	for key := range t.translations {
-		unusedNames[key] = true
-	}
-	t.lock.RUnlock()
-
-	for _, config := range configs {
-		err := t.load(config)
+func (t *imageNameTranslator) LoadConfigs(sources ...ConfigSource) {
+	translations := map[string]*ImageTranslation{}
+	for _, source := range sources {
+		configs, err := source.Configs()
 		if err != nil {
-			glog.Warning("Error loading image translation config: ", err)
-		} else {
-			delete(unusedNames, config.Name())
+			glog.V(2).Infof("cannot get image translation configs from %s: %v", source.Description(), err)
+			continue
 		}
-	}
+		for _, cfg := range configs {
+			body, err := cfg.Payload()
+			if err != nil {
+				glog.V(2).Infof("cannot load image translation config %s from %s: %v", cfg.Name(), source.Description(), err)
+				continue
+			}
 
-	if len(unusedNames) > 0 {
-		t.lock.Lock()
-		defer t.lock.Unlock()
-		for name := range unusedNames {
-			glog.Warning("Deleting image translation config ", name)
-			delete(t.translations, name)
+			translations[cfg.Name()] = &body
 		}
 	}
-	return nil
+	t.translations = translations
 }
 
-func (t *ImageNameTranslator) Translate(name string) Endpoint {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+func (t *imageNameTranslator) Translate(name string) utils.Endpoint {
 	for _, translation := range t.translations {
 		prefix := translation.Prefix + "/"
 		unprefixedName := name
@@ -199,7 +77,7 @@ func (t *ImageNameTranslator) Translate(name string) Endpoint {
 			}
 			re, err := regexp.Compile(r.Regex)
 			if err != nil {
-				glog.Warning("Invalid regexp in image translation config: ", r.Regex)
+				glog.V(2).Infof("invalid regexp in image translation config: ", r.Regex)
 				continue
 			}
 			submatchIndexes := re.FindStringSubmatchIndex(unprefixedName)
@@ -209,42 +87,12 @@ func (t *ImageNameTranslator) Translate(name string) Endpoint {
 			}
 		}
 	}
-	return Endpoint{}
+	return utils.Endpoint{}
 }
 
-func (t *ImageNameTranslator) StartBackgroundUpdates(pollFrequency time.Duration) {
-	if t.stopBackgroundUpdates != nil {
-		return
-	}
-	t.LoadConfigs()
-	ticker := time.NewTicker(pollFrequency)
-	t.stopBackgroundUpdates = make(chan struct{})
-	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				t.LoadConfigs()
-			case <-t.stopBackgroundUpdates:
-				ticker.Stop()
-				close(t.stopBackgroundUpdates)
-				t.stopBackgroundUpdates = nil
-				return
-			}
-		}
-	}()
-}
-
-func (t *ImageNameTranslator) StopBackgroundUpdates() {
-	if t.stopBackgroundUpdates != nil {
-		t.stopBackgroundUpdates <- struct{}{}
-	}
-}
-
-func NewImageNameTranslator(source ConfigSource) *ImageNameTranslator {
+func NewImageNameTranslator() ImageNameTranslator {
 	env := strings.ToUpper(os.Getenv("IMAGE_REGEXP_TRANSLATION"))
-	return &ImageNameTranslator{
-		configSource: source,
-		translations: map[string]*ImageTranslation{},
-		AllowRegexp:  env == "1" || env == "TRUE" || env == "YES",
+	return &imageNameTranslator{
+		AllowRegexp: env == "1" || env == "TRUE" || env == "YES",
 	}
 }
