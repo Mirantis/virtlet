@@ -13,11 +13,17 @@ Currently the script supports the following commands:
  * `./build/cmd.sh gobuild [BUILD_ARGS...]`
  * `./build/cmd.sh run CMD...`
 
-`build`, `test`, `run`, `gobuild`, `gotest` commands check whether
-the build container image and data volumes are available
-before proceeding. They build the image if necessary and create
-the data volumes if they don't exist, then, on each run they copy the
-local sources into `virtlet_src` data volume.
+`build`, `test`, `integration`, `run`, `gobuild`, `gotest`, `copy`,
+`copy-back` and `prepare-vendor` commands check whether the build
+container image and data volumes are available before proceeding. They
+build the image if necessary and create the data volumes if they don't
+exist, then, on each run they copy the local sources into
+`virtlet_src` data volume.
+
+The build container used by `build/cmd.sh` needs to be able to access
+Docker socket inside it. By default it mounts `/var/run/docker.sock`
+inside the container but you can override the path by setting
+`DOCKER_SOCKET_PATH` environment variable.
 
 ## build
 
@@ -25,14 +31,23 @@ Performs full build based on autotools.
 
 ## test
 
-Runs tests inside a build container on libvirt/qemu with KVM disabled - suitable
-for CI on platforms not supporting kernel virtualization, like Travis.
-Tests run is preceded by full build based on autotools.
+Runs the unit tests inside a build container.
+
+## integration
+
+Runs the integration tests. KVM is disabled for these so as to make them run
+inside limited CI environments that don't support kernel virtualization.
+You need to invoke `build/cmd.sh build` before running this command.
 
 ## copy
 
 Extracts output binaries from build container into `_output/` in the
 current directory.
+
+## copy-back
+
+Syncs local `_output_` contents to the build container. This is used
+by CI for passing build artifacts between the jobs in a workflow.
 
 ## copy-dind
 
@@ -75,3 +90,13 @@ at least once since the last `clean`.
 
 Runs the specified command inside the build container. This command can be
 used to debug the build scripts.
+
+## prepare-vendor
+
+Populates `vendor/` directory inside the build container. This is used
+by CI.
+
+## start-build-container
+
+Starts the build container. This is done automatically by other
+`build/cmd.sh` commands that need the build container.

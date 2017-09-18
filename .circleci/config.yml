@@ -1,45 +1,178 @@
+defaults: &defaults
+  docker:
+    - image: ubuntu:xenial
+  working_directory: ~/virtlet
+  environment:
+    DOCKER_VERSION: "17.03.0-ce"
+
+prereqs: &prereqs
+  name: Install prerequisites
+  command: |
+    apt-get -qq update
+    apt-get install -y curl ca-certificates openssh-client rsync socat wget git
+
+setup_env: &setup_env
+  name: Set up the environment
+  command: |
+    # Install Docker client
+    curl -sSL -o "/tmp/docker-${DOCKER_VERSION}.tgz" "https://get.docker.com/builds/Linux/x86_64/docker-${DOCKER_VERSION}.tgz"
+    tar -xz -C /tmp -f "/tmp/docker-${DOCKER_VERSION}.tgz"
+    mv /tmp/docker/* /usr/bin
+
+    # Disable apparmor
+    docker run --rm --pid=host -it --privileged ubuntu:xenial \
+      nsenter -t 1 -m -u -i -n /bin/bash -c \
+      "service apparmor stop &&
+       service apparmor teardown &&
+       update-rc.d -f apparmor remove &&
+       apt-get remove -y apparmor"
+
+    # Start port forwarder
+    build/portforward.sh start
+
+restore_image_cache: &restore_image_cache
+  name: Restore image cache
+  keys:
+  # bump '-vNNN' to update the cache (also everywhere this key is used in the file)
+  - images-v1-{{ checksum "images/Dockerfile.build-base" }}-{{ checksum "images/Dockerfile.virtlet-base" }}
+
+restore_vendor_cache: &restore_vendor_cache
+  name: Restore vendor cache
+  keys:
+  # bump '-vNNN' to update the cache (also everywhere this key is used in the file)
+  - vendor-v1-{{ checksum "glide.yaml" }}-{{ checksum "glide.lock" }}
+
+restore_images_and_vendor: &restore_images_and_vendor
+  name: Prepare build image & vendor dir
+  command: |
+    if [[ -f _output/images.tar ]]; then
+      docker load -i _output/images.tar
+    fi
+    if [[ -f _output/vendor.tar ]]; then
+      build/portforward.sh 18730&
+      build/cmd.sh start-build-container
+      docker exec -i virtlet-build tar -C /go/src/github.com/Mirantis/virtlet -xv <_output/vendor.tar
+    fi
+
+push_images: &push_images
+  <<: *defaults
+  steps:
+  - run:
+      <<: *prereqs
+  # the checkout is needed for getting cache key from dockerfiles
+  - checkout
+  - setup_remote_docker
+  - run:
+      name: Install Docker client
+      command: |
+        apt-get -qq update
+        apt-get install -y curl ca-certificates
+        curl -sSL -o "/tmp/docker-${DOCKER_VERSION}.tgz" "https://get.docker.com/builds/Linux/x86_64/docker-${DOCKER_VERSION}.tgz"
+        tar -xz -C /tmp -f "/tmp/docker-${DOCKER_VERSION}.tgz"
+        mv /tmp/docker/* /usr/bin
+  - restore_cache:
+      <<: *restore_image_cache
+  - attach_workspace:
+      at: _output
+  - run:
+      name: Restore images
+      command: |
+        if [[ ! ${DOCKER_USER:-} || ! ${DOCKER_PASS} ]]; then
+          echo >&2 "*** WARNING: can't push images for outside forks"
+          exit 0
+        fi
+        docker load -i _output/virtlet.tar
+        if [[ -f _output/images.tar ]]; then
+          docker load -i _output/images.tar
+        fi
+  - run:
+      name: Retag the image
+      command: |
+        if [[ ! ${DOCKER_USER:-} || ! ${DOCKER_PASS} ]]; then
+          echo >&2 "*** WARNING: can't push images for outside forks"
+          exit 0
+        fi
+        docker tag mirantis/virtlet:latest mirantis/virtlet:"$(echo "${CIRCLE_TAG:-${CIRCLE_BRANCH}}"|tr / _)"
+        docker rmi mirantis/virtlet:latest
+  - run:
+      name: Push the images
+      command: |
+        if [[ ! ${DOCKER_USER:-} || ! ${DOCKER_PASS} ]]; then
+          echo >&2 "*** WARNING: can't push images for outside forks"
+          exit 0
+        fi
+        docker login -u $DOCKER_USER -p $DOCKER_PASS
+        for img in build-base virtlet-base virtlet; do
+          docker images -q -f label=virtlet.image="${img}" --format '{{.Repository}}:{{.Tag}}'
+        done | grep '^mirantis/virtlet' | while read img; do
+          echo >&2 "*** Pushing: ${img}"
+          docker push "${img}"
+        done
+
 version: 2
 jobs:
-  build:
-    docker:
-    - image: ubuntu:xenial
-    working_directory: ~/virtlet
-    environment:
-      DOCKER_VERSION: "17.03.0-ce"
+  prepare_build:
+    <<: *defaults
     steps:
+    - run:
+        <<: *prereqs
     - checkout
     - setup_remote_docker
-
     - run:
-        name: Ensure prerequisites
-        command: |
-          apt-get -qq update
-          apt-get install -y libxml2-utils jq curl ca-certificates openssh-client rsync socat wget
-
+        <<: *setup_env
+    - restore_cache:
+        <<: *restore_image_cache
+    - restore_cache:
+        <<: *restore_vendor_cache
     - run:
-        name: Install Docker client
+        name: Prepare images and the vendor dir
         command: |
-          set -x
-          curl -sSL -o "/tmp/docker-${DOCKER_VERSION}.tgz" "https://get.docker.com/builds/Linux/x86_64/docker-${DOCKER_VERSION}.tgz"
-          tar -xz -C /tmp -f "/tmp/docker-${DOCKER_VERSION}.tgz"
-          mv /tmp/docker/* /usr/bin
-
+          if [[ ! -f _output/images.tar || ! -f _output/vendor.tar ]]; then
+            build/portforward.sh 18730&
+            build/cmd.sh prepare-vendor
+          fi
     - run:
-        name: Disable apparmor on the remote docker VM
-        # TODO: use smaller image for nsenter.
-        # Or, even better, learn to live with apparmor
+        name: Store base images
         command: |
-          docker run --rm --pid=host -it --privileged ubuntu:xenial \
-            nsenter -t 1 -m -u -i -n /bin/bash -c \
-            "service apparmor stop &&
-             service apparmor teardown &&
-             update-rc.d -f apparmor remove &&
-             apt-get remove -y apparmor"
-
+          if [[ ! -f _output/images.tar ]]; then
+            mkdir -p _output
+            build_base_image="$(docker images -q -f label=virtlet.image=build-base --format '{{.Repository}}:{{.Tag}}')"
+            virtlet_base_image="$(docker images -q -f label=virtlet.image=virtlet-base --format '{{.Repository}}:{{.Tag}}')"
+            docker save "${build_base_image}" "${virtlet_base_image}" >_output/images.tar
+          fi
+    - save_cache:
+        name: Save image cache
+        key: images-v1-{{ checksum "images/Dockerfile.build-base" }}-{{ checksum "images/Dockerfile.virtlet-base" }}
+        paths:
+        - _output/images.tar
     - run:
-        name: Start port forwarder
+        name: Store vendor archive
         command: |
-          build/portforward.sh start
+          if [[ ! -f _output/vendor.tar ]]; then
+            mkdir -p _output
+            docker exec virtlet-build tar -C /go/src/github.com/Mirantis/virtlet -c vendor >_output/vendor.tar
+          fi
+    - save_cache:
+        name: Save vendor cache
+        key: vendor-v1-{{ checksum "glide.yaml" }}-{{ checksum "glide.lock" }}
+        paths:
+        - _output/vendor.tar
+
+  build:
+    <<: *defaults
+    steps:
+    - run:
+        <<: *prereqs
+    - checkout
+    - setup_remote_docker
+    - run:
+        <<: *setup_env
+    - restore_cache:
+        <<: *restore_image_cache
+    - restore_cache:
+        <<: *restore_vendor_cache
+    - run:
+        <<: *restore_images_and_vendor
 
     - run:
         name: Build virtlet
@@ -47,32 +180,155 @@ jobs:
           build/portforward.sh 18730&
           build/cmd.sh build
           build/cmd.sh copy
+    - run:
+        name: Save image
+        command: |
+          docker save mirantis/virtlet >_output/virtlet.tar
+    - persist_to_workspace:
+        root: _output
+        paths:
+        - virtlet.tar
+        - virtlet-e2e-tests
+        # needed by integration tests
+        - vmwrapper
 
+  test:
+    <<: *defaults
+    steps:
+    - run:
+        <<: *prereqs
+    - checkout
+    - setup_remote_docker
+    - run:
+        <<: *setup_env
+    - restore_cache:
+        <<: *restore_image_cache
+    - restore_cache:
+        <<: *restore_vendor_cache
+    - run:
+        <<: *restore_images_and_vendor
     - run:
         name: Run tests
         command: |
           build/portforward.sh 18730&
           build/cmd.sh test
 
+  integration:
+    <<: *defaults
+    steps:
     - run:
-        name: Build virtlet image
+        <<: *prereqs
+    - checkout
+    - setup_remote_docker
+    - run:
+        <<: *setup_env
+    - restore_cache:
+        <<: *restore_image_cache
+    - restore_cache:
+        <<: *restore_vendor_cache
+    - run:
+        <<: *restore_images_and_vendor
+    - attach_workspace:
+        at: _output
+    - run:
+        name: Run tests
         command: |
-          docker build -t mirantis/virtlet .
+          build/portforward.sh 18730&
+          rm -f _output/*.tar
+          build/cmd.sh copy-back
+          build/cmd.sh integration
 
+  e2e:
+    <<: *defaults
+    steps:
+    - run:
+        <<: *prereqs
+    - checkout
+    - setup_remote_docker
+    - run:
+        <<: *setup_env
+    - attach_workspace:
+        at: _output
+    - run:
+        name: Restore virtlet image
+        command: |
+          docker load -i _output/virtlet.tar
     - run:
         name: Start the demo
         command: |
           build/portforward.sh 8080&
           VIRTLET_DEMO_RELEASE=master \
+            SKIP_SNAPSHOT=1 \
             NONINTERACTIVE=1 \
             NO_VM_CONSOLE=1 \
             INJECT_LOCAL_IMAGE=1 \
             VIRTLET_DEMO_RELEASE=master \
             BASE_LOCATION="$PWD" \
             deploy/demo.sh
-
     - run:
         name: Run e2e tests
         command: |
           build/portforward.sh 8080&
           _output/virtlet-e2e-tests -test.v
+
+  push_branch:
+    <<: *push_images
+
+  push_tested:
+    <<: *push_images
+
+workflows:
+  version: 2
+  build-and-test:
+    jobs:
+    - prepare_build:
+        filters:
+          tags:
+            only:
+              - /^v[0-9].*/
+    - build:
+        requires:
+        - prepare_build
+        filters:
+          tags:
+            only:
+              - /^v[0-9].*/
+    - test:
+        requires:
+        - prepare_build
+        filters:
+          tags:
+            only:
+              - /^v[0-9].*/
+    - integration:
+        requires:
+        - build
+        filters:
+          tags:
+            only:
+              - /^v[0-9].*/
+    - e2e:
+        requires:
+        - build
+        filters:
+          tags:
+            only:
+              - /^v[0-9].*/
+    - push_branch:
+        requires:
+        - build
+        filters:
+          branches:
+            ignore:
+              /^master$|^pull\//
+    - push_tested:
+        requires:
+        - test
+        - e2e
+        - integration
+        filters:
+          branches:
+            only: master
+          tags:
+            only:
+              - /^v[0-9].*/
