@@ -91,6 +91,13 @@ func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, m
 		return nil, err
 	}
 
+	if errors := libvirtVirtualizationTool.RegainNetworkNamespaces(fdManager); errors != nil {
+		glog.Warning("During regaining network namespaces encountered above errors:")
+		for _, err := range errors {
+			glog.Warningf("* %q", err)
+		}
+	}
+
 	if errors := libvirtVirtualizationTool.GarbageCollect(); errors != nil {
 		glog.Warning("During garbage collecting encountered above errors:")
 		for _, err := range errors {
@@ -189,7 +196,8 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 			Options:     config.DnsConfig.Options,
 		}
 	}
-	netConfigBytes, err := v.fdManager.AddFD(podId, pnd)
+	fdPayload := &tapmanager.GetFDPayload{Description: pnd}
+	netConfigBytes, err := v.fdManager.AddFD(podId, fdPayload)
 	if err != nil {
 		// this will cause kubelet to delete the pod sandbox and then retry
 		// its creation

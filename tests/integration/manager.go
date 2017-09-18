@@ -38,6 +38,10 @@ func (m *fakeFDManager) AddFD(key string, data interface{}) ([]byte, error) {
 	return nil, nil
 }
 
+func (m *fakeFDManager) RegainFD(key string, data interface{}) error {
+	return nil
+}
+
 func (m *fakeFDManager) ReleaseFD(key string) error {
 	return nil
 }
