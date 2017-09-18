@@ -33,12 +33,14 @@ setup_env: &setup_env
 restore_image_cache: &restore_image_cache
   name: Restore image cache
   keys:
-  - tst-images-v2-{{ checksum "images/Dockerfile.build-base" }}-{{ checksum "images/Dockerfile.virtlet-base" }}
+  # bump '-vNNN' to update the cache (also everywhere this key is used in the file)
+  - images-v1-{{ checksum "images/Dockerfile.build-base" }}-{{ checksum "images/Dockerfile.virtlet-base" }}
 
 restore_vendor_cache: &restore_vendor_cache
   name: Restore vendor cache
   keys:
-  - tst-vendor-v2-{{ checksum "glide.yaml" }}-{{ checksum "glide.lock" }}
+  # bump '-vNNN' to update the cache (also everywhere this key is used in the file)
+  - vendor-v1-{{ checksum "glide.yaml" }}-{{ checksum "glide.lock" }}
 
 restore_images_and_vendor: &restore_images_and_vendor
   name: Prepare build image & vendor dir
@@ -140,7 +142,7 @@ jobs:
           fi
     - save_cache:
         name: Save image cache
-        key: tst-images-v2-{{ checksum "images/Dockerfile.build-base" }}-{{ checksum "images/Dockerfile.virtlet-base" }}
+        key: images-v1-{{ checksum "images/Dockerfile.build-base" }}-{{ checksum "images/Dockerfile.virtlet-base" }}
         paths:
         - _output/images.tar
     - run:
@@ -152,7 +154,7 @@ jobs:
           fi
     - save_cache:
         name: Save vendor cache
-        key: tst-vendor-v2-{{ checksum "glide.yaml" }}-{{ checksum "glide.lock" }}
+        key: vendor-v1-{{ checksum "glide.yaml" }}-{{ checksum "glide.lock" }}
         paths:
         - _output/vendor.tar
 
