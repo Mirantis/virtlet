@@ -1,4 +1,3 @@
 translations:
   - name: cirros
     url: https://github.com/mirantis/virtlet/releases/download/v0.8.2/cirros.img
-

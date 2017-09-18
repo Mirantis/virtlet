@@ -18,57 +18,30 @@ package imagetranslation
 
 import (
 	"testing"
-	"time"
+
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
-type objectConfig struct {
-	name        string
-	translation ImageTranslation
-}
-
-func (c objectConfig) Name() string {
-	return c.name
-}
-
-func (c objectConfig) Timestamp() (time.Time, error) {
-	return c.translation.timestamp, nil
-}
-
-func (c objectConfig) Body() (ImageTranslation, error) {
-	return c.translation, nil
-}
-
-type fakeConfigSource struct {
-	configs map[string]ImageTranslation
-}
-
-func (cs fakeConfigSource) Configs() ([]TranslationConfig, error) {
-	var result []TranslationConfig
-	for name, tr := range cs.configs {
-		result = append(result, objectConfig{name: name, translation: tr})
-	}
-	return result, nil
-}
-
+// TestTranslations tests how image names are translated with various translation rules
 func TestTranslations(t *testing.T) {
 	configs := map[string]ImageTranslation{
 		"config1": {
 			Rules: []TranslationRule{
 				{
 					Regex: `^image(\d+)`,
-					Endpoint: Endpoint{
+					Endpoint: utils.Endpoint{
 						Url: "http://example.net/image_$1.qcow2",
 					},
 				},
 				{
 					Regex: `image(\d+)`,
-					Endpoint: Endpoint{
+					Endpoint: utils.Endpoint{
 						Url: "http://example.net/alt_$1.qcow2",
 					},
 				},
 				{
 					Name: "image1",
-					Endpoint: Endpoint{
+					Endpoint: utils.Endpoint{
 						Url: "https://example.net/base.qcow2",
 					},
 				},
@@ -79,13 +52,13 @@ func TestTranslations(t *testing.T) {
 			Rules: []TranslationRule{
 				{
 					Regex: `^linux/(\d+\.\d+)`,
-					Endpoint: Endpoint{
+					Endpoint: utils.Endpoint{
 						Url: "http://acme.org/linux_$1.qcow2",
 					},
 				},
 				{
 					Name: "linux/1",
-					Endpoint: Endpoint{
+					Endpoint: utils.Endpoint{
 						Url: "https://acme.org/linux.qcow2",
 					},
 				},
@@ -93,8 +66,8 @@ func TestTranslations(t *testing.T) {
 		},
 	}
 
-	translator := NewImageNameTranslator(fakeConfigSource{configs})
-	translator.LoadConfigs()
+	translator := NewImageNameTranslator().(*imageNameTranslator)
+	translator.LoadConfigs(NewFakeConfigSource(configs))
 
 	for _, tc := range []struct {
 		name        string

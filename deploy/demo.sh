@@ -14,6 +14,7 @@ BASE_LOCATION="${BASE_LOCATION:-https://raw.githubusercontent.com/Mirantis/virtl
 RELEASE_LOCATION="${RELEASE_LOCATION:-https://github.com/Mirantis/virtlet/releases/download/}"
 VIRTLET_DEMO_RELEASE="${VIRTLET_DEMO_RELEASE:-}"
 VIRTLET_ON_MASTER="${VIRTLET_ON_MASTER:-}"
+IMAGE_REGEXP_TRANSLATION="${VIRTLET_ON_MASTER:-1}"
 # Convenience setting for local testing:
 # BASE_LOCATION="${HOME}/work/kubernetes/src/github.com/Mirantis/virtlet"
 cirros_key="demo-cirros-private-key"

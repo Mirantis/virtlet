@@ -15,6 +15,7 @@ else
 fi
 
 PROTOCOL="${VIRTLET_DOWNLOAD_PROTOCOL:-https}"
+IMAGE_TRANSLATIONS_DIR="${IMAGE_TRANSLATIONS_DIR:-}"
 
 FLEXVOLUME_DIR=/usr/libexec/kubernetes/kubelet-plugins/volume/exec
 if [ ! -d ${FLEXVOLUME_DIR}/virtlet~flexvolume_driver ]; then
@@ -28,4 +29,4 @@ while [ ! -S /var/run/libvirt/libvirt-sock ] ; do
   sleep 0.3
 done
 
-/usr/local/bin/virtlet -v=${VIRTLET_LOGLEVEL:-3} -logtostderr=true -image-download-protocol="${PROTOCOL}" "${RAW_DEVICES}"
+/usr/local/bin/virtlet -v=${VIRTLET_LOGLEVEL:-3} -logtostderr=true -image-download-protocol="${PROTOCOL}" -image-translations-dir="${IMAGE_TRANSLATIONS_DIR}" "${RAW_DEVICES}"

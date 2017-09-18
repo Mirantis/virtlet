@@ -27,11 +27,13 @@ import:
 - package: k8s.io/kubernetes
   version: v1.7.0
 - package: k8s.io/apiserver
-  version: b74e5942e2a7ef9f73874b7e5a48c030ff7f1189
+  version: b6348e73bd115a31b70a4e9ff12d35869d057d8c
+  //version: b74e5942e2a7ef9f73874b7e5a48c030ff7f1189
 - package: k8s.io/client-go
-  version: cc44961f935a644fb82c0f4b6591543704578db7
-  # version: 56fd84210219dbdfe6501fb2085adfb8e61f2bc1
+  version: 4cbb4d746a6a36cf99d6cd4f1b69a6907f49318a
 - package: github.com/jonboulle/clockwork
   version: bcac9884e7502bb2b474c0339d889cb981a2f27f
 - package: github.com/onsi/ginkgo
 - package: github.com/onsi/gomega
+- package: k8s.io/apiextensions-apiserver
+  version: fcd622fe88a4a6efcb5aea9e94ee87324ac1b036

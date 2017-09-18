@@ -170,6 +170,8 @@ spec:
               name: virtlet-config
               key: image_regexp_translation
               optional: true
+        - name: IMAGE_TRANSLATIONS_DIR
+          value: /etc/virtlet/images
       - name: vms
         image: mirantis/virtlet
         imagePullPolicy: IfNotPresent
@@ -275,6 +277,38 @@ rules:
       - configmaps
     verbs:
       - create
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: virtlet-crd
+rules:
+  - apiGroups:
+      - "apiextensions.k8s.io"
+    resources:
+      - customresourcedefinitions
+    verbs:
+      - create
+  - apiGroups:
+      - "virtlet.k8s"
+    resources:
+      - virtletimagemappings
+    verbs:
+      - list
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: virtlet-crd
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: virtlet-crd
+subjects:
+- kind: ServiceAccount
+  name: virtlet
+  namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRole
