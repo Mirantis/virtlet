@@ -1,7 +1,0 @@
-#!/bin/bash
-set -xe
-
-# FIXME: don't know exactly why it fails there
-export VIRTLET_SKIP_RSYNC=y
-./build/cmd.sh build
-./build/cmd.sh copy
