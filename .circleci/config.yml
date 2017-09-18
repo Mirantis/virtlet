@@ -7,14 +7,14 @@ jobs:
     environment:
       DOCKER_VERSION: "17.03.0-ce"
     steps:
-    - checkout
-    - setup_remote_docker
-
     - run:
         name: Ensure prerequisites
         command: |
           apt-get -qq update
-          apt-get install -y libxml2-utils jq curl ca-certificates openssh-client rsync socat wget
+          apt-get install -y libxml2-utils jq curl ca-certificates openssh-client rsync socat wget git
+
+    - checkout
+    - setup_remote_docker
 
     - run:
         name: Install Docker client
