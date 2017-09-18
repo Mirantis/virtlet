@@ -126,6 +126,7 @@ jobs:
         name: Prepare images and the vendor dir
         command: |
           if [[ ! -f _output/images.tar || ! -f _output/vendor.tar ]]; then
+            build/portforward.sh 18730&
             build/cmd.sh prepare-vendor
           fi
     - run:
