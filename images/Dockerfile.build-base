@@ -1,5 +1,20 @@
-FROM ubuntu:16.04
+# TODO: generate this tag. unfortunately can't use ARG:
+# https://docs.docker.com/engine/reference/builder/#understand-how-arg-and-from-interact
+# (but add a note about it here for the future)
+FROM mirantis/virtlet-base:v1-0e9910bc
 MAINTAINER Ivan Shvedunov <ishvedunov@mirantis.com>
+
+LABEL virtlet.image="build-base"
+
+ENV DOCKER_CLIENT_VERSION 1.12.6
+ENV DOCKER_CLIENT_DOWNLOAD_URL_BASE https://get.docker.com/builds
+ENV DOCKER_CLIENT_SHA256 cce8aa52a33f007673b9c7ed0cb786359aa6f3f8a9875aaf69799c71f86e8a43
+
+# Go installation commands are based on official Go container:
+# https://github.com/docker-library/golang/blob/18ee81a2ec649dd7b3d5126b24eef86bc9c86d80/1.7/Dockerfile
+ENV GOLANG_VERSION 1.8.3
+ENV GOLANG_DOWNLOAD_URL https://golang.org/dl/go$GOLANG_VERSION.linux-amd64.tar.gz
+ENV GOLANG_DOWNLOAD_SHA256 1862f4c3d3907e59b04a757cfda0ea7aa9ef39274af99a784f5be843c80c6772
 
 # build container should be able to run libvirt because it's used for integration tests
 RUN apt-get update && \
@@ -12,30 +27,19 @@ RUN apt-get update && \
                 libvirt-dev \
                 libguestfs-dev \
                 libguestfs0-dbg \
-                libguestfs-tools \
-                genisoimage \
                 p7zip-full \
-                iptables \
-                ebtables \
                 dhcpcd5 \
                 tcpdump \
-                iproute2 \
-                openssl \
-                qemu-kvm \
-                qemu-system-x86 \
-                libvirt-bin \
-                python-libvirt \
-                netbase \
                 iputils-ping \
                 mercurial && \
     apt-get clean
 
-# The following is based on official Go container:
-# https://github.com/docker-library/golang/blob/18ee81a2ec649dd7b3d5126b24eef86bc9c86d80/1.7/Dockerfile
-ENV GOLANG_VERSION 1.8.3
-ENV GOLANG_DOWNLOAD_URL https://golang.org/dl/go$GOLANG_VERSION.linux-amd64.tar.gz
-ENV GOLANG_DOWNLOAD_SHA256 1862f4c3d3907e59b04a757cfda0ea7aa9ef39274af99a784f5be843c80c6772
+# Install docker client
+RUN curl -sSL "${DOCKER_CLIENT_DOWNLOAD_URL_BASE}/$(uname -s)/$(uname -m)/docker-${DOCKER_CLIENT_VERSION}.tgz" | \
+    tar -C /usr/local/bin -xz --strip-components=1 docker/docker && \
+    echo "${DOCKER_CLIENT_SHA256}  /usr/local/bin/docker" | sha256sum -c -
 
+# Install Go
 RUN curl -fsSL "$GOLANG_DOWNLOAD_URL" -o golang.tar.gz \
 	&& echo "$GOLANG_DOWNLOAD_SHA256  golang.tar.gz" | sha256sum -c - \
 	&& tar -C /usr/local -xzf golang.tar.gz \
@@ -47,19 +51,10 @@ ENV PATH /go/src/github.com/Mirantis/virtlet/_output:$GOPATH/bin:/usr/local/go/b
 RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" && chmod -R 777 "$GOPATH"
 WORKDIR $GOPATH
 
-RUN mkdir -p /go/src/github.com/Mirantis/virtlet
-COPY . /go/src/github.com/Mirantis/virtlet
-
-WORKDIR /go/src/github.com/Mirantis/virtlet
-
+# TODO: update CNI ver
 RUN mkdir -p ~/.ssh && \
     ssh-keyscan github.com >> ~/.ssh/known_hosts && \
     mkdir -p /var/lib/virtlet/volumes /opt/cni/bin && \
     curl -L https://github.com/containernetworking/cni/releases/download/v0.3.0/cni-v0.3.0.tgz | \
       tar zxC /opt/cni/bin && \
     ln -s /go/src/github.com/Mirantis/virtlet/_output/vmwrapper /vmwrapper
-
-COPY image_skel /.
-# this conf file runs the emulator as root which is ok for
-# testing purposes
-COPY qemu-build.conf /etc/libvirt/qemu.conf
