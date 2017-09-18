@@ -23,7 +23,6 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/golang/glog"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
@@ -33,15 +32,9 @@ import (
 	"github.com/Mirantis/virtlet/pkg/virt"
 )
 
-const (
-	imageTranslationConfigsDirectory     = "/etc/virtlet/images"
-	imageTranslationConfigsPollFrequency = time.Second * 3
-)
-
 type ImageTool struct {
 	pool       virt.VirtStoragePool
 	downloader utils.Downloader
-	translator *imagetranslation.ImageNameTranslator
 }
 
 type ImagePullError struct {
@@ -63,10 +56,7 @@ func NewImageTool(conn virt.VirtStorageConnection, downloader utils.Downloader, 
 	if err != nil {
 		return nil, err
 	}
-	translator := imagetranslation.NewImageNameTranslator(
-		imagetranslation.NewFileConfigSource(imageTranslationConfigsDirectory))
-	translator.StartBackgroundUpdates(imageTranslationConfigsPollFrequency)
-	return &ImageTool{pool: pool, downloader: downloader, translator: translator}, nil
+	return &ImageTool{pool: pool, downloader: downloader}, nil
 }
 
 func (i *ImageTool) ListVolumes() ([]virt.VirtStorageVolume, error) {
@@ -91,14 +81,14 @@ func (i *ImageTool) fileToVolume(path, volumeName string) (virt.VirtStorageVolum
 	}, path)
 }
 
-func (i *ImageTool) PullRemoteImageToVolume(imageName, volumeName string) (virt.VirtStorageVolume, error) {
+func (i *ImageTool) PullRemoteImageToVolume(imageName, volumeName string, nameTranslator imagetranslation.ImageNameTranslator) (virt.VirtStorageVolume, error) {
 	imageName = stripTagFromImageName(imageName)
-	endpoint := i.translator.Translate(imageName)
+	endpoint := nameTranslator.Translate(imageName)
 	if endpoint.Url == "" {
-		endpoint = imagetranslation.Endpoint{Url: imageName}
-		glog.Infof("Using URL %q without translation", imageName)
+		endpoint = utils.Endpoint{Url: imageName}
+		glog.V(1).Infof("Using URL %q without translation", imageName)
 	} else {
-		glog.Infof("URL %q was translated to %q", imageName, endpoint.Url)
+		glog.V(1).Infof("URL %q was translated to %q", imageName, endpoint.Url)
 	}
 
 	// TODO(nhlfr): Handle AuthConfig from PullImageRequest.

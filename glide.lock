@@ -1,5 +1,5 @@
-hash: e04d6be0b6326f064beccc605e1b1ca51cfa784ff2fd66c3d96fc1384de3d510
-updated: 2017-08-20T03:59:07.425226591-07:00
+hash: f96ed038c80c62dd342149ab54a30af5b9234012df802a84809f0056076b6aa1
+updated: 2017-09-17T22:16:30.247489964-07:00
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
@@ -77,62 +77,17 @@ imports:
 - name: github.com/coreos/etcd
   version: 20490caaf0dcd96bb4a95e40625559def8ef5b04
   subpackages:
-  - alarm
-  - auth
   - auth/authpb
   - client
   - clientv3
-  - compactor
-  - discovery
-  - error
-  - etcdserver
-  - etcdserver/api
-  - etcdserver/api/v2http
-  - etcdserver/api/v2http/httptypes
-  - etcdserver/api/v3rpc
   - etcdserver/api/v3rpc/rpctypes
-  - etcdserver/auth
   - etcdserver/etcdserverpb
-  - etcdserver/membership
-  - etcdserver/stats
-  - integration
-  - lease
-  - lease/leasehttp
-  - lease/leasepb
-  - mvcc
-  - mvcc/backend
   - mvcc/mvccpb
-  - pkg/adt
-  - pkg/contention
-  - pkg/cpuutil
-  - pkg/crc
   - pkg/fileutil
-  - pkg/httputil
-  - pkg/idutil
-  - pkg/ioutil
-  - pkg/logutil
-  - pkg/monotime
-  - pkg/netutil
   - pkg/pathutil
-  - pkg/pbutil
-  - pkg/runtime
-  - pkg/schedule
-  - pkg/testutil
   - pkg/tlsutil
   - pkg/transport
   - pkg/types
-  - pkg/wait
-  - proxy/grpcproxy
-  - proxy/grpcproxy/cache
-  - raft
-  - raft/raftpb
-  - rafthttp
-  - snap
-  - snap/snappb
-  - store
-  - version
-  - wal
-  - wal/walpb
 - name: github.com/coreos/go-semver
   version: 568e959cd89871e61434c1143528d9162da89ef2
   subpackages:
@@ -146,10 +101,8 @@ imports:
 - name: github.com/coreos/pkg
   version: fa29b1d70f0beaddd4c7021607cc3c3be8ce94b8
   subpackages:
+  - capnslog
   - dlopen
-  - health
-  - httputil
-  - timeutil
 - name: github.com/coreos/rkt
   version: ec37f3cb649bfb72408906e7cbf330e4aeda1075
   subpackages:
@@ -249,7 +202,12 @@ imports:
 - name: github.com/golang/protobuf
   version: 4bd1920723d7b7c925de087aa32e2187708897f7
   subpackages:
+  - jsonpb
   - proto
+  - ptypes
+  - ptypes/any
+  - ptypes/duration
+  - ptypes/timestamp
 - name: github.com/google/cadvisor
   version: d19cc94b760cd8f150a0a5d95b404dec39a121a1
   subpackages:
@@ -480,7 +438,7 @@ imports:
   - trace
   - websocket
 - name: golang.org/x/sys
-  version: 076b546753157f758b316e59bcb51e6807c04057
+  version: 8f0908ab3b2457e2e15403d3697c9ef5cb4b57a9
   subpackages:
   - unix
   - windows
@@ -520,18 +478,28 @@ imports:
   version: 4fe9229aaa9d704f8a2a21cdcd50de2bbb6e1b57
   subpackages:
   - core/v1
+- name: k8s.io/apiextensions-apiserver
+  version: fcd622fe88a4a6efcb5aea9e94ee87324ac1b036
+  subpackages:
+  - pkg/apis/apiextensions
+  - pkg/apis/apiextensions/v1beta1
+  - pkg/client/clientset/clientset
+  - pkg/client/clientset/clientset/scheme
+  - pkg/client/clientset/clientset/typed/apiextensions/v1beta1
 - name: k8s.io/apimachinery
-  version: abe34e4f5b4413c282a83011892cbeea5b32223b
+  version: 917740426ad66ff818da4809990480bcc0786a77
   subpackages:
   - pkg/api/equality
   - pkg/api/errors
   - pkg/api/meta
   - pkg/api/resource
+  - pkg/api/testing
   - pkg/api/validation
   - pkg/api/validation/path
   - pkg/apimachinery
   - pkg/apimachinery/announced
   - pkg/apimachinery/registered
+  - pkg/apis/meta/internalversion
   - pkg/apis/meta/v1
   - pkg/apis/meta/v1/unstructured
   - pkg/apis/meta/v1/validation
@@ -579,7 +547,7 @@ imports:
   - third_party/forked/golang/netutil
   - third_party/forked/golang/reflect
 - name: k8s.io/apiserver
-  version: b74e5942e2a7ef9f73874b7e5a48c030ff7f1189
+  version: b6348e73bd115a31b70a4e9ff12d35869d057d8c
   subpackages:
   - pkg/admission
   - pkg/apis/apiserver
@@ -603,7 +571,7 @@ imports:
   - pkg/util/trace
   - pkg/util/wsstream
 - name: k8s.io/client-go
-  version: cc44961f935a644fb82c0f4b6591543704578db7
+  version: 4cbb4d746a6a36cf99d6cd4f1b69a6907f49318a
   subpackages:
   - discovery
   - discovery/fake

@@ -24,16 +24,22 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-
-	"github.com/Mirantis/virtlet/pkg/imagetranslation"
 )
+
+// Endpoint contains all the endpoint parameters needed to download a file
+// TODO: add TLS and other HTTP parameters here
+type Endpoint struct {
+	Url string `yaml:"url,omitempty" json:"url,omitempty"`
+}
 
 // Downloader is an interface for downloading files from web
 type Downloader interface {
 	// DownloadFile downloads the specified file and returns path
 	// to it
-	DownloadFile(endpoint imagetranslation.Endpoint) (string, error)
+	DownloadFile(endpoint Endpoint) (string, error)
 }
+
+
 
 type defaultDownloader struct {
 	protocol string
@@ -47,7 +53,7 @@ func NewDownloader(protocol string) Downloader {
 	return &defaultDownloader{protocol}
 }
 
-func (d *defaultDownloader) DownloadFile(endpoint imagetranslation.Endpoint) (string, error) {
+func (d *defaultDownloader) DownloadFile(endpoint Endpoint) (string, error) {
 	url := endpoint.Url
 	if !strings.Contains(url, "://") {
 		url = fmt.Sprintf("%s://%s", d.protocol, url)
