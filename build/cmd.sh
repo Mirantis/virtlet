@@ -13,8 +13,6 @@ DOCKER_SOCKET_PATH="${DOCKER_SOCKET_PATH:-/var/run/docker.sock}"
 
 # Note that project_dir must not end with slash
 project_dir="$(cd "$(dirname "${BASH_SOURCE}")/.." && pwd)"
-build_base_image="$(awk '/^FROM /{print $2}' "${project_dir}/images/Dockerfile.build")"
-virtlet_base_image="$(awk '/^FROM /{print $2}' "${project_dir}/images/Dockerfile.virtlet")"
 virtlet_image="mirantis/virtlet"
 remote_project_dir="/go/src/github.com/Mirantis/virtlet"
 build_name="virtlet_build"
@@ -58,7 +56,30 @@ function image_exists {
     docker history -q "${name}" >& /dev/null || return 1
 }
 
+function update_dockerfile_from {
+    local dockerfile="${1}"
+    local from_dockerfile="${2}"
+    local dest_var="${3:-}"
+    local cur_from="$(awk '/^FROM /{print $2}' "${dockerfile}")"
+    if [[ ${cur_from} =~ (^.*:.*-)([0-9a-f]) ]]; then
+        new_from="${BASH_REMATCH[1]}$(md5sum ${from_dockerfile} | sed 's/ .*//')"
+        if [[ ${new_from} != ${cur_from} ]]; then
+            sed -i "s@^FROM .*@FROM ${new_from}@" "${dockerfile}"
+        fi
+        if [[ ${dest_var} ]]; then
+            eval "${dest_var}=${new_from}"
+        fi
+    else
+        echo >&2 "*** ERROR: can't update FROM in ${dockerfile}: unexpected value: '${cur_from}'"
+        return 1
+    fi
+}
+
 function ensure_build_image {
+    update_dockerfile_from "${project_dir}/images/Dockerfile.build-base" "${project_dir}/images/Dockerfile.virtlet-base" virtlet_base_image
+    update_dockerfile_from "${project_dir}/images/Dockerfile.build" "${project_dir}/images/Dockerfile.build-base" build_base_image
+    update_dockerfile_from "${project_dir}/images/Dockerfile.virtlet" "${project_dir}/images/Dockerfile.virtlet-base"
+
     if ! image_exists "${build_image}"; then
         if ! image_exists "${build_base_image}"; then
             if ! image_exists "${virtlet_base_image}"; then
