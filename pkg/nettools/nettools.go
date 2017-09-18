@@ -47,6 +47,7 @@ import (
 	"github.com/containernetworking/cni/pkg/ns"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/vishvananda/netlink"
 
 	"github.com/Mirantis/virtlet/pkg/cni"
@@ -453,11 +454,11 @@ func updateEbTables(interfaceName, command string) error {
 	return nil
 }
 
-func setHardwareAddr(link netlink.Link, hwaddr net.HardwareAddr) error {
+func setHardwareAddr(link netlink.Link, hwAddr net.HardwareAddr) error {
 	if err := netlink.LinkSetDown(link); err != nil {
 		return fmt.Errorf("can't bring down the link: %v", err)
 	}
-	if err := netlink.LinkSetHardwareAddr(link, hwaddr); err != nil {
+	if err := netlink.LinkSetHardwareAddr(link, hwAddr); err != nil {
 		return fmt.Errorf("can't set hardware address for the link: %v", err)
 	}
 	if err := netlink.LinkSetUp(link); err != nil {
@@ -556,6 +557,26 @@ func SetupContainerSideNetwork(info *cnicurrent.Result) (*ContainerSideNetwork, 
 
 	if err := bringUpLoopback(); err != nil {
 		return nil, err
+	}
+
+	tapFile, err := OpenTAP(tapInterfaceName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open tap: %v", err)
+	}
+
+	return &ContainerSideNetwork{info, tapFile, hwAddr}, nil
+}
+
+// RecreateContainerSideNetwork tries to recreate
+// ContainerSideNetwork structure for already configured environment
+func RecreateContainerSideNetwork(info *cnicurrent.Result) (*ContainerSideNetwork, error) {
+	if len(info.Interfaces) == 0 {
+		return nil, fmt.Errorf("wrong cni configuration - missing interfaces list: %v", spew.Sdump(info))
+	}
+
+	hwAddr, err := net.ParseMAC(info.Interfaces[0].Mac)
+	if err != nil {
+		return nil, fmt.Errorf("invalid mac address %q: %v", info.Interfaces[0].Mac, err)
 	}
 
 	tapFile, err := OpenTAP(tapInterfaceName)

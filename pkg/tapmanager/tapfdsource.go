@@ -23,6 +23,7 @@ import (
 
 	"github.com/containernetworking/cni/pkg/ns"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
+	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 
@@ -42,6 +43,18 @@ type PodNetworkDesc struct {
 	PodName string `json:"podName"`
 	// DNS specifies DNS settings for the pod
 	DNS *cnitypes.DNS
+}
+
+// GetFDPayload contains the data that are required by TapFDSource
+// to regain already configured tap device, or create new one if CNIConfig
+// is nil
+type GetFDPayload struct {
+	// Description specifies pod network description for already
+	// prepared network configuration
+	Description *PodNetworkDesc `json:"podNetworkDesc"`
+	// CNIConfig specifies CNI configuration used to configure retaken
+	// environment
+	CNIConfig *cnicurrent.Result `json:"cniConfig"`
 }
 
 type podNetwork struct {
@@ -76,29 +89,36 @@ func NewTapFDSource(cniPluginsDir, cniConfigsDir string) (*TapFDSource, error) {
 
 // GetFD implements GetFD method of FDSource interface
 func (s *TapFDSource) GetFD(key string, data []byte) (int, []byte, error) {
-	var pnd PodNetworkDesc
-	if err := json.Unmarshal(data, &pnd); err != nil {
-		return 0, nil, fmt.Errorf("error unmarshalling pod network desc: %v", err)
+	var payload GetFDPayload
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return 0, nil, fmt.Errorf("error unmarshalling GetFD payload: %v", err)
+	}
+	pnd := payload.Description
+
+	regain := payload.CNIConfig == nil
+
+	if !regain {
+		if err := cni.CreateNetNS(pnd.PodId); err != nil {
+			return 0, nil, fmt.Errorf("error creating new netns for pod %s (%s): %v", pnd.PodName, pnd.PodId, err)
+		}
+
+		netConfig, err := s.cniClient.AddSandboxToNetwork(pnd.PodId, pnd.PodName, pnd.PodNs)
+		if err != nil {
+			return 0, nil, fmt.Errorf("error adding pod %s (%s) to CNI network: %v", pnd.PodName, pnd.PodId, err)
+		}
+		glog.V(3).Infof("CNI configuration for pod %s (%s): %s", pnd.PodName, pnd.PodId, spew.Sdump(netConfig))
+
+		if payload.Description.DNS != nil {
+			netConfig.DNS.Nameservers = pnd.DNS.Nameservers
+			netConfig.DNS.Search = pnd.DNS.Search
+			netConfig.DNS.Options = pnd.DNS.Options
+		}
+		payload.CNIConfig = netConfig
 	}
 
-	if err := cni.CreateNetNS(pnd.PodId); err != nil {
-		return 0, nil, fmt.Errorf("error creating new netns for pod %s (%s): %v", pnd.PodName, pnd.PodId, err)
-	}
-
-	netConfig, err := s.cniClient.AddSandboxToNetwork(pnd.PodId, pnd.PodName, pnd.PodNs)
-	if err != nil {
-		return 0, nil, fmt.Errorf("error adding pod %s (%s) to CNI network: %v", pnd.PodName, pnd.PodId, err)
-	}
-	glog.V(3).Infof("CNI configuration for pod %s (%s): %s", pnd.PodName, pnd.PodId, spew.Sdump(netConfig))
-
-	if pnd.DNS != nil {
-		netConfig.DNS.Nameservers = pnd.DNS.Nameservers
-		netConfig.DNS.Search = pnd.DNS.Search
-		netConfig.DNS.Options = pnd.DNS.Options
-	}
+	netConfig := payload.CNIConfig
 
 	netNSPath := cni.PodNetNSPath(pnd.PodId)
-
 	vmNS, err := ns.GetNS(netNSPath)
 	if err != nil {
 		return 0, nil, fmt.Errorf("failed to open network namespace at %q: %v", netNSPath, err)
@@ -109,16 +129,27 @@ func (s *TapFDSource) GetFD(key string, data []byte) (int, []byte, error) {
 	doneCh := make(chan error)
 	if err := vmNS.Do(func(ns.NetNS) error {
 		var err error
-		csn, err = nettools.SetupContainerSideNetwork(netConfig)
+		if regain {
+			csn, err = nettools.RecreateContainerSideNetwork(payload.CNIConfig)
+		} else {
+			csn, err = nettools.SetupContainerSideNetwork(netConfig)
+		}
 		if err != nil {
 			return err
 		}
-		// NOTE: we have info about interface hardware address, which
-		// is needed by Cloud Init support, but old cni plugins do not
-		// return it in `Result` - so we can fix it.
-		if len(netConfig.Interfaces) == 0 {
-			fixNetConfigForOldCNIPlugins(netConfig, csn)
+		if regain {
+			// NOTE: we have info about interface hardware address, which
+			// is needed by Cloud Init support, but old cni plugins do not
+			// return it in `Result` - so we can fix it.
+			if len(netConfig.Interfaces) == 0 {
+				fixNetConfigForOldCNIPlugins(netConfig, csn)
+			}
 		}
+
+		// TODO: now CNIConfig should always contain interface mac address, so there
+		// is no reason to pass it as separate field in dhcp.Config,
+		// dhcp.NewServer should need only CNIConfig, instead of dhcp.Config
+		// TODO: make dhcp server working for all defined in CNIConfig interfaces
 		dhcpConfg := &dhcp.Config{
 			CNIResult:           *csn.Result,
 			PeerHardwareAddress: csn.HardwareAddr,
@@ -151,7 +182,7 @@ func (s *TapFDSource) GetFD(key string, data []byte) (int, []byte, error) {
 	}
 
 	s.fdMap[key] = &podNetwork{
-		pnd:        pnd,
+		pnd:        *pnd,
 		csn:        csn,
 		dhcpServer: dhcpServer,
 		doneCh:     doneCh,
