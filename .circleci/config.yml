@@ -75,6 +75,10 @@ push_images: &push_images
   - run:
       name: Restore images
       command: |
+        if [[ ! ${DOCKER_USER:-} || ! ${DOCKER_PASS} ]]; then
+          echo >&2 "*** WARNING: can't push images for outside forks"
+          exit 0
+        fi
         docker load -i _output/virtlet.tar
         if [[ -f _output/images.tar ]]; then
           docker load -i _output/images.tar
@@ -82,11 +86,19 @@ push_images: &push_images
   - run:
       name: Retag the image
       command: |
+        if [[ ! ${DOCKER_USER:-} || ! ${DOCKER_PASS} ]]; then
+          echo >&2 "*** WARNING: can't push images for outside forks"
+          exit 0
+        fi
         docker tag mirantis/virtlet:latest mirantis/virtlet:"$(echo "${CIRCLE_TAG:-${CIRCLE_BRANCH}}"|tr / _)"
         docker rmi mirantis/virtlet:latest
   - run:
       name: Push the images
       command: |
+        if [[ ! ${DOCKER_USER:-} || ! ${DOCKER_PASS} ]]; then
+          echo >&2 "*** WARNING: can't push images for outside forks"
+          exit 0
+        fi
         docker login -u $DOCKER_USER -p $DOCKER_PASS
         for img in build-base virtlet-base virtlet; do
           docker images -q -f label=virtlet.image="${img}" --format '{{.Repository}}:{{.Tag}}'
@@ -305,7 +317,7 @@ workflows:
         filters:
           branches:
             ignore:
-              master
+              /^master$|^pull\//
     - push_tested:
         requires:
         - test
