@@ -33,6 +33,7 @@ import (
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	"github.com/Mirantis/virtlet/pkg/cni"
+	"github.com/Mirantis/virtlet/pkg/imagetranslation"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
 	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
@@ -53,11 +54,17 @@ type VirtletManager struct {
 	libvirtImageTool          *libvirttools.ImageTool
 	libvirtVirtualizationTool *libvirttools.VirtualizationTool
 	// metadata
-	metadataStore metadata.MetadataStore
-	fdManager     tapmanager.FDManager
+	metadataStore              metadata.MetadataStore
+	fdManager                  tapmanager.FDManager
+	imageTranslationConfigsDir string
 }
 
-func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, metadataPath, rawDevices string, fdManager tapmanager.FDManager) (*VirtletManager, error) {
+func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, metadataPath, rawDevices, imageTranslationConfigsDir string, fdManager tapmanager.FDManager) (*VirtletManager, error) {
+	err := imagetranslation.RegisterCustomResourceType()
+	if err != nil {
+		return nil, err
+	}
+
 	if downloadProtocol == "" {
 		downloadProtocol = defaultDownloadProtocol
 	}
@@ -99,11 +106,12 @@ func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, m
 	}
 
 	virtletManager := &VirtletManager{
-		server:                    grpc.NewServer(),
-		libvirtImageTool:          libvirtImageTool,
-		libvirtVirtualizationTool: libvirtVirtualizationTool,
-		metadataStore:             metadataStore,
-		fdManager:                 fdManager,
+		server:                     grpc.NewServer(),
+		libvirtImageTool:           libvirtImageTool,
+		libvirtVirtualizationTool:  libvirtVirtualizationTool,
+		metadataStore:              metadataStore,
+		fdManager:                  fdManager,
+		imageTranslationConfigsDir: imageTranslationConfigsDir,
 	}
 
 	kubeapi.RegisterRuntimeServiceServer(virtletManager.server, virtletManager)
@@ -629,7 +637,8 @@ func (v *VirtletManager) PullImage(ctx context.Context, in *kubeapi.PullImageReq
 		return nil, err
 	}
 
-	if _, err = v.libvirtImageTool.PullRemoteImageToVolume(imageName, volumeName); err != nil {
+	imageNameTranslator := v.getImageNameTranslator()
+	if _, err = v.libvirtImageTool.PullRemoteImageToVolume(imageName, volumeName, imageNameTranslator); err != nil {
 		glog.Errorf("Error when pulling image %q: %v", imageName, err)
 		return nil, err
 	}
@@ -642,6 +651,17 @@ func (v *VirtletManager) PullImage(ctx context.Context, in *kubeapi.PullImageReq
 
 	response := &kubeapi.PullImageResponse{ImageRef: imageName}
 	return response, nil
+}
+
+func (v *VirtletManager) getImageNameTranslator() imagetranslation.ImageNameTranslator {
+	var sources []imagetranslation.ConfigSource
+	sources = append(sources, imagetranslation.NewCRDSource("kube-system"))
+	if v.imageTranslationConfigsDir != "" {
+		sources = append(sources, imagetranslation.NewFileConfigSource(v.imageTranslationConfigsDir))
+	}
+	translator := imagetranslation.NewImageNameTranslator()
+	translator.LoadConfigs(sources...)
+	return translator
 }
 
 func (v *VirtletManager) RemoveImage(ctx context.Context, in *kubeapi.RemoveImageRequest) (*kubeapi.RemoveImageResponse, error) {

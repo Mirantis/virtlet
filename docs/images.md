@@ -16,6 +16,7 @@ Virtlet supports QCOW2 format for VM images.
 
 **Note:** You need to specify url without `scheme://`. In case you are using [instructions](../deploy/README.md) in `deploy/` directory to deploy Virtlet, you need to add `virtlet/` prefix to the url.
 
+Also see [Image Name Translation](image-name-translation.md) for another way of providing image URL.
 
 ## Image handling Workflow:
 1. Kubelet sends `PullImage` gRPC request to Virtlet.
