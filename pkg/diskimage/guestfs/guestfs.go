@@ -24,7 +24,7 @@ package guestfs
 
 /*
 #cgo CFLAGS:  -DGUESTFS_PRIVATE=1
-#cgo LDFLAGS: -lguestfs
+#cgo pkg-config: libguestfs
 #include <stdio.h>
 #include <stdlib.h>
 #include "guestfs.h"

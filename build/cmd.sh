@@ -303,12 +303,26 @@ function gobuild {
 }
 
 function build_image_internal {
+    build_internal
     tar -c _output -C "${project_dir}/images" image_skel/ Dockerfile.virtlet |
         docker build -t "${virtlet_image}" -f Dockerfile.virtlet -
 }
 
+function install_vendor_internal {
+    if ! hash glide 2>/dev/null; then
+        go get github.com/Masterminds/glide
+    fi
+    if [ ! -d vendor ]; then
+        glide install --strip-vendor
+    fi
+    if [ ! -f ./vendor/github.com/libvirt/libvirt-go-xml/domain.go.orig ]; then
+        patch -d vendor/github.com/libvirt/libvirt-go-xml -p1 -b -i "${project_dir}/libvirt-xml-go.patch"
+    fi
+}
+
 function run_tests_internal {
     local -a failed=()
+    install_vendor_internal
     find . -name 'go.test' \( -path ./tests/integration/go.test -o -print \) |
         sort |
         while read test_path; do
@@ -325,7 +339,19 @@ function run_tests_internal {
 }
 
 function run_integration_internal {
+    install_vendor_internal
     ( cd tests/integration && ./go.test )
+}
+
+function build_internal {
+    install_vendor_internal
+    mkdir -p "${project_dir}/_output"
+    go build -i -o "${project_dir}/_output/virtlet" ./cmd/virtlet
+    go build -i -o "${project_dir}/_output/vmwrapper" ./cmd/vmwrapper
+    go build -i -o "${project_dir}/_output/criproxy" ./cmd/criproxy
+    go build -i -o "${project_dir}/_output/flexvolume_driver" ./cmd/flexvolume_driver
+    go build -i -o "${project_dir}/_output/virtlet_log" ./cmd/virtlet_log
+    go test -i -c -o "${project_dir}/_output/virtlet-e2e-tests" ./tests/e2e
 }
 
 function usage {
@@ -359,20 +385,20 @@ case "${cmd}" in
         gobuild "$@"
         ;;
     prepare-vendor)
-        ( vcmd "./autogen.sh && ./configure && make install-vendor" )
+        ( vcmd "build/cmd.sh install-vendor-internal" )
         ;;
     build)
-        ( vcmd "./autogen.sh && ./configure && make && build/cmd.sh build-image-internal" )
+        ( vcmd "build/cmd.sh build-image-internal" )
         ;;
     build-image-internal)
         # this is executed inside the container
         build_image_internal "$@"
         ;;
     test)
-        ( vcmd './autogen.sh && ./configure && make install-vendor && build/cmd.sh run-tests-internal' )
+        ( vcmd 'build/cmd.sh run-tests-internal' )
         ;;
     integration)
-        ( vcmd './autogen.sh && ./configure && make install-vendor && build/cmd.sh run-integration-internal' )
+        ( vcmd 'build/cmd.sh run-integration-internal' )
         ;;
     run-tests-internal)
         run_tests_internal
