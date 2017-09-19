@@ -567,8 +567,8 @@ func SetupContainerSideNetwork(info *cnicurrent.Result) (*ContainerSideNetwork, 
 	return &ContainerSideNetwork{info, tapFile, hwAddr}, nil
 }
 
-// RecreateContainerSideNetwork tries to recreate
-// ContainerSideNetwork structure for already configured environment
+// RecreateContainerSideNetwork tries to populate ContainerSideNetwork
+// structure based on a network namespace that was already adjusted for Virtlet
 func RecreateContainerSideNetwork(info *cnicurrent.Result) (*ContainerSideNetwork, error) {
 	if len(info.Interfaces) == 0 {
 		return nil, fmt.Errorf("wrong cni configuration - missing interfaces list: %v", spew.Sdump(info))

@@ -23,8 +23,9 @@ import (
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
 )
 
-// RecoverNetworkNamespaces scans metadata store for all defined sandboxes
-// and tries to recreate their network configuration (with dhcp server in it)
+// RecoverNetworkNamespaces recovers all the active VM network namespaces
+// from previous Virtlet run by scanning the metadata store and starting
+// dhcp server for each namespace that's still active
 func (v *VirtualizationTool) RecoverNetworkNamespaces(fdManager tapmanager.FDManager) (allErrors []error) {
 	sandboxes, err := v.metadataStore.ListPodSandboxes(nil)
 	if err != nil {
@@ -41,7 +42,7 @@ func (v *VirtualizationTool) RecoverNetworkNamespaces(fdManager tapmanager.FDMan
 
 		cniConfig, err := cni.BytesToResult([]byte(psi.CNIConfig))
 		if err != nil {
-			allErrors = append(allErrors, fmt.Errorf("incorrect cni configuration in sandbox %q: %v", s.GetID(), err))
+			allErrors = append(allErrors, fmt.Errorf("sanbox %q has incorrect cni configuration: %v", s.GetID(), err))
 			continue
 		}
 
@@ -56,7 +57,7 @@ func (v *VirtualizationTool) RecoverNetworkNamespaces(fdManager tapmanager.FDMan
 				},
 			},
 		); err != nil {
-			allErrors = append(allErrors, fmt.Errorf("error regaining netns for %q pod: %v", s.GetID(), err))
+			allErrors = append(allErrors, fmt.Errorf("error recovering netns for %q pod: %v", s.GetID(), err))
 		}
 	}
 	return
