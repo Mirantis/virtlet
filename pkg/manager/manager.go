@@ -92,14 +92,14 @@ func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, m
 	}
 
 	if errors := libvirtVirtualizationTool.RecoverNetworkNamespaces(fdManager); errors != nil {
-		glog.Warning("During regaining network namespaces encountered above errors:")
+		glog.Warning("The following errors were encountered while recovering the VM network namespaces:")
 		for _, err := range errors {
 			glog.Warningf("* %q", err)
 		}
 	}
 
 	if errors := libvirtVirtualizationTool.GarbageCollect(); errors != nil {
-		glog.Warning("During garbage collecting encountered above errors:")
+		glog.Warning("The following errors were encountered while garbage collection process:")
 		for _, err := range errors {
 			glog.Warningf("* %q", err)
 		}

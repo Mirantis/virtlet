@@ -46,8 +46,8 @@ type PodNetworkDesc struct {
 }
 
 // GetFDPayload contains the data that are required by TapFDSource
-// to regain already configured tap device, or create new one if CNIConfig
-// is nil
+// to recover the tap device that was already configured, or create a new one
+// if CNIConfig is nil
 type GetFDPayload struct {
 	// Description specifies pod network description for already
 	// prepared network configuration
@@ -95,9 +95,9 @@ func (s *TapFDSource) GetFD(key string, data []byte) (int, []byte, error) {
 	}
 	pnd := payload.Description
 
-	regain := payload.CNIConfig == nil
+	recover := payload.CNIConfig == nil
 
-	if !regain {
+	if !recover {
 		if err := cni.CreateNetNS(pnd.PodId); err != nil {
 			return 0, nil, fmt.Errorf("error creating new netns for pod %s (%s): %v", pnd.PodName, pnd.PodId, err)
 		}
@@ -129,7 +129,7 @@ func (s *TapFDSource) GetFD(key string, data []byte) (int, []byte, error) {
 	doneCh := make(chan error)
 	if err := vmNS.Do(func(ns.NetNS) error {
 		var err error
-		if regain {
+		if recover {
 			csn, err = nettools.RecreateContainerSideNetwork(payload.CNIConfig)
 		} else {
 			csn, err = nettools.SetupContainerSideNetwork(netConfig)
@@ -137,19 +137,16 @@ func (s *TapFDSource) GetFD(key string, data []byte) (int, []byte, error) {
 		if err != nil {
 			return err
 		}
-		if regain {
-			// NOTE: we have info about interface hardware address, which
-			// is needed by Cloud Init support, but old cni plugins do not
-			// return it in `Result` - so we can fix it.
-			if len(netConfig.Interfaces) == 0 {
-				fixNetConfigForOldCNIPlugins(netConfig, csn)
-			}
-		}
+
+		// NOTE: older CNI plugins don't include the hardware address
+		// in Result, but it's needed for Cloud-Init based
+		// network setup, so we add it here if it's missing
+		ensureCNIInterfaceHwAddress(netConfig, csn)
 
 		// TODO: now CNIConfig should always contain interface mac address, so there
 		// is no reason to pass it as separate field in dhcp.Config,
 		// dhcp.NewServer should need only CNIConfig, instead of dhcp.Config
-		// TODO: make dhcp server working for all defined in CNIConfig interfaces
+		// TODO: set up DHCP server for all the interfaces defined in CNIConfig
 		dhcpConfg := &dhcp.Config{
 			CNIResult:           *csn.Result,
 			PeerHardwareAddress: csn.HardwareAddr,
@@ -238,9 +235,13 @@ func (s *TapFDSource) GetInfo(key string) ([]byte, error) {
 	return pn.csn.HardwareAddr, nil
 }
 
-func fixNetConfigForOldCNIPlugins(netConfig *cnicurrent.Result, csn *nettools.ContainerSideNetwork) {
-	// If there is no info about interfaces, we can assume that this is
-	// old style cni plugin, which support just one interface
+func ensureCNIInterfaceHwAddress(netConfig *cnicurrent.Result, csn *nettools.ContainerSideNetwork) {
+	// If there's no interface info in netConfig, we can assume that we're dealing
+	// with an old-style CNI plugin which only supports a single network interface
+	if len(netConfig.Interfaces) > 0 {
+		return
+	}
+
 	iface := &cnicurrent.Interface{
 		Name: "cni0",
 		Mac:  csn.HardwareAddr.String(),
