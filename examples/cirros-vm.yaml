@@ -39,7 +39,6 @@ spec:
     # virtlet/ prefix is used by CRI proxy, the remaining part
     # of the image name is prepended with https:// and used to download the image
     image: virtlet/cirros
-
     # Virtlet currently ignores image tags, but their meaning may change
     # in future, so it’s better not to set them for VM pods. If there’s no tag
     # provided in the image specification kubelet defaults to
@@ -49,6 +48,9 @@ spec:
     # so a previously downloaded image is reused if there is one
     # in Virtlet’s image store
     imagePullPolicy: IfNotPresent
+    # tty and stdin required for `kubectl attach -t` to work
+    tty: true
+    stdin: true
     resources:
       limits:
         # This memory limit is applied to the libvirt domain definition

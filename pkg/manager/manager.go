@@ -36,6 +36,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/imagetranslation"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
 	"github.com/Mirantis/virtlet/pkg/metadata"
+	"github.com/Mirantis/virtlet/pkg/stream"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/Mirantis/virtlet/pkg/virt"
@@ -57,6 +58,7 @@ type VirtletManager struct {
 	metadataStore              metadata.MetadataStore
 	fdManager                  tapmanager.FDManager
 	imageTranslationConfigsDir string
+	StreamServer               *stream.Server
 }
 
 func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, metadataPath, rawDevices, imageTranslationConfigsDir string, fdManager tapmanager.FDManager) (*VirtletManager, error) {
@@ -488,9 +490,9 @@ func (v *VirtletManager) Exec(context.Context, *kubeapi.ExecRequest) (*kubeapi.E
 	return nil, errors.New("not implemented")
 }
 
-func (v *VirtletManager) Attach(context.Context, *kubeapi.AttachRequest) (*kubeapi.AttachResponse, error) {
-	glog.Errorf("Attach() not implemented")
-	return nil, errors.New("not implemented")
+func (v *VirtletManager) Attach(ctx context.Context, req *kubeapi.AttachRequest) (*kubeapi.AttachResponse, error) {
+	glog.V(3).Infof("Attach called: %s", spew.Sdump(req))
+	return v.StreamServer.GetAttach(req)
 }
 
 func (v *VirtletManager) PortForward(context.Context, *kubeapi.PortForwardRequest) (*kubeapi.PortForwardResponse, error) {

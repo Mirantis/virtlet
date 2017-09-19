@@ -71,7 +71,7 @@ type domainSettings struct {
 	vmLogLocation    string
 }
 
-func (ds *domainSettings) createDomain() *libvirtxml.Domain {
+func (ds *domainSettings) createDomain(config *VMConfig) *libvirtxml.Domain {
 	domainType := defaultDomainType
 	emulator := defaultEmulator
 	if !ds.useKvm {
@@ -152,6 +152,12 @@ func (ds *domainSettings) createDomain() *libvirtxml.Domain {
 			Envs: []libvirtxml.DomainQEMUCommandlineEnv{
 				libvirtxml.DomainQEMUCommandlineEnv{Name: "VIRTLET_EMULATOR", Value: emulator},
 				libvirtxml.DomainQEMUCommandlineEnv{Name: "VIRTLET_NET_KEY", Value: ds.netFdKey},
+				libvirtxml.DomainQEMUCommandlineEnv{Name: "VIRTLET_POD_NAME", Value: config.PodName},
+				libvirtxml.DomainQEMUCommandlineEnv{Name: "VIRTLET_POD_NAMESPACE", Value: config.PodNamespace},
+				libvirtxml.DomainQEMUCommandlineEnv{Name: "VIRTLET_POD_UID", Value: config.PodSandboxId},
+				libvirtxml.DomainQEMUCommandlineEnv{Name: "VIRTLET_CONTAINER_ID", Value: config.DomainUUID},
+				libvirtxml.DomainQEMUCommandlineEnv{Name: "VIRTLET_CONTAINER_NAME", Value: config.Name},
+				libvirtxml.DomainQEMUCommandlineEnv{Name: "CONTAINER_ATTEMPTS", Value: fmt.Sprint(config.Attempt)},
 			},
 		},
 	}
@@ -294,31 +300,11 @@ func (v *VirtualizationTool) RemoveLibvirtSandboxLog(sandboxId string) error {
 func (v *VirtualizationTool) addSerialDevicesToDomain(sandboxId, containerName string, containerAttempt uint32, domain *libvirtxml.Domain, settings domainSettings) error {
 	port := uint(0)
 	if settings.vmLogLocation != vmLogLocationPty {
-		logDir := filepath.Join(settings.vmLogLocation, sandboxId)
-		logPath := filepath.Join(logDir, fmt.Sprintf("%s_%d.log", containerName, containerAttempt))
-
-		// Prepare directory where libvirt will store log file to.
-		if _, err := os.Stat(logDir); os.IsNotExist(err) {
-			if err := os.Mkdir(logDir, 0755); err != nil {
-				return fmt.Errorf("failed to create vmLogDir %q: %v", logDir, err)
-			}
-			if err := ChownForEmulator(logDir); err != nil {
-				return fmt.Errorf("failed to chown vmLogDir %q: %v", err)
-			}
-		}
-
 		domain.Devices.Serials = []libvirtxml.DomainSerial{
 			{
-				Type:   "file",
+				Type:   "unix",
+				Source: &libvirtxml.DomainChardevSource{Mode: "connect", Path: "/var/lib/libvirt/streamer.sock"},
 				Target: &libvirtxml.DomainSerialTarget{Port: &port},
-				Source: &libvirtxml.DomainChardevSource{Path: logPath},
-			},
-		}
-		domain.Devices.Consoles = []libvirtxml.DomainConsole{
-			{
-				Type:   "file",
-				Target: &libvirtxml.DomainConsoleTarget{Type: "serial", Port: &port},
-				Source: &libvirtxml.DomainChardevSource{Path: logPath},
 			},
 		}
 	} else {
@@ -370,7 +356,7 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netFdKey string) 
 	}
 
 	settings.useKvm = v.forceKVM || canUseKvm()
-	domainConf := settings.createDomain()
+	domainConf := settings.createDomain(config)
 
 	if err := v.setupVolumes(config, domainConf); err != nil {
 		return "", err

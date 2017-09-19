@@ -37,3 +37,10 @@ import:
 - package: github.com/onsi/gomega
 - package: k8s.io/apiextensions-apiserver
   version: fcd622fe88a4a6efcb5aea9e94ee87324ac1b036
+- package: k8s.io/metrics
+  version: 8efbc8e22d00b9c600afec5f1c14073fd2412fce
+- package: k8s.io/api
+  version: 4fe9229aaa9d704f8a2a21cdcd50de2bbb6e1b57
+- package: golang.org/x/sync
+  subpackages:
+  - syncmap
