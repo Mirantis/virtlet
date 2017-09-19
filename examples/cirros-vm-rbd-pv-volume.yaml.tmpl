@@ -50,6 +50,9 @@ spec:
   containers:
   - name: cirros-vm-rbd-pv
     image: virtlet/image-service.kube-system/cirros
+    # tty and stdin required for `kubectl attach -t` to work
+    tty: true
+    stdin: true
     resources:
       limits:
         # This memory limit is applied to the libvirt domain definition

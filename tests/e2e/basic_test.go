@@ -19,7 +19,6 @@ package e2e
 import (
 	"encoding/json"
 	"fmt"
-	"path"
 	"strings"
 	"time"
 
@@ -119,33 +118,20 @@ var _ = Describe("Basic cirros tests", func() {
 
 			domain, err := vm.Domain()
 			Expect(err).NotTo(HaveOccurred())
-			var logPath string
-			for _, serial := range domain.Devices.Serials {
-				if serial.Type == "file" {
-					logPath = serial.Source.Path
-					break
+			var vmName, attempt string
+			for _, env := range domain.QEMUCommandline.Envs {
+				if env.Name == "VIRTLET_POD_NAME" {
+					vmName = env.Value
+				} else if env.Name == "CONTAINER_ATTEMPTS" {
+					attempt = env.Value
+				} else if env.Name == "VIRTLET_POD_UID" {
+					sandboxID = env.Value
 				}
 			}
-			Expect(logPath).NotTo(BeEmpty())
-			var dir string
-			dir, filename = path.Split(logPath)
-			sandboxID = path.Base(dir)
-		})
-
-		It("Should contain login string in VM log", func() {
-			Eventually(func() error {
-				out, err := framework.ExecSimple(nodeExecutor, "cat",
-					fmt.Sprintf("/var/log/virtlet/vms/%s/%s", sandboxID, filename))
-				if err != nil {
-					return err
-				}
-				fmt.Printf("OUT:\n%s\n---\n", out)
-				n := strings.Count(out, "login as 'cirros' user. default password: 'cubswin:)'. use 'sudo' for root.")
-				if n != 1 {
-					return fmt.Errorf("expected login prompt to appear exactly once in the log, but got %d occurences", n)
-				}
-				return nil
-			}, 60*5, 5)
+			Expect(sandboxID).NotTo(BeEmpty())
+			Expect(vmName).NotTo(BeEmpty())
+			Expect(attempt).NotTo(BeEmpty())
+			filename = fmt.Sprintf("%s_%s.log", vmName, attempt)
 		})
 
 		It("Should contain login string in pod log and each line of that log must be a valid JSON", func() {
