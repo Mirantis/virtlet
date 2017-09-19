@@ -267,7 +267,7 @@ function start_dind {
     kubectl label node --overwrite "${virtlet_node}" extraRuntime=virtlet
     kubectl create configmap -n kube-system virtlet-config "${virtlet_config[@]}"
     kubectl create configmap -n kube-system virtlet-image-translations --from-file "${project_dir}/deploy/images.yaml"
-    kubectl create -f "${project_dir}/deploy/virtlet-ds-dev.yaml"
+    kubectl create -f "${project_dir}/deploy/virtlet-ds.yaml"
 }
 
 function virtlet_subdir {
@@ -357,7 +357,6 @@ function build_internal {
     go build -i -o "${project_dir}/_output/vmwrapper" ./cmd/vmwrapper
     go build -i -o "${project_dir}/_output/criproxy" ./cmd/criproxy
     go build -i -o "${project_dir}/_output/flexvolume_driver" ./cmd/flexvolume_driver
-    go build -i -o "${project_dir}/_output/virtlet_log" ./cmd/virtlet_log
     go test -i -c -o "${project_dir}/_output/virtlet-e2e-tests" ./tests/e2e
 }
 

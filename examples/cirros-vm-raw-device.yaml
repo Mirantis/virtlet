@@ -18,6 +18,9 @@ spec:
     - name: cirros-vm
       imagePullPolicy: IfNotPresent
       image: virtlet/image-service/cirros
+      # tty and stdin required for `kubectl attach -t` to work
+      tty: true
+      stdin: true
   volumes:
   - name: raw
     flexVolume:

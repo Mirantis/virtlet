@@ -28,6 +28,7 @@ import (
 
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
 	"github.com/Mirantis/virtlet/pkg/manager"
+	"github.com/Mirantis/virtlet/pkg/stream"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
 )
 
@@ -80,6 +81,23 @@ func runVirtlet() {
 	if err != nil {
 		glog.Errorf("Initializing server failed: %v", err)
 		os.Exit(1)
+	}
+
+	kubernetesDir := os.Getenv("KUBERNETES_POD_LOGS")
+	if kubernetesDir == "" {
+		glog.Infoln("KUBERNETES_POD_LOGS environment variables must be set")
+		os.Exit(1)
+	}
+	streamServer, err := stream.NewServer(kubernetesDir, "/var/lib/libvirt/streamer.sock")
+	if err != nil {
+		glog.V(1).Infoln("Could not create stream server: %s", err)
+		os.Exit(2)
+	}
+	server.StreamServer = streamServer
+	err = server.StreamServer.Start()
+	if err != nil {
+		glog.V(1).Infoln("Could not start stream server: %s", err)
+
 	}
 	glog.V(1).Infof("Starting server on socket %s", *listen)
 	if err = server.Serve(*listen); err != nil {

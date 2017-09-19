@@ -26,6 +26,9 @@ spec:
   - name: ubuntu-vm
     image: virtlet/cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img
     imagePullPolicy: IfNotPresent
+    # tty and stdin required for `kubectl attach -t` to work
+    tty: true
+    stdin: true
     volumeMounts:
     - name: docker
       mountPath: /var/lib/docker

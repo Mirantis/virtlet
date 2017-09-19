@@ -19,7 +19,6 @@ package e2e
 import (
 	"encoding/json"
 	"fmt"
-	"path"
 	"strings"
 	"time"
 
@@ -119,25 +118,21 @@ var _ = Describe("Basic cirros tests", func() {
 
 			domain, err := vm.Domain()
 			Expect(err).NotTo(HaveOccurred())
-			var logPath string
-			for _, serial := range domain.Devices.Serials {
-				if serial.Type == "file" {
-					logPath = serial.Source.Path
-					break
+			var vmName, attempt string
+			for _, env := range domain.QEMUCommandline.Envs {
+				if env.Name == "VIRTLET_POD_NAME" {
+					vmName = env.Value
+				} else if env.Name == "CONTAINER_ATTEMPTS" {
+					attempt = env.Value
+				} else if env.Name == "VIRTLET_POD_UID" {
+					sandboxID = env.Value
 				}
 			}
-			Expect(logPath).NotTo(BeEmpty())
-			var dir string
-			dir, filename = path.Split(logPath)
-			sandboxID = path.Base(dir)
-		})
+			Expect(sandboxID).NotTo(BeEmpty())
+			Expect(vmName).NotTo(BeEmpty())
+			Expect(attempt).NotTo(BeEmpty())
+			filename = fmt.Sprintf("%s_%s.log", vmName, attempt)
 
-		It("Should contain login string in VM log", func() {
-			out := do(framework.ExecSimple(nodeExecutor, "cat",
-				fmt.Sprintf("/var/log/virtlet/vms/%s/%s", sandboxID, filename))).(string)
-			Expect(strings.Count(out,
-				"login as 'cirros' user. default password: 'cubswin:)'. use 'sudo' for root.",
-			)).To(Equal(1))
 		})
 
 		It("Should contain login string in pod log and each line of that log must be a valid JSON", func() {
