@@ -27,7 +27,8 @@ inside the container but you can override the path by setting
 
 ## build
 
-Performs full build based on autotools.
+Performs a full build of Virtlet. Also builds
+`mirantis/virtlet:latest` image.
 
 ## test
 
