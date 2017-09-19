@@ -152,6 +152,7 @@ function ensure_build_container {
                -e CIRCLE_PULL_REQUEST="${CIRCLE_PULL_REQUEST:-}" \
                -e CIRCLE_BRANCH="${CIRCLE_PULL_REQUEST:-}" \
                -e CRIPROXY_TEST_REMOTE_DOCKER_ENDPOINT="${CRIPROXY_TEST_REMOTE_DOCKER_ENDPOINT:-}" \
+               -e VIRTLET_ON_MASTER="${VIRTLET_ON_MASTER:-}" \
                ${docker_cert_args[@]+"${docker_cert_args[@]}"} \
                --name virtlet-build \
                --tmpfs /tmp \
