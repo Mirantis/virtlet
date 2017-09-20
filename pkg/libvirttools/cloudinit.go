@@ -127,6 +127,7 @@ func (g *CloudInitGenerator) generateNetworkConfiguration() ([]byte, error) {
 
 	var config []map[string]interface{}
 
+	// physical interfaces
 	for i, iface := range cniResult.Interfaces {
 		interfaceConf := map[string]interface{}{
 			"type":        "physical",
@@ -135,6 +136,16 @@ func (g *CloudInitGenerator) generateNetworkConfiguration() ([]byte, error) {
 			"subnets":     g.getSubnetsForNthInterface(i, cniResult),
 		}
 		config = append(config, interfaceConf)
+	}
+
+	// routes
+	for _, cniRoute := range cniResult.Routes {
+		route := map[string]interface{}{
+			"type":        "route",
+			"destination": cniRoute.Dst.String(),
+			"gateway":     cniRoute.GW.String(),
+		}
+		config = append(config, route)
 	}
 
 	r, err := yaml.Marshal(map[string]interface{}{
@@ -177,7 +188,6 @@ func (g *CloudInitGenerator) getSubnetsForNthInterface(interfaceNo int, cniResul
 		})
 	}
 
-	// TODO: parse cniResult.Routes and add them to correct subnet configuration
 	return subnets
 }
 
