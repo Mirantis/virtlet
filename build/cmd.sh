@@ -11,7 +11,7 @@ VIRTLET_ON_MASTER="${VIRTLET_ON_MASTER:-}"
 # XXX: try to extract the docker socket path from DOCKER_HOST if it's set to unix://...
 DOCKER_SOCKET_PATH="${DOCKER_SOCKET_PATH:-/var/run/docker.sock}"
 FORCE_UPDATE_IMAGE="${FORCE_UPDATE_IMAGE:-}"
-IMAGE_REGEXP_TRANSLATION="${IMAGE_REGEXP_TRANSLATION:-}"
+IMAGE_REGEXP_TRANSLATION="${IMAGE_REGEXP_TRANSLATION:-1}"
 
 # Note that project_dir must not end with slash
 project_dir="$(cd "$(dirname "${BASH_SOURCE}")/.." && pwd)"
