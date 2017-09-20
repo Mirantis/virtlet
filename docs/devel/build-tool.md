@@ -27,7 +27,8 @@ inside the container but you can override the path by setting
 
 ## build
 
-Performs full build based on autotools.
+Performs a full build of Virtlet. Also builds
+`mirantis/virtlet:latest` image.
 
 ## test
 
@@ -62,6 +63,9 @@ Starts Virtlet on kube-node-1 of `kubeadm-dind-cluster` (or
 kube-master if `VIRTLET_ON_MASTER` environment variable is set to a
 non-empty value). You need to do `dind-cluster...sh up` and
 `build/cmd.sh copy-dind` to be able to use this command.
+This command copies locally-built `mirantis/virtlet` image to
+the DIND node that will run Virtlet if it doesn't exist there
+or if `FORCE_UPDATE_IMAGE` is set to a non-empty value.
 
 ## vsh
 

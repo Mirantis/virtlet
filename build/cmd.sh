@@ -10,6 +10,7 @@ VIRTLET_RSYNC_PORT="${VIRTLET_RSYNC_PORT:-18730}"
 VIRTLET_ON_MASTER="${VIRTLET_ON_MASTER:-}"
 # XXX: try to extract the docker socket path from DOCKER_HOST if it's set to unix://...
 DOCKER_SOCKET_PATH="${DOCKER_SOCKET_PATH:-/var/run/docker.sock}"
+FORCE_UPDATE_IMAGE="${FORCE_UPDATE_IMAGE:-}"
 
 # Note that project_dir must not end with slash
 project_dir="$(cd "$(dirname "${BASH_SOURCE}")/.." && pwd)"
@@ -152,6 +153,7 @@ function ensure_build_container {
                -e CIRCLE_PULL_REQUEST="${CIRCLE_PULL_REQUEST:-}" \
                -e CIRCLE_BRANCH="${CIRCLE_PULL_REQUEST:-}" \
                -e CRIPROXY_TEST_REMOTE_DOCKER_ENDPOINT="${CRIPROXY_TEST_REMOTE_DOCKER_ENDPOINT:-}" \
+               -e VIRTLET_ON_MASTER="${VIRTLET_ON_MASTER:-}" \
                ${docker_cert_args[@]+"${docker_cert_args[@]}"} \
                --name virtlet-build \
                --tmpfs /tmp \
@@ -256,6 +258,10 @@ function start_dind {
     kubectl label node --overwrite "${virtlet_node}" extraRuntime=virtlet
     if ! kvm_ok; then
         kubectl create configmap -n kube-system virtlet-config --from-literal=disable_kvm=y
+    fi
+    if [[ ${FORCE_UPDATE_IMAGE} ]] || ! docker exec "${virtlet_node}" docker history -q mirantis/virtlet:latest >&/dev/null; then
+        echo >&2 "Propagating Virtlet image to the node container..."
+        vcmd "docker save '${virtlet_image}' | docker exec -i '${virtlet_node}' docker load"
     fi
     kubectl create -f "${project_dir}/deploy/virtlet-ds-dev.yaml"
 }
