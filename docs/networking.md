@@ -46,16 +46,18 @@ pair with one end belonging to the pod network namespace.
 1. On `RunPodSandBox` request Virtlet requests `tapmanager` process to
    set up the networking for the VM by sending it a command over its
    Unix domain socket
-2. `tapmanager` sets up the network according to the above diagram
+1. `tapmanager` sets up the network according to the above diagram
    (see below for more details)
-3. When the VM is started, Virtlet wraps the emulator using `vmwrapper` program
+1. `tapmanager` returns to Virtlet prepared network configuration
+   which is then added to Cloud-Init data source
+1. When the VM is started, Virtlet wraps the emulator using `vmwrapper` program
    which it passes `VIRTLET_NET_KEY` environment variable containing the key
    the was used by `tapmanager` to set up the network.
-4. `vmwrapper` uses the key to ask `tapmanager` to send it the file
+1. `vmwrapper` uses the key to ask `tapmanager` to send it the file
    descriptor for the tap interface over `tapmanager`'s Unix domain
    socket. It then extends emulator command line arguments to make it
    use the tap device and then `exec`s the emulator.
-5. Upon `StopPodSandbox`, Virtlet requests `tapmanager` to tear down
+1. Upon `StopPodSandbox`, Virtlet requests `tapmanager` to tear down
    the VM network.
 
 The rationale for having separate `tapmanager` process is
