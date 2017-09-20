@@ -27,11 +27,14 @@ import (
 	"path/filepath"
 	"strings"
 
+	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
+	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/flexvolume"
+	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
@@ -40,13 +43,21 @@ const (
 )
 
 type CloudInitGenerator struct {
-	config    *VMConfig
-	volumeMap map[string]string
-	isoDir    string
+	config         *VMConfig
+	podSandboxInfo *metadata.PodSandboxInfo
+	volumeMap      map[string]string
+	isoDir         string
 }
 
-func NewCloudInitGenerator(config *VMConfig, volumeMap map[string]string, isoDir string) *CloudInitGenerator {
-	return &CloudInitGenerator{config: config, volumeMap: volumeMap, isoDir: isoDir}
+func NewCloudInitGenerator(config *VMConfig, volumeMap map[string]string,
+	isoDir string, podSandboxInfo *metadata.PodSandboxInfo) *CloudInitGenerator {
+
+	return &CloudInitGenerator{
+		config:         config,
+		podSandboxInfo: podSandboxInfo,
+		volumeMap:      volumeMap,
+		isoDir:         isoDir,
+	}
 }
 
 func (g *CloudInitGenerator) generateMetaData() ([]byte, error) {
@@ -103,6 +114,83 @@ func (g *CloudInitGenerator) generateUserData() ([]byte, error) {
 	return []byte("#cloud-config\n" + string(r)), nil
 }
 
+func (g *CloudInitGenerator) generateNetworkConfiguration() ([]byte, error) {
+	cniResult, err := cni.BytesToResult([]byte(g.podSandboxInfo.CNIConfig))
+	if err != nil {
+		return nil, err
+	}
+	if cniResult == nil {
+		// This can only happen during integration tests
+		// where a dummy sandbox is used
+		return []byte("version: 1\n"), nil
+	}
+
+	var config []map[string]interface{}
+
+	// physical interfaces
+	for i, iface := range cniResult.Interfaces {
+		interfaceConf := map[string]interface{}{
+			"type":        "physical",
+			"name":        iface.Name,
+			"mac_address": iface.Mac,
+			"subnets":     g.getSubnetsForNthInterface(i, cniResult),
+		}
+		config = append(config, interfaceConf)
+	}
+
+	// routes
+	for _, cniRoute := range cniResult.Routes {
+		route := map[string]interface{}{
+			"type":        "route",
+			"destination": cniRoute.Dst.String(),
+			"gateway":     cniRoute.GW.String(),
+		}
+		config = append(config, route)
+	}
+
+	r, err := yaml.Marshal(map[string]interface{}{
+		"config": config,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return []byte("version: 1\n" + string(r)), nil
+}
+
+func (g *CloudInitGenerator) getSubnetsForNthInterface(interfaceNo int, cniResult *cnicurrent.Result) []map[string]interface{} {
+	var subnets []map[string]interface{}
+	for _, ipConfig := range cniResult.IPs {
+		if ipConfig.Interface == interfaceNo {
+			subnet := map[string]interface{}{
+				"type":    "static",
+				"address": ipConfig.Address.String(),
+			}
+			if !ipConfig.Gateway.IsUnspecified() {
+				subnet["gateway"] = ipConfig.Gateway.String()
+			}
+			// Cloud Init requires dns settings on the subnet level (yeah, I know...)
+			// while we get just one setting for all the IP configurations from CNI,
+			// so as a workaround we're adding it to all subnets configurations
+			if cniResult.DNS.Nameservers != nil {
+				subnet["dns_nameservers"] = cniResult.DNS.Nameservers
+			}
+			if cniResult.DNS.Search != nil {
+				subnet["dns_search"] = cniResult.DNS.Search
+			}
+			subnets = append(subnets, subnet)
+		}
+	}
+
+	// fallback to dhcp - should never happen, we always should have IPs
+	if subnets == nil {
+		subnets = append(subnets, map[string]interface{}{
+			"type": "dhcp",
+		})
+	}
+
+	return subnets
+}
+
 func (g *CloudInitGenerator) IsoPath() string {
 	return filepath.Join(g.isoDir, fmt.Sprintf("nocloud-%s.iso", g.config.DomainUUID))
 }
@@ -114,18 +202,22 @@ func (g *CloudInitGenerator) GenerateDisk() (*libvirtxml.DomainDisk, error) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	var metaData, userData []byte
+	var metaData, userData, networkConfiguration []byte
 	metaData, err = g.generateMetaData()
 	if err == nil {
 		userData, err = g.generateUserData()
+	}
+	if err == nil {
+		networkConfiguration, err = g.generateNetworkConfiguration()
 	}
 	if err != nil {
 		return nil, err
 	}
 
 	if err := utils.WriteFiles(tmpDir, map[string][]byte{
-		"user-data": userData,
-		"meta-data": metaData,
+		"user-data":      userData,
+		"meta-data":      metaData,
+		"network-config": networkConfiguration,
 	}); err != nil {
 		return nil, fmt.Errorf("can't write user-data: %v", err)
 	}
@@ -275,6 +367,9 @@ func (m *WriteFilesManipulator) AddFileLikeMounts() {
 			"permissions": "0644",
 		}}
 	})
+}
+
+func (m *WriteFilesManipulator) AddNetworkConfiguration() {
 }
 
 func (m *WriteFilesManipulator) addFilesForVolumeType(suffix, permissions string) {

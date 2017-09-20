@@ -29,10 +29,37 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ghodss/yaml"
 
+	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 )
+
+var dummyPodSandboxInfoWithFakeNetConf metadata.PodSandboxInfo
+
+func init() {
+	dummyPodSandboxInfoWithFakeNetConf.CNIConfig = `{
+  "cniVersion": "0.3.1",
+  "interfaces": [
+      {
+          "name": "cni0",
+	  "mac": "00:11:22:33:44:55"
+      }
+  ],
+  "ips": [
+      {
+          "version": "4",
+          "address": "1.1.1.1/8",
+          "gateway": "1.2.3.4",
+          "interface": 0
+      }
+  ],
+  "dns": {
+    "nameservers": ["1.2.3.4"],
+    "search": ["some", "search"]
+  }
+}`
+}
 
 type fakeFlexvolume struct {
 	uuid string
@@ -287,7 +314,7 @@ func TestCloudInitGenerator(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// we're not invoking actual iso generation here so "/foobar"
 			// as isoDir will do
-			g := NewCloudInitGenerator(tc.config, tc.volumeMap, "/foobar")
+			g := NewCloudInitGenerator(tc.config, tc.volumeMap, "/foobar", nil)
 
 			metaDataBytes, err := g.generateMetaData()
 			if err != nil {
@@ -337,7 +364,7 @@ func TestGenerateDisk(t *testing.T) {
 		PodName:           "foo",
 		PodNamespace:      "default",
 		ParsedAnnotations: &VirtletAnnotations{},
-	}, nil, tmpDir)
+	}, nil, tmpDir, &dummyPodSandboxInfoWithFakeNetConf)
 	diskDef, err := g.GenerateDisk()
 	if err != nil {
 		t.Fatalf("GenerateDisk(): %v", err)
@@ -356,8 +383,9 @@ func TestGenerateDisk(t *testing.T) {
 		t.Fatalf("IsoToMap(): %v", err)
 	}
 	if !reflect.DeepEqual(m, map[string]interface{}{
-		"meta-data": "{\"instance-id\":\"foo.default\",\"local-hostname\":\"foo\"}",
-		"user-data": "#cloud-config\n",
+		"meta-data":      "{\"instance-id\":\"foo.default\",\"local-hostname\":\"foo\"}",
+		"network-config": "version: 1\nconfig:\n- mac_address: \"00:11:22:33:44:55\"\n  name: cni0\n  subnets:\n  - address: 1.1.1.1/8\n    dns_nameservers:\n    - 1.2.3.4\n    dns_search:\n    - some\n    - search\n    gateway: 1.2.3.4\n    type: static\n  type: physical\n",
+		"user-data":      "#cloud-config\n",
 	}) {
 		t.Errorf("Bad iso content:\n%s", spew.Sdump(m))
 	}
@@ -369,7 +397,7 @@ func TestEnvDataGeneration(t *testing.T) {
 		Environment: []*VMKeyValue{
 			{Key: "key", Value: "value"},
 		},
-	}, nil, "")
+	}, nil, "", nil)
 
 	output := g.generateEnvVarsContent()
 	if output != expected {

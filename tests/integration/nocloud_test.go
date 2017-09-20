@@ -27,8 +27,9 @@ import (
 )
 
 const (
-	noCloudMetaData = "{\"instance-id\":\"testName_0.default\",\"local-hostname\":\"testName_0\"}"
-	noCloudUserData = "#cloud-config\n"
+	noCloudMetaData      = "{\"instance-id\":\"testName_0.default\",\"local-hostname\":\"testName_0\"}"
+	noCloudUserData      = "#cloud-config\n"
+	noCloudNetworkConfig = "version: 1\n"
 )
 
 func TestCloudInitNoCloud(t *testing.T) {
@@ -51,8 +52,9 @@ func TestCloudInitNoCloud(t *testing.T) {
 		t.Fatalf("isoToMap() on %q: %v", isoPath, err)
 	}
 	expectedFiles := map[string]interface{}{
-		"meta-data": noCloudMetaData,
-		"user-data": noCloudUserData,
+		"meta-data":      noCloudMetaData,
+		"network-config": noCloudNetworkConfig,
+		"user-data":      noCloudUserData,
 	}
 	if !reflect.DeepEqual(files, expectedFiles) {
 		t.Errorf("bad nocloud metadata iso:\n%s\n-- instead of --\n%s", utils.MapToJson(files), utils.MapToJson(expectedFiles))

@@ -964,5 +964,6 @@ func (v *VirtualizationTool) ContainerStatus(containerId string) (*kubeapi.Conta
 func (v *VirtualizationTool) StoragePool() virt.VirtStoragePool           { return v.volumePool }
 func (v *VirtualizationTool) DomainConnection() virt.VirtDomainConnection { return v.domainConn }
 func (v *VirtualizationTool) ImageManager() ImageManager                  { return v.imageManager }
+func (v *VirtualizationTool) MetadataStore() metadata.MetadataStore       { return v.metadataStore }
 func (v *VirtualizationTool) RawDevices() []string                        { return v.rawDevices }
 func (v *VirtualizationTool) KubeletRootDir() string                      { return v.kubeletRootDir }
