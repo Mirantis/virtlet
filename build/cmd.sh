@@ -11,6 +11,7 @@ VIRTLET_ON_MASTER="${VIRTLET_ON_MASTER:-}"
 # XXX: try to extract the docker socket path from DOCKER_HOST if it's set to unix://...
 DOCKER_SOCKET_PATH="${DOCKER_SOCKET_PATH:-/var/run/docker.sock}"
 FORCE_UPDATE_IMAGE="${FORCE_UPDATE_IMAGE:-}"
+IMAGE_REGEXP_TRANSLATION="${IMAGE_REGEXP_TRANSLATION:-}"
 
 # Note that project_dir must not end with slash
 project_dir="$(cd "$(dirname "${BASH_SOURCE}")/.." && pwd)"
@@ -256,13 +257,16 @@ function start_dind {
         fi
     fi
     kubectl label node --overwrite "${virtlet_node}" extraRuntime=virtlet
+    local -a virtlet_config=(--from-literal=image_regexp_translation="${IMAGE_REGEXP_TRANSLATION}")
     if ! kvm_ok; then
-        kubectl create configmap -n kube-system virtlet-config --from-literal=disable_kvm=y
+        virtlet_config+=(--from-literal=disable_kvm=y)
     fi
     if [[ ${FORCE_UPDATE_IMAGE} ]] || ! docker exec "${virtlet_node}" docker history -q mirantis/virtlet:latest >&/dev/null; then
         echo >&2 "Propagating Virtlet image to the node container..."
         vcmd "docker save '${virtlet_image}' | docker exec -i '${virtlet_node}' docker load"
     fi
+    kubectl create configmap -n kube-system virtlet-config "${virtlet_config[@]}"
+    kubectl create configmap -n kube-system virtlet-image-translations --from-file "${project_dir}/deploy/images.yaml"
     kubectl create -f "${project_dir}/deploy/virtlet-ds-dev.yaml"
 }
 

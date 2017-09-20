@@ -10,3 +10,5 @@ This directory holds files containing documentation.
     * [Volume handling](volumes.md)
     * [CRI proxy](criproxy.md) overview
     * [Environment variables](environment-variables.md) support
+    * [Image Handling](images.md)
+    * [Image Name Translation](image-name-translation.md)

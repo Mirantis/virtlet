@@ -21,16 +21,25 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"strings"
 
 	"github.com/golang/glog"
 )
+
+// Endpoint contains all the endpoint parameters needed to download a file
+// TODO: add TLS and other HTTP parameters here
+type Endpoint struct {
+	Url string `yaml:"url,omitempty" json:"url,omitempty"`
+}
 
 // Downloader is an interface for downloading files from web
 type Downloader interface {
 	// DownloadFile downloads the specified file and returns path
 	// to it
-	DownloadFile(location string) (string, error)
+	DownloadFile(endpoint Endpoint) (string, error)
 }
+
+
 
 type defaultDownloader struct {
 	protocol string
@@ -44,8 +53,11 @@ func NewDownloader(protocol string) Downloader {
 	return &defaultDownloader{protocol}
 }
 
-func (d *defaultDownloader) DownloadFile(location string) (string, error) {
-	url := fmt.Sprintf("%s://%s", d.protocol, location)
+func (d *defaultDownloader) DownloadFile(endpoint Endpoint) (string, error) {
+	url := endpoint.Url
+	if !strings.Contains(url, "://") {
+		url = fmt.Sprintf("%s://%s", d.protocol, url)
+	}
 
 	tempFile, err := ioutil.TempFile("", "virtlet_")
 	if err != nil {

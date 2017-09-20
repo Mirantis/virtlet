@@ -24,8 +24,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/golang/glog"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
+	"github.com/Mirantis/virtlet/pkg/imagetranslation"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/Mirantis/virtlet/pkg/virt"
 )
@@ -33,6 +35,18 @@ import (
 type ImageTool struct {
 	pool       virt.VirtStoragePool
 	downloader utils.Downloader
+}
+
+type ImagePullError struct {
+	message    string
+	InnerError error
+}
+
+func (e ImagePullError) Error() string {
+	if e.InnerError == nil {
+		return e.message
+	}
+	return fmt.Sprintf("%s: %v", e.message, e.InnerError)
 }
 
 var _ ImageManager = &ImageTool{}
@@ -67,17 +81,30 @@ func (i *ImageTool) fileToVolume(path, volumeName string) (virt.VirtStorageVolum
 	}, path)
 }
 
-func (i *ImageTool) PullRemoteImageToVolume(imageName, volumeName string) (virt.VirtStorageVolume, error) {
-	// TODO(nhlfr): Handle AuthConfig from PullImageRequest.
-	path, err := i.downloader.DownloadFile(stripTagFromImageName(imageName))
-	if err != nil {
-		return nil, err
+func (i *ImageTool) PullRemoteImageToVolume(imageName, volumeName string, nameTranslator imagetranslation.ImageNameTranslator) (virt.VirtStorageVolume, error) {
+	imageName = stripTagFromImageName(imageName)
+	endpoint := nameTranslator.Translate(imageName)
+	if endpoint.Url == "" {
+		endpoint = utils.Endpoint{Url: imageName}
+		glog.V(1).Infof("Using URL %q without translation", imageName)
+	} else {
+		glog.V(1).Infof("URL %q was translated to %q", imageName, endpoint.Url)
 	}
-	defer func() {
-		os.Remove(path)
-	}()
 
-	return i.fileToVolume(path, volumeName)
+	// TODO(nhlfr): Handle AuthConfig from PullImageRequest.
+	path, err := i.downloader.DownloadFile(endpoint)
+	if err == nil {
+		defer os.Remove(path)
+		var vsv virt.VirtStorageVolume
+		vsv, err = i.fileToVolume(path, volumeName)
+		if err == nil {
+			return vsv, nil
+		}
+	}
+	return nil, ImagePullError{
+		message:    fmt.Sprintf("error pulling image %q from %q", imageName, endpoint.Url),
+		InnerError: err,
+	}
 }
 
 func (i *ImageTool) RemoveImage(volumeName string) error {

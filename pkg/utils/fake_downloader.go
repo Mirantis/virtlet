@@ -33,10 +33,10 @@ func NewFakeDownloader(baseDir string) *fakeDownloader {
 	return &fakeDownloader{baseDir}
 }
 
-func (d *fakeDownloader) DownloadFile(location string) (string, error) {
-	filename := NewUuid5("e8a52768-229e-4d59-830b-9ec40ba76e70", location)
+func (d *fakeDownloader) DownloadFile(endpoint Endpoint) (string, error) {
+	filename := NewUuid5("e8a52768-229e-4d59-830b-9ec40ba76e70", endpoint.Url)
 	fullPath := filepath.Join(d.baseDir, filename)
-	if err := ioutil.WriteFile(fullPath, []byte(location), 0777); err != nil {
+	if err := ioutil.WriteFile(fullPath, []byte(endpoint.Url), 0777); err != nil {
 		return "", err
 	}
 	return fullPath, nil

@@ -30,6 +30,8 @@ import (
 
 	// register standard k8s types
 	_ "k8s.io/kubernetes/pkg/api/install"
+
+	"github.com/Mirantis/virtlet/pkg/imagetranslation"
 )
 
 var url = flag.String("cluster-url", "http://127.0.0.1:8080", "apiserver URL")
@@ -90,6 +92,36 @@ func (c *Controller) Finalize() error {
 		return nil
 	}
 	return c.client.Namespaces().Delete(c.namespace.Name, nil)
+}
+
+
+func (c *Controller) CreateVirtletImageMapping(mapping imagetranslation.VirtletImageMapping) (*imagetranslation.VirtletImageMapping, error) {
+	client, err := imagetranslation.GetCRDRestClient(c.restConfig)
+	if err != nil {
+		return nil, err
+	}
+	var result imagetranslation.VirtletImageMapping
+	err = client.Post().
+		Resource("virtletimagemappings").
+		Namespace("kube-system").
+		Body(&mapping).
+		Do().Into(&result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *Controller) DeleteVirtletImageMapping(name string) error {
+	client, err := imagetranslation.GetCRDRestClient(c.restConfig)
+	if err != nil {
+		return err
+	}
+	return client.Delete().
+		Resource("virtletimagemappings").
+		Namespace("kube-system").
+		Name(name).
+		Do().Error()
 }
 
 // PersistentVolumesClient returns interface for PVs
