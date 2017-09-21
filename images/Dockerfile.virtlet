@@ -6,7 +6,7 @@ MAINTAINER Ivan Shvedunov <ishvedunov@mirantis.com>
 
 LABEL virtlet.image="virtlet"
 
-COPY image_skel /.
+COPY images/image_skel /.
 COPY _output/flexvolume_driver /
 # Integration tests look for virtlet in $PATH
 # and we want it to be located in the same place both
