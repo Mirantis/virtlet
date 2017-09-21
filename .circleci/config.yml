@@ -92,8 +92,12 @@ push_images: &push_images
           echo >&2 "*** WARNING: can't push images for outside forks"
           exit 0
         fi
-        docker tag mirantis/virtlet:latest mirantis/virtlet:"$(echo "${CIRCLE_TAG:-${CIRCLE_BRANCH}}"|tr / _)"
-        docker rmi mirantis/virtlet:latest
+        tag="$(echo "${CIRCLE_TAG:-${CIRCLE_BRANCH}}"|tr / _)"
+        # we want to push 'latest' image for the master branch
+        if [[ ${tag} != master ]]; then
+          docker tag mirantis/virtlet:latest "mirantis/virtlet:${tag}"
+          docker rmi mirantis/virtlet:latest
+        fi
   - run:
       name: Push the images
       command: |
