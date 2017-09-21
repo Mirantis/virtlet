@@ -23,7 +23,6 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/Mirantis/virtlet/pkg/imagetranslation"
-	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/Mirantis/virtlet/tests/e2e/framework"
 	. "github.com/Mirantis/virtlet/tests/e2e/ginkgo-ext"
 )
@@ -40,9 +39,7 @@ var _ = Describe("Image URL", func() {
 				Rules: []imagetranslation.TranslationRule{
 					{
 						Name: "test-image",
-						Endpoint: utils.Endpoint{
-							Url: *cirrosLocation,
-						},
+						Url: *cirrosLocation,
 					},
 				},
 			},

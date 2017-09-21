@@ -17,9 +17,16 @@ limitations under the License.
 package imagetranslation
 
 import (
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
+	"errors"
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/golang/glog"
 
@@ -54,6 +61,99 @@ func (t *imageNameTranslator) LoadConfigs(sources ...ConfigSource) {
 	t.translations = translations
 }
 
+func convertEndpoint(rule TranslationRule, config *ImageTranslation) utils.Endpoint {
+	profile, exists := config.Transports[rule.Transport]
+	if !exists {
+		return utils.Endpoint{
+			Url:          rule.Url,
+			MaxRedirects: -1,
+		}
+	}
+	if profile.TimeoutMilliseconds < 0 {
+		profile.TimeoutMilliseconds = 0
+	}
+	maxRedirects := -1
+	if profile.MaxRedirects != nil {
+		maxRedirects = *profile.MaxRedirects
+	}
+
+	var tlsConfig *utils.TLSConfig
+	if profile.TLS != nil {
+		var certificates []utils.TLSCertificate
+		for i, record := range profile.TLS.Certificates {
+			var x509Certs []*x509.Certificate
+			var privateKey crypto.PrivateKey
+
+			for _, data := range [2]string{record.Key, record.Cert} {
+				dataBytes := []byte(data)
+				for {
+					block, rest := pem.Decode(dataBytes)
+					if block == nil {
+						break
+					}
+					if block.Type == "CERTIFICATE" {
+						c, err := x509.ParseCertificate(block.Bytes)
+						if err != nil {
+							glog.V(2).Infof("error decoding certificate #%d from transport profile %s", i, rule.Transport)
+						} else {
+							x509Certs = append(x509Certs, c)
+						}
+					} else if privateKey == nil && strings.HasSuffix(block.Type, "PRIVATE KEY") {
+						k, err := parsePrivateKey(block.Bytes)
+						if err != nil {
+							glog.V(2).Infof("error decoding private key #%d from transport profile %s", i, rule.Transport)
+						} else {
+							privateKey = k
+						}
+					}
+					dataBytes = rest
+				}
+			}
+
+			for _, c := range x509Certs {
+				certificates = append(certificates, utils.TLSCertificate{
+					Certificate: c,
+					PrivateKey:  privateKey,
+				})
+			}
+		}
+
+		tlsConfig = &utils.TLSConfig{
+			ServerName:   profile.TLS.ServerName,
+			Insecure:     profile.TLS.Insecure,
+			Certificates: certificates,
+		}
+	}
+
+	return utils.Endpoint{
+		Url:          rule.Url,
+		Timeout:      time.Millisecond * time.Duration(profile.TimeoutMilliseconds),
+		Proxy:        profile.Proxy,
+		ProfileName:  rule.Transport,
+		MaxRedirects: maxRedirects,
+		TLS:          tlsConfig,
+	}
+}
+
+func parsePrivateKey(der []byte) (crypto.PrivateKey, error) {
+	if key, err := x509.ParsePKCS1PrivateKey(der); err == nil {
+		return key, nil
+	}
+	if key, err := x509.ParsePKCS8PrivateKey(der); err == nil {
+		switch key := key.(type) {
+		case *rsa.PrivateKey, *ecdsa.PrivateKey:
+			return key, nil
+		default:
+			return nil, errors.New("tls: found unknown private key type in PKCS#8 wrapping")
+		}
+	}
+	if key, err := x509.ParseECPrivateKey(der); err == nil {
+		return key, nil
+	}
+
+	return nil, errors.New("tls: failed to parse private key")
+}
+
 // Translate implements ImageNameTranslator Translate
 func (t *imageNameTranslator) Translate(name string) utils.Endpoint {
 	for _, translation := range t.translations {
@@ -67,7 +167,7 @@ func (t *imageNameTranslator) Translate(name string) utils.Endpoint {
 		}
 		for _, r := range translation.Rules {
 			if r.Name != "" && r.Name == unprefixedName {
-				return r.Endpoint
+				return convertEndpoint(r, translation)
 			}
 		}
 		if !t.AllowRegexp {
@@ -85,7 +185,7 @@ func (t *imageNameTranslator) Translate(name string) utils.Endpoint {
 			submatchIndexes := re.FindStringSubmatchIndex(unprefixedName)
 			if len(submatchIndexes) > 0 {
 				r.Url = string(re.ExpandString(nil, r.Url, unprefixedName, submatchIndexes))
-				return r.Endpoint
+				return convertEndpoint(r, translation)
 			}
 		}
 	}
