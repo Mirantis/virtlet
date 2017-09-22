@@ -20,9 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
-	"strings"
 	"sync"
 	"time"
 
@@ -35,10 +33,6 @@ import (
 	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/dhcp"
 	"github.com/Mirantis/virtlet/pkg/nettools"
-)
-
-const (
-	podIpFile = "/pod-ip"
 )
 
 // PodNetworkDesc contains the data that are required by TapFDSource
@@ -78,8 +72,9 @@ type podNetwork struct {
 type TapFDSource struct {
 	sync.Mutex
 
-	cniClient *cni.Client
-	fdMap     map[string]*podNetwork
+	cniClient    *cni.Client
+	dummyGateway net.IP
+	fdMap        map[string]*podNetwork
 }
 
 var _ FDSource = &TapFDSource{}
@@ -92,10 +87,22 @@ func NewTapFDSource(cniPluginsDir, cniConfigsDir string) (*TapFDSource, error) {
 		return nil, err
 	}
 
-	return &TapFDSource{
+	s := &TapFDSource{
 		cniClient: cniClient,
 		fdMap:     make(map[string]*podNetwork),
-	}, nil
+	}
+
+	// TODO: detect Calico here
+	dummyResult, err := cniClient.GetDummyNetwork()
+	if err != nil {
+		return nil, err
+	}
+	if len(dummyResult.IPs) != 1 {
+		return nil, fmt.Errorf("expected 1 ip for the dummy network, but got %d", len(dummyResult.IPs))
+	}
+	s.dummyGateway = dummyResult.IPs[0].Address.IP
+
+	return s, nil
 }
 
 // GetFD implements GetFD method of FDSource interface
@@ -136,22 +143,7 @@ func (s *TapFDSource) GetFD(key string, data []byte) (int, []byte, error) {
 		return 0, nil, fmt.Errorf("error marshalling net config: %v", err)
 	}
 
-	// TODO: do this upon startup
-	var dummyGateway net.IP
-	// TODO: detect Calico here
-	// TODO: get pod IP address from an env var set by cmd/virtlet/virtlet.go
-	// TODO: add descriptive comments why that's needed
-	// (incl. the fact that Virtlet runs in host network ns so it can't just grab
-	ipBytes, err := ioutil.ReadFile(podIpFile)
-	if err == nil {
-		ipStr := strings.TrimSpace(string(ipBytes))
-		dummyGateway = net.ParseIP(ipStr)
-		if dummyGateway == nil {
-			return 0, nil, fmt.Errorf("error parsing pod IP: %q", ipStr)
-		}
-	}
-
-	if dummyGateway != nil {
+	if s.dummyGateway != nil {
 		// TODO: better diagnostics
 		if len(netConfig.IPs) != 1 {
 			return 0, nil, errors.New("didn't expect more than one IP config")
@@ -161,14 +153,14 @@ func (s *TapFDSource) GetFD(key string, data []byte) (int, []byte, error) {
 		}
 		// TODO: calculate network mask based on the pod IP and the gateway IP
 		netConfig.IPs[0].Address.Mask = net.IPv4Mask(255, 255, 255, 0)
-		netConfig.IPs[0].Gateway = dummyGateway
+		netConfig.IPs[0].Gateway = s.dummyGateway
 		netConfig.Routes = []*cnitypes.Route{
 			{
 				Dst: net.IPNet{
 					IP:   net.IP{0, 0, 0, 0},
 					Mask: net.IPMask{0, 0, 0, 0},
 				},
-				GW: dummyGateway,
+				GW: s.dummyGateway,
 			},
 		}
 	}

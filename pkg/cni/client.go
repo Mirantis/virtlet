@@ -23,6 +23,8 @@ import (
 	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
+
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 type Client struct {
@@ -43,17 +45,34 @@ func NewClient(pluginsDir, configsDir string) (*Client, error) {
 }
 
 func (c *Client) cniRuntimeConf(podId, podName, podNs string) *libcni.RuntimeConf {
-	return &libcni.RuntimeConf{
+	r := &libcni.RuntimeConf{
 		ContainerID: podId,
 		NetNS:       PodNetNSPath(podId),
 		IfName:      "virtlet-eth0",
-		Args: [][2]string{
+	}
+	if podName != "" && podNs != "" {
+		r.Args = [][2]string{
 			{"IgnoreUnknown", "1"},
 			{"K8S_POD_NAMESPACE", podNs},
 			{"K8S_POD_NAME", podName},
 			{"K8S_POD_INFRA_CONTAINER_ID", podId},
-		},
+		}
 	}
+	return r
+}
+
+func (c *Client) GetDummyNetwork() (*cnicurrent.Result, error) {
+	// TODO: document the function
+	// TODO: the fake pod id should be generated in a way
+	// to make it unique for each node. Then a check should
+	// be made to see whether the corresponding netns is
+	// alive. If it is, it should be reused, otherwise
+	// a new one with the same id should be created.
+	podId := utils.NewUuid()
+	if err := CreateNetNS(podId); err != nil {
+		return nil, fmt.Errorf("couldn't create netns for fake pod %q: %v", podId, err)
+	}
+	return c.AddSandboxToNetwork(podId, "", "")
 }
 
 func (c *Client) AddSandboxToNetwork(podId, podName, podNs string) (*cnicurrent.Result, error) {
