@@ -113,6 +113,43 @@ push_images: &push_images
           docker push "${img}"
         done
 
+e2e: &e2e
+  <<: *defaults
+  steps:
+  - run:
+      <<: *prereqs
+  - checkout
+  - setup_remote_docker
+  - run:
+      <<: *setup_env
+  - attach_workspace:
+      at: _output
+  - run:
+      name: Restore virtlet image
+      command: |
+        docker load -i _output/virtlet.tar
+  - run:
+      name: Start the demo
+      command: |
+        build/portforward.sh 8080&
+        if [[ ${CIRCLE_JOB} = e2e_calico ]]; then
+          export CNI_PLUGIN=calico
+          echo >&2 "*** Using Calico CNI"
+        fi
+        VIRTLET_DEMO_RELEASE=master \
+          SKIP_SNAPSHOT=1 \
+          NONINTERACTIVE=1 \
+          NO_VM_CONSOLE=1 \
+          INJECT_LOCAL_IMAGE=1 \
+          VIRTLET_DEMO_RELEASE=master \
+          BASE_LOCATION="$PWD" \
+          deploy/demo.sh
+  - run:
+      name: Run e2e tests
+      command: |
+        build/portforward.sh 8080&
+        _output/virtlet-e2e-tests -test.v
+
 version: 2
 jobs:
   prepare_build:
@@ -243,37 +280,10 @@ jobs:
           build/cmd.sh integration
 
   e2e:
-    <<: *defaults
-    steps:
-    - run:
-        <<: *prereqs
-    - checkout
-    - setup_remote_docker
-    - run:
-        <<: *setup_env
-    - attach_workspace:
-        at: _output
-    - run:
-        name: Restore virtlet image
-        command: |
-          docker load -i _output/virtlet.tar
-    - run:
-        name: Start the demo
-        command: |
-          build/portforward.sh 8080&
-          VIRTLET_DEMO_RELEASE=master \
-            SKIP_SNAPSHOT=1 \
-            NONINTERACTIVE=1 \
-            NO_VM_CONSOLE=1 \
-            INJECT_LOCAL_IMAGE=1 \
-            VIRTLET_DEMO_RELEASE=master \
-            BASE_LOCATION="$PWD" \
-            deploy/demo.sh
-    - run:
-        name: Run e2e tests
-        command: |
-          build/portforward.sh 8080&
-          _output/virtlet-e2e-tests -test.v
+    <<: *e2e
+
+  e2e_calico:
+    <<: *e2e
 
   push_branch:
     <<: *push_images
@@ -318,6 +328,13 @@ workflows:
           tags:
             only:
               - /^v[0-9].*/
+    - e2e_calico:
+        requires:
+        - build
+        filters:
+          tags:
+            only:
+              - /^v[0-9].*/
     - push_branch:
         requires:
         - build
@@ -329,6 +346,7 @@ workflows:
         requires:
         - test
         - e2e
+        - e2e_calico
         - integration
         filters:
           branches:
