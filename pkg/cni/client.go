@@ -34,6 +34,7 @@ type Client struct {
 
 func NewClient(pluginsDir, configsDir string) (*Client, error) {
 	configuration, err := ReadConfiguration(configsDir)
+	glog.V(3).Infof("CNI config: name: %q type: %q", configuration.Network.Name, configuration.Network.Type)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read CNI configuration: %v", err)
 	}
@@ -43,6 +44,8 @@ func NewClient(pluginsDir, configsDir string) (*Client, error) {
 		configuration:    configuration,
 	}, nil
 }
+
+func (c *Client) Type() string { return c.configuration.Network.Type }
 
 func (c *Client) cniRuntimeConf(podId, podName, podNs string) *libcni.RuntimeConf {
 	r := &libcni.RuntimeConf{

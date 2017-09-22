@@ -35,6 +35,10 @@ import (
 	"github.com/Mirantis/virtlet/pkg/nettools"
 )
 
+const (
+	calicoNetType = "calico"
+)
+
 // PodNetworkDesc contains the data that are required by TapFDSource
 // to set up a tap device for a VM
 type PodNetworkDesc struct {
@@ -92,15 +96,20 @@ func NewTapFDSource(cniPluginsDir, cniConfigsDir string) (*TapFDSource, error) {
 		fdMap:     make(map[string]*podNetwork),
 	}
 
-	// TODO: detect Calico here
-	dummyResult, err := cniClient.GetDummyNetwork()
-	if err != nil {
-		return nil, err
+	// Calico needs special treatment here.
+	// We need to make network config DHCP-compatible by throwing away
+	// Calico's gateway and dev route and using a fake gateway instead.
+	// TODO: add better explanation here
+	if cniClient.Type() == calicoNetType {
+		dummyResult, err := cniClient.GetDummyNetwork()
+		if err != nil {
+			return nil, err
+		}
+		if len(dummyResult.IPs) != 1 {
+			return nil, fmt.Errorf("expected 1 ip for the dummy network, but got %d", len(dummyResult.IPs))
+		}
+		s.dummyGateway = dummyResult.IPs[0].Address.IP
 	}
-	if len(dummyResult.IPs) != 1 {
-		return nil, fmt.Errorf("expected 1 ip for the dummy network, but got %d", len(dummyResult.IPs))
-	}
-	s.dummyGateway = dummyResult.IPs[0].Address.IP
 
 	return s, nil
 }
@@ -143,6 +152,7 @@ func (s *TapFDSource) GetFD(key string, data []byte) (int, []byte, error) {
 		return 0, nil, fmt.Errorf("error marshalling net config: %v", err)
 	}
 
+	// Calico needs network config to be adjusted for DHCP compatibility
 	if s.dummyGateway != nil {
 		// TODO: better diagnostics
 		if len(netConfig.IPs) != 1 {
