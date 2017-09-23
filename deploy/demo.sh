@@ -279,7 +279,20 @@ function demo::start-virtlet {
     virtlet_config+=(--from-literal=disable_kvm=y)
   fi
   "${kubectl}" create configmap -n kube-system virtlet-config "${virtlet_config[@]}"
-  "${kubectl}" create configmap -n kube-system virtlet-image-translations --from-file "${BASE_LOCATION}/deploy/images.yaml"
+  # new functionality added post 0.8.2
+  # that logic could be removed later
+  if [[ ${BASE_LOCATION} == https://* ]]; then
+    # remote location so fetch file
+    rm -f demo_images.yaml
+    status_code=$(curl -w "%{http_code}" --silent -o demo_images.yaml "${BASE_LOCATION}"/deploy/images.yaml)
+    if [[ $status_code == "200" ]]; then
+      "${kubectl}" create configmap -n kube-system virtlet-image-translations --from-file demo_images.yaml
+    fi
+  else
+    if [[ -f ${BASE_LOCATION}/deploy/images.yaml ]]; then
+      "${kubectl}" create configmap -n kube-system virtlet-image-translations --from-file "${BASE_LOCATION}/deploy/images.yaml"
+    fi
+  fi
   demo::step "Deploying Virtlet DaemonSet from ${ds_location}"
   "${kubectl}" create -f "${ds_location}"
   demo::wait-for "Virtlet DaemonSet" demo::pods-ready runtime=virtlet
