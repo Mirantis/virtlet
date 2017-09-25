@@ -294,11 +294,10 @@ function clean {
 }
 
 function gotest {
-    start_libvirt=""
     # FIXME: exit 1 in $(virtlet_subdir) doesn't cause the script to exit
     virtlet_subdir >/dev/null
     subdir="$(virtlet_subdir)"
-    if ! vcmd "${start_libvirt}cd '${subdir}' && go test $*"; then
+    if ! vcmd "cd '${subdir}' && go test $*"; then
         vcmd_simple "find . -name 'Test*.json' | xargs tar -c -T -" | tar -C "${project_dir}" -x
         exit 1
     fi
@@ -333,15 +332,13 @@ function install_vendor_internal {
 function run_tests_internal {
     local -a failed=()
     install_vendor_internal
-    find . -name 'go.test' \( -path ./tests/integration/go.test -o -print \) |
-        sort |
-        while read test_path; do
-            test_dir="$(dirname "${test_path}")"
-            echo >&2 "*** Running tests: ${test_dir}"
-            if ! ( cd "${test_dir}" && ./go.test ); then
-                failed+=("${test_dir}")
-            fi
-        done
+    while read test_path; do
+        test_dir="$(dirname "${test_path}")"
+        echo >&2 "*** Running tests: ${test_dir}"
+        if ! ( cd "${test_dir}" && ./go.test ); then
+            failed+=("${test_dir}")
+        fi
+    done < <(find . -name 'go.test' \( -path ./tests/integration/go.test -o -print \) | sort)
     if [[ ${#failed[@]} > 0 ]]; then
         echo >&2 "*** Tests failed for ${failed[@]}"
         exit 1
