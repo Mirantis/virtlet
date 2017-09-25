@@ -18,7 +18,12 @@ $ chmod +x ~/dind-cluster-v1.7.sh
 
 In order to start locally-built Virtlet and CRI proxy on `kubeadm-dind-cluster`: 
 ```
+$ # Remove the previous build container & related docker volumes
+$ # This is optional step that should be done if the build container
+$ # doesn't match current Virtlet sources (i.e. is too old)
 $ build/cmd.sh clean
+
+$ # build Virtlet binaries & the image
 $ build/cmd.sh build
 
 $ # start DIND cluster
@@ -27,7 +32,7 @@ $ ~/dind-cluster-v1.7.sh up
 $ # copy binaries to kube-node-1
 $ build/cmd.sh copy-dind
 
-$ # start Virtlet daemonset
+$ # inject Virtlet image into the DIND node and start Virtlet daemonset
 $ build/cmd.sh start-dind
 
 $ # Restart DIND cluster. Binaries from copy-dind are preserved
@@ -36,17 +41,6 @@ $ ~/dind-cluster-v1.7.sh up
 
 $ # start Virtlet daemonset again
 $ build/cmd.sh start-dind
-```
-
-You can also build Virtlet image and propagate it to the DIND node
-(by default the latest image from Docker Hub is used with current
-binaries being placed instead of original ones):
-```
-$ build/cmd.sh copy
-$ docker build -t mirantis/virtlet .
-
-$ # copy the image to the DIND node
-$ docker save mirantis/virtlet | docker exec -i kube-node-1 docker load
 ```
 
 You may use [flannel](https://github.com/coreos/flannel) instead of
