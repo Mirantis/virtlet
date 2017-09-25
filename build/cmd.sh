@@ -332,13 +332,16 @@ function install_vendor_internal {
 function run_tests_internal {
     local -a failed=()
     install_vendor_internal
-    for test_path in $(find . -name 'go.test' \( -path ./tests/integration/go.test -o -print \) | sort) ; do
+    orig_ifs="${IFS}"
+    IFS=$'\n'
+    for test_path in $(find . -name 'go.test' \( -path ./tests/integration/go.test -o -print \) | sort ) ; do
 	test_dir="$(dirname "${test_path}")"
 	echo >&2 "*** Running tests: ${test_dir}"
 	if ! ( cd "${test_dir}" && ./go.test ); then
 	    failed+=("${test_dir}")
 	fi
     done
+    IFS="${orig_ifs}"
     if [[ ${#failed[@]} > 0 ]]; then
         echo >&2 "*** Tests failed for ${failed[@]}"
         exit 1
