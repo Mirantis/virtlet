@@ -294,11 +294,10 @@ function clean {
 }
 
 function gotest {
-    start_libvirt=""
     # FIXME: exit 1 in $(virtlet_subdir) doesn't cause the script to exit
     virtlet_subdir >/dev/null
     subdir="$(virtlet_subdir)"
-    if ! vcmd "${start_libvirt}cd '${subdir}' && go test $*"; then
+    if ! vcmd "cd '${subdir}' && go test $*"; then
         vcmd_simple "find . -name 'Test*.json' | xargs tar -c -T -" | tar -C "${project_dir}" -x
         exit 1
     fi
