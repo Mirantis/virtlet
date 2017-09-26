@@ -22,12 +22,16 @@ digraph criproxy {
                 labeljust="r";
                 libvirt [shape=rectangle];
                 vmwrapper [shape=rectangle, label="vmwrapper\n0..n"];
-                qemu_kvm [shape=rectangle, label="qemu-kvm\n0..n"];
                 libvirt -> vmwrapper [label="Runs"];
-                vmwrapper -> qemu_kvm [label=" Execs", shape=rectangle];
                 vmwrapper -> tapmanager [label="Request tap FD\nby pod ID"];
                 virtlet -> libvirt [label="libvirt API"];
-                {rank=same vmwrapper qemu_kvm}
+                // {rank=same vmwrapper qemu_kvm}
+        }
+        subgraph cluster_3 {
+                label="vms container";
+                labeljust="r";
+                qemu_kvm [shape=rectangle, label="qemu-kvm\n0..n"];
+                vmwrapper -> qemu_kvm [label=" Execs", shape=rectangle];
         }
         kubelet [shape=rectangle];
         docker [shape=rectangle];
