@@ -94,7 +94,6 @@ func (c *Controller) Finalize() error {
 	return c.client.Namespaces().Delete(c.namespace.Name, nil)
 }
 
-
 func (c *Controller) CreateVirtletImageMapping(mapping imagetranslation.VirtletImageMapping) (*imagetranslation.VirtletImageMapping, error) {
 	client, err := imagetranslation.GetCRDRestClient(c.restConfig)
 	if err != nil {
@@ -201,9 +200,10 @@ func (c *Controller) RunPod(name, image string, command []string, timeout time.D
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
-					Name:    name,
-					Image:   image,
-					Command: command,
+					Name:            name,
+					Image:           image,
+					ImagePullPolicy: v1.PullIfNotPresent,
+					Command:         command,
 				},
 			},
 		},

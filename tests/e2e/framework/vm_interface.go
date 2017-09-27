@@ -171,6 +171,7 @@ func (vmi *VMInterface) buildVMPod(options VMOptions) *v1.Pod {
 					Resources: v1.ResourceRequirements{
 						Limits: limits,
 					},
+					ImagePullPolicy: v1.PullIfNotPresent,
 				},
 			},
 		},
