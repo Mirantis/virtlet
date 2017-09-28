@@ -99,7 +99,8 @@ func NewTapFDSource(cniPluginsDir, cniConfigsDir string) (*TapFDSource, error) {
 	// Calico needs special treatment here.
 	// We need to make network config DHCP-compatible by throwing away
 	// Calico's gateway and dev route and using a fake gateway instead.
-	// TODO: add better explanation here
+	// The fake gateway is just an IP address allocated by Calico IPAM,
+	// it's needed for proper ARP resppnses for VMs.
 	if cniClient.Type() == calicoNetType {
 		dummyResult, err := cniClient.GetDummyNetwork()
 		if err != nil {
@@ -154,15 +155,16 @@ func (s *TapFDSource) GetFD(key string, data []byte) (int, []byte, error) {
 
 	// Calico needs network config to be adjusted for DHCP compatibility
 	if s.dummyGateway != nil {
-		// TODO: better diagnostics
 		if len(netConfig.IPs) != 1 {
 			return 0, nil, errors.New("didn't expect more than one IP config")
 		}
 		if netConfig.IPs[0].Version != "4" {
 			return 0, nil, errors.New("IPv4 config was expected")
 		}
-		// TODO: calculate network mask based on the pod IP and the gateway IP
-		netConfig.IPs[0].Address.Mask = net.IPv4Mask(255, 255, 255, 0)
+		netConfig.IPs[0].Address.Mask, err = calcNetmaskForCalico(netConfig.IPs[0].Address.IP, s.dummyGateway)
+		if err != nil {
+			return 0, nil, err
+		}
 		netConfig.IPs[0].Gateway = s.dummyGateway
 		netConfig.Routes = []*cnitypes.Route{
 			{
@@ -309,4 +311,22 @@ func ensureCNIInterfaceHwAddress(netConfig *cnicurrent.Result, csn *nettools.Con
 	for _, IP := range netConfig.IPs {
 		IP.Interface = 0
 	}
+}
+
+func calcNetmaskForCalico(ipA, ipB net.IP) (net.IPMask, error) {
+	var a, b uint
+	for _, v := range ipA {
+		a = (a << 8) + uint(v)
+	}
+	for _, v := range ipB {
+		b = (b << 8) + uint(v)
+	}
+	for n := 30; n >= 0; n-- {
+		m := (uint(1) << uint(32-n)) - 1
+		// avoid zero and broadcast addrs
+		if (a&^m) == (b&^m) && (a&m) != 0 && (b&m) != 0 && (a&m) != m && (b&m) != m {
+			return net.CIDRMask(n, 32), nil
+		}
+	}
+	return nil, errors.New("addresses too different")
 }
