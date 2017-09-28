@@ -38,7 +38,6 @@ spec:
     # This specifies the image to use.
     # virtlet/ prefix is used by CRI proxy, the remaining part
     # of the image name is prepended with https:// and used to download the image
-    image: virtlet/cirros
     resources:
       limits:
         # This memory limit is applied to the libvirt domain definition
