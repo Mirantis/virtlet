@@ -39,6 +39,15 @@ spec:
     # virtlet/ prefix is used by CRI proxy, the remaining part
     # of the image name is prepended with https:// and used to download the image
     image: virtlet/cirros
+
+    # Virtlet currently ignores image tags, but their meaning may change
+    # in future, so it’s better not to set them for VM pods. If there’s no tag
+    # provided in the image specification kubelet defaults to
+    # imagePullPolicy: Always, which means that the image is always
+    # redownloaded when the pod is created. In order to make pod creation
+    # faster and more reliable, we set imagePullPolicy to IfNotPresent here
+    # so a previously downloaded image is reused if there is one
+    # in Virtlet’s image store
     imagePullPolicy: IfNotPresent
     resources:
       limits:
