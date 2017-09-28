@@ -407,6 +407,9 @@ case "${cmd}" in
     integration)
         ( vcmd 'build/cmd.sh run-integration-internal' )
         ;;
+    install-vendor-internal)
+        ( vcmd "build/cmd.sh install-vendor-internal" )
+        ;;
     run-tests-internal)
         run_tests_internal
         ;;
