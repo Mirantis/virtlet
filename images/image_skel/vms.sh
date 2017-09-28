@@ -11,12 +11,5 @@ elif [[ -e /dev/kvm ]]; then
   chown libvirt-qemu.kvm /dev/kvm
 fi
 
-echo 'Defaults closefrom_override' > /etc/sudoers.d/virtlet-qemu
-
-# rm the following (tmp fix):
-chown -R root.root /etc/sudoers.d/
-
-# mount --bind /hostdev /dev
-
 echo "$$ $(cut -d' ' -f22 /proc/$$/stat)" >/var/lib/virtlet/vms.procfile
 sleep Infinity
