@@ -355,7 +355,33 @@
             "Address": null
           }
         ],
-        "Graphics": null,
+        "Graphics": [
+          {
+            "XMLName": {
+              "Space": "",
+              "Local": ""
+            },
+            "Type": "vnc",
+            "AutoPort": "",
+            "Port": -1,
+            "TLSPort": 0,
+            "WebSocket": 0,
+            "Listen": "",
+            "Socket": "",
+            "Keymap": "",
+            "Passwd": "",
+            "PasswdValidTo": "",
+            "Connected": "",
+            "SharePolicy": "",
+            "DefaultMode": "",
+            "Display": "",
+            "XAuth": "",
+            "FullScreen": "",
+            "ReplaceUser": "",
+            "MultiUser": "",
+            "Listeners": null
+          }
+        ],
         "Videos": [
           {
             "XMLName": {
