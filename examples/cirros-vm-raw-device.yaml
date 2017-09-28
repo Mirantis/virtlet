@@ -16,6 +16,7 @@ spec:
             - virtlet
   containers:
     - name: cirros-vm
+      imagePullPolicy: IfNotPresent
       image: virtlet/image-service/cirros
   volumes:
   - name: raw
