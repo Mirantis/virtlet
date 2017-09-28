@@ -39,6 +39,13 @@ spec:
     # virtlet/ prefix is used by CRI proxy, the remaining part
     # of the image name is prepended with https:// and used to download the image
     image: virtlet/cirros
+
+    # Without specifying below policy kubelet would ask Virtlet image service
+    # to download image again and again on each pod creation with above image
+    # specification. Setting imagePullPolicy to IfNotPresent according to
+    # https://kubernetes.io/docs/concepts/containers/images/#updating-images
+    # allows Virtlet to reuse already downloaded image if it's already in
+    # local store
     imagePullPolicy: IfNotPresent
     resources:
       limits:
