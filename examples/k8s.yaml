@@ -99,6 +99,7 @@ spec:
       containers:
       - name: ubuntu-vm
         image: virtlet/cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img
+        imagePullPolicy: IfNotPresent
         readinessProbe:
           tcpSocket:
             port: 22
