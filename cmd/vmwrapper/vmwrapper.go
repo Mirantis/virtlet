@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"strconv"
 	"strings"
 	"syscall"
 
@@ -31,6 +30,86 @@ import (
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
+// Here we use cgo constructor trick to avoid threading-related problems
+// (not being able to enter the mount namespace)
+// when working with process uids/gids and namespaces
+// https://github.com/golang/go/issues/8676#issuecomment-66098496
+
+/*
+#define _GNU_SOURCE
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <fcntl.h>
+#include <sched.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <linux/limits.h>
+
+static void vmwrapper_perr(const char* msg) {
+	perror(msg);
+	exit(1);
+}
+
+static void vmwrapper_setns(int my_pid, int target_pid, int nstype, const char* nsname) {
+	int my_ns_inode, fd;
+        struct stat st;
+	char my_ns_path[PATH_MAX], target_ns_path[PATH_MAX];
+	snprintf(my_ns_path, sizeof(my_ns_path), "/proc/%u/ns/%s", my_pid, nsname);
+	snprintf(target_ns_path, sizeof(target_ns_path), "/proc/%u/ns/%s", target_pid, nsname);
+	if (stat(my_ns_path, &st) < 0) {
+		vmwrapper_perr("stat() my ns");
+	}
+	my_ns_inode = st.st_ino;
+	if (stat(target_ns_path, &st) < 0) {
+		vmwrapper_perr("stat() target ns");
+	}
+
+	// Check if that's the same namespace
+	// (actually only critical for CLONE_NEWUSER)
+	if (my_ns_inode == st.st_ino)
+		return;
+
+	if ((fd = open(target_ns_path, O_RDONLY)) < 0) {
+		vmwrapper_perr("open() target ns");
+	}
+
+	if (setns(fd, nstype) < 0) {
+		vmwrapper_perr("setns()");
+	}
+}
+
+// This function is a high-priority constructor that will be invoked
+// before any Go code starts.
+__attribute__((constructor (200))) void vmwrapper_handle_reexec(void) {
+	int my_pid, target_pid;
+	char* pid_str;
+	if ((pid_str = getenv("VMWRAPPER_NS_PID")) == NULL)
+		return;
+
+	my_pid = getpid();
+        target_pid = atoi(pid_str);
+
+        // Other namespaces:
+        // cgroup, user - not touching
+        // pid - host pid namespace is used by virtlet
+        // net - host network is used by virtlet
+	fprintf(stderr, "vmwrapper reexec: entering vms container namespaces\n");
+	vmwrapper_setns(my_pid, target_pid, CLONE_NEWNS, "mnt");
+	vmwrapper_setns(my_pid, target_pid, CLONE_NEWUTS, "uts");
+	vmwrapper_setns(my_pid, target_pid, CLONE_NEWIPC, "ipc");
+
+	// permanently drop privs
+	fprintf(stderr, "vmwrapper reexec: dropping privs\n");
+	if (setgid(getgid()) < 0)
+		vmwrapper_perr("setgid()");
+	if (setuid(getuid()) < 0)
+		vmwrapper_perr("setuid()");
+}
+*/
+import "C"
+
 const (
 	fdSocketPath    = "/var/lib/virtlet/tapfdserver.sock"
 	defaultEmulator = "/usr/bin/qemu-system-x86_64" // FIXME
@@ -39,19 +118,22 @@ const (
 	vmsProcFile     = "/var/lib/virtlet/vms.procfile"
 )
 
-func shouldUseWrapperScript() bool {
-	// emulator being run as root means we're running inside
-	// the build container
-	return os.Getuid() != 0
-}
-
 func main() {
 	// configure glog (apparently no better way to do it ...)
 	flag.CommandLine.Parse([]string{"-v=3", "-alsologtostderr=true"})
 
+	if os.Getenv("VMWRAPPER_NS_PID") != "" {
+		if err := syscall.Exec(os.Args[1], os.Args[1:], os.Environ()); err != nil {
+			glog.Errorf("Can't exec emulator: %v", err)
+			os.Exit(1)
+		}
+	}
+
+	runInAnotherContainer := os.Getuid() != 0
+
 	var pid int
 	var err error
-	if shouldUseWrapperScript() {
+	if runInAnotherContainer {
 		glog.V(0).Infof("Obtaining PID of the VM container process...")
 		pid, err = utils.WaitForProcess(vmsProcFile)
 		if err != nil {
@@ -92,13 +174,16 @@ func main() {
 	}
 
 	args := append([]string{emulator}, emulatorArgs...)
-	if shouldUseWrapperScript() {
-		args = append([]string{
-			"/qemu.sh", strconv.Itoa(pid),
-		}, args...)
+	env := os.Environ()
+	if runInAnotherContainer {
+		// re-execute itself because entering mount namespace
+		// is impossible after Go runtime spawns some threads
+		env = append(env, fmt.Sprintf("VMWRAPPER_NS_PID=%d", pid))
+		args = append([]string{os.Args[0]}, args...)
 	}
+
 	glog.V(0).Infof("Executing emulator: %s", strings.Join(args, " "))
-	if err := syscall.Exec(args[0], append(args, netArgs...), os.Environ()); err != nil {
+	if err := syscall.Exec(args[0], append(args, netArgs...), env); err != nil {
 		glog.Errorf("Can't exec emulator: %v", err)
 		os.Exit(1)
 	}
