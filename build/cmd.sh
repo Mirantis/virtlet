@@ -238,7 +238,7 @@ function copy_dind_internal {
                -v "kubeadm-dind-${virtlet_node}:/dind" \
                --name ${tmp_container_name} \
                "${busybox_image}" \
-               tar -C /dind -xv
+               /bin/sh -c 'tar -C /dind -xv && chmod ug+s /dind/vmwrapper'
 }
 
 function kvm_ok {
