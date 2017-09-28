@@ -155,9 +155,7 @@ var _ = Describe("Basic cirros tests", func() {
 		})
 	})
 
-	// Skip vnc test until we find the correct way to solve issue with libvirt
-	// vnc/spice allocation
-	XIt("Should provide VNC interface", func(done Done) {
+	It("Should provide VNC interface", func(done Done) {
 		defer close(done)
 		pod, err := vm.VirtletPod()
 		Expect(err).NotTo(HaveOccurred())
