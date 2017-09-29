@@ -13,6 +13,7 @@ kubectl="${HOME}/.kubeadm-dind-cluster/kubectl"
 BASE_LOCATION="${BASE_LOCATION:-https://raw.githubusercontent.com/Mirantis/virtlet/master/}"
 RELEASE_LOCATION="${RELEASE_LOCATION:-https://github.com/Mirantis/virtlet/releases/download/}"
 VIRTLET_DEMO_RELEASE="${VIRTLET_DEMO_RELEASE:-}"
+VIRTLET_DEMO_BRANCH="${VIRTLET_DEMO_BRANCH:-}"
 VIRTLET_ON_MASTER="${VIRTLET_ON_MASTER:-}"
 IMAGE_REGEXP_TRANSLATION="${IMAGE_REGEXP_TRANSLATION:-1}"
 # Convenience setting for local testing:
@@ -256,10 +257,20 @@ function demo::get-correct-virtlet-release {
 function demo::start-virtlet {
   local -a virtlet_config=(--from-literal=download_protocol=http --from-literal=image_regexp_translation="$IMAGE_REGEXP_TRANSLATION")
   local ds_location
-  if [[ ${VIRTLET_DEMO_RELEASE} = "master" ]]; then
+  local replace_image_in_ds
+  if [[ ${VIRTLET_DEMO_BRANCH} ]]; then
+    if [[ ${VIRTLET_DEMO_BRANCH} = "master" ]]; then
       virtlet_release="master"
       virtlet_docker_tag="latest"
       ds_location="${BASE_LOCATION}/deploy/virtlet-ds.yaml"
+      replace_image_in_ds=1
+    else
+      virtlet_release="${VIRTLET_DEMO_BRANCH}"
+      virtlet_docker_tag=$(echo $VIRTLET_DEMO_BRANCH | sed -e "s/\//_/g")
+      BASE_LOCATION="https://raw.githubusercontent.com/Mirantis/virtlet/${virtlet_release}/"
+      ds_location="${BASE_LOCATION}/deploy/virtlet-ds.yaml"
+      replace_image_in_ds=1
+    fi
   else
     if [[ ${VIRTLET_DEMO_RELEASE} ]]; then
       virtlet_release="${VIRTLET_DEMO_RELEASE}"
@@ -270,6 +281,7 @@ function demo::start-virtlet {
     virtlet_docker_tag="${virtlet_release}"
     ds_location="${RELEASE_LOCATION}/${virtlet_release}/virtlet-ds.yaml"
     BASE_LOCATION="https://raw.githubusercontent.com/Mirantis/virtlet/${virtlet_release}/"
+    replace_image_in_ds=0
   fi
   echo "Will run demo using Virtlet:${virtlet_release} for demo and ${virtlet_docker_tag} as docker tag"
   if demo::kvm-ok; then
@@ -278,6 +290,7 @@ function demo::start-virtlet {
     demo::step "Setting up Virtlet configuration *without* KVM support"
     virtlet_config+=(--from-literal=disable_kvm=y)
   fi
+
   "${kubectl}" create configmap -n kube-system virtlet-config "${virtlet_config[@]}"
   # new functionality added post 0.8.2
   # that logic could be removed later
@@ -293,8 +306,14 @@ function demo::start-virtlet {
       "${kubectl}" create configmap -n kube-system virtlet-image-translations --from-file "${BASE_LOCATION}/deploy/images.yaml"
     fi
   fi
-  demo::step "Deploying Virtlet DaemonSet from ${ds_location}"
-  "${kubectl}" create -f "${ds_location}"
+
+  if [[ "${replace_image_in_ds}" == 1 ]]; then
+    demo::step "Deploying Virtlet DaemonSet from ${ds_location} and will set correct ${virtlet_docker_tag}"
+    curl --silent "${ds_location}" | sed "s/image: mirantis\/virtlet/image: mirantis\/virtlet:${virtlet_docker_tag}/g" | "${kubectl}" create -f -
+  else
+    demo::step "Deploying Virtlet DaemonSet from ${ds_location}"
+   "${kubectl}" create -f "${ds_location}"
+  fi
   demo::wait-for "Virtlet DaemonSet" demo::pods-ready runtime=virtlet
 }
 
