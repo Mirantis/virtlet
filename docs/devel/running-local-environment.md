@@ -35,6 +35,12 @@ $ build/cmd.sh copy-dind
 $ # inject Virtlet image into the DIND node and start Virtlet daemonset
 $ build/cmd.sh start-dind
 
+$ # run some e2e tests
+$ build/cmd.sh e2e -test.v
+
+$ # run e2e tests that have 'Should have default route' in their description
+$ build/cmd.sh e2e -test.v -ginkgo.focus="Should have default route"
+
 $ # Restart DIND cluster. Binaries from copy-dind are preserved
 $ # (you may copy newer ones with another copy-dind command)
 $ ~/dind-cluster-v1.7.sh up

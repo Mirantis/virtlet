@@ -361,6 +361,13 @@ function build_internal {
     go test -i -c -o "${project_dir}/_output/virtlet-e2e-tests" ./tests/e2e
 }
 
+function e2e {
+    ensure_build_container
+    local cluster_url
+    cluster_url="$(kubectl config view -o jsonpath='{.clusters[?(@.name=="dind")].cluster.server}')"
+    docker exec virtlet-build _output/virtlet-e2e-tests -cluster-url "${cluster_url}" "$@"
+}
+
 function usage {
     echo >&2 "Usage:"
     echo >&2 "  $0 build"
@@ -436,6 +443,9 @@ case "${cmd}" in
         ;;
     copy-dind)
         VIRTLET_SKIP_RSYNC=y vcmd "build/cmd.sh copy-dind-internal"
+        ;;
+    e2e)
+        e2e "$@"
         ;;
     copy-dind-internal)
         copy_dind_internal
