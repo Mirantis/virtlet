@@ -136,12 +136,11 @@ e2e: &e2e
           export CNI_PLUGIN=calico
           echo >&2 "*** Using Calico CNI"
         fi
-        VIRTLET_DEMO_RELEASE=master \
           SKIP_SNAPSHOT=1 \
           NONINTERACTIVE=1 \
           NO_VM_CONSOLE=1 \
           INJECT_LOCAL_IMAGE=1 \
-          VIRTLET_DEMO_RELEASE=master \
+          VIRTLET_DEMO_BRANCH=master \
           BASE_LOCATION="$PWD" \
           deploy/demo.sh
   - run:
