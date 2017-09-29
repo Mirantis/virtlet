@@ -164,6 +164,12 @@ spec:
               name: virtlet-config
               key: loglevel
               optional: true
+        - name: VIRTLET_CALICO_SUBNET
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: calico-subnet
+              optional: true
         - name: IMAGE_REGEXP_TRANSLATION
           valueFrom:
             configMapKeyRef:

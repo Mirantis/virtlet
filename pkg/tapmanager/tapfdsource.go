@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -36,7 +38,9 @@ import (
 )
 
 const (
-	calicoNetType = "calico"
+	calicoNetType       = "calico"
+	calicoDefaultSubnet = 24
+	calicoSubnetVar     = "VIRTLET_CALICO_SUBNET"
 )
 
 // PodNetworkDesc contains the data that are required by TapFDSource
@@ -154,6 +158,7 @@ func (s *TapFDSource) GetFD(key string, data []byte) (int, []byte, error) {
 		if netConfig.IPs[0].Version != "4" {
 			return 0, nil, errors.New("IPv4 config was expected")
 		}
+		netConfig.IPs[0].Address.Mask = netmaskForCalico()
 		netConfig.IPs[0].Gateway = s.dummyGateway
 		netConfig.Routes = []*cnitypes.Route{
 			{
@@ -313,20 +318,15 @@ func fixCNIResult(netConfig *cnicurrent.Result, csn *nettools.ContainerSideNetwo
 	}
 }
 
-func calcNetmaskForCalico(ipA, ipB net.IP) (net.IPMask, error) {
-	var a, b uint
-	for _, v := range ipA {
-		a = (a << 8) + uint(v)
-	}
-	for _, v := range ipB {
-		b = (b << 8) + uint(v)
-	}
-	for n := 30; n >= 0; n-- {
-		m := (uint(1) << uint(32-n)) - 1
-		// avoid zero and broadcast addrs
-		if (a&^m) == (b&^m) && (a&m) != 0 && (b&m) != 0 && (a&m) != m && (b&m) != m {
-			return net.CIDRMask(n, 32), nil
+func netmaskForCalico() net.IPMask {
+	n := calicoDefaultSubnet
+	subnetStr := os.Getenv(calicoSubnetVar)
+	if subnetStr != "" {
+		n, err := strconv.Atoi(subnetStr)
+		if err != nil || n <= 0 || n > 30 {
+			glog.Warningf("bad calico subnet %q, using /%d", subnetStr, calicoDefaultSubnet)
+			n = calicoDefaultSubnet
 		}
 	}
-	return nil, errors.New("addresses too different")
+	return net.CIDRMask(n, 32)
 }

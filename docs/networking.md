@@ -85,7 +85,10 @@ spawning it as a child process.
 as it tries to pass a routing configuration that cannot be passed
 over DHCP. For it to work Virtlet patches Calico-provided CNI result,
 replacing Calico's unreachable fake gateway with another fake gateway
-with an IP address acquired from Calico IPAM.
+with an IP address acquired from Calico IPAM. A proper node subnet must
+be set for Calico-based virtlet installations. It's controlled by
+`calico-subnet` key Virtlet configmap (denoting the number of 1s in
+the netmask) and defaults to `24`.
 
 **NOTE:** Virtlet doesn't support `hostNetwork` pod setting because it
 cannot be impelemnted for VM in a meaningful way.
