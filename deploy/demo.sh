@@ -13,6 +13,7 @@ kubectl="${HOME}/.kubeadm-dind-cluster/kubectl"
 BASE_LOCATION="${BASE_LOCATION:-https://raw.githubusercontent.com/Mirantis/virtlet/master/}"
 RELEASE_LOCATION="${RELEASE_LOCATION:-https://github.com/Mirantis/virtlet/releases/download/}"
 VIRTLET_DEMO_RELEASE="${VIRTLET_DEMO_RELEASE:-}"
+VIRTLET_DEMO_BRANCH="${VIRTLET_DEMO_BRANCH:-}"
 VIRTLET_ON_MASTER="${VIRTLET_ON_MASTER:-}"
 IMAGE_REGEXP_TRANSLATION="${IMAGE_REGEXP_TRANSLATION:-1}"
 # Convenience setting for local testing:
@@ -256,10 +257,17 @@ function demo::get-correct-virtlet-release {
 function demo::start-virtlet {
   local -a virtlet_config=(--from-literal=download_protocol=http --from-literal=image_regexp_translation="$IMAGE_REGEXP_TRANSLATION")
   local ds_location
-  if [[ ${VIRTLET_DEMO_RELEASE} = "master" ]]; then
+  if [[ ${VIRTLET_DEMO_BRANCH} ]]; then
+    if [[ ${VIRTLET_DEMO_BRANCH} = "master" ]]; then
       virtlet_release="master"
       virtlet_docker_tag="latest"
       ds_location="${BASE_LOCATION}/deploy/virtlet-ds.yaml"
+    else
+      virtlet_release="${VIRTLET_DEMO_BRANCH}"
+      virtlet_docker_tag=$(echo $VIRTLET_DEMO_BRANCH | sed -e "s/\//_/g")
+      ds_location="${BASE_LOCATION}/deploy/virtlet-ds.yaml"
+      BASE_LOCATION="https://raw.githubusercontent.com/Mirantis/virtlet/${virtlet_release}/"
+    fi
   else
     if [[ ${VIRTLET_DEMO_RELEASE} ]]; then
       virtlet_release="${VIRTLET_DEMO_RELEASE}"
