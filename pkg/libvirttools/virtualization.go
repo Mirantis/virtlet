@@ -86,10 +86,9 @@ func (ds *domainSettings) createDomain() *libvirtxml.Domain {
 			Inputs: []libvirtxml.DomainInput{
 				{Type: "tablet", Bus: "usb"},
 			},
-			// Disabling vnc console because of libvirt failure
-			// Graphics: []libvirtxml.DomainGraphic{
-			// 	{Type: "vnc", Port: -1},
-			// },
+			Graphics: []libvirtxml.DomainGraphic{
+				{Type: "vnc", Port: -1},
+			},
 			Videos: []libvirtxml.DomainVideo{
 				{Model: libvirtxml.DomainVideoModel{Type: "cirrus"}},
 			},
