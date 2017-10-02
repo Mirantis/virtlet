@@ -54,6 +54,18 @@ restore_images_and_vendor: &restore_images_and_vendor
       docker exec -i virtlet-build tar -C /go/src/github.com/Mirantis/virtlet -xv <_output/vendor.tar
     fi
 
+extract_binaries_from_the_image: &extract_binaries_from_the_image
+  name: Extract binaries from the image (in non-workflow case)
+  command: |
+    if [[ -f _output/vmwrapper ]]; then
+      exit 0
+    fi
+    tag="$(echo "${CIRCLE_TAG:-${CIRCLE_BRANCH}}"|tr / _)"
+    image="mirantis/virtlet:${tag}"
+    echo "Extracting binaries from ${image}"
+    mkdir -p _output/
+    docker run "${image}" tar -C / -c vmwrapper virtlet-e2e-tests | tar -C _output/ -xv
+
 push_images: &push_images
   <<: *defaults
   steps:
@@ -235,6 +247,8 @@ jobs:
     - attach_workspace:
         at: _output
     - run:
+        <<: *extract_binaries_from_the_image
+    - run:
         name: Run tests
         command: |
           build/portforward.sh 18730&
@@ -254,9 +268,13 @@ jobs:
     - attach_workspace:
         at: _output
     - run:
+        <<: *extract_binaries_from_the_image
+    - run:
         name: Restore virtlet image
         command: |
-          docker load -i _output/virtlet.tar
+          if [[ -f _output/virtlet.tar ]]; then
+            docker load -i _output/virtlet.tar
+          fi
     - run:
         name: Start the demo
         command: |
