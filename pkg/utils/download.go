@@ -17,29 +17,68 @@ limitations under the License.
 package utils
 
 import (
+	"crypto"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
+	"time"
 
 	"github.com/golang/glog"
 )
 
 // Endpoint contains all the endpoint parameters needed to download a file
-// TODO: add TLS and other HTTP parameters here
 type Endpoint struct {
-	Url string `yaml:"url,omitempty" json:"url,omitempty"`
+	// Url is the image URL
+	Url string
+
+	// MaxRedirects is the maximum number of redirects that downloader is allowed to follow. -1 for stdlib default (fails on request #10)
+	MaxRedirects int
+
+	// TLS is the TLS config
+	TLS *TLSConfig
+
+	// Timeout specifies a time limit for http(s) download request. <= 0 is no timeout (default)
+	Timeout time.Duration
+
+	// Proxy is the proxy server to use. Default = use proxy from HTTP_PROXY environment variable
+	Proxy string
+
+	// Transport profile name for this endpoint. Provided for logging/debugging
+	ProfileName string
+}
+
+// TLSConfig has the TLS transport parameters
+type TLSConfig struct {
+	// Certificates to use (both CA and for client authentication)
+	Certificates []TLSCertificate
+
+	// ServerName is needed when connecting to domain other that certificate was issued for
+	ServerName string
+
+	// Insecure skips certificate verification
+	Insecure bool
+}
+
+// TLSCertificate is a x509 certificate with optional private key
+type TLSCertificate struct {
+	// Certificate is the x509 certificate
+	Certificate *x509.Certificate
+
+	// PrivateKey is the private key needed for certificate-based client authentication
+	PrivateKey crypto.PrivateKey
 }
 
 // Downloader is an interface for downloading files from web
 type Downloader interface {
-	// DownloadFile downloads the specified file and returns path
-	// to it
+	// DownloadFile downloads the specified file and returns path to it
 	DownloadFile(endpoint Endpoint) (string, error)
 }
-
-
 
 type defaultDownloader struct {
 	protocol string
@@ -53,12 +92,98 @@ func NewDownloader(protocol string) Downloader {
 	return &defaultDownloader{protocol}
 }
 
+func buildTLSConfig(config *TLSConfig, profileName string) (*tls.Config, error) {
+	var certificates []tls.Certificate
+	roots, err := x509.SystemCertPool()
+	if err != nil {
+		roots = x509.NewCertPool()
+	}
+	for _, cert := range config.Certificates {
+		if cert.Certificate.IsCA {
+			roots.AddCert(cert.Certificate)
+		} else if cert.PrivateKey != nil {
+			certificates = append(certificates, tls.Certificate{
+				Certificate: [][]byte{cert.Certificate.Raw},
+				PrivateKey:  cert.PrivateKey,
+			})
+		} else {
+			glog.V(3).Infof("Skipping certificate %q because it is neither CA not has a private key", cert.Certificate.SerialNumber.String())
+		}
+	}
+
+	return &tls.Config{
+		Certificates:       certificates,
+		RootCAs:            roots,
+		InsecureSkipVerify: config.Insecure,
+		ServerName:         config.ServerName,
+	}, nil
+}
+
+func createTransport(endpoint Endpoint) (*http.Transport, error) {
+	var tlsConfig *tls.Config
+	var err error
+	if endpoint.TLS != nil {
+		tlsConfig, err = buildTLSConfig(endpoint.TLS, endpoint.ProfileName)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	proxyFunc := http.ProxyFromEnvironment
+	if endpoint.Proxy != "" {
+		proxyFunc = func(*http.Request) (*url.URL, error) {
+			return url.Parse(endpoint.Proxy)
+		}
+	}
+
+	return &http.Transport{
+		Proxy: proxyFunc,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		TLSClientConfig:       tlsConfig,
+	}, nil
+}
+
+func createHttpClient(endpoint Endpoint) (*http.Client, error) {
+	transport, err := createTransport(endpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	var checkRedirects func(req *http.Request, via []*http.Request) error
+	if endpoint.MaxRedirects >= 0 {
+		checkRedirects = func(req *http.Request, via []*http.Request) error {
+			if len(via) > endpoint.MaxRedirects {
+				return fmt.Errorf("stopped after %d redirects", endpoint.MaxRedirects)
+			}
+			return nil
+		}
+	}
+
+	return &http.Client{
+		Transport:     transport,
+		Timeout:       endpoint.Timeout,
+		CheckRedirect: checkRedirects,
+	}, nil
+}
+
 func (d *defaultDownloader) DownloadFile(endpoint Endpoint) (string, error) {
 	url := endpoint.Url
 	if !strings.Contains(url, "://") {
 		url = fmt.Sprintf("%s://%s", d.protocol, url)
 	}
 
+	client, err := createHttpClient(endpoint)
+	if err != nil {
+		return "", err
+	}
 	tempFile, err := ioutil.TempFile("", "virtlet_")
 	if err != nil {
 		return "", err
@@ -67,7 +192,7 @@ func (d *defaultDownloader) DownloadFile(endpoint Endpoint) (string, error) {
 
 	glog.V(2).Infof("Start downloading %s", url)
 
-	resp, err := http.Get(url)
+	resp, err := client.Get(url)
 	if err != nil {
 		return "", err
 	}

@@ -18,8 +18,6 @@ package imagetranslation
 
 import (
 	"testing"
-
-	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 // TestTranslations tests how image names are translated with various translation rules
@@ -29,21 +27,15 @@ func TestTranslations(t *testing.T) {
 			Rules: []TranslationRule{
 				{
 					Regex: `^image(\d+)`,
-					Endpoint: utils.Endpoint{
-						Url: "http://example.net/image_$1.qcow2",
-					},
+					Url:   "http://example.net/image_$1.qcow2",
 				},
 				{
 					Regex: `image(\d+)`,
-					Endpoint: utils.Endpoint{
-						Url: "http://example.net/alt_$1.qcow2",
-					},
+					Url:   "http://example.net/alt_$1.qcow2",
 				},
 				{
 					Name: "image1",
-					Endpoint: utils.Endpoint{
-						Url: "https://example.net/base.qcow2",
-					},
+					Url:  "https://example.net/base.qcow2",
 				},
 			},
 		},
@@ -52,15 +44,11 @@ func TestTranslations(t *testing.T) {
 			Rules: []TranslationRule{
 				{
 					Regex: `^linux/(\d+\.\d+)`,
-					Endpoint: utils.Endpoint{
-						Url: "http://acme.org/linux_$1.qcow2",
-					},
+					Url:   "http://acme.org/linux_$1.qcow2",
 				},
 				{
 					Name: "linux/1",
-					Endpoint: utils.Endpoint{
-						Url: "https://acme.org/linux.qcow2",
-					},
+					Url:  "https://acme.org/linux.qcow2",
 				},
 			},
 		},
