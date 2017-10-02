@@ -19,6 +19,7 @@ package tapmanager
 import (
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/containernetworking/cni/pkg/ns"
@@ -67,6 +68,8 @@ type podNetwork struct {
 // TapFDSource sets up and tears down Virtlet VM network.
 // It implements FDSource interface
 type TapFDSource struct {
+	sync.Mutex
+
 	cniClient *cni.Client
 	fdMap     map[string]*podNetwork
 }
@@ -178,6 +181,8 @@ func (s *TapFDSource) GetFD(key string, data []byte) (int, []byte, error) {
 		return 0, nil, fmt.Errorf("error marshalling net config: %v", err)
 	}
 
+	s.Lock()
+	defer s.Unlock()
 	s.fdMap[key] = &podNetwork{
 		pnd:        *pnd,
 		csn:        csn,
@@ -189,6 +194,8 @@ func (s *TapFDSource) GetFD(key string, data []byte) (int, []byte, error) {
 
 // Release implements Release method of FDSource interface
 func (s *TapFDSource) Release(key string) error {
+	s.Lock()
+	defer s.Unlock()
 	pn, found := s.fdMap[key]
 	if !found {
 		return fmt.Errorf("bad fd key: %q", key)
@@ -228,6 +235,8 @@ func (s *TapFDSource) Release(key string) error {
 
 // GetInfo implements GetInfo method of FDSource interface
 func (s *TapFDSource) GetInfo(key string) ([]byte, error) {
+	s.Lock()
+	defer s.Unlock()
 	pn, found := s.fdMap[key]
 	if !found {
 		return nil, fmt.Errorf("bad fd key: %q", key)
