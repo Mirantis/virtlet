@@ -210,7 +210,7 @@ function vcmd_simple {
 }
 
 function stop {
-    docker ps -q --filter=label=virtlet_build | while read container_id; do
+    docker ps -a -q --filter=label=virtlet_build | while read container_id; do
         echo >&2 "Removing container:" "${container_id}"
         docker rm -fv "${container_id}"
     done
