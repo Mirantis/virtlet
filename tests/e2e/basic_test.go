@@ -133,25 +133,43 @@ var _ = Describe("Basic cirros tests", func() {
 		})
 
 		It("Should contain login string in VM log", func() {
-			out := do(framework.ExecSimple(nodeExecutor, "cat",
-				fmt.Sprintf("/var/log/virtlet/vms/%s/%s", sandboxID, filename))).(string)
-			Expect(strings.Count(out,
-				"login as 'cirros' user. default password: 'cubswin:)'. use 'sudo' for root.",
-			)).To(Equal(1))
+			Eventually(func() error {
+				out, err := framework.ExecSimple(nodeExecutor, "cat",
+					fmt.Sprintf("/var/log/virtlet/vms/%s/%s", sandboxID, filename))
+				if err != nil {
+					return err
+				}
+				fmt.Printf("OUT:\n%s\n---\n", out)
+				n := strings.Count(out, "login as 'cirros' user. default password: 'cubswin:)'. use 'sudo' for root.")
+				if n != 1 {
+					return fmt.Errorf("expected login prompt to appear exactly once in the log, but got %d occurences", n)
+				}
+				return nil
+			}, 60*5, 5)
 		})
 
 		It("Should contain login string in pod log and each line of that log must be a valid JSON", func() {
-			out := do(framework.ExecSimple(nodeExecutor, "cat",
-				fmt.Sprintf("/var/log/pods/%s/%s", sandboxID, filename))).(string)
-			found := 0
-			for _, line := range strings.Split(out, "\n") {
-				var entry map[string]string
-				Expect(json.Unmarshal([]byte(line), &entry)).To(Succeed())
-				if strings.HasPrefix(entry["log"], "login as 'cirros' user. default password") {
-					found++
+			Eventually(func() error {
+				out, err := framework.ExecSimple(nodeExecutor, "cat",
+					fmt.Sprintf("/var/log/pods/%s/%s", sandboxID, filename))
+				if err != nil {
+					return err
 				}
-			}
-			Expect(found).To(Equal(1))
+				found := 0
+				for _, line := range strings.Split(out, "\n") {
+					var entry map[string]string
+					if err := json.Unmarshal([]byte(line), &entry); err != nil {
+						return fmt.Errorf("error unmarshalling json: %v", err)
+					}
+					if strings.HasPrefix(entry["log"], "login as 'cirros' user. default password") {
+						found++
+					}
+				}
+				if found != 1 {
+					return fmt.Errorf("expected login prompt to appear exactly once in the log, but got %d occurences", found)
+				}
+				return nil
+			})
 		})
 	})
 

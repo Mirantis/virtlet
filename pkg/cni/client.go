@@ -23,6 +23,8 @@ import (
 	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
+
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 type Client struct {
@@ -32,6 +34,7 @@ type Client struct {
 
 func NewClient(pluginsDir, configsDir string) (*Client, error) {
 	configuration, err := ReadConfiguration(configsDir)
+	glog.V(3).Infof("CNI config: name: %q type: %q", configuration.Network.Name, configuration.Network.Type)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read CNI configuration: %v", err)
 	}
@@ -42,18 +45,37 @@ func NewClient(pluginsDir, configsDir string) (*Client, error) {
 	}, nil
 }
 
+func (c *Client) Type() string { return c.configuration.Network.Type }
+
 func (c *Client) cniRuntimeConf(podId, podName, podNs string) *libcni.RuntimeConf {
-	return &libcni.RuntimeConf{
+	r := &libcni.RuntimeConf{
 		ContainerID: podId,
 		NetNS:       PodNetNSPath(podId),
 		IfName:      "virtlet-eth0",
-		Args: [][2]string{
+	}
+	if podName != "" && podNs != "" {
+		r.Args = [][2]string{
 			{"IgnoreUnknown", "1"},
 			{"K8S_POD_NAMESPACE", podNs},
 			{"K8S_POD_NAME", podName},
 			{"K8S_POD_INFRA_CONTAINER_ID", podId},
-		},
+		}
 	}
+	return r
+}
+
+// GetDummyNetwork creates a dummy network using CNI plugin.
+// It's used for making a dummy gateway for Calico CNI plugin.
+func (c *Client) GetDummyNetwork() (*cnicurrent.Result, error) {
+	// TODO: virtlet pod restarts should not grab another address for
+	// the gateway. That's not a big problem usually though
+	// as the IPs are not returned to Calico so both old
+	// IPs on existing VMs and new ones should work.
+	podId := utils.NewUuid()
+	if err := CreateNetNS(podId); err != nil {
+		return nil, fmt.Errorf("couldn't create netns for fake pod %q: %v", podId, err)
+	}
+	return c.AddSandboxToNetwork(podId, "", "")
 }
 
 func (c *Client) AddSandboxToNetwork(podId, podName, podNs string) (*cnicurrent.Result, error) {

@@ -18,7 +18,11 @@ package tapmanager
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -31,6 +35,12 @@ import (
 	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/dhcp"
 	"github.com/Mirantis/virtlet/pkg/nettools"
+)
+
+const (
+	calicoNetType       = "calico"
+	calicoDefaultSubnet = 24
+	calicoSubnetVar     = "VIRTLET_CALICO_SUBNET"
 )
 
 // PodNetworkDesc contains the data that are required by TapFDSource
@@ -70,8 +80,9 @@ type podNetwork struct {
 type TapFDSource struct {
 	sync.Mutex
 
-	cniClient *cni.Client
-	fdMap     map[string]*podNetwork
+	cniClient    *cni.Client
+	dummyGateway net.IP
+	fdMap        map[string]*podNetwork
 }
 
 var _ FDSource = &TapFDSource{}
@@ -84,10 +95,28 @@ func NewTapFDSource(cniPluginsDir, cniConfigsDir string) (*TapFDSource, error) {
 		return nil, err
 	}
 
-	return &TapFDSource{
+	s := &TapFDSource{
 		cniClient: cniClient,
 		fdMap:     make(map[string]*podNetwork),
-	}, nil
+	}
+
+	// Calico needs special treatment here.
+	// We need to make network config DHCP-compatible by throwing away
+	// Calico's gateway and dev route and using a fake gateway instead.
+	// The fake gateway is just an IP address allocated by Calico IPAM,
+	// it's needed for proper ARP resppnses for VMs.
+	if cniClient.Type() == calicoNetType {
+		dummyResult, err := cniClient.GetDummyNetwork()
+		if err != nil {
+			return nil, err
+		}
+		if len(dummyResult.IPs) != 1 {
+			return nil, fmt.Errorf("expected 1 ip for the dummy network, but got %d", len(dummyResult.IPs))
+		}
+		s.dummyGateway = dummyResult.IPs[0].Address.IP
+	}
+
+	return s, nil
 }
 
 // GetFD implements GetFD method of FDSource interface
@@ -121,6 +150,27 @@ func (s *TapFDSource) GetFD(key string, data []byte) (int, []byte, error) {
 
 	netConfig := payload.CNIConfig
 
+	// Calico needs network config to be adjusted for DHCP compatibility
+	if s.dummyGateway != nil {
+		if len(netConfig.IPs) != 1 {
+			return 0, nil, errors.New("didn't expect more than one IP config")
+		}
+		if netConfig.IPs[0].Version != "4" {
+			return 0, nil, errors.New("IPv4 config was expected")
+		}
+		netConfig.IPs[0].Address.Mask = netmaskForCalico()
+		netConfig.IPs[0].Gateway = s.dummyGateway
+		netConfig.Routes = []*cnitypes.Route{
+			{
+				Dst: net.IPNet{
+					IP:   net.IP{0, 0, 0, 0},
+					Mask: net.IPMask{0, 0, 0, 0},
+				},
+				GW: s.dummyGateway,
+			},
+		}
+	}
+
 	netNSPath := cni.PodNetNSPath(pnd.PodId)
 	vmNS, err := ns.GetNS(netNSPath)
 	if err != nil {
@@ -143,8 +193,10 @@ func (s *TapFDSource) GetFD(key string, data []byte) (int, []byte, error) {
 
 		// NOTE: older CNI plugins don't include the hardware address
 		// in Result, but it's needed for Cloud-Init based
-		// network setup, so we add it here if it's missing
-		ensureCNIInterfaceHwAddress(netConfig, csn)
+		// network setup, so we add it here if it's missing.
+		// Also, some of the plugins may skip adding routes
+		// to the CNI result, so we must add them, too
+		fixCNIResult(netConfig, csn)
 
 		// TODO: now CNIConfig should always contain interface mac address, so there
 		// is no reason to pass it as separate field in dhcp.Config,
@@ -244,7 +296,7 @@ func (s *TapFDSource) GetInfo(key string) ([]byte, error) {
 	return pn.csn.HardwareAddr, nil
 }
 
-func ensureCNIInterfaceHwAddress(netConfig *cnicurrent.Result, csn *nettools.ContainerSideNetwork) {
+func fixCNIResult(netConfig *cnicurrent.Result, csn *nettools.ContainerSideNetwork) {
 	// If there's no interface info in netConfig, we can assume that we're dealing
 	// with an old-style CNI plugin which only supports a single network interface
 	if len(netConfig.Interfaces) > 0 {
@@ -260,4 +312,21 @@ func ensureCNIInterfaceHwAddress(netConfig *cnicurrent.Result, csn *nettools.Con
 	for _, IP := range netConfig.IPs {
 		IP.Interface = 0
 	}
+
+	if len(netConfig.Routes) == 0 {
+		netConfig.Routes = csn.Result.Routes
+	}
+}
+
+func netmaskForCalico() net.IPMask {
+	n := calicoDefaultSubnet
+	subnetStr := os.Getenv(calicoSubnetVar)
+	if subnetStr != "" {
+		n, err := strconv.Atoi(subnetStr)
+		if err != nil || n <= 0 || n > 30 {
+			glog.Warningf("bad calico subnet %q, using /%d", subnetStr, calicoDefaultSubnet)
+			n = calicoDefaultSubnet
+		}
+	}
+	return net.CIDRMask(n, 32)
 }
