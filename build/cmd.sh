@@ -35,6 +35,8 @@ if [[ ${VIRTLET_ON_MASTER} ]]; then
   virtlet_node=kube-master
 fi
 
+dind_mounts='.items[0].spec.template.spec.volumes|=.+[{"name":"dind",hostPath:{"path":"/dind"}}]|.items[0].spec.template.spec.containers[].volumeMounts|=.+[{"name":"dind", "mountPath":"/dind"}]|.items[0].spec.template.spec.initContainers[].volumeMounts|=.+[{"name":"dind", "mountPath":"/dind"}]'
+
 # from build/common.sh in k8s
 function rsync_probe {
     # Wait unil rsync is up and running.
@@ -267,7 +269,9 @@ function start_dind {
     kubectl label node --overwrite "${virtlet_node}" extraRuntime=virtlet
     kubectl create configmap -n kube-system virtlet-config "${virtlet_config[@]}"
     kubectl create configmap -n kube-system virtlet-image-translations --from-file "${project_dir}/deploy/images.yaml"
-    kubectl create -f "${project_dir}/deploy/virtlet-ds.yaml"
+    kubectl convert --local -o json -f "${project_dir}/deploy/virtlet-ds.yaml" |
+       jq "${dind_mounts}" |
+       kubectl apply -f -
 }
 
 function virtlet_subdir {
