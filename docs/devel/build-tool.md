@@ -104,3 +104,17 @@ by CI.
 
 Starts the build container. This is done automatically by other
 `build/cmd.sh` commands that need the build container.
+
+## e2e
+
+Runs Virtlet e2e tests against the currently running DIND cluster.
+You can also pass test options to this command:
+```
+build/cmd.sh e2e -test.v
+```
+You can also pass [Ginkgo](https://onsi.github.io/ginkgo/) options to
+this command, e.g. the following command will run only the tests that
+have `Should have default route` in their description:
+```
+build/cmd.sh e2e -test.v -ginkgo.focus="Should have default route"
+```
