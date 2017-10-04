@@ -1,5 +1,5 @@
-hash: f96ed038c80c62dd342149ab54a30af5b9234012df802a84809f0056076b6aa1
-updated: 2017-09-17T22:16:30.247489964-07:00
+hash: f71db26d07e8dd60d258ae0300da4c2db0beb33d42ab15e43af058aededc65a3
+updated: 2017-09-30T01:57:00.317384229+02:00
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
@@ -63,7 +63,7 @@ imports:
 - name: github.com/blang/semver
   version: b38d23b8782a487059e8fc8773e9a5b228a77cb6
 - name: github.com/boltdb/bolt
-  version: e9cf4fae01b5a8ff89d0ec6b32f0d9c9f79aefdd
+  version: 583e8937c61f1af6513608ccc75c97b6abdf4ff9
 - name: github.com/containernetworking/cni
   version: 137b4975ecab6e1f0c24c1e3c228a50a3cfba75e
   subpackages:
@@ -77,17 +77,62 @@ imports:
 - name: github.com/coreos/etcd
   version: 20490caaf0dcd96bb4a95e40625559def8ef5b04
   subpackages:
+  - alarm
+  - auth
   - auth/authpb
   - client
   - clientv3
+  - compactor
+  - discovery
+  - error
+  - etcdserver
+  - etcdserver/api
+  - etcdserver/api/v2http
+  - etcdserver/api/v2http/httptypes
+  - etcdserver/api/v3rpc
   - etcdserver/api/v3rpc/rpctypes
+  - etcdserver/auth
   - etcdserver/etcdserverpb
+  - etcdserver/membership
+  - etcdserver/stats
+  - integration
+  - lease
+  - lease/leasehttp
+  - lease/leasepb
+  - mvcc
+  - mvcc/backend
   - mvcc/mvccpb
+  - pkg/adt
+  - pkg/contention
+  - pkg/cpuutil
+  - pkg/crc
   - pkg/fileutil
+  - pkg/httputil
+  - pkg/idutil
+  - pkg/ioutil
+  - pkg/logutil
+  - pkg/monotime
+  - pkg/netutil
   - pkg/pathutil
+  - pkg/pbutil
+  - pkg/runtime
+  - pkg/schedule
+  - pkg/testutil
   - pkg/tlsutil
   - pkg/transport
   - pkg/types
+  - pkg/wait
+  - proxy/grpcproxy
+  - proxy/grpcproxy/cache
+  - raft
+  - raft/raftpb
+  - rafthttp
+  - snap
+  - snap/snappb
+  - store
+  - version
+  - wal
+  - wal/walpb
 - name: github.com/coreos/go-semver
   version: 568e959cd89871e61434c1143528d9162da89ef2
   subpackages:
@@ -101,8 +146,10 @@ imports:
 - name: github.com/coreos/pkg
   version: fa29b1d70f0beaddd4c7021607cc3c3be8ce94b8
   subpackages:
-  - capnslog
   - dlopen
+  - health
+  - httputil
+  - timeutil
 - name: github.com/coreos/rkt
   version: ec37f3cb649bfb72408906e7cbf330e4aeda1075
   subpackages:
@@ -153,7 +200,7 @@ imports:
   - sockets
   - tlsconfig
 - name: github.com/docker/go-units
-  version: e30f1e79f3cd72542f2026ceec18d3bd67ab859c
+  version: 0dadbb0345b35ec7ef35e228dabb8de89a65bf52
 - name: github.com/docker/spdystream
   version: 449fdfce4d962303d702fec724ef0ad181c92528
   subpackages:
@@ -194,20 +241,15 @@ imports:
   - protoc-gen-gogo/descriptor
   - sortkeys
 - name: github.com/golang/glog
-  version: 44145f04b68cf362d9c4df2182967c2275eaefed
+  version: 23def4e6c14b4da8ac2ed8007337bc5eb5007998
 - name: github.com/golang/groupcache
   version: 02826c3e79038b59d737d3b1c0a1d937f71a4433
   subpackages:
   - lru
 - name: github.com/golang/protobuf
-  version: 4bd1920723d7b7c925de087aa32e2187708897f7
+  version: 130e6b02ab059e7b717a096f397c5b60111cae74
   subpackages:
-  - jsonpb
   - proto
-  - ptypes
-  - ptypes/any
-  - ptypes/duration
-  - ptypes/timestamp
 - name: github.com/google/cadvisor
   version: d19cc94b760cd8f150a0a5d95b404dec39a121a1
   subpackages:
@@ -260,13 +302,6 @@ imports:
   - simplelru
 - name: github.com/howeyc/gopass
   version: bf9dde6d0d2c004a008c27aaee91170c786f6db8
-- name: github.com/hpcloud/tail
-  version: faf842bde7ed83bbc3c65a2c454fae39bc29a95f
-  subpackages:
-  - ratelimiter
-  - util
-  - watch
-  - winfile
 - name: github.com/imdario/mergo
   version: 6633656539c1639d9d78127b7d47c622b5d7b6dc
 - name: github.com/jmespath/go-jmespath
@@ -401,7 +436,7 @@ imports:
 - name: github.com/vishvananda/netns
   version: 8ba1072b58e0c2a240eb5f6120165c7776c3e7b8
 - name: go.universe.tf/netboot
-  version: 9253ccdf97149d96019a62122555b37047168c1f
+  version: b8b3aeb641f62e5ce4ca0a0ff05f1298f24610d6
   subpackages:
   - dhcp4
 - name: go4.org
@@ -437,8 +472,12 @@ imports:
   - proxy
   - trace
   - websocket
+- name: golang.org/x/sync
+  version: 8e0aa688b654ef28caa72506fa5ec8dba9fc7690
+  subpackages:
+  - syncmap
 - name: golang.org/x/sys
-  version: 8f0908ab3b2457e2e15403d3697c9ef5cb4b57a9
+  version: 076b546753157f758b316e59bcb51e6807c04057
   subpackages:
   - unix
   - windows
@@ -466,12 +505,8 @@ imports:
   - naming
   - peer
   - transport
-- name: gopkg.in/fsnotify.v1
-  version: 7be54206639f256967dd82fa767397ba5f8f48f5
 - name: gopkg.in/inf.v0
   version: 3887ee99ecf07df5b447e9b00d9c0b2adaa9f3e4
-- name: gopkg.in/tomb.v1
-  version: c131134a1947e9afd9cecfe11f4c6dff0732ae58
 - name: gopkg.in/yaml.v2
   version: 53feefa2559fb8dfa8d81baad31be332c97d6c77
 - name: k8s.io/api
@@ -493,13 +528,11 @@ imports:
   - pkg/api/errors
   - pkg/api/meta
   - pkg/api/resource
-  - pkg/api/testing
   - pkg/api/validation
   - pkg/api/validation/path
   - pkg/apimachinery
   - pkg/apimachinery/announced
   - pkg/apimachinery/registered
-  - pkg/apis/meta/internalversion
   - pkg/apis/meta/v1
   - pkg/apis/meta/v1/unstructured
   - pkg/apis/meta/v1/validation

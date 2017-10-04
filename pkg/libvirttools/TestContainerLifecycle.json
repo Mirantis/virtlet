@@ -417,6 +417,30 @@
           {
             "Name": "VIRTLET_NET_KEY",
             "Value": "/tmp/fakenetns"
+	  },
+          {
+          "Name": "VIRTLET_POD_NAME",
+          "Value": "testName_0"
+          },
+          {
+          "Name": "VIRTLET_POD_NAMESPACE",
+          "Value": "default"
+          },
+          {
+          "Name": "VIRTLET_POD_UID",
+          "Value": "69eec606-0493-5825-73a4-c5e0c0236155"
+          },
+          {
+          "Name": "VIRTLET_CONTAINER_ID",
+          "Value": "231700d5-c9a6-5a49-738d-99a954c51550"
+          },
+          {
+          "Name": "VIRTLET_CONTAINER_NAME",
+          "Value": "container1"
+          },
+          {
+          "Name": "CONTAINER_ATTEMPTS",
+          "Value": "42"
           }
         ]
       }

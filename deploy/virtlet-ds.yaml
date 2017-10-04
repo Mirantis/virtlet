@@ -143,6 +143,8 @@ spec:
           mountPath: /var/log/vms
         - mountPath: /etc/virtlet/images
           name: image-name-translations
+        - name: pods-log
+          mountPath: /kubernetes-log
         securityContext:
           privileged: true
         env:
@@ -178,24 +180,11 @@ spec:
               optional: true
         - name: IMAGE_TRANSLATIONS_DIR
           value: /etc/virtlet/images
-        # Uncomment the following to redirect VM logs to file /var/log/vms/<sandboxId>/<containerId>_<attemptIdx>.log:
-        - name: VIRTLET_VM_LOG_LOCATION
-          value: "/var/log/vms"
-      - name: virtlet-log
-        image: mirantis/virtlet
-        imagePullPolicy: IfNotPresent
-        command:
-          - /virtlet_log
-        volumeMounts:
-        - name: vms-log
-          mountPath: /virtlet-log
-        - name: pods-log
-          mountPath: /kubernetes-log
-        env:
-        - name: VIRTLET_VM_LOGS
-          value: "/virtlet-log"
         - name: KUBERNETES_POD_LOGS
           value: "/kubernetes-log"
+        # TODO: should we rename it?
+        - name: VIRTLET_VM_LOG_LOCATION
+          value: "1"
       - name: vms
         image: mirantis/virtlet
         imagePullPolicy: IfNotPresent
