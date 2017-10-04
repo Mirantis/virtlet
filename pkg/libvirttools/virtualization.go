@@ -19,7 +19,6 @@ package libvirttools
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -52,7 +51,6 @@ const (
 
 	ContainerNsUuid       = "67b7fb47-7735-4b64-86d2-6d062d121966"
 	defaultKubeletRootDir = "/var/lib/kubelet/pods"
-	vmLogLocationPty      = "pty"
 )
 
 type domainSettings struct {
@@ -68,7 +66,6 @@ type domainSettings struct {
 	rootDiskFilepath string
 	netFdKey         string
 	cniConfig        string
-	vmLogLocation    string
 }
 
 func (ds *domainSettings) createDomain(config *VMConfig) *libvirtxml.Domain {
@@ -281,25 +278,17 @@ func (v *VirtualizationTool) teardownVolumes(config *VMConfig) error {
 	return nil
 }
 
-func vmLogLocation() string {
-	logLocation := os.Getenv("VIRTLET_VM_LOG_LOCATION")
-	if logLocation == "" {
-		return vmLogLocationPty
+func loggingDisabled() bool {
+	disabled := os.Getenv("VIRTLET_DISABLE_LOGGING")
+	if disabled != "" {
+		return true
 	}
-	return logLocation
-}
-
-func (v *VirtualizationTool) RemoveLibvirtSandboxLog(sandboxId string) error {
-	logLocation := vmLogLocation()
-	if logLocation == vmLogLocationPty {
-		return nil
-	}
-	return os.RemoveAll(filepath.Join(logLocation, sandboxId))
+	return false
 }
 
 func (v *VirtualizationTool) addSerialDevicesToDomain(sandboxId, containerName string, containerAttempt uint32, domain *libvirtxml.Domain, settings domainSettings) error {
 	port := uint(0)
-	if settings.vmLogLocation != vmLogLocationPty {
+	if !loggingDisabled() {
 		domain.Devices.Serials = []libvirtxml.DomainSerial{
 			{
 				Type:   "unix",
@@ -336,9 +325,8 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netFdKey string) 
 		domainUUID: domainUUID,
 		// Note: using only first 13 characters because libvirt has an issue with handling
 		// long path names for qemu monitor socket
-		domainName:    "virtlet-" + domainUUID[:13] + "-" + config.Name,
-		netFdKey:      netFdKey,
-		vmLogLocation: vmLogLocation(),
+		domainName: "virtlet-" + domainUUID[:13] + "-" + config.Name,
+		netFdKey:   netFdKey,
 	}
 
 	cloneName := "virtlet_root_" + settings.domainUUID
