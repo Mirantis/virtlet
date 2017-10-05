@@ -178,13 +178,16 @@ spec:
               name: virtlet-config
               key: image_regexp_translation
               optional: true
+        - name: VIRTLET_DISABLE_LOGGING
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: disable_logging
+              optional: true
         - name: IMAGE_TRANSLATIONS_DIR
           value: /etc/virtlet/images
         - name: KUBERNETES_POD_LOGS
           value: "/kubernetes-log"
-        # TODO: should we rename it?
-        - name: VIRTLET_VM_LOG_LOCATION
-          value: "1"
       - name: vms
         image: mirantis/virtlet
         imagePullPolicy: IfNotPresent
