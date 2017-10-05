@@ -400,8 +400,12 @@
               "Space": "",
               "Local": ""
             },
-            "Type": "pty",
-            "Source": null,
+            "Type": "unix",
+            "Source": {
+              "Mode": "connect",
+              "Path": "/var/lib/libvirt/streamer.sock",
+              "Append": ""
+            },
             "Target": {
               "Type": "",
               "Port": 0
@@ -410,22 +414,7 @@
             "Address": null
           }
         ],
-        "Consoles": [
-          {
-            "XMLName": {
-              "Space": "",
-              "Local": ""
-            },
-            "Type": "pty",
-            "Source": null,
-            "Target": {
-              "Type": "serial",
-              "Port": 0
-            },
-            "Alias": null,
-            "Address": null
-          }
-        ],
+        "Consoles": null,
         "Inputs": [
           {
             "XMLName": {
@@ -499,30 +488,30 @@
           {
             "Name": "VIRTLET_NET_KEY",
             "Value": "/tmp/fakenetns"
-	  },
-          {
-          "Name": "VIRTLET_POD_NAME",
-          "Value": "testName_0"
           },
           {
-          "Name": "VIRTLET_POD_NAMESPACE",
-          "Value": "default"
+            "Name": "VIRTLET_POD_NAME",
+            "Value": "testName_0"
           },
           {
-          "Name": "VIRTLET_POD_UID",
-          "Value": "69eec606-0493-5825-73a4-c5e0c0236155"
+            "Name": "VIRTLET_POD_NAMESPACE",
+            "Value": "default"
           },
           {
-          "Name": "VIRTLET_CONTAINER_ID",
-          "Value": "231700d5-c9a6-5a49-738d-99a954c51550"
+            "Name": "VIRTLET_POD_UID",
+            "Value": "69eec606-0493-5825-73a4-c5e0c0236155"
           },
           {
-          "Name": "VIRTLET_CONTAINER_NAME",
-          "Value": "container1"
+            "Name": "VIRTLET_CONTAINER_ID",
+            "Value": "231700d5-c9a6-5a49-738d-99a954c51550"
           },
           {
-          "Name": "CONTAINER_ATTEMPTS",
-          "Value": "42"
+            "Name": "VIRTLET_CONTAINER_NAME",
+            "Value": "container1"
+          },
+          {
+            "Name": "CONTAINER_ATTEMPTS",
+            "Value": "42"
           }
         ]
       }

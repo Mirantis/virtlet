@@ -21,10 +21,11 @@ import (
 
 	"google.golang.org/grpc"
 
+	"os"
+
 	"github.com/Mirantis/virtlet/pkg/manager"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
 	"github.com/Mirantis/virtlet/pkg/utils"
-	"os"
 )
 
 const (
@@ -65,6 +66,7 @@ func (v *VirtletManager) Run() {
 	}
 
 	os.Setenv("KUBERNETES_CLUSTER_URL", "")
+	os.Setenv("VIRTLET_DISABLE_LOGGING", "true")
 	v.manager, err = manager.NewVirtletManager(libvirtUri, "default", "http", "dir", dbFilename, "loop*", "", &fakeFDManager{})
 	if err != nil {
 		v.t.Fatalf("Failed to create VirtletManager: %v", err)
