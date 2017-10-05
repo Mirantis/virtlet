@@ -334,19 +334,8 @@ function install_vendor_internal {
 }
 
 function run_tests_internal {
-    local -a failed=()
     install_vendor_internal
-    while read test_path; do
-        test_dir="$(dirname "${test_path}")"
-        echo >&2 "*** Running tests: ${test_dir}"
-        if ! ( cd "${test_dir}" && ./go.test ); then
-            failed+=("${test_dir}")
-        fi
-    done < <(find . -name 'go.test' \( -path ./tests/integration/go.test -o -print \) | sort)
-    if [[ ${#failed[@]} > 0 ]]; then
-        echo >&2 "*** Tests failed for ${failed[@]}"
-        exit 1
-    fi
+    go test -v ./pkg/... ./tests/network/...
 }
 
 function run_integration_internal {
