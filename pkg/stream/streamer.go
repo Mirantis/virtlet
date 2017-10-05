@@ -34,6 +34,7 @@ func (s *Server) GetAttach(req *kubeapi.AttachRequest) (*kubeapi.AttachResponse,
 	return s.streamServer.GetAttach(req)
 }
 
+// Attach endpoint for streaming.Runtime
 func (s *Server) Attach(containerID string, inputStream io.Reader, outputStream, errorStream io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 	glog.V(1).Infoln("New Attach request", containerID)
 	c, ok := s.unixServer.UnixConnections.Load(containerID)
