@@ -45,7 +45,7 @@ var _ = Describe("VM resources", func() {
 		deleteVM(vm)
 	})
 
-	scheduleWaitSSH(&vm, &ssh)
+	scheduleWaitSSH(&vm, &ssh, "cirros")
 
 	It("Should have CPU count as set for the domain", func() {
 		checkCPUCount(vm, ssh, 2)

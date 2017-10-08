@@ -48,6 +48,7 @@ type VMOptions struct {
 	UserData          string
 	OverwriteUserData bool
 	UserDataScript    string
+	NodeName          string
 }
 
 func newVMInterface(controller *Controller, name string) *VMInterface {
@@ -151,6 +152,21 @@ func (vmi *VMInterface) buildVMPod(options VMOptions) *v1.Pod {
 		limits[v1.ResourceName(k)] = resource.MustParse(v)
 	}
 
+	var nodeMatch v1.NodeSelectorRequirement
+	if options.NodeName == "" {
+		nodeMatch = v1.NodeSelectorRequirement{
+			Key:      "extraRuntime",
+			Operator: "In",
+			Values:   []string{"virtlet"},
+		}
+	} else {
+		nodeMatch = v1.NodeSelectorRequirement{
+			Key:      "kubernetes.io/hostname",
+			Operator: "In",
+			Values:   []string{options.NodeName},
+		}
+	}
+
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        vmi.Name,
@@ -164,11 +180,7 @@ func (vmi *VMInterface) buildVMPod(options VMOptions) *v1.Pod {
 						NodeSelectorTerms: []v1.NodeSelectorTerm{
 							{
 								MatchExpressions: []v1.NodeSelectorRequirement{
-									{
-										Key:      "extraRuntime",
-										Operator: "In",
-										Values:   []string{"virtlet"},
-									},
+									nodeMatch,
 								},
 							},
 						},

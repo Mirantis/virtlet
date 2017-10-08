@@ -32,13 +32,14 @@ import (
 
 var (
 	cirrosLocation = flag.String("cirros", defaultCirrosLocation, "cirros image URL (*without http(s)://*")
+	ubuntuLocation = flag.String("ubuntu", defaultUbuntuLocation, "ubuntu image URL (*without http(s)://*")
 	memoryLimit    = flag.Int("memoryLimit", 160, "default VM memory limit (in MiB)")
 )
 
 // scheduleWaitSSH schedules SSH interface initialization before the test context starts
-func scheduleWaitSSH(vm **framework.VMInterface, ssh *framework.Executor) {
+func scheduleWaitSSH(vm **framework.VMInterface, ssh *framework.Executor, user string) {
 	BeforeAll(func() {
-		*ssh = waitSSH(*vm)
+		*ssh = waitSSH(*vm, user)
 	})
 
 	AfterAll(func() {
@@ -46,12 +47,12 @@ func scheduleWaitSSH(vm **framework.VMInterface, ssh *framework.Executor) {
 	})
 }
 
-func waitSSH(vm *framework.VMInterface) framework.Executor {
+func waitSSH(vm *framework.VMInterface, user string) framework.Executor {
 	var ssh framework.Executor
 	Eventually(
 		func() error {
 			var err error
-			ssh, err = vm.SSH("cirros", sshPrivateKey)
+			ssh, err = vm.SSH(user, sshPrivateKey)
 			if err != nil {
 				return err
 			}
