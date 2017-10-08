@@ -388,7 +388,8 @@ partition. This can be changed by specifying `part` option in the
 flexvolume definition, which may make sense in case of e.g. raw
 devices. `part` value of `0` denotes mounting the device itself and
 not looking for partitions on it, and `part` values above 0 denote the
-corresponding partition numbers. Below is an example:
+corresponding partition numbers. Note that the number must be quoted
+so it's treated as a string when parsing yaml. Below is an example:
 
 ```yaml
   volumes:
@@ -398,7 +399,7 @@ corresponding partition numbers. Below is an example:
       options:
         type: raw
         path: /dev/sdc
-        part: 2
+        part: "2"
 ```
 
 ## Injecting Secret and ConfigMap content into the VMs as files
