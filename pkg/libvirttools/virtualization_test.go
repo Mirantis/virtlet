@@ -31,12 +31,12 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 
 	"github.com/Mirantis/virtlet/pkg/flexvolume"
+	"github.com/Mirantis/virtlet/pkg/imagetranslation"
 	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/Mirantis/virtlet/pkg/virt/fake"
 	"github.com/Mirantis/virtlet/tests/criapi"
 	"github.com/Mirantis/virtlet/tests/gm"
-	"github.com/Mirantis/virtlet/pkg/imagetranslation"
 )
 
 const (

@@ -119,7 +119,7 @@ func (o VMOptions) applyDefaults() framework.VMOptions {
 	if res.Image == "" {
 		res.Image = *cirrosLocation
 	}
-	if res.SSHKey == "" {
+	if res.SSHKey == "" && res.SSHKeySource == "" {
 		res.SSHKey = sshPublicKey
 	}
 	if res.VCPUCount == 0 {

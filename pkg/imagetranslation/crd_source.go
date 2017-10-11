@@ -18,7 +18,6 @@ package imagetranslation
 
 import (
 	"fmt"
-	"os"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -26,8 +25,9 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/rest"
+
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 const groupName = "virtlet.k8s"
@@ -70,14 +70,6 @@ func init() {
 	}
 }
 
-func getClientConfig() (*rest.Config, error) {
-	url, exists := os.LookupEnv("KUBERNETES_CLUSTER_URL")
-	if !exists {
-		return rest.InClusterConfig()
-	}
-	return &rest.Config{Host: url}, nil
-}
-
 // RegisterCustomResourceType registers custom resource definition for VirtletImageMapping kind in k8s
 func RegisterCustomResourceType() error {
 	crd := apiextensionsv1beta1.CustomResourceDefinition{
@@ -96,7 +88,7 @@ func RegisterCustomResourceType() error {
 			},
 		},
 	}
-	cfg, err := getClientConfig()
+	cfg, err := utils.GetK8sClientConfig("")
 	if err != nil || cfg.Host == "" {
 		return err
 	}
@@ -131,7 +123,7 @@ var _ ConfigSource = crdConfigSource{}
 
 // Configs implements ConfigSource Configs
 func (cs crdConfigSource) Configs() ([]TranslationConfig, error) {
-	cfg, err := getClientConfig()
+	cfg, err := utils.GetK8sClientConfig("")
 	if err != nil {
 		return nil, err
 	}
@@ -162,17 +154,7 @@ func (cs crdConfigSource) Configs() ([]TranslationConfig, error) {
 
 // GetCRDRestClient returns ReST client that can be used to work with virtlet CRDs
 func GetCRDRestClient(cfg *rest.Config) (*rest.RESTClient, error) {
-	config := *cfg
-	config.GroupVersion = &schemeGroupVersion
-	config.APIPath = "/apis"
-	config.ContentType = runtime.ContentTypeJSON
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: serializer.NewCodecFactory(scheme)}
-
-	client, err := rest.RESTClientFor(&config)
-	if err != nil {
-		return nil, err
-	}
-	return client, nil
+	return utils.GetK8sRestClient(cfg, scheme, &schemeGroupVersion)
 }
 
 // Description implements ConfigSource Description
