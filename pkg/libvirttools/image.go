@@ -85,7 +85,7 @@ func (i *ImageTool) PullRemoteImageToVolume(imageName, volumeName string, nameTr
 	imageName = stripTagFromImageName(imageName)
 	endpoint := nameTranslator.Translate(imageName)
 	if endpoint.Url == "" {
-		endpoint = utils.Endpoint{Url: imageName}
+		endpoint = utils.Endpoint{Url: imageName, MaxRedirects: -1}
 		glog.V(1).Infof("Using URL %q without translation", imageName)
 	} else {
 		glog.V(1).Infof("URL %q was translated to %q", imageName, endpoint.Url)
