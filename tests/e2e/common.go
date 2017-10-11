@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"flag"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -29,24 +30,35 @@ import (
 	. "github.com/Mirantis/virtlet/tests/e2e/ginkgo-ext"
 )
 
+var (
+	cirrosLocation = flag.String("cirros", defaultCirrosLocation, "cirros image URL (*without http(s)://*")
+	memoryLimit    = flag.Int("memoryLimit", 160, "default VM memory limit (in MiB)")
+)
+
 // scheduleWaitSSH schedules SSH interface initialization before the test context starts
 func scheduleWaitSSH(vm **framework.VMInterface, ssh *framework.Executor) {
 	BeforeAll(func() {
-		Eventually(
-			func() error {
-				var err error
-				*ssh, err = (*vm).SSH("cirros", sshPrivateKey)
-				if err != nil {
-					return err
-				}
-				_, err = framework.ExecSimple(*ssh)
-				return err
-			}, 60*5, 3).Should(Succeed())
+		*ssh = waitSSH(*vm)
 	})
 
 	AfterAll(func() {
 		(*ssh).Close()
 	})
+}
+
+func waitSSH(vm *framework.VMInterface) framework.Executor {
+	var ssh framework.Executor
+	Eventually(
+		func() error {
+			var err error
+			ssh, err = vm.SSH("cirros", sshPrivateKey)
+			if err != nil {
+				return err
+			}
+			_, err = framework.ExecSimple(ssh)
+			return err
+		}, 60*5, 3).Should(Succeed())
+	return ssh
 }
 
 func checkCPUCount(vm *framework.VMInterface, ssh framework.Executor, cpus int) {
@@ -84,7 +96,7 @@ func deleteVM(vm *framework.VMInterface) {
 				return fmt.Errorf("%s ~%s~ was not deleted", key, domainName)
 			}
 			return nil
-		}, "2m").Should(Succeed())
+		}, "3m").Should(Succeed())
 	}
 }
 
@@ -98,4 +110,30 @@ func deleteVM(vm *framework.VMInterface) {
 func do(value interface{}, extra ...interface{}) interface{} {
 	ExpectWithOffset(1, value, extra...).To(BeAnything())
 	return value
+}
+
+type VMOptions framework.VMOptions
+
+func (o VMOptions) applyDefaults() framework.VMOptions {
+	res := framework.VMOptions(o)
+	if res.Image == "" {
+		res.Image = *cirrosLocation
+	}
+	if res.SSHKey == "" {
+		res.SSHKey = sshPublicKey
+	}
+	if res.VCPUCount == 0 {
+		res.VCPUCount = 1
+	}
+	if res.DiskDriver == "" {
+		res.DiskDriver = "virtio"
+	}
+	if res.Limits == nil {
+		res.Limits = map[string]string{}
+	}
+	if res.Limits["memory"] == "" {
+		res.Limits["memory"] = fmt.Sprintf("%dMi", *memoryLimit)
+	}
+
+	return res
 }
