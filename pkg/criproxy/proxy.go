@@ -126,7 +126,10 @@ func (c *apiClient) connectNonLocked() chan error {
 			return err
 		}); err != nil {
 			glog.Errorf("Failed to find the socket: %v", err)
-			errCh <- fmt.Errorf("failed to find the socket: %v", err)
+			err = fmt.Errorf("failed to find the socket: %v", err)
+			for _, ch := range c.connectErrChs {
+				ch <- err
+			}
 			return
 		}
 
@@ -137,7 +140,9 @@ func (c *apiClient) connectNonLocked() chan error {
 		c.ImageServiceClient = runtimeapi.NewImageServiceClient(c.conn)
 		c.state = clientStateConnected
 
-		errCh <- nil
+		for _, ch := range c.connectErrChs {
+			ch <- nil
+		}
 	}()
 	return errCh
 }
