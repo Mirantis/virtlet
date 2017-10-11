@@ -34,17 +34,10 @@ var _ = Describe("VM resources", func() {
 	)
 
 	BeforeAll(func() {
-		vm = controller.VM("cirros-vm2")
-		vm.Create(framework.VMOptions{
-			Image:      *cirrosLocation,
-			SSHKey:     sshPublicKey,
-			VCPUCount:  2,
-			DiskDriver: "virtio",
-			Limits: map[string]string{
-				"memory": "128Mi",
-				"cpu":    "500m",
-			},
-		}, time.Minute*5, nil)
+		vm = controller.VM("vm-resources")
+		vm.Create(VMOptions{
+			VCPUCount: 2,
+		}.applyDefaults(), time.Minute*5, nil)
 		do(vm.Pod())
 	})
 
@@ -67,6 +60,6 @@ var _ = Describe("VM resources", func() {
 			Expect(m).To(HaveLen(2))
 			total += do(strconv.Atoi(m[1])).(int)
 		}
-		Expect(total).To(Equal(130944))
+		Expect(total).To(Equal(1024*(*memoryLimit) - 128))
 	})
 })

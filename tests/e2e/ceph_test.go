@@ -66,14 +66,7 @@ var _ = Describe("Ceph volumes tests", func() {
 				})
 			}
 
-			vm.Create(framework.VMOptions{
-				Image:      *cirrosLocation,
-				SSHKey:     sshPublicKey,
-				DiskDriver: "virtio",
-				Limits: map[string]string{
-					"memory": "128Mi",
-				},
-			}, time.Minute*5, podCustomization)
+			vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, podCustomization)
 			var err error
 			vmPod, err = vm.Pod()
 			Expect(err).NotTo(HaveOccurred())
@@ -150,14 +143,7 @@ var _ = Describe("Ceph volumes tests", func() {
 				})
 			}
 
-			vm.Create(framework.VMOptions{
-				Image:      *cirrosLocation,
-				SSHKey:     sshPublicKey,
-				DiskDriver: "virtio",
-				Limits: map[string]string{
-					"memory": "128Mi",
-				},
-			}, time.Minute*5, podCustomization)
+			vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, podCustomization)
 			vmPod = do(vm.Pod()).(*framework.PodInterface)
 		})
 
