@@ -17,8 +17,10 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"strings"
 	"time"
 
@@ -164,5 +166,34 @@ var _ = Describe("Basic cirros tests", func() {
 
 		By(fmt.Sprintf("Taking VNC display snapshot from %s", display))
 		do(framework.ExecSimple(virtletPodExecutor, "vncsnapshot", "-allowblank", display, "/vm.jpg"))
+	}, 60)
+
+	It("Should start port forwarding", func(done Done) {
+		defer close(done)
+		podName := "nginx-pf"
+		localPort := rand.Intn(899) + 100
+		portMapping := fmt.Sprintf("18%d:80", localPort)
+
+		ctx, closeFunc := context.WithCancel(context.Background())
+		defer closeFunc()
+		localExecutor := framework.LocalExecutor(ctx)
+
+		By(fmt.Sprintf("Starting nginx pod"))
+		nginxPod, err := controller.RunPod(podName, "nginx", nil, time.Minute*4, 80)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(nginxPod).NotTo(BeNil())
+
+		By(fmt.Sprintf("Running command: kubectl -n %s port-forward %s %s", controller.Namespace(), podName, portMapping))
+		_, err = framework.ExecSimple(localExecutor, "kubectl", "-n", controller.Namespace(), "port-forward", podName, portMapping)
+		Expect(err).NotTo(HaveOccurred())
+		// give it a chance to start
+		time.Sleep(3 * time.Second)
+
+		By(fmt.Sprintf("Checking if nginx is available via localhost"))
+		data, err := framework.Curl(fmt.Sprintf("http://localhost:18%d", localPort))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(data).Should(ContainSubstring("nginx web server"))
+
+		Expect(nginxPod.Delete()).To(Succeed())
 	}, 60)
 })

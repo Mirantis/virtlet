@@ -61,7 +61,7 @@ type VirtletManager struct {
 	StreamServer               *stream.Server
 }
 
-func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, metadataPath, rawDevices, imageTranslationConfigsDir string, fdManager tapmanager.FDManager) (*VirtletManager, error) {
+func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, rawDevices, imageTranslationConfigsDir string, metadataStore metadata.MetadataStore, fdManager tapmanager.FDManager) (*VirtletManager, error) {
 	err := imagetranslation.RegisterCustomResourceType()
 	if err != nil {
 		return nil, err
@@ -78,11 +78,6 @@ func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, m
 	}
 
 	libvirtImageTool, err := libvirttools.NewImageTool(conn, downloader, poolName)
-	if err != nil {
-		return nil, err
-	}
-
-	metadataStore, err := metadata.NewMetadataStore(metadataPath)
 	if err != nil {
 		return nil, err
 	}
@@ -490,9 +485,9 @@ func (v *VirtletManager) Attach(ctx context.Context, req *kubeapi.AttachRequest)
 	return v.StreamServer.GetAttach(req)
 }
 
-func (v *VirtletManager) PortForward(context.Context, *kubeapi.PortForwardRequest) (*kubeapi.PortForwardResponse, error) {
+func (v *VirtletManager) PortForward(ctx context.Context, req *kubeapi.PortForwardRequest) (*kubeapi.PortForwardResponse, error) {
 	glog.Errorf("PortForward() not implemented")
-	return nil, errors.New("not implemented")
+	return v.StreamServer.GetPortForward(req)
 }
 
 func (v *VirtletManager) UpdateRuntimeConfig(context.Context, *kubeapi.UpdateRuntimeConfigRequest) (*kubeapi.UpdateRuntimeConfigResponse, error) {

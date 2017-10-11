@@ -22,6 +22,8 @@ import (
 	"os"
 	"syscall"
 
+	"github.com/Mirantis/virtlet/pkg/metadata"
+
 	knet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 )
@@ -36,12 +38,14 @@ type Server struct {
 	streamServer        streaming.Server
 	streamServerCloseCh chan struct{}
 	streaming.Runtime
+
+	metadataStore metadata.MetadataStore //required for port-forward
 }
 
 var _ streaming.Runtime = (*Server)(nil)
 
 // NewServer creates a new Server
-func NewServer(kubernetesDir, socketPath string) (*Server, error) {
+func NewServer(kubernetesDir, socketPath string, metadataStore metadata.MetadataStore) (*Server, error) {
 	s := &Server{DeadlineSeconds: 10}
 
 	// Prepare unix server
@@ -59,6 +63,8 @@ func NewServer(kubernetesDir, socketPath string) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to create streaming server")
 	}
+
+	s.metadataStore = metadataStore
 
 	return s, nil
 }
