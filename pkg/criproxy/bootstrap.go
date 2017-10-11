@@ -42,7 +42,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/rest"
+
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 const (
@@ -277,17 +278,11 @@ func (b *Bootstrap) installCriProxyContainer(dockerEndpoint, endpointToPass stri
 }
 
 func (b *Bootstrap) initClientset() error {
-	var err error
-	var config *rest.Config
-	if b.config.ApiServerHost == "" {
-		config, err = rest.InClusterConfig()
-		if err != nil {
-			return fmt.Errorf("failed to get REST client config: %v", err)
-		}
-	} else {
-		config = &rest.Config{Host: b.config.ApiServerHost}
+	config, err := utils.GetK8sClientConfig(b.config.ApiServerHost)
+	if err != nil {
+		return fmt.Errorf("failed to get REST client config: %v", err)
 	}
-	b.clientset, err = kubernetes.NewForConfig(config)
+	b.clientset, err = utils.GetK8sClientset(config)
 	if err != nil {
 		return fmt.Errorf("failed to create ClientSet: %v", err)
 	}

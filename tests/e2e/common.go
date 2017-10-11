@@ -121,7 +121,7 @@ func (o VMOptions) applyDefaults() framework.VMOptions {
 	if res.Image == "" {
 		res.Image = *vmImageLocation
 	}
-	if res.SSHKey == "" {
+	if res.SSHKey == "" && res.SSHKeySource == "" {
 		res.SSHKey = sshPublicKey
 	}
 	if res.VCPUCount == 0 {
@@ -138,4 +138,10 @@ func (o VMOptions) applyDefaults() framework.VMOptions {
 	}
 
 	return res
+}
+
+func requireCloudInit() {
+	if !*includeCloudInitTests {
+		Skip("Cloud-Init tests are not enabled")
+	}
 }

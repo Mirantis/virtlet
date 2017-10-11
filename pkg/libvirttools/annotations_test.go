@@ -140,7 +140,7 @@ func TestVirtletAnnotations(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			va, err := LoadAnnotations(testCase.annotations)
+			va, err := LoadAnnotations("", testCase.annotations)
 			switch {
 			case testCase.va == nil && err == nil:
 				t.Errorf("invalid annotations considered valid:\n%#v", testCase.annotations)
