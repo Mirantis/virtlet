@@ -34,7 +34,15 @@ var _ = Describe("Hung VM", func() {
 
 	BeforeAll(func() {
 		vm = controller.VM("hung-vm")
-		vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, nil)
+		vm.Create(framework.VMOptions{
+			Image:      *cirrosLocation,
+			SSHKey:     sshPublicKey,
+			VCPUCount:  1,
+			DiskDriver: "virtio",
+			Limits: map[string]string{
+				"memory": "128Mi",
+			},
+		}, time.Minute*5, nil)
 		var err error
 		vmPod, err = vm.Pod()
 		Expect(err).NotTo(HaveOccurred())

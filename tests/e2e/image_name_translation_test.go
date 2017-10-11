@@ -23,6 +23,7 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/Mirantis/virtlet/pkg/imagetranslation"
+	"github.com/Mirantis/virtlet/tests/e2e/framework"
 	. "github.com/Mirantis/virtlet/tests/e2e/ginkgo-ext"
 )
 
@@ -38,7 +39,7 @@ var _ = Describe("Image URL", func() {
 				Rules: []imagetranslation.TranslationRule{
 					{
 						Name: "test-image",
-						Url:  *cirrosLocation,
+						Url: *cirrosLocation,
 					},
 				},
 			},
@@ -54,9 +55,12 @@ var _ = Describe("Image URL", func() {
 
 	It("Can be specified in CRD", func() {
 		vm := controller.VM("cirros-vm-with-remapped-image")
-		vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, nil)
+		vm.Create(framework.VMOptions{
+			Image:      "test-image",
+			VCPUCount:  1,
+			DiskDriver: "virtio",
+		}, time.Minute*5, nil)
 		_, err := vm.Pod()
 		Expect(err).NotTo(HaveOccurred())
-		deleteVM(vm)
 	})
 })

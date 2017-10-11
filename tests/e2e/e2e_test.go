@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"flag"
 	"fmt"
 	"testing"
 	"time"
@@ -28,6 +29,7 @@ import (
 )
 
 var controller *framework.Controller
+var cirrosLocation = flag.String("cirros", defaultCirrosLocation, "cirros image URL (*without http(s)://*")
 
 func TestE2E(t *testing.T) {
 	SetDefaultEventuallyTimeout(time.Minute * 5)
