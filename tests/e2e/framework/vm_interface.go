@@ -42,12 +42,14 @@ type VMOptions struct {
 	Image             string
 	VCPUCount         int
 	SSHKey            string
+	SSHKeySource      string
 	CloudInitScript   string
 	DiskDriver        string
 	Limits            map[string]string
 	UserData          string
 	OverwriteUserData bool
 	UserDataScript    string
+	UserDataSource    string
 }
 
 func newVMInterface(controller *Controller, name string) *VMInterface {
@@ -136,8 +138,14 @@ func (vmi *VMInterface) buildVMPod(options VMOptions) *v1.Pod {
 	if options.SSHKey != "" {
 		annotations["VirtletSSHKeys"] = options.SSHKey
 	}
+	if options.SSHKeySource != "" {
+		annotations["VirtletSSHKeySource"] = options.SSHKeySource
+	}
 	if options.UserData != "" {
 		annotations["VirtletCloudInitUserData"] = options.UserData
+	}
+	if options.UserDataSource != "" {
+		annotations["VirtletCloudInitUserDataSource"] = options.UserDataSource
 	}
 	if options.UserDataScript != "" {
 		annotations["VirtletCloudInitUserDataScript"] = options.UserDataScript

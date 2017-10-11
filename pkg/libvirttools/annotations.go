@@ -24,6 +24,10 @@ import (
 	// use this instead of "gopkg.in/yaml.v2" so we don't get
 	// map[interface{}]interface{} when unmarshalling cloud-init data
 	"github.com/ghodss/yaml"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 type DiskDriver string
@@ -33,9 +37,11 @@ const (
 	VCPUCountAnnotationKeyName                   = "VirtletVCPUCount"
 	CloudInitMetaDataKeyName                     = "VirtletCloudInitMetaData"
 	CloudInitUserDataKeyName                     = "VirtletCloudInitUserData"
+	CloudInitUserDataSourceKeyName               = "VirtletCloudInitUserDataSource"
 	CloudInitUserDataOverwriteKeyName            = "VirtletCloudInitUserDataOverwrite"
 	CloudInitUserDataScriptKeyName               = "VirtletCloudInitUserDataScript"
 	SSHKeysKeyName                               = "VirtletSSHKeys"
+	SSHKeySourceKeyName                          = "VirtletSSHKeySource"
 	DiskDriverKeyName                            = "VirtletDiskDriver"
 	DiskDriverVirtio                  DiskDriver = "virtio"
 	DiskDriverScsi                    DiskDriver = "scsi"
@@ -51,9 +57,9 @@ type VirtletAnnotations struct {
 	DiskDriver        DiskDriver
 }
 
-func LoadAnnotations(podAnnotations map[string]string) (*VirtletAnnotations, error) {
+func LoadAnnotations(ns string, podAnnotations map[string]string) (*VirtletAnnotations, error) {
 	var va VirtletAnnotations
-	if err := va.parsePodAnnotations(podAnnotations); err != nil {
+	if err := va.parsePodAnnotations(ns, podAnnotations); err != nil {
 		return nil, err
 	}
 	va.applyDefaults()
@@ -63,7 +69,14 @@ func LoadAnnotations(podAnnotations map[string]string) (*VirtletAnnotations, err
 	return &va, nil
 }
 
-func (va *VirtletAnnotations) parsePodAnnotations(podAnnotations map[string]string) error {
+func (va *VirtletAnnotations) parsePodAnnotations(ns string, podAnnotations map[string]string) error {
+	if podAnnotations[CloudInitUserDataOverwriteKeyName] == "true" {
+		va.UserDataOverwrite = true
+	}
+	if err := va.loadExternalUserData(ns, podAnnotations); err != nil {
+		return err
+	}
+
 	if vcpuCountStr, found := podAnnotations[VCPUCountAnnotationKeyName]; found {
 		var err error
 		n, err := strconv.Atoi(vcpuCountStr)
@@ -80,18 +93,23 @@ func (va *VirtletAnnotations) parsePodAnnotations(podAnnotations map[string]stri
 	}
 
 	if userDataStr, found := podAnnotations[CloudInitUserDataKeyName]; found {
-		if err := yaml.Unmarshal([]byte(userDataStr), &va.UserData); err != nil {
+		var userData map[string]interface{}
+		if err := yaml.Unmarshal([]byte(userDataStr), &userData); err != nil {
 			return fmt.Errorf("failed to unmarshal cloud-init userdata")
 		}
-	}
-
-	if podAnnotations[CloudInitUserDataOverwriteKeyName] == "true" {
-		va.UserDataOverwrite = true
+		if va.UserDataOverwrite {
+			va.UserData = userData
+		} else {
+			va.UserData = utils.Merge(va.UserData, userData).(map[string]interface{})
+		}
 	}
 
 	va.UserDataScript = podAnnotations[CloudInitUserDataScriptKeyName]
 
 	if sshKeysStr, found := podAnnotations[SSHKeysKeyName]; found {
+		if va.UserDataOverwrite {
+			va.SSHKeys = nil
+		}
 		keys := strings.Split(sshKeysStr, "\n")
 		for _, k := range keys {
 			k = strings.TrimSpace(k)
@@ -129,4 +147,119 @@ func (va *VirtletAnnotations) validate() error {
 	}
 
 	return nil
+}
+
+func (va *VirtletAnnotations) loadExternalUserData(ns string, podAnnotations map[string]string) error {
+	if ns == "" {
+		return nil
+	}
+	var clientset *kubernetes.Clientset
+	userDataSourceKey := podAnnotations[CloudInitUserDataSourceKeyName]
+	if userDataSourceKey != "" {
+		var err error
+		if clientset == nil {
+			clientset, err = utils.GetK8sClientset(nil)
+			if err != nil {
+				return err
+			}
+		}
+		err = va.loadUserDataFromDataSource(ns, userDataSourceKey, clientset)
+		if err != nil {
+			return err
+		}
+	}
+	sshKeySourceKey := podAnnotations[SSHKeySourceKeyName]
+	if sshKeySourceKey != "" {
+		var err error
+		if clientset == nil {
+			clientset, err = utils.GetK8sClientset(nil)
+			if err != nil {
+				return err
+			}
+		}
+		err = va.loadSSHKeysFromDataSource(ns, sshKeySourceKey, clientset)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (va *VirtletAnnotations) loadUserDataFromDataSource(ns, key string, clientset *kubernetes.Clientset) error {
+	parts := strings.Split(key, "/")
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid %s annotation format. Expected kind/name, but insted got %s", CloudInitUserDataSourceKeyName, key)
+	}
+	ud, err := readK8sKeySource(parts[0], parts[1], ns, "", clientset)
+	if err != nil {
+		return err
+	}
+	va.UserData = map[string]interface{}{}
+	for k, v := range ud {
+		var value interface{}
+		if yaml.Unmarshal([]byte(v), &value) == nil {
+			va.UserData[k] = value
+		}
+	}
+	return nil
+}
+
+func (va *VirtletAnnotations) loadSSHKeysFromDataSource(ns, key string, clientset *kubernetes.Clientset) error {
+	parts := strings.Split(key, "/")
+	if len(parts) != 2 && len(parts) != 3 {
+		return fmt.Errorf("invalid %s annotation format. Expected kind/name[/key], but insted got %s", SSHKeySourceKeyName, key)
+	}
+	dataKey := "authorized_keys"
+	if len(parts) == 3 {
+		dataKey = parts[2]
+	}
+	ud, err := readK8sKeySource(parts[0], parts[1], ns, dataKey, clientset)
+	if err != nil {
+		return err
+	}
+	sshKeys := ud[dataKey]
+	keys := strings.Split(sshKeys, "\n")
+	for _, k := range keys {
+		k = strings.TrimSpace(k)
+		if k != "" {
+			va.SSHKeys = append(va.SSHKeys, k)
+		}
+	}
+	return nil
+}
+
+func readK8sKeySource(sourceType, sourceName, ns, key string, clientset *kubernetes.Clientset) (map[string]string, error) {
+	sourceType = strings.ToLower(sourceType)
+	switch sourceType {
+	case "secret":
+		secret, err := clientset.Secrets(ns).Get(sourceName, meta_v1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		if key != "" {
+			return map[string]string{key: string(secret.Data[key])}, nil
+		} else {
+			result := map[string]string{}
+			for k, v := range secret.Data {
+				result[k] = string(v)
+			}
+			return result, nil
+		}
+	case "configmap":
+		configmap, err := clientset.ConfigMaps(ns).Get(sourceName, meta_v1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		if key != "" {
+			return map[string]string{key: configmap.Data[key]}, nil
+		} else {
+			result := map[string]string{}
+			for k, v := range configmap.Data {
+				result[k] = v
+			}
+			return result, nil
+		}
+	default:
+		return nil, fmt.Errorf("unsupported source kind %s. Must be one of (secret, configmap)", sourceType)
+	}
 }
