@@ -17,10 +17,13 @@ limitations under the License.
 package stream
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func getServer() *UnixServer {
@@ -71,4 +74,81 @@ func TestBroadcastMessageToManyReceivers(t *testing.T) {
 	default:
 		t.Errorf("channel did not receive message")
 	}
+}
+
+func TestStopListen(t *testing.T) {
+	// setup server
+	u := getServer()
+	go u.Listen()
+	err := waitForSocket(u.SocketPath, 5)
+	if err != nil {
+		t.Errorf("Error when waiting for socket to be created: %s", u.SocketPath)
+	}
+
+	// stop listening
+	close(u.closeCh)
+
+	passed := 0
+loop:
+	for {
+		select {
+		case <-u.listenDone:
+			break loop
+		default:
+			if passed > 5 {
+				t.Fatal("Listener didn't finsh in 5 seconds")
+			}
+			time.Sleep(time.Duration(1) * time.Second)
+			passed++
+		}
+	}
+
+	if len(u.outputReaders) > 0 {
+		t.Errorf("Error after closing listener. outputReaders should be empty but contains: %v", u.outputReaders)
+	}
+}
+
+func TestCleaningReader(t *testing.T) {
+	// setup server
+	u := getServer()
+	go u.Listen()
+	err := waitForSocket(u.SocketPath, 5)
+	if err != nil {
+		t.Errorf("Error when waiting for socket to be created: %s", u.SocketPath)
+	}
+
+	// setup client
+	containerID := "1123ab2-baed-32e7-6d1d-13110da12345"
+	cmd := exec.Command("nc", "-U", u.SocketPath)
+	cmd.Env = append(os.Environ(),
+		"VIRTLET_POD_UID=8c8e8cf1-acea-11e7-8e0e-02420ac00002",
+		"VIRTLET_CONTAINER_NAME=ubuntu",
+		fmt.Sprintf("VIRTLET_CONTAINER_ID=%s", containerID),
+		"CONTAINER_ATTEMPTS=0",
+	)
+	if err := cmd.Start(); err != nil {
+		t.Errorf("Error when starting command: %v", err)
+	}
+	defer cmd.Process.Kill()
+
+	u.Stop()
+	outputReaders, ok := u.outputReaders[containerID]
+	if ok == true {
+		t.Errorf("Error after closing connection. outputReaders should be deleted but exists and contains: %v", outputReaders)
+	}
+}
+
+func waitForSocket(path string, timeout int) error {
+	passed := 0
+	for {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			break
+		}
+		time.Sleep(time.Duration(1) * time.Second)
+		passed += 1
+		if passed >= timeout {
+			return fmt.Errorf("Timeout")
+		}
+	}
+	return nil
 }

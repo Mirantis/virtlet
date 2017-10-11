@@ -35,13 +35,14 @@ type UnixServer struct {
 	SocketPath      string
 	kubernetesDir   string
 	closeCh         chan bool
+	listenDone      chan bool
 	deadlineSeconds int
 	UnixConnections *syncmap.Map
 
 	outputReaders    map[string][]chan []byte
 	outputReadersMux sync.Mutex
 
-	logWritersWG sync.WaitGroup
+	workersWG sync.WaitGroup
 }
 
 func NewUnixServer(socketPath, kubernetesDir string) *UnixServer {
@@ -52,11 +53,17 @@ func NewUnixServer(socketPath, kubernetesDir string) *UnixServer {
 	}
 	u.UnixConnections = new(syncmap.Map)
 	u.outputReaders = map[string][]chan []byte{}
+	u.closeCh = make(chan bool)
+	u.listenDone = make(chan bool)
 	return &u
 }
 
 func (u *UnixServer) Listen() {
 	glog.V(1).Info("UnixSocket Listener started")
+	defer func() {
+		u.listenDone <- true
+	}()
+
 	l, err := net.ListenUnix("unix", &net.UnixAddr{u.SocketPath, "unix"})
 	if err != nil {
 		glog.Error("listen error:", err)
@@ -110,16 +117,18 @@ func (u *UnixServer) Listen() {
 
 		logChan := make(chan []byte)
 		u.AddOutputReader(containerID, logChan)
-		go u.reader(containerID)
+		u.workersWG.Add(1)
+		go u.reader(containerID, &u.workersWG)
 
 		fileName := fmt.Sprintf("%s_%s.log", containerName, attempt)
 		outputFile := filepath.Join(u.kubernetesDir, podUID, fileName)
-		u.logWritersWG.Add(1)
-		go NewLogWriter(logChan, outputFile, &u.logWritersWG)
+		u.workersWG.Add(1)
+		go NewLogWriter(logChan, outputFile, &u.workersWG)
 	}
 }
 
-func (u *UnixServer) reader(containerID string) {
+func (u *UnixServer) reader(containerID string, wg *sync.WaitGroup) {
+	defer wg.Done()
 	glog.V(1).Infoln("Spawned new stream reader for container", containerID)
 	connObj, ok := u.UnixConnections.Load(containerID)
 	if !ok {
@@ -153,6 +162,7 @@ func (u *UnixServer) reader(containerID string) {
 	for _, reader := range outputReaders {
 		close(reader)
 	}
+	delete(u.outputReaders, containerID)
 	u.outputReadersMux.Unlock()
 
 	glog.V(1).Infof("Stream reader for container '%s' stopped gracefully", containerID)
@@ -160,7 +170,8 @@ func (u *UnixServer) reader(containerID string) {
 
 func (u *UnixServer) Stop() {
 	close(u.closeCh)
-	u.logWritersWG.Wait()
+	<-u.listenDone
+	u.workersWG.Wait()
 	glog.V(1).Info("UnixSocket Listener stopped")
 }
 
