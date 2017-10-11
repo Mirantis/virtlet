@@ -160,6 +160,12 @@ e2e: &e2e
           BASE_LOCATION="$PWD" \
           deploy/demo.sh
   - run:
+      name: install kubectl
+      command: |
+        curl -L https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl -o /bin/kubectl
+        chmod +x /bin/kubectl
+
+  - run:
       name: Run e2e tests
       command: |
         build/portforward.sh 8080&

@@ -28,6 +28,7 @@ import (
 
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
 	"github.com/Mirantis/virtlet/pkg/manager"
+	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/stream"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
 )
@@ -77,7 +78,14 @@ func runVirtlet() {
 		glog.Errorf("Failed to connect to tapmanager: %v", err)
 		os.Exit(1)
 	}
-	server, err := manager.NewVirtletManager(*libvirtUri, *pool, *imageDownloadProtocol, *storageBackend, *boltPath, *rawDevices, *imageTranslationConfigsDir, c)
+
+	metadataStore, err := metadata.NewMetadataStore(*boltPath)
+	if err != nil {
+		glog.Errorf("Failed to create metadata store: %v", err)
+		os.Exit(1)
+	}
+
+	server, err := manager.NewVirtletManager(*libvirtUri, *pool, *imageDownloadProtocol, *storageBackend, *rawDevices, *imageTranslationConfigsDir, metadataStore, c)
 	if err != nil {
 		glog.Errorf("Initializing server failed: %v", err)
 		os.Exit(1)
@@ -88,9 +96,9 @@ func runVirtlet() {
 		glog.Infoln("KUBERNETES_POD_LOGS environment variables must be set")
 		os.Exit(1)
 	}
-	streamServer, err := stream.NewServer(kubernetesDir, "/var/lib/libvirt/streamer.sock")
+	streamServer, err := stream.NewServer(kubernetesDir, "/var/lib/libvirt/streamer.sock", metadataStore)
 	if err != nil {
-		glog.V(1).Infoln("Could not create stream server: %s", err)
+		glog.V(1).Infoln("Could not create stream server:", err)
 		os.Exit(2)
 	}
 	server.StreamServer = streamServer

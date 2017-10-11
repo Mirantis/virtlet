@@ -1,7 +1,7 @@
 # TODO: generate this tag. unfortunately can't use ARG:
 # https://docs.docker.com/engine/reference/builder/#understand-how-arg-and-from-interact
 # (but add a note about it here for the future)
-FROM mirantis/virtlet-base:v1-cf40a28764fedf5f3fefa5f60fb668b2
+FROM mirantis/virtlet-base:v1-13deb720a48ab153ce8bbe95840af75e
 MAINTAINER Ivan Shvedunov <ishvedunov@mirantis.com>
 
 LABEL virtlet.image="build-base"
@@ -50,6 +50,10 @@ ENV PATH /go/src/github.com/Mirantis/virtlet/_output:$GOPATH/bin:/usr/local/go/b
 
 RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" && chmod -R 777 "$GOPATH"
 WORKDIR $GOPATH
+
+# Install kubectl
+RUN curl -L https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl -o /bin/kubectl
+RUN chmod +x /bin/kubectl
 
 # TODO: update CNI ver
 RUN mkdir -p ~/.ssh && \

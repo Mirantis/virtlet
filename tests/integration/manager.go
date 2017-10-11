@@ -24,6 +24,7 @@ import (
 	"os"
 
 	"github.com/Mirantis/virtlet/pkg/manager"
+	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
@@ -65,9 +66,14 @@ func (v *VirtletManager) Run() {
 		v.t.Fatalf("Can't create temp file: %v", err)
 	}
 
+	metadataStore, err := metadata.NewMetadataStore(dbFilename)
+	if err != nil {
+		v.t.Fatalf("Failed to create metadata store: %v", err)
+	}
+
 	os.Setenv("KUBERNETES_CLUSTER_URL", "")
 	os.Setenv("VIRTLET_DISABLE_LOGGING", "true")
-	v.manager, err = manager.NewVirtletManager(libvirtUri, "default", "http", "dir", dbFilename, "loop*", "", &fakeFDManager{})
+	v.manager, err = manager.NewVirtletManager(libvirtUri, "default", "http", "dir", "loop*", "", metadataStore, &fakeFDManager{})
 	if err != nil {
 		v.t.Fatalf("Failed to create VirtletManager: %v", err)
 	}
