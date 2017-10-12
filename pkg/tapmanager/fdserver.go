@@ -235,7 +235,11 @@ func (s *FDServer) serveAdd(c *net.UnixConn, hdr *fdHeader) (*fdHeader, []byte, 
 }
 
 func (s *FDServer) serveRelease(hdr *fdHeader) (*fdHeader, error) {
-	s.removeFD(hdr.getKey())
+	key := hdr.getKey()
+	if err := s.source.Release(key); err != nil {
+		return nil, fmt.Errorf("error releasing fd: %v", err)
+	}
+	s.removeFD(key)
 	return &fdHeader{
 		Magic:   fdMagic,
 		Command: fdReleaseResponse,
