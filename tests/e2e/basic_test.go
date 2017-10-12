@@ -51,7 +51,7 @@ var _ = Describe("Basic cirros tests", func() {
 		scheduleWaitSSH(&vm, &ssh)
 
 		It("Should have default route", func() {
-			Expect(framework.ExecSimple(ssh, "/sbin/ip r")).To(SatisfyAll(
+			Expect(framework.ExecSimple(ssh, "ip r")).To(SatisfyAll(
 				ContainSubstring("default via"),
 				ContainSubstring("src "+vmPod.Pod.Status.PodIP),
 			))
