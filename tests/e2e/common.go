@@ -31,15 +31,16 @@ import (
 )
 
 var (
-	cirrosLocation = flag.String("cirros", defaultCirrosLocation, "cirros image URL (*without http(s)://*")
-	ubuntuLocation = flag.String("ubuntu", defaultUbuntuLocation, "ubuntu image URL (*without http(s)://*")
-	memoryLimit    = flag.Int("memoryLimit", 160, "default VM memory limit (in MiB)")
+	vmImageLocation       = flag.String("image", defaultVMImageLocation, "VM image URL (*without http(s)://*")
+	sshUser               = flag.String("sshuser", defaultSSHUser, "default SSH user for VMs")
+	includeCloudInitTests = flag.Bool("include-cloud-init-tests", false, "include Cloud-Init tests")
+	memoryLimit           = flag.Int("memoryLimit", 160, "default VM memory limit (in MiB)")
 )
 
 // scheduleWaitSSH schedules SSH interface initialization before the test context starts
-func scheduleWaitSSH(vm **framework.VMInterface, ssh *framework.Executor, user string) {
+func scheduleWaitSSH(vm **framework.VMInterface, ssh *framework.Executor) {
 	BeforeAll(func() {
-		*ssh = waitSSH(*vm, user)
+		*ssh = waitSSH(*vm)
 	})
 
 	AfterAll(func() {
@@ -47,12 +48,12 @@ func scheduleWaitSSH(vm **framework.VMInterface, ssh *framework.Executor, user s
 	})
 }
 
-func waitSSH(vm *framework.VMInterface, user string) framework.Executor {
+func waitSSH(vm *framework.VMInterface) framework.Executor {
 	var ssh framework.Executor
 	Eventually(
 		func() error {
 			var err error
-			ssh, err = vm.SSH(user, sshPrivateKey)
+			ssh, err = vm.SSH(*sshUser, sshPrivateKey)
 			if err != nil {
 				return err
 			}
@@ -118,7 +119,7 @@ type VMOptions framework.VMOptions
 func (o VMOptions) applyDefaults() framework.VMOptions {
 	res := framework.VMOptions(o)
 	if res.Image == "" {
-		res.Image = *cirrosLocation
+		res.Image = *vmImageLocation
 	}
 	if res.SSHKey == "" {
 		res.SSHKey = sshPublicKey

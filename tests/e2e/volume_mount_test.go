@@ -26,7 +26,7 @@ import (
 	. "github.com/Mirantis/virtlet/tests/e2e/ginkgo-ext"
 )
 
-var _ = Describe("[Heavy] Container volume mounts", func() {
+var _ = Describe("Container volume mounts", func() {
 	Context("of raw volumes", func() {
 		var (
 			vm           *framework.VMInterface
@@ -63,7 +63,7 @@ var _ = Describe("[Heavy] Container volume mounts", func() {
 			framework.ExecSimple(nodeExecutor, "losetup", "-d", devPath)
 		})
 
-		scheduleWaitSSH(&vm, &ssh, "ubuntu")
+		scheduleWaitSSH(&vm, &ssh)
 		itShouldBeMounted(&ssh)
 	})
 
@@ -84,7 +84,7 @@ var _ = Describe("[Heavy] Container volume mounts", func() {
 			deleteVM(vm)
 		})
 
-		scheduleWaitSSH(&vm, &ssh, "ubuntu")
+		scheduleWaitSSH(&vm, &ssh)
 		itShouldBeMounted(&ssh)
 	})
 })
@@ -107,7 +107,6 @@ func makeVolumeMountVM(flexvolOptions map[string]string, nodeName string) *frame
 	}
 	vm := controller.VM("ubuntu-vm")
 	vm.Create(VMOptions{
-		Image:    *ubuntuLocation,
 		NodeName: nodeName,
 	}.applyDefaults(), time.Minute*5, podCustomization)
 	_, err := vm.Pod()
@@ -117,6 +116,9 @@ func makeVolumeMountVM(flexvolOptions map[string]string, nodeName string) *frame
 
 func itShouldBeMounted(ssh *framework.Executor) {
 	It("Should be handled inside the VM", func() {
+		if !*includeCloudInitTests {
+			Skip("Cloud-Init tests not enabled")
+		}
 		Eventually(func() (string, error) {
 			return framework.ExecSimple(*ssh, "ls -l /foo")
 		}, 60).Should(ContainSubstring("lost+found"))

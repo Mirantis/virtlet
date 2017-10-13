@@ -85,7 +85,7 @@ var _ = Describe("Ceph volumes tests", func() {
 
 		Context("Mounted volumes", func() {
 			var ssh framework.Executor
-			scheduleWaitSSH(&vm, &ssh, "cirros")
+			scheduleWaitSSH(&vm, &ssh)
 
 			It("Must be accessible from within OS", func() {
 				checkFilesystemAccess(ssh)
@@ -160,7 +160,7 @@ var _ = Describe("Ceph volumes tests", func() {
 
 		Context("Mounted volumes", func() {
 			var ssh framework.Executor
-			scheduleWaitSSH(&vm, &ssh, "cirros")
+			scheduleWaitSSH(&vm, &ssh)
 
 			It("Must be accessible from within OS", func() {
 				checkFilesystemAccess(ssh)

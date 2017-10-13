@@ -40,7 +40,7 @@ var _ = Describe("Hung VM", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	scheduleWaitSSH(&vm, &ssh, "cirros")
+	scheduleWaitSSH(&vm, &ssh)
 
 	It("Must be successfully deleted after it hangs", func() {
 		Eventually(framework.WithTimeout(time.Second*2, func() error {

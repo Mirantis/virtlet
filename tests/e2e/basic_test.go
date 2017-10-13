@@ -48,7 +48,7 @@ var _ = Describe("Basic cirros tests", func() {
 
 	Context("VM guest OS", func() {
 		var ssh framework.Executor
-		scheduleWaitSSH(&vm, &ssh, "cirros")
+		scheduleWaitSSH(&vm, &ssh)
 
 		It("Should have default route", func() {
 			Expect(framework.ExecSimple(ssh, "ip r")).To(SatisfyAll(

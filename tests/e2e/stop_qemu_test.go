@@ -57,7 +57,7 @@ var _ = Describe("QEMU Process", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	scheduleWaitSSH(&vm, &ssh, "cirros")
+	scheduleWaitSSH(&vm, &ssh)
 
 	It("Must be active while VM is running and gone after it's deleted", func() {
 		qemuRunning := func() bool {
