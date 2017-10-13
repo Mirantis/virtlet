@@ -39,15 +39,12 @@ type VMInterface struct {
 
 // VMOptions defines VM parameters
 type VMOptions struct {
-	Image             string
-	VCPUCount         int
-	SSHKey            string
-	CloudInitScript   string
-	DiskDriver        string
-	Limits            map[string]string
-	UserData          string
-	OverwriteUserData bool
-	UserDataScript    string
+	Image           string
+	VCPUCount       int
+	SSHKey          string
+	CloudInitScript string
+	DiskDriver      string
+	Limits          map[string]string
 }
 
 func newVMInterface(controller *Controller, name string) *VMInterface {
@@ -129,18 +126,10 @@ func (vmi *VMInterface) VirtletPod() (*PodInterface, error) {
 
 func (vmi *VMInterface) buildVMPod(options VMOptions) *v1.Pod {
 	annotations := map[string]string{
-		"kubernetes.io/target-runtime":      "virtlet",
-		"VirtletDiskDriver":                 options.DiskDriver,
-		"VirtletCloudInitUserDataOverwrite": strconv.FormatBool(options.OverwriteUserData),
-	}
-	if options.SSHKey != "" {
-		annotations["VirtletSSHKeys"] = options.SSHKey
-	}
-	if options.UserData != "" {
-		annotations["VirtletCloudInitUserData"] = options.UserData
-	}
-	if options.UserDataScript != "" {
-		annotations["VirtletCloudInitUserDataScript"] = options.UserDataScript
+		"kubernetes.io/target-runtime":   "virtlet",
+		"VirtletDiskDriver":              options.DiskDriver,
+		"VirtletSSHKeys":                 options.SSHKey,
+		"VirtletCloudInitUserDataScript": options.SSHKey,
 	}
 	if options.VCPUCount > 0 {
 		annotations["VirtletVCPUCount"] = strconv.Itoa(options.VCPUCount)
@@ -183,8 +172,6 @@ func (vmi *VMInterface) buildVMPod(options VMOptions) *v1.Pod {
 						Limits: limits,
 					},
 					ImagePullPolicy: v1.PullIfNotPresent,
-					Stdin:           true,
-					TTY:             true,
 				},
 			},
 		},
