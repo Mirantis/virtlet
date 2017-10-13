@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 )
 
-// Server implements the RuntimeService and ImageService
+// Server implements streaming.Runtime
 type Server struct {
 	DeadlineSeconds int
 	exitMonitorChan chan struct{}
@@ -38,7 +38,9 @@ type Server struct {
 	streaming.Runtime
 }
 
-// New creates a new Server with options provided
+var _ streaming.Runtime = (*Server)(nil)
+
+// NewServer creates a new Server
 func NewServer(kubernetesDir, socketPath string) (*Server, error) {
 	s := &Server{DeadlineSeconds: 10}
 
@@ -61,6 +63,7 @@ func NewServer(kubernetesDir, socketPath string) (*Server, error) {
 	return s, nil
 }
 
+// Start starts streaming server gorutine and unixServer gorutine
 func (s *Server) Start() error {
 	if err := syscall.Unlink(s.unixServer.SocketPath); err != nil && !os.IsNotExist(err) {
 		return err
@@ -77,6 +80,7 @@ func (s *Server) Start() error {
 
 }
 
+// Stop stops all goroutines
 func (s *Server) Stop() {
 	// in k8s 1.7 Stop() does nothing, starting from 1.8 it will stop streaming server
 	s.streamServer.Stop()

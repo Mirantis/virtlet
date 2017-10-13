@@ -31,6 +31,8 @@ import (
 	"github.com/golang/glog"
 )
 
+// UnixServer listens for connections from qemu instances and sends its
+// stdout to registerd channels.
 type UnixServer struct {
 	SocketPath      string
 	kubernetesDir   string
@@ -45,6 +47,8 @@ type UnixServer struct {
 	workersWG sync.WaitGroup
 }
 
+// NewUnixServer creates new UnixServer. Requires socketPath on which it will listen
+// and kubernetesDir where logs will be written
 func NewUnixServer(socketPath, kubernetesDir string) *UnixServer {
 	u := UnixServer{
 		SocketPath:      socketPath,
@@ -58,6 +62,7 @@ func NewUnixServer(socketPath, kubernetesDir string) *UnixServer {
 	return &u
 }
 
+// Listen starts listening for connections from qemus
 func (u *UnixServer) Listen() {
 	glog.V(1).Info("UnixSocket Listener started")
 	defer func() {
@@ -168,6 +173,7 @@ func (u *UnixServer) reader(containerID string, wg *sync.WaitGroup) {
 	glog.V(1).Infof("Stream reader for container '%s' stopped gracefully", containerID)
 }
 
+// Stop stops listening and waits for all writers to finish
 func (u *UnixServer) Stop() {
 	close(u.closeCh)
 	<-u.listenDone
@@ -184,6 +190,7 @@ func (u *UnixServer) cleanup() {
 	})
 }
 
+// AddOutputReader adds a new channel for containerID to send stdout
 func (u *UnixServer) AddOutputReader(containerID string, newChan chan []byte) {
 	u.outputReadersMux.Lock()
 	defer u.outputReadersMux.Unlock()
@@ -196,6 +203,7 @@ func (u *UnixServer) AddOutputReader(containerID string, newChan chan []byte) {
 	u.outputReaders[containerID] = outputReaders
 }
 
+// RemoveOutputReader removes a channel for containerID
 func (u *UnixServer) RemoveOutputReader(containerID string, readerChan chan []byte) {
 	u.outputReadersMux.Lock()
 	defer u.outputReadersMux.Unlock()
