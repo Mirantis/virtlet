@@ -193,8 +193,8 @@ func setupCeph() (string, string) {
 	Expect(err).NotTo(HaveOccurred())
 
 	container.Delete()
-	Expect(container.PullImage("ceph/demo")).To(Succeed())
-	Expect(container.Run("ceph/demo",
+	Expect(container.PullImage("ceph/demo:tag-stable-3.0-jewel-ubuntu-16.04")).To(Succeed())
+	Expect(container.Run("ceph/demo:tag-stable-3.0-jewel-ubuntu-16.04",
 		map[string]string{"MON_IP": monIP, "CEPH_PUBLIC_NETWORK": cephPublicNetwork},
 		"host", nil, false)).To(Succeed())
 

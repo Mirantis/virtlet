@@ -94,7 +94,7 @@ func (s *sampleFDSource) GetInfo(key string) ([]byte, error) {
 }
 
 func (s *sampleFDSource) isEmpty() bool {
-	return len(s.files) != 0
+	return len(s.files) == 0
 }
 
 func verifyFD(t *testing.T, c *FDClient, key string, data string) {
