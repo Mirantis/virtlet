@@ -171,6 +171,26 @@ func (c *Controller) FindPod(namespace string, labelMap map[string]string,
 	return nil, nil
 }
 
+// VirtletPod returns one of the active virtlet pods
+func (c *Controller) VirtletPod() (*PodInterface, error) {
+	pod, err := c.FindPod("kube-system", map[string]string{"runtime": "virtlet"}, nil)
+	if err != nil {
+		return nil, err
+	} else if pod == nil {
+		return nil, fmt.Errorf("cannot find virtlet pod")
+	}
+	return pod, nil
+}
+
+// VirtletNodeName returns the name of one of the nodes that run virtlet
+func (c *Controller) VirtletNodeName() (string, error) {
+	virtletPod, err := c.VirtletPod()
+	if err != nil {
+		return "", err
+	}
+	return virtletPod.Pod.Spec.NodeName, nil
+}
+
 // DinDNodeExecutor returns executor in DinD container for one of k8s nodes
 func (c *Controller) DinDNodeExecutor(name string) (Executor, error) {
 	dockerInterface, err := newDockerContainerInterface(name)
