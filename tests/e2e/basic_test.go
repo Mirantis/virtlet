@@ -36,7 +36,7 @@ var _ = Describe("Basic cirros tests", func() {
 
 	BeforeAll(func() {
 		vm = controller.VM("cirros-vm")
-		vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, nil)
+		vm.Create(VMOptions{}.applyDefaults(false), time.Minute*5, nil)
 		var err error
 		vmPod, err = vm.Pod()
 		Expect(err).NotTo(HaveOccurred())

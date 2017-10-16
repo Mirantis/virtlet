@@ -46,7 +46,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			vm = controller.VM("ssh-from-cm-impl")
 			vm.Create(VMOptions{
 				SSHKeySource: "configmap/cm-ssh-key-impl",
-			}.applyDefaults(), time.Minute*5, nil)
+			}.applyDefaults(false), time.Minute*5, nil)
 		})
 
 		AfterAll(func() {
@@ -77,7 +77,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			vm = controller.VM("ssh-from-cm-expl")
 			vm.Create(VMOptions{
 				SSHKeySource: "configmap/cm-ssh-key-expl/myKey",
-			}.applyDefaults(), time.Minute*5, nil)
+			}.applyDefaults(false), time.Minute*5, nil)
 		})
 
 		AfterAll(func() {
@@ -108,7 +108,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			vm = controller.VM("ssh-from-secret-impl")
 			vm.Create(VMOptions{
 				SSHKeySource: "secret/secret-ssh-key-impl",
-			}.applyDefaults(), time.Minute*5, nil)
+			}.applyDefaults(false), time.Minute*5, nil)
 		})
 
 		AfterAll(func() {
@@ -139,7 +139,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			vm = controller.VM("ssh-from-secret-expl")
 			vm.Create(VMOptions{
 				SSHKeySource: "secret/secret-ssh-key-expl/myKey",
-			}.applyDefaults(), time.Minute*5, nil)
+			}.applyDefaults(false), time.Minute*5, nil)
 		})
 
 		AfterAll(func() {
@@ -172,7 +172,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			vm = controller.VM("userdata-cm")
 			vm.Create(VMOptions{
 				UserDataSource: "configmap/cm-userdata",
-			}.applyDefaults(), time.Minute*5, nil)
+			}.applyDefaults(true), time.Minute*5, nil)
 		})
 
 		AfterAll(func() {
@@ -207,7 +207,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			vm = controller.VM("userdata-secret")
 			vm.Create(VMOptions{
 				UserDataSource: "secret/secret-userdata",
-			}.applyDefaults(), time.Minute*5, nil)
+			}.applyDefaults(true), time.Minute*5, nil)
 		})
 
 		AfterAll(func() {
@@ -244,7 +244,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			vm.Create(VMOptions{
 				UserDataSource: "configmap/cm-userdata",
 				UserData:       userData,
-			}.applyDefaults(), time.Minute*5, nil)
+			}.applyDefaults(true), time.Minute*5, nil)
 		})
 
 		AfterAll(func() {

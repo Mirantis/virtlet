@@ -37,7 +37,7 @@ var _ = Describe("VM resources", func() {
 		vm = controller.VM("vm-resources")
 		vm.Create(VMOptions{
 			VCPUCount: 2,
-		}.applyDefaults(), time.Minute*5, nil)
+		}.applyDefaults(false), time.Minute*5, nil)
 		do(vm.Pod())
 	})
 

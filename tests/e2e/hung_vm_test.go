@@ -34,7 +34,7 @@ var _ = Describe("Hung VM", func() {
 
 	BeforeAll(func() {
 		vm = controller.VM("hung-vm")
-		vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, nil)
+		vm.Create(VMOptions{}.applyDefaults(false), time.Minute*5, nil)
 		var err error
 		vmPod, err = vm.Pod()
 		Expect(err).NotTo(HaveOccurred())
