@@ -158,6 +158,7 @@ var _ = Describe("Cloud-init related tests", func() {
 		const fileConf = `[{"content": "Hello world!", "path": "/tmp/test-file"}]`
 
 		BeforeAll(func() {
+			requireCloudInit()
 			cm := &v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cm-userdata",
@@ -181,7 +182,6 @@ var _ = Describe("Cloud-init related tests", func() {
 		})
 
 		It("Must be processed", func() {
-			requireCloudInit()
 			ssh := waitSSH(vm)
 			Expect(framework.ExecSimple(ssh, "cat", "/tmp/test-file")).To(Equal("Hello world!"))
 		})
@@ -193,6 +193,7 @@ var _ = Describe("Cloud-init related tests", func() {
 		const fileConf = `[{"content": "Hello world!", "path": "/tmp/test-file"}]`
 
 		BeforeAll(func() {
+			requireCloudInit()
 			secret := &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "secret-userdata",
@@ -216,7 +217,6 @@ var _ = Describe("Cloud-init related tests", func() {
 		})
 
 		It("Must be processed", func() {
-			requireCloudInit()
 			ssh := waitSSH(vm)
 			Expect(framework.ExecSimple(ssh, "cat", "/tmp/test-file")).To(Equal("Hello world!"))
 		})
@@ -229,6 +229,7 @@ var _ = Describe("Cloud-init related tests", func() {
 		const userData = `{"write_files": [{"content": "world!", "path": "/tmp/test-file2"}]}`
 
 		BeforeAll(func() {
+			requireCloudInit()
 			cm := &v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cm-userdata",
@@ -253,7 +254,6 @@ var _ = Describe("Cloud-init related tests", func() {
 		})
 
 		It("Must be processed", func() {
-			requireCloudInit()
 			ssh := waitSSH(vm)
 			Expect(framework.ExecSimple(ssh, "cat", "/tmp/test-file1", "/tmp/test-file2")).To(Equal("Hello world!"))
 		})
