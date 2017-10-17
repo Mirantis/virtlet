@@ -334,11 +334,11 @@ func NewWriteFilesManipulator(userData map[string]interface{}, mounts []*VMMount
 }
 
 func (m *WriteFilesManipulator) AddSecrets() {
-	m.addFilesForVolumeType("secret", "0600")
+	m.addFilesForVolumeType("secret")
 }
 
 func (m *WriteFilesManipulator) AddConfigMapEntries() {
-	m.addFilesForVolumeType("configmap", "0644")
+	m.addFilesForVolumeType("configmap")
 }
 
 func (m *WriteFilesManipulator) AddFileLikeMounts() {
@@ -372,13 +372,13 @@ func (m *WriteFilesManipulator) AddFileLikeMounts() {
 func (m *WriteFilesManipulator) AddNetworkConfiguration() {
 }
 
-func (m *WriteFilesManipulator) addFilesForVolumeType(suffix, permissions string) {
+func (m *WriteFilesManipulator) addFilesForVolumeType(suffix string) {
 	filter := "volumes/kubernetes.io~" + suffix + "/"
 
 	m.processMounts(func(path string) bool {
 		return strings.Contains(path, filter)
 	}, func(mount *VMMount) []interface{} {
-		return m.addFilesForMount(mount, permissions)
+		return m.addFilesForMount(mount)
 	})
 }
 
@@ -460,11 +460,15 @@ func scanDirectory(dirPath string, callback func(string) error) error {
 	return nil
 }
 
-func (m *WriteFilesManipulator) addFilesForMount(mount *VMMount, permissions string) []interface{} {
+func (m *WriteFilesManipulator) addFilesForMount(mount *VMMount) []interface{} {
 	var writeFiles []interface{}
 
 	addFileContent := func(fullPath string) error {
 		content, err := ioutil.ReadFile(fullPath)
+		if err != nil {
+			return err
+		}
+		stat, err := os.Stat(fullPath)
 		if err != nil {
 			return err
 		}
@@ -475,7 +479,7 @@ func (m *WriteFilesManipulator) addFilesForMount(mount *VMMount, permissions str
 			"path":        path.Join(mount.ContainerPath, relativePath),
 			"content":     encodedContent,
 			"encoding":    "b64",
-			"permissions": permissions,
+			"permissions": fmt.Sprintf("%#o", uint32(stat.Mode())),
 		})
 
 		return nil

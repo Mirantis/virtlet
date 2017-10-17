@@ -408,22 +408,23 @@ func TestEnvDataGeneration(t *testing.T) {
 func TestAddingSecrets(t *testing.T) {
 	tmpDir, err := ioutil.TempDir("", "")
 	if err != nil {
-		t.Fatal("Can't create temp dir: %v", err)
+		t.Fatalf("Can't create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
 	location := filepath.Join(tmpDir, "volumes/kubernetes.io~secret/test-volume")
 	if err := os.MkdirAll(location, 0755); err != nil {
-		t.Fatal("Can't create secrets directory in temp dir: %v", err)
+		t.Fatalf("Can't create secrets directory in temp dir: %v", err)
 	}
 
 	f, err := os.Create(filepath.Join(location, "file"))
 	if err != nil {
-		t.Fatal("Can't create sample file in temp directory: %v", err)
+		t.Fatalf("Can't create sample file in temp directory: %v", err)
 	}
+	f.Chmod(0640)
 	defer f.Close()
 	if _, err := f.WriteString("test content"); err != nil {
-		t.Fatal("Error during write to test file: %v", err)
+		t.Fatalf("Error during write to test file: %v", err)
 	}
 
 	userData := make(map[string]interface{})
@@ -439,7 +440,7 @@ func TestAddingSecrets(t *testing.T) {
 				"path":        "/container/file",
 				"content":     "dGVzdCBjb250ZW50",
 				"encoding":    "b64",
-				"permissions": "0600",
+				"permissions": "0640",
 			},
 		},
 	}
