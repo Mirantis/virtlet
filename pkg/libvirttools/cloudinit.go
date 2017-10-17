@@ -92,7 +92,6 @@ func (g *CloudInitGenerator) generateUserData() ([]byte, error) {
 		userData[k] = v
 	}
 
-	// TODO: use merge algorithm
 	g.addEnvVarsFileToWriteFiles(userData)
 
 	writeFilesManipulator := NewWriteFilesManipulator(userData, g.config.Mounts)
@@ -100,8 +99,7 @@ func (g *CloudInitGenerator) generateUserData() ([]byte, error) {
 	writeFilesManipulator.AddConfigMapEntries()
 	writeFilesManipulator.AddFileLikeMounts()
 
-	// TODO: use merge algorithm
-	g.addMounts(userData)
+	userData["mounts"] = utils.Merge(userData["mounts"], g.generateMounts())
 
 	r := []byte{}
 	if len(userData) != 0 {
@@ -298,27 +296,6 @@ func (g *CloudInitGenerator) generateMounts() []interface{} {
 		r = append(r, []interface{}{devPath, m.ContainerPath})
 	}
 	return r
-}
-
-func (g *CloudInitGenerator) addMounts(userData map[string]interface{}) {
-	mounts := g.generateMounts()
-	if len(mounts) == 0 {
-		return
-	}
-
-	// TODO: use merge algorithm instead
-	var oldMounts []interface{}
-	oldMountsRaw, _ := userData["mounts"]
-	if oldMountsRaw != nil {
-		var ok bool
-		oldMounts, ok = oldMountsRaw.([]interface{})
-		if !ok {
-			glog.Warning("Malformed mounts entry in user-data, can't add mounts")
-			return
-		}
-	}
-
-	userData["mounts"] = append(oldMounts, mounts...)
 }
 
 type WriteFilesManipulator struct {
