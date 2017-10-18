@@ -50,14 +50,14 @@ var _ = Describe("Basic cirros tests", func() {
 		var ssh framework.Executor
 		scheduleWaitSSH(&vm, &ssh)
 
-		It("Should have default route", func() {
+		It("Should have default route [Conformance]", func() {
 			Expect(framework.ExecSimple(ssh, "ip r")).To(SatisfyAll(
 				ContainSubstring("default via"),
 				ContainSubstring("src "+vmPod.Pod.Status.PodIP),
 			))
 		})
 
-		It("Should have internet connectivity", func(done Done) {
+		It("Should have internet connectivity [Conformance]", func(done Done) {
 			defer close(done)
 			Expect(framework.ExecSimple(ssh, "ping -c1 8.8.8.8")).To(ContainSubstring(
 				"1 packets transmitted, 1 packets received, 0% packet loss"))
@@ -77,7 +77,7 @@ var _ = Describe("Basic cirros tests", func() {
 				Expect(nginxPod.Delete()).To(Succeed())
 			})
 
-			It("Should be able to access another k8s endpoint", func(done Done) {
+			It("Should be able to access another k8s endpoint [Conformance]", func(done Done) {
 				defer close(done)
 				cmd := fmt.Sprintf("curl -s --connect-timeout 5 http://nginx.%s.svc.cluster.local", controller.Namespace())
 				Eventually(func() (string, error) {
@@ -86,11 +86,11 @@ var _ = Describe("Basic cirros tests", func() {
 			}, 60*5)
 		})
 
-		It("Should have hostname equal to the pod name", func() {
+		It("Should have hostname equal to the pod name [Conformance]", func() {
 			Expect(framework.ExecSimple(ssh, "hostname")).To(Equal(vmPod.Pod.Name))
 		})
 
-		It("Should have CPU count that was specified for the pod", func() {
+		It("Should have CPU count that was specified for the pod [Conformance]", func() {
 			checkCPUCount(vm, ssh, 1)
 		})
 	})
@@ -151,7 +151,7 @@ var _ = Describe("Basic cirros tests", func() {
 		})
 	})
 
-	It("Should provide VNC interface", func(done Done) {
+	It("Should provide VNC interface [Conformance]", func(done Done) {
 		defer close(done)
 		pod, err := vm.VirtletPod()
 		Expect(err).NotTo(HaveOccurred())

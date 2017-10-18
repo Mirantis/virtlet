@@ -54,7 +54,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			controller.ConfigMaps().Delete("cm-ssh-key-impl", nil)
 		})
 
-		It("Should have SSH accessible", func() {
+		It("Should have SSH accessible [Conformance]", func() {
 			waitSSH(vm)
 		})
 	})
@@ -85,7 +85,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			controller.ConfigMaps().Delete("cm-ssh-key-expl", nil)
 		})
 
-		It("Should have SSH accessible", func() {
+		It("Should have SSH accessible [Conformance]", func() {
 			waitSSH(vm)
 		})
 	})
@@ -116,7 +116,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			controller.Secrets().Delete("secret-ssh-key-impl", nil)
 		})
 
-		It("Should have SSH accessible", func() {
+		It("Should have SSH accessible [Conformance]", func() {
 			waitSSH(vm)
 		})
 	})
@@ -147,7 +147,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			controller.Secrets().Delete("secret-ssh-key-expl", nil)
 		})
 
-		It("Should have SSH accessible", func() {
+		It("Should have SSH accessible [Conformance]", func() {
 			waitSSH(vm)
 		})
 	})
@@ -181,7 +181,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			controller.ConfigMaps().Delete("cm-userdata", nil)
 		})
 
-		It("Must be processed", func() {
+		It("Must be processed [Conformance]", func() {
 			ssh := waitSSH(vm)
 			Expect(framework.ExecSimple(ssh, "cat", "/tmp/test-file")).To(Equal("Hello world!"))
 		})
@@ -216,7 +216,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			controller.Secrets().Delete("secret-userdata", nil)
 		})
 
-		It("Must be processed", func() {
+		It("Must be processed [Conformance]", func() {
 			ssh := waitSSH(vm)
 			Expect(framework.ExecSimple(ssh, "cat", "/tmp/test-file")).To(Equal("Hello world!"))
 		})
@@ -253,7 +253,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			controller.ConfigMaps().Delete("cm-userdata", nil)
 		})
 
-		It("Must be processed", func() {
+		It("Must be processed [Conformance]", func() {
 			ssh := waitSSH(vm)
 			Expect(framework.ExecSimple(ssh, "cat", "/tmp/test-file1", "/tmp/test-file2")).To(Equal("Hello world!"))
 		})

@@ -47,11 +47,11 @@ var _ = Describe("VM resources", func() {
 
 	scheduleWaitSSH(&vm, &ssh)
 
-	It("Should have CPU count as set for the domain", func() {
+	It("Should have CPU count as set for the domain [Conformance]", func() {
 		checkCPUCount(vm, ssh, 2)
 	})
 
-	It("Should have total memory amount close to that set for the domain", func() {
+	It("Should have total memory amount close to that set for the domain [Conformance]", func() {
 		meminfo := do(framework.ExecSimple(ssh, "cat", "/proc/meminfo")).(string)
 		totals := regexp.MustCompile(`(?:DirectMap4k|DirectMap2M):\s+(\d+)`).FindAllStringSubmatch(meminfo, -1)
 		Expect(totals).To(HaveLen(2))

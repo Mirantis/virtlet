@@ -28,7 +28,7 @@ import (
 )
 
 var _ = Describe("Container volume mounts", func() {
-	Context("of raw volumes", func() {
+	Context("Of raw volumes", func() {
 		var (
 			vm           *framework.VMInterface
 			nodeExecutor framework.Executor
@@ -66,10 +66,13 @@ var _ = Describe("Container volume mounts", func() {
 		})
 
 		scheduleWaitSSH(&vm, &ssh)
-		itShouldBeMounted(&ssh)
+
+		It("Should be handled inside the VM", func() {
+			shouldBeMounted(ssh)
+		})
 	})
 
-	Context("of ephemeral volumes", func() {
+	Context("Of ephemeral volumes", func() {
 		var (
 			vm  *framework.VMInterface
 			ssh framework.Executor
@@ -88,7 +91,9 @@ var _ = Describe("Container volume mounts", func() {
 		})
 
 		scheduleWaitSSH(&vm, &ssh)
-		itShouldBeMounted(&ssh)
+		It("Should be handled inside the VM [Conformance]", func() {
+			shouldBeMounted(ssh)
+		})
 	})
 
 	Context("ConfigMap files must be mounted", func() {
@@ -146,7 +151,7 @@ var _ = Describe("Container volume mounts", func() {
 			controller.ConfigMaps().Delete("files-cm", nil)
 		})
 
-		It("And files must be found on VM", func() {
+		It("And files must be found on VM [Conformance]", func() {
 			ssh := waitSSH(vm)
 			Expect(framework.ExecSimple(ssh, "cat", "/tmp/vol/test-file1", "/tmp/vol/test-file2")).To(Equal("Hello world!"))
 		})
@@ -205,7 +210,7 @@ var _ = Describe("Container volume mounts", func() {
 			controller.Secrets().Delete("files-secret", nil)
 		})
 
-		It("And files must be found on VM", func() {
+		It("And files must be found on VM [Conformance]", func() {
 			ssh := waitSSH(vm)
 			Expect(framework.ExecSimple(ssh, "cat", "/tmp/vol/test-file1", "/tmp/vol/test-file2")).To(Equal("Hello world!"))
 		})
@@ -238,10 +243,8 @@ func makeVolumeMountVM(flexvolOptions map[string]string, nodeName string) *frame
 	return vm
 }
 
-func itShouldBeMounted(ssh *framework.Executor) {
-	It("Should be handled inside the VM", func() {
-		Eventually(func() (string, error) {
-			return framework.ExecSimple(*ssh, "ls -l /foo")
-		}, 60).Should(ContainSubstring("lost+found"))
-	})
+func shouldBeMounted(ssh framework.Executor) {
+	Eventually(func() (string, error) {
+		return framework.ExecSimple(ssh, "ls -l /foo")
+	}, 60).Should(ContainSubstring("lost+found"))
 }
