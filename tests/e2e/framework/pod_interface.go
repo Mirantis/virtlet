@@ -21,7 +21,9 @@ import (
 	"io"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"k8s.io/apimachinery/pkg/api/errors"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/client-go/pkg/api/v1"
@@ -92,7 +94,7 @@ func (pi *PodInterface) Wait(timing ...time.Duration) error {
 
 		for _, cs := range podUpdated.Status.ContainerStatuses {
 			if cs.State.Running == nil {
-				return fmt.Errorf("container %s in pod %s is not running", cs.Name, podUpdated.Name)
+				return fmt.Errorf("container %s in pod %s is not running: %s", cs.Name, podUpdated.Name, spew.Sdump(cs.State))
 			}
 		}
 		return nil
