@@ -52,7 +52,7 @@ var _ = Describe("Image URL", func() {
 		Expect(controller.DeleteVirtletImageMapping(vimName)).NotTo(HaveOccurred())
 	})
 
-	It("Can be specified in CRD", func() {
+	It("Can be specified in CRD [Conformance]", func() {
 		vm := controller.VM("cirros-vm-with-remapped-image")
 		vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, nil)
 		_, err := vm.Pod()

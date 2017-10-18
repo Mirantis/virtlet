@@ -59,7 +59,7 @@ var _ = Describe("QEMU Process", func() {
 
 	scheduleWaitSSH(&vm, &ssh)
 
-	It("Must be active while VM is running and gone after it's deleted", func() {
+	It("Must be active while VM is running and gone after it's deleted [Conformance]", func() {
 		qemuRunning := func() bool {
 			_, _, exitCode, err := framework.Exec(vmsContainer, []string{
 				"pgrep", "-f", fmt.Sprintf("qemu-system-x86_64.* %s", containerId),
