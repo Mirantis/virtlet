@@ -133,6 +133,16 @@ func (c *Controller) PersistentVolumeClaimsClient() typedv1.PersistentVolumeClai
 	return c.client.PersistentVolumeClaims(c.namespace.Name)
 }
 
+// ConfigMaps returns interface for ConfigMap objects
+func (c *Controller) ConfigMaps() typedv1.ConfigMapInterface {
+	return c.client.ConfigMaps(c.namespace.Name)
+}
+
+// Secrets returns interface for Secret objects
+func (c *Controller) Secrets() typedv1.SecretInterface {
+	return c.client.Secrets(c.namespace.Name)
+}
+
 // VM returns interface for operations on virtlet VM pods
 func (c *Controller) VM(name string) *VMInterface {
 	return newVMInterface(c, name)

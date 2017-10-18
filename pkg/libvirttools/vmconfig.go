@@ -73,7 +73,7 @@ type VMConfig struct {
 // LoadAnnotations parses pod annotations in the VM config an
 // populates the ParsedAnnotations field.
 func (c *VMConfig) LoadAnnotations() error {
-	ann, err := LoadAnnotations(c.PodAnnotations)
+	ann, err := LoadAnnotations(c.PodNamespace, c.PodAnnotations)
 	if err != nil {
 		return err
 	}

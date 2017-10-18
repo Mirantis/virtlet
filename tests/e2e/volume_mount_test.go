@@ -116,9 +116,7 @@ func makeVolumeMountVM(flexvolOptions map[string]string, nodeName string) *frame
 
 func itShouldBeMounted(ssh *framework.Executor) {
 	It("Should be handled inside the VM", func() {
-		if !*includeCloudInitTests {
-			Skip("Cloud-Init tests not enabled")
-		}
+		requireCloudInit()
 		Eventually(func() (string, error) {
 			return framework.ExecSimple(*ssh, "ls -l /foo")
 		}, 60).Should(ContainSubstring("lost+found"))
