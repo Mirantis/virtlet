@@ -84,9 +84,16 @@ func (pi *PodInterface) Wait(timing ...time.Duration) error {
 			return err
 		}
 		pi.Pod = podUpdated
+
 		phase := v1.PodRunning
 		if podUpdated.Status.Phase != phase {
 			return fmt.Errorf("pod %s is not %s phase: %s", podUpdated.Name, phase, podUpdated.Status.Phase)
+		}
+
+		for _, cs := range podUpdated.Status.ContainerStatuses {
+			if cs.State.Running == nil {
+				return fmt.Errorf("container %s in pod %s is not running", cs.Name, podUpdated.Name)
+			}
 		}
 		return nil
 	}, timeout, pollPeriond, consistencyPeriod)
