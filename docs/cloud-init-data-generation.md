@@ -9,38 +9,8 @@ mounted by the VM. An implementation of either
 [Amazon EC2](http://cloudinit.readthedocs.io/en/latest/topics/datasources/ec2.html)
 or
 [OpenStack](http://cloudinit.readthedocs.io/en/latest/topics/datasources/openstack.html)
-datasource can be added.
+datasource can be added later.
 
-## Implementation stages
-
-The plan is to implement this spec in stages, based on the priorities
-of particular items. The suggested sequence is this:
-
-1. Implement `meta-data` generation and merge parts, default
-   `user-data` to empty. Allow the user to override parts of
-   `meta-data` and `user-data` via the annotations.
-2. Implement applying the data from `ConfigMap` and `Secret` k8s
-   objects via the
-   [write_files](http://cloudinit.readthedocs.io/en/latest/topics/modules.html#write-files)
-   module in `user-data`. Possible additional option is to generate a
-   shell script to serve as `user-data` so CirrOS and other images
-   with 'simpler' cloud-init can be supported, too. Possible problem:
-   `user-data` is usually limited to ~16Kb by cloud providers, need to
-   check whether this limitation isn't enforced by any images on the
-   OS side.
-3. Update Virtlet extra volumes (libvirt volumes / raw devices) to use
-   flexvolume driver and implement mounting them into VMs using `mounts`
-   module of `user-data`.
-4. Implement retrieving parts of cloud-init configuration from Secrets
-   and ConfigMaps. This includes retrieving SSH public keys from
-   Secrets/ConfigMaps specified using `VirtletSSHKeySource` (this part
-   also needs to be done because it's not very correct to embed SSH
-   keys into pod definitions). Another useful feature is retrieving
-   cloud-init `user-data` overrides from Secrets/ConfigMaps specified
-   using VirtletCloudInitUserDataSource.
-5. Implement passing advanced network configuration via cloud-init so
-   as to avoid DHCP server limitations and support more advanced
-   network configs such as required by Calico.
 
 ## Basic idea with an example
 
@@ -77,7 +47,7 @@ metadata:
     # this option disables merging of user-data keys.
     # By default the lists and dicts in user-data keys
     # are merged using the standard method (more on this below)
-    # VirtletCloudInitUserDataOverwrite: true
+    # VirtletCloudInitUserDataOverwrite: "true"
 
     # this options makes it possible to write a script
     # in place of the user-data file. In case if this option
@@ -252,6 +222,25 @@ The `user-data` content is generated as follows:
   by adding `VirtletCloudInitUserDataScript` option. This may be
   useful if you want to pass a script there which may be necessary for
   older/simpler cloud-init implementations such as one used by CirrOS.
+
+## Propagating user-data from kubernetes objects
+
+In addition to putting user-data document right in the pod definition using `VirtletCloudInitUserData` annotation, it is possible
+to have this document stored in either `ConfigMap` or `Secret` kubernetes object. This is achieved with yet another annotation,
+called `VirtletCloudInitUserDataSource`. It has the following format: `kind/name` where `kind` is either `configmap` or `secret`
+and `name` is the name of appropriate resource. When `virtlet` sees this annotation, it reads the object it refers to and puts
+all its keys into the `user-data` dictionary. This is done at the very beginning of the `user-data` generation process.
+If the pod definition has both `VirtletCloudInitUserData` and `VirtletCloudInitUserDataSource` annotations, the `virtlet`
+will load `user-data` from kubernetes object and then will merge it with that from `VirtletCloudInitUserData` (unless
+`VirtletCloudInitUserDataOverwrite` is set to `"true"`, in which case `VirtletCloudInitUserData` will overwrite it).
+
+Similar approach is taken with SSH keys. It is possible to provide VM with a list of SSH keys obtained from `ConfigMap` or `Secret`
+kubernetes objects. In order to do so, one uses `VirtletSSHKeySource` annotation with the following format: `kind/name/key`.
+As for the user-data, `kind` is one of `configmap`, `secret`, `name` is the name of resource and `key` is the key name in that resource
+containing SSH keys in the same format in `VirtletSSHKeys`. The `key` part is optional. When using `kind/name` annotation (without `key`),
+`virtlet` will look for the `authorized_keys` key. As with the `user-data` `VirtletSSHKeys` keys are going to be appended to those from
+`VirtletSSHKeySource` unless it is set to overwrite them by `VirtletCloudInitUserData: "true"`.
+
 
 ## Additional links
 
