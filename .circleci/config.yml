@@ -4,6 +4,8 @@ defaults: &defaults
   working_directory: ~/virtlet
   environment:
     DOCKER_VERSION: "17.03.0-ce"
+    KUBECTL_VERSION: "v1.7.8"
+    KUBECTL_SHA1: "0c3a28ac6551ee340b838e406f32fafe3124a5d5"
 
 prereqs: &prereqs
   name: Install prerequisites
@@ -159,6 +161,13 @@ e2e: &e2e
           VIRTLET_DEMO_BRANCH=master \
           BASE_LOCATION="$PWD" \
           deploy/demo.sh
+  - run:
+      name: install kubectl
+      command: |
+        curl -L https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl -o /usr/local/bin/kubectl
+        echo ${KUBECTL_SHA1} /usr/local/bin/kubectl |sha1sum -c
+        chmod +x /usr/local/bin/kubectl
+
   - run:
       name: Run e2e tests
       command: |

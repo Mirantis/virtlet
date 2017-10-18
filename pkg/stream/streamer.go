@@ -17,10 +17,14 @@ limitations under the License.
 package stream
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net"
+	"os/exec"
 
+	"github.com/Mirantis/virtlet/pkg/cni"
+	"github.com/docker/docker/pkg/pools"
 	"github.com/golang/glog"
 
 	"k8s.io/client-go/tools/remotecommand"
@@ -32,6 +36,11 @@ import (
 // GetAttach returns attach stream request
 func (s *Server) GetAttach(req *kubeapi.AttachRequest) (*kubeapi.AttachResponse, error) {
 	return s.streamServer.GetAttach(req)
+}
+
+// GetPortForward returns pofrforward stream request
+func (s *Server) GetPortForward(req *kubeapi.PortForwardRequest) (*kubeapi.PortForwardResponse, error) {
+	return s.streamServer.GetPortForward(req)
 }
 
 // Attach endpoint for streaming.Runtime
@@ -79,4 +88,73 @@ func (s *Server) Attach(containerID string, inputStream io.Reader, outputStream,
 	s.unixServer.RemoveOutputReader(containerID, outChan)
 	glog.V(1).Infoln("Attach request finished", containerID)
 	return err
+}
+
+// PortForward endpoint for streaming.Runtime
+func (s *Server) PortForward(podSandboxID string, port int32, stream io.ReadWriteCloser) error {
+	// implementation based on https://github.com/kubernetes-incubator/cri-o/blob/master/server/container_portforward.go
+	glog.V(1).Infoln("New PortForward request", podSandboxID)
+
+	socatPath, lookupErr := exec.LookPath("socat")
+	if lookupErr != nil {
+		return fmt.Errorf("unable to do port forwarding: socat not found")
+	}
+
+	ip, err := s.getPodSandboxIP(podSandboxID)
+	if err != nil {
+		return fmt.Errorf("unable to do port forwarding: %v", err)
+	}
+
+	args := []string{"-", fmt.Sprintf("TCP4:%s:%d", ip, port)}
+
+	command := exec.Command(socatPath, args...)
+	command.Stdout = stream
+
+	stderr := new(bytes.Buffer)
+	command.Stderr = stderr
+
+	// If we use Stdin, command.Run() won't return until the goroutine that's copying
+	// from stream finishes. Unfortunately, if you have a client like telnet connected
+	// via port forwarding, as long as the user's telnet client is connected to the user's
+	// local listener that port forwarding sets up, the telnet session never exits. This
+	// means that even if socat has finished running, command.Run() won't ever return
+	// (because the client still has the connection and stream open).
+	//
+	// The work around is to use StdinPipe(), as Wait() (called by Run()) closes the pipe
+	// when the command (socat) exits.
+	inPipe, err := command.StdinPipe()
+	if err != nil {
+		return fmt.Errorf("unable to do port forwarding: error creating stdin pipe: %v", err)
+	}
+	go func() {
+		pools.Copy(inPipe, stream)
+		inPipe.Close()
+	}()
+
+	if err := command.Run(); err != nil {
+		return fmt.Errorf("%v: %s", err, stderr.String())
+	}
+
+	return nil
+}
+
+func (s *Server) getPodSandboxIP(sandboxID string) (string, error) {
+	sandbox := s.metadataStore.PodSandbox(sandboxID)
+	sandboxInfo, err := sandbox.Retrieve()
+	if err != nil {
+		glog.Errorf("Error when getting pod sandbox '%s': %v", sandboxID, err)
+		return "", err
+	}
+
+	netResult, err := cni.BytesToResult([]byte(sandboxInfo.CNIConfig))
+	if err != nil {
+		glog.Errorf("Error when unmarshaling pod network configuration for sandbox '%s': %v", sandboxID, err)
+		return "", err
+	}
+
+	ip := cni.GetPodIP(netResult)
+	if ip != "" {
+		return ip, nil
+	}
+	return "", fmt.Errorf("Couldn't get IP address for for PodSandbox: %s", sandboxID)
 }
