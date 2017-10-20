@@ -16,6 +16,8 @@ limitations under the License.
 
 package imagetranslation
 
+import "context"
+
 type objectConfig struct {
 	name        string
 	translation ImageTranslation
@@ -40,7 +42,7 @@ type fakeConfigSource struct {
 var _ ConfigSource = fakeConfigSource{}
 
 // Configs implements ConfigSource Configs
-func (cs fakeConfigSource) Configs() ([]TranslationConfig, error) {
+func (cs fakeConfigSource) Configs(ctx context.Context) ([]TranslationConfig, error) {
 	var result []TranslationConfig
 	for name, tr := range cs.configs {
 		result = append(result, objectConfig{name: name, translation: tr})

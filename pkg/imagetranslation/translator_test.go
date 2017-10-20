@@ -17,6 +17,7 @@ limitations under the License.
 package imagetranslation
 
 import (
+	"context"
 	"testing"
 )
 
@@ -55,7 +56,7 @@ func TestTranslations(t *testing.T) {
 	}
 
 	translator := NewImageNameTranslator().(*imageNameTranslator)
-	translator.LoadConfigs(NewFakeConfigSource(configs))
+	translator.LoadConfigs(context.Background(), NewFakeConfigSource(configs))
 
 	for _, tc := range []struct {
 		name        string

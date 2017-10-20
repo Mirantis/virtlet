@@ -637,7 +637,7 @@ func (v *VirtletManager) PullImage(ctx context.Context, in *kubeapi.PullImageReq
 		return nil, err
 	}
 
-	imageNameTranslator := v.getImageNameTranslator()
+	imageNameTranslator := v.getImageNameTranslator(ctx)
 	if _, err = v.libvirtImageTool.PullRemoteImageToVolume(imageName, volumeName, imageNameTranslator); err != nil {
 		glog.Errorf("Error when pulling image %q: %v", imageName, err)
 		return nil, err
@@ -653,14 +653,14 @@ func (v *VirtletManager) PullImage(ctx context.Context, in *kubeapi.PullImageReq
 	return response, nil
 }
 
-func (v *VirtletManager) getImageNameTranslator() imagetranslation.ImageNameTranslator {
+func (v *VirtletManager) getImageNameTranslator(ctx context.Context) imagetranslation.ImageNameTranslator {
 	var sources []imagetranslation.ConfigSource
 	sources = append(sources, imagetranslation.NewCRDSource("kube-system"))
 	if v.imageTranslationConfigsDir != "" {
 		sources = append(sources, imagetranslation.NewFileConfigSource(v.imageTranslationConfigsDir))
 	}
 	translator := imagetranslation.NewImageNameTranslator()
-	translator.LoadConfigs(sources...)
+	translator.LoadConfigs(ctx, sources...)
 	return translator
 }
 

@@ -16,7 +16,11 @@ limitations under the License.
 
 package imagetranslation
 
-import "github.com/Mirantis/virtlet/pkg/utils"
+import (
+	"context"
+
+	"github.com/Mirantis/virtlet/pkg/utils"
+)
 
 // TranslationRule represents a single translation rule from either name or regexp to Endpoint
 type TranslationRule struct {
@@ -94,7 +98,7 @@ type TranslationConfig interface {
 // ConfigSource is the data-source for translation configs
 type ConfigSource interface {
 	// Configs returns list of configs that are available in this data source
-	Configs() ([]TranslationConfig, error)
+	Configs(ctx context.Context) ([]TranslationConfig, error)
 
 	// Description returns the data-source description to be used in the logs
 	Description() string
@@ -103,7 +107,7 @@ type ConfigSource interface {
 // ImageNameTranslator is the main translator interface
 type ImageNameTranslator interface {
 	// LoadConfigs initializes translator with configs from supplied data sources. All previous mappings are discarded.
-	LoadConfigs(sources ...ConfigSource)
+	LoadConfigs(ctx context.Context, sources ...ConfigSource)
 
 	// Translate translates image name to ins Endpoint. If no suitable mapping was found, the default Endpoint is returned
 	Translate(name string) utils.Endpoint
