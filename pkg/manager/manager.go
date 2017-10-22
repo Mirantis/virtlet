@@ -475,9 +475,9 @@ func (v *VirtletManager) ExecSync(context.Context, *kubeapi.ExecSyncRequest) (*k
 	return nil, errors.New("not implemented")
 }
 
-func (v *VirtletManager) Exec(context.Context, *kubeapi.ExecRequest) (*kubeapi.ExecResponse, error) {
-	glog.Errorf("Exec() not implemented")
-	return nil, errors.New("not implemented")
+func (v *VirtletManager) Exec(ctx context.Context, req *kubeapi.ExecRequest) (*kubeapi.ExecResponse, error) {
+	glog.V(3).Infof("Exec called: %s", spew.Sdump(req))
+	return v.StreamServer.GetExec(req)
 }
 
 func (v *VirtletManager) Attach(ctx context.Context, req *kubeapi.AttachRequest) (*kubeapi.AttachResponse, error) {

@@ -22,6 +22,9 @@ import (
 	"io"
 	"net"
 	"os/exec"
+	"strings"
+
+	"golang.org/x/crypto/ssh"
 
 	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/docker/docker/pkg/pools"
@@ -41,6 +44,11 @@ func (s *Server) GetAttach(req *kubeapi.AttachRequest) (*kubeapi.AttachResponse,
 // GetPortForward returns pofrforward stream request
 func (s *Server) GetPortForward(req *kubeapi.PortForwardRequest) (*kubeapi.PortForwardResponse, error) {
 	return s.streamServer.GetPortForward(req)
+}
+
+// GetPortForward returns pofrforward stream request
+func (s *Server) GetExec(req *kubeapi.ExecRequest) (*kubeapi.ExecResponse, error) {
+	return s.streamServer.GetExec(req)
 }
 
 // Attach endpoint for streaming.Runtime
@@ -138,6 +146,70 @@ func (s *Server) PortForward(podSandboxID string, port int32, stream io.ReadWrit
 	return nil
 }
 
+func (s *Server) Exec(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
+	glog.V(1).Infoln("New Exec request", containerID)
+	_, ok := s.unixServer.UnixConnections.Load(containerID)
+	if ok == false {
+		return fmt.Errorf("could not find vm %q", containerID)
+	}
+
+	kubecontainer.HandleResizing(resize, func(size remotecommand.TerminalSize) {
+		glog.Info("Got a resize event: %+v", size)
+	})
+
+	sandboxID, err := s.getSandbox(containerID)
+	if err != nil {
+		return fmt.Errorf("Failed to get sandboxID: %v", err)
+	}
+	ip, err := s.getPodSandboxIP(sandboxID)
+	if err != nil {
+		return fmt.Errorf("Unable to get IP for sandbox %s: %v", sandboxID, err)
+	}
+
+	sshConfig := getSSHConfig()
+	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:22", ip), sshConfig)
+	if err != nil {
+		return fmt.Errorf("Failed to dial: %v", err)
+	}
+
+	session, err := client.NewSession()
+	if err != nil {
+		return fmt.Errorf("Couldn't create ssh session: %v", err)
+	}
+	defer session.Close()
+
+	session.Stdout = stdout
+	session.Stderr = stderr
+	session.Stdin = stdin
+
+	for i, arg := range cmd {
+		if i == 0 {
+			continue
+		}
+		cmd[i] = fmt.Sprintf("'%s'", strings.Replace(arg, "'", "\\'", -1))
+	}
+	err = session.Run(strings.Join(cmd, " "))
+	if err != nil {
+		if _, ok := err.(*ssh.ExitError); ok {
+			err = nil
+		}
+	}
+	return err
+}
+
+func (s *Server) getSandbox(containerID string) (string, error) {
+	containerInfo, err := s.metadataStore.Container(containerID).Retrieve()
+	if err != nil {
+		glog.Errorf("Error when retrieving domain %q info from metadata store: %v", containerID, err)
+		return "", err
+	}
+	if containerInfo == nil {
+		return "", fmt.Errorf("container infor for containerID: %s is nil", containerID)
+	}
+
+	return containerInfo.SandboxID, nil
+}
+
 func (s *Server) getPodSandboxIP(sandboxID string) (string, error) {
 	sandbox := s.metadataStore.PodSandbox(sandboxID)
 	sandboxInfo, err := sandbox.Retrieve()
@@ -157,4 +229,21 @@ func (s *Server) getPodSandboxIP(sandboxID string) (string, error) {
 		return ip, nil
 	}
 	return "", fmt.Errorf("Couldn't get IP address for for PodSandbox: %s", sandboxID)
+}
+
+func getSSHConfig() *ssh.ClientConfig {
+	var authMethod ssh.AuthMethod
+	key := ""
+	secret := "testuser"
+	signer, err := ssh.ParsePrivateKey([]byte(key))
+	if err != nil {
+		authMethod = ssh.Password(secret)
+	} else {
+		authMethod = ssh.PublicKeys(signer)
+	}
+
+	return &ssh.ClientConfig{
+		User: "testuser",
+		Auth: []ssh.AuthMethod{authMethod},
+	}
 }
