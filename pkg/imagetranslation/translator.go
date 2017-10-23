@@ -17,6 +17,7 @@ limitations under the License.
 package imagetranslation
 
 import (
+	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/rsa"
@@ -40,10 +41,10 @@ type imageNameTranslator struct {
 }
 
 // LoadConfigs implements ImageNameTranslator LoadConfigs
-func (t *imageNameTranslator) LoadConfigs(sources ...ConfigSource) {
+func (t *imageNameTranslator) LoadConfigs(ctx context.Context, sources ...ConfigSource) {
 	translations := map[string]*ImageTranslation{}
 	for _, source := range sources {
-		configs, err := source.Configs()
+		configs, err := source.Configs(ctx)
 		if err != nil {
 			glog.V(2).Infof("cannot get image translation configs from %s: %v", source.Description(), err)
 			continue

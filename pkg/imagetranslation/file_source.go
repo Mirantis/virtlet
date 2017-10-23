@@ -17,6 +17,7 @@ limitations under the License.
 package imagetranslation
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"path"
@@ -38,7 +39,7 @@ type fileConfig struct {
 var _ TranslationConfig = fileConfig{}
 
 // Config implements ConfigSource Config
-func (cs fileConfigSource) Configs() ([]TranslationConfig, error) {
+func (cs fileConfigSource) Configs(ctx context.Context) ([]TranslationConfig, error) {
 	var result []TranslationConfig
 	r, err := ioutil.ReadDir(cs.configsDirectory)
 	if err != nil {

@@ -18,6 +18,7 @@ package imagetranslation
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -43,7 +44,7 @@ func translate(config ImageTranslation, name string, server *httptest.Server) ut
 	configs := map[string]ImageTranslation{"config": config}
 
 	translator := NewImageNameTranslator()
-	translator.LoadConfigs(NewFakeConfigSource(configs))
+	translator.LoadConfigs(context.Background(), NewFakeConfigSource(configs))
 	return translator.Translate(name)
 }
 

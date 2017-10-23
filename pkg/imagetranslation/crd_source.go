@@ -17,6 +17,7 @@ limitations under the License.
 package imagetranslation
 
 import (
+	"context"
 	"fmt"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -122,7 +123,7 @@ type crdConfigSource struct {
 var _ ConfigSource = crdConfigSource{}
 
 // Configs implements ConfigSource Configs
-func (cs crdConfigSource) Configs() ([]TranslationConfig, error) {
+func (cs crdConfigSource) Configs(ctx context.Context) ([]TranslationConfig, error) {
 	cfg, err := utils.GetK8sClientConfig("")
 	if err != nil {
 		return nil, err
@@ -138,6 +139,7 @@ func (cs crdConfigSource) Configs() ([]TranslationConfig, error) {
 	}
 	var list VirtletImageMappingList
 	err = client.Get().
+		Context(ctx).
 		Resource("virtletimagemappings").
 		Namespace(cs.namespace).
 		Do().Into(&list)
