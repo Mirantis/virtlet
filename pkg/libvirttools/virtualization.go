@@ -448,8 +448,11 @@ func (v *VirtualizationTool) startContainer(containerId string) error {
 
 	return v.metadataStore.Container(containerId).Save(
 		func(c *metadata.ContainerInfo) (*metadata.ContainerInfo, error) {
-			c.State = kubeapi.ContainerState_CONTAINER_RUNNING
-			c.StartedAt = v.clock.Now().UnixNano()
+			// make sure the container is not removed during the call
+			if c != nil {
+				c.State = kubeapi.ContainerState_CONTAINER_RUNNING
+				c.StartedAt = v.clock.Now().UnixNano()
+			}
 			return c, nil
 		})
 }
@@ -523,7 +526,10 @@ func (v *VirtualizationTool) StopContainer(containerId string, timeout time.Dura
 	if err == nil {
 		err = v.metadataStore.Container(containerId).Save(
 			func(c *metadata.ContainerInfo) (*metadata.ContainerInfo, error) {
-				c.State = kubeapi.ContainerState_CONTAINER_EXITED
+				// make sure the container is not removed during the call
+				if c != nil {
+					c.State = kubeapi.ContainerState_CONTAINER_EXITED
+				}
 				return c, nil
 			})
 	}
@@ -726,7 +732,10 @@ func (v *VirtualizationTool) getContainerInfo(domain virt.VirtDomain, containerI
 	if containerInfo.State != containerState {
 		if err := v.metadataStore.Container(containerId).Save(
 			func(c *metadata.ContainerInfo) (*metadata.ContainerInfo, error) {
-				c.State = containerState
+				// make sure the container is not removed during the call
+				if c != nil {
+					c.State = containerState
+				}
 				return c, nil
 			},
 		); err != nil {
