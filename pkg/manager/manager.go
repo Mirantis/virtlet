@@ -261,7 +261,10 @@ func (v *VirtletManager) StopPodSandbox(ctx context.Context, in *kubeapi.StopPod
 	if status.State != kubeapi.PodSandboxState_SANDBOX_NOTREADY {
 		if err := sandbox.Save(
 			func(c *metadata.PodSandboxInfo) (*metadata.PodSandboxInfo, error) {
-				c.State = kubeapi.PodSandboxState_SANDBOX_NOTREADY
+				// make sure the pod is not removed during the call
+				if c != nil {
+					c.State = kubeapi.PodSandboxState_SANDBOX_NOTREADY
+				}
 				return c, nil
 			},
 		); err != nil {
