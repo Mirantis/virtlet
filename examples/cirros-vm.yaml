@@ -4,7 +4,7 @@ metadata:
   name: cirros-vm
   annotations:
     # This tells CRI Proxy that this pod belongs to Virtlet runtime
-    kubernetes.io/target-runtime: virtlet
+    kubernetes.io/target-runtime: virtlet.cloud
     # An optional annotation specifying the count of virtual CPUs.
     # Note that annotation values must always be strings,
     # thus numeric values need to be quoted.
@@ -36,9 +36,9 @@ spec:
   containers:
   - name: cirros-vm
     # This specifies the image to use.
-    # virtlet/ prefix is used by CRI proxy, the remaining part
+    # virtlet.cloud/ prefix is used by CRI proxy, the remaining part
     # of the image name is prepended with https:// and used to download the image
-    image: virtlet/cirros
+    image: virtlet.cloud/cirros
     # Virtlet currently ignores image tags, but their meaning may change
     # in future, so it’s better not to set them for VM pods. If there’s no tag
     # provided in the image specification kubelet defaults to

@@ -132,7 +132,7 @@ func (vmi *VMInterface) VirtletPod() (*PodInterface, error) {
 
 func (vmi *VMInterface) buildVMPod(options VMOptions) *v1.Pod {
 	annotations := map[string]string{
-		"kubernetes.io/target-runtime":      "virtlet",
+		"kubernetes.io/target-runtime":      "virtlet.cloud",
 		"VirtletDiskDriver":                 options.DiskDriver,
 		"VirtletCloudInitUserDataOverwrite": strconv.FormatBool(options.OverwriteUserData),
 	}
@@ -198,7 +198,7 @@ func (vmi *VMInterface) buildVMPod(options VMOptions) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  vmi.Name,
-					Image: "virtlet/" + options.Image,
+					Image: "virtlet.cloud/" + options.Image,
 					Resources: v1.ResourceRequirements{
 						Limits: limits,
 					},

@@ -3,7 +3,7 @@ kind: Pod
 metadata:
   name: ubuntu-vm
   annotations:
-    kubernetes.io/target-runtime: virtlet
+    kubernetes.io/target-runtime: virtlet.cloud
     VirtletCloudInitUserData: |
       ssh_pwauth: True
       users:
@@ -32,7 +32,7 @@ spec:
   terminationGracePeriodSeconds: 120
   containers:
   - name: ubuntu-vm
-    image: virtlet/cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img
+    image: virtlet.cloud/cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img
     imagePullPolicy: IfNotPresent
     # tty and stdin required for `kubectl attach -t` to work
     tty: true

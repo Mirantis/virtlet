@@ -12,9 +12,9 @@ To overcome these limitations, Virtlet provides a mechanism for image name trans
 The idea is that image can be identified by some abstract ID rather than URL. Virtlet then will map this ID
 to arbitrary URL using special translation table that specifies rules for image name translation.
 
-Thus instead of `virtlet/example.net/path/to/my.qcow2` one would use `virtlet/my-image` and put a mapping that says that
+Thus instead of `virtlet.cloud/example.net/path/to/my.qcow2` one would use `virtlet.cloud/my-image` and put a mapping that says that
 `my-image` must be translated to `http://example.net/path/to/my.qcow2` into translation table.
-Here and below I assume that `CRI Proxy` is used. Otherwise, the `virtlet/` prefix is not needed.
+Here and below I assume that `CRI Proxy` is used. Otherwise, the `virtlet.cloud/` prefix is not needed.
 
 ## Translation configs
 
@@ -34,13 +34,13 @@ translations:
 ```
 
 The prefix is optional and may be omitted. In example above the image name
-`virtlet/my-prefix/cirros` is going to be translated into `https://download.cirros-cloud.net/0.3.5/cirros-0.3.5-x86_64-disk.img`,
-but `virtlet/cirros` won't be unless there is also a translation config without a prefix (or with empty string prefix).
+`virtlet.cloud/my-prefix/cirros` is going to be translated into `https://download.cirros-cloud.net/0.3.5/cirros-0.3.5-x86_64-disk.img`,
+but `virtlet.cloud/cirros` won't be unless there is also a translation config without a prefix (or with empty string prefix).
 In the later case, the `cirros` part will be treated as an URL (the default behavior without translations).
 
 There are two types of translations: those that map a fixed image name and those that map set of names identified by regexp expression.
 In the later case, URL can be generalized by using regexp sub-matches through the `$n` syntax.
-In example above, `virtlet/my-prefix/centos/7-01` is going to be translated to
+In example above, `virtlet.cloud/my-prefix/centos/7-01` is going to be translated to
 `https://cloud.centos.org/centos/$1/images/CentOS-7-x86_64-GenericCloud-01.qcow2`.
 
 The regexp translations are only available when Virtlet is run with `IMAGE_REGEXP_TRANSLATION` environment variable set to a

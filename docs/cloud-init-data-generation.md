@@ -30,7 +30,7 @@ kind: Pod
 metadata:
   name: ubuntu-vm
   annotations:
-    kubernetes.io/target-runtime: virtlet
+    kubernetes.io/target-runtime: virtlet.cloud
 
     # override some fields in cloud-init meta-data
     VirtletCloudInitMetaData: |
@@ -84,7 +84,7 @@ spec:
 
   containers:
   - name: ubuntu-vm
-    image: virtlet/cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img
+    image: virtlet.cloud/cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img
     volumeMounts:
 
     # this will write configmap contents using the `write_file` cloud-init module
