@@ -143,7 +143,7 @@ func installCriProxy(execPath, nodeInfoPath string) error {
 			"3",
 			"-alsologtostderr",
 			"-connect",
-			"docker,virtlet:/run/virtlet.sock",
+			"docker,virtlet.cloud:/run/virtlet.sock",
 		},
 		ProxySocketPath: "/run/criproxy.sock",
 		NodeInfo:        ni,

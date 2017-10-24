@@ -89,7 +89,7 @@ docker run -d --privileged \
        nsenter --mount=/proc/1/ns/mnt -- \
        /opt/criproxy/bin/criproxy \
        -v 3 -alsologtostderr \
-       -connect docker,virtlet:/run/virtlet.sock
+       -connect docker,virtlet.cloud:/run/virtlet.sock
 ```
 
 `-v` option of `criproxy` controls the verbosity here. 0-1 means some

@@ -14,7 +14,7 @@ Virtlet supports QCOW2 format for VM images.
       image: download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img
 ```
 
-**Note:** You need to specify url without `scheme://`. In case you are using [instructions](../deploy/README.md) in `deploy/` directory to deploy Virtlet, you need to add `virtlet/` prefix to the url.
+**Note:** You need to specify url without `scheme://`. In case you are using [instructions](../deploy/README.md) in `deploy/` directory to deploy Virtlet, you need to add `virtlet.cloud/` prefix to the url.
 
 Also see [Image Name Translation](image-name-translation.md) for another way of providing image URL.
 

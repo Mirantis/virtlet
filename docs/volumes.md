@@ -14,7 +14,7 @@ kind: Pod
 metadata:
   name: cirros-vm
   annotations:
-    kubernetes.io/target-runtime: virtlet
+    kubernetes.io/target-runtime: virtlet.cloud
     VirtletDiskDriver: virtio
 ```
 
@@ -119,7 +119,7 @@ kind: Pod
 metadata:
   name: test-vm-pod
   annotations:
-    kubernetes.io/target-runtime: virtlet
+    kubernetes.io/target-runtime: virtlet.cloud
 spec:
   affinity:
     nodeAffinity:
@@ -193,7 +193,7 @@ kind: Pod
 metadata:
   name: cirros-vm-rbd
   annotations:
-    kubernetes.io/target-runtime: virtlet
+    kubernetes.io/target-runtime: virtlet.cloud
 spec:
   affinity:
     nodeAffinity:
@@ -206,7 +206,7 @@ spec:
             - virtlet
   containers:
     - name: cirros-vm-rbd
-      image: virtlet/image-service.kube-system/cirros
+      image: virtlet.cloud/image-service.kube-system/cirros
   volumes:
     - name: test
       flexVolume:
@@ -259,7 +259,7 @@ kind: Pod
 metadata:
   name: cirros-vm-rbd
   annotations:
-    kubernetes.io/target-runtime: virtlet
+    kubernetes.io/target-runtime: virtlet.cloud
 spec:
   affinity:
     nodeAffinity:
@@ -272,7 +272,7 @@ spec:
             - virtlet
   containers:
     - name: cirros-vm-rbd
-      image: virtlet/image-service.kube-system/cirros
+      image: virtlet.cloud/image-service.kube-system/cirros
   volumes:
     - name: test
       persistentVolumeClaim:
@@ -302,7 +302,7 @@ kind: Pod
 metadata:
   name: test-vm-pod
   annotations:
-    kubernetes.io/target-runtime: virtlet
+    kubernetes.io/target-runtime: virtlet.cloud
 spec:
   affinity:
     nodeAffinity:
@@ -367,7 +367,7 @@ spec:
 ...
   containers:
   - name: ubuntu-vm
-    image: virtlet/cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img
+    image: virtlet.cloud/cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img
     volumeMounts:
     - name: docker
       mountPath: /var/lib/docker
