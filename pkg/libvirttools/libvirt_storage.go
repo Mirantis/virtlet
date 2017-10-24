@@ -191,10 +191,14 @@ func (pool *LibvirtStoragePool) ImageToVolume(def *libvirtxml.StorageVolume, sou
 
 func (pool *LibvirtStoragePool) RemoveVolumeByName(name string) error {
 	vol, err := pool.LookupVolumeByName(name)
-	if err != nil {
+	switch {
+	case err == virt.ErrStorageVolumeNotFound:
+		return nil
+	case err != nil:
 		return err
+	default:
+		return vol.Remove()
 	}
-	return vol.Remove()
 }
 
 type LibvirtStorageVolume struct {
