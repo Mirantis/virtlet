@@ -27,7 +27,6 @@ import (
 	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/vishvananda/netlink"
 
-	"github.com/Mirantis/virtlet/pkg/dhcp"
 	"github.com/Mirantis/virtlet/pkg/nettools"
 )
 
@@ -133,10 +132,7 @@ func runDhcpTestCase(t *testing.T, testCase *dhcpTestCase) {
 
 	g := NewNetTestGroup(t, 1*time.Minute)
 	defer g.Stop()
-	g.Add(serverNS, NewDhcpServerTester(&dhcp.Config{
-		CNIResult:           testCase.info,
-		PeerHardwareAddress: clientVeth.Attrs().HardwareAddr,
-	}))
+	g.Add(serverNS, NewDhcpServerTester(&testCase.info))
 
 	g.Add(clientNS, NewDhcpClient(testCase.expectedSubstrings))
 	g.Wait()

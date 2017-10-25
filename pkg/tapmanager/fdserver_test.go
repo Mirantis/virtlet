@@ -44,33 +44,33 @@ func newSampleFDSource(tmpDir string) *sampleFDSource {
 	}
 }
 
-func (s *sampleFDSource) GetFD(key string, data []byte) (int, []byte, error) {
+func (s *sampleFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 	var fdData sampleFDData
 	if err := json.Unmarshal(data, &fdData); err != nil {
-		return 0, nil, fmt.Errorf("error unmarshalling json: %v", err)
+		return nil, nil, fmt.Errorf("error unmarshalling json: %v", err)
 	}
 	if _, found := s.files[key]; found {
-		return 0, nil, fmt.Errorf("file already exists: %q", key)
+		return nil, nil, fmt.Errorf("file already exists: %q", key)
 	}
 	filename := filepath.Join(s.tmpDir, key)
 	f, err := os.Create(filename)
 	if err != nil {
-		return 0, nil, fmt.Errorf("error creating file %q: %v", filename, err)
+		return nil, nil, fmt.Errorf("error creating file %q: %v", filename, err)
 	}
 	if err := os.Remove(f.Name()); err != nil {
 		f.Close()
-		return 0, nil, fmt.Errorf("Remove(): %v", err)
+		return nil, nil, fmt.Errorf("Remove(): %v", err)
 	}
 	if _, err := f.Write([]byte(fdData.Content)); err != nil {
 		f.Close()
-		return 0, nil, fmt.Errorf("Write(): %v", err)
+		return nil, nil, fmt.Errorf("Write(): %v", err)
 	}
 	if _, err := f.Seek(0, io.SeekStart); err != nil {
 		f.Close()
-		return 0, nil, fmt.Errorf("Seek(): %v", err)
+		return nil, nil, fmt.Errorf("Seek(): %v", err)
 	}
 	s.files[key] = f
-	return int(f.Fd()), []byte("abcdef"), nil
+	return []int{int(f.Fd())}, []byte("abcdef"), nil
 }
 
 func (s *sampleFDSource) Release(key string) error {
@@ -98,9 +98,9 @@ func (s *sampleFDSource) isEmpty() bool {
 }
 
 func verifyFD(t *testing.T, c *FDClient, key string, data string) {
-	fd, info, err := c.GetFD(key)
+	fds, info, err := c.GetFDs(key)
 	if err != nil {
-		t.Fatalf("GetFD(): %v", err)
+		t.Fatalf("GetFDs(): %v", err)
 	}
 
 	expectedInfo := "info_" + key
@@ -108,7 +108,7 @@ func verifyFD(t *testing.T, c *FDClient, key string, data string) {
 		t.Errorf("bad info: %q instead of %q", info, expectedInfo)
 	}
 
-	f1 := os.NewFile(uintptr(fd), "acquired-fd")
+	f1 := os.NewFile(uintptr(fds[0]), "acquired-fd")
 	defer f1.Close()
 
 	content, err := ioutil.ReadAll(f1)
@@ -149,9 +149,9 @@ func TestFDServer(t *testing.T) {
 	for _, data := range content {
 		var err error
 		key := "k_" + data
-		respData, err := c.AddFD(key, sampleFDData{Content: data})
+		respData, err := c.AddFDs(key, sampleFDData{Content: data})
 		if err != nil {
-			t.Fatalf("AddFD(): %v", err)
+			t.Fatalf("AddFDs(): %v", err)
 		}
 		expectedRespData := "abcdef"
 		if string(respData) != expectedRespData {
@@ -166,7 +166,7 @@ func TestFDServer(t *testing.T) {
 
 	for _, data := range content {
 		key := "k_" + data
-		if err := c.ReleaseFD(key); err != nil {
+		if err := c.ReleaseFDs(key); err != nil {
 			t.Fatalf("ReleaseFD(): key %q: %v", key, err)
 		}
 	}
@@ -174,8 +174,8 @@ func TestFDServer(t *testing.T) {
 	// here we make sure that releasing FDs works and also that passing errors from the
 	// server works, too
 	expectedErrorMessage := fmt.Sprintf("server returned error: bad fd key: \"k_foo\"")
-	if _, _, err := c.GetFD("k_foo"); err == nil {
-		t.Errorf("GetFD didn't return an error for a released fd")
+	if _, _, err := c.GetFDs("k_foo"); err == nil {
+		t.Errorf("GetFDs didn't return an error for a released fd")
 	} else if err.Error() != expectedErrorMessage {
 		t.Errorf("Bad error message from GetFD: %q instead of %q", err.Error(), expectedErrorMessage)
 	}

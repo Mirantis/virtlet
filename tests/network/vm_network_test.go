@@ -34,7 +34,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
 
-	"github.com/Mirantis/virtlet/pkg/dhcp"
 	"github.com/Mirantis/virtlet/pkg/nettools"
 )
 
@@ -160,10 +159,7 @@ func TestVmNetwork(t *testing.T) {
 	tcpdump := newTcpdump(hostVeth, "10.1.90.1.4243 > 10.1.90.5.4242: UDP", "BOOTP/DHCP")
 	g.Add(hostNS, tcpdump)
 
-	g.Add(contNS, NewDhcpServerTester(&dhcp.Config{
-		CNIResult:           *info,
-		PeerHardwareAddress: dhcpClientVeth.Attrs().HardwareAddr,
-	}))
+	g.Add(contNS, NewDhcpServerTester(info))
 	// wait for dhcp client to complete so we don't interfere
 	// with the network link too early
 	<-g.Add(clientNS, NewDhcpClient([]string{
