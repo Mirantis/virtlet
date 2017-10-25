@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/containernetworking/cni/pkg/ns"
+	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 
 	"github.com/Mirantis/virtlet/pkg/dhcp"
 )
@@ -135,10 +136,10 @@ func (g *NetTestGroup) Wait() {
 }
 
 type DhcpServerTester struct {
-	config *dhcp.Config
+	config *cnicurrent.Result
 }
 
-func NewDhcpServerTester(config *dhcp.Config) *DhcpServerTester {
+func NewDhcpServerTester(config *cnicurrent.Result) *DhcpServerTester {
 	return &DhcpServerTester{config}
 }
 
@@ -146,7 +147,10 @@ func (d *DhcpServerTester) Name() string { return "dhcp server" }
 func (d *DhcpServerTester) Fg() bool     { return false }
 
 func (d *DhcpServerTester) Run(readyCh, stopCh chan struct{}) error {
-	server := dhcp.NewServer(d.config)
+	server, err := dhcp.NewServer(d.config)
+	if err != nil {
+		return fmt.Errorf("fialed to create new dhcp server: %v", err)
+	}
 	if err := server.SetupListener("0.0.0.0"); err != nil {
 		return fmt.Errorf("failed to setup dhcp listener: %v", err)
 	}
@@ -158,7 +162,7 @@ func (d *DhcpServerTester) Run(readyCh, stopCh chan struct{}) error {
 		// Serve() will fail, but no race condition should happen
 		server.Close()
 	}()
-	err := server.Serve()
+	err = server.Serve()
 	select {
 	case <-stopCh:
 		// skip 'use of closed network connection' error
