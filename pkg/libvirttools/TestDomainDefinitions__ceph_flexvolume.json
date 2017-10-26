@@ -160,6 +160,7 @@
         "Current": "",
         "Value": 1
       },
+      "VCPUs": null,
       "CPUTune": {
         "Shares": {
           "Value": 0
@@ -472,7 +473,9 @@
         "Channels": null,
         "MemBalloon": null,
         "Sounds": null,
-        "RNGs": null
+        "RNGs": null,
+        "Hostdevs": null,
+        "Memorydevs": null
       },
       "QEMUCommandline": {
         "XMLName": {

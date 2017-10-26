@@ -1,11 +1,28 @@
+From c7d077ba50794945f8328e5dd2ee9b7f65732462 Mon Sep 17 00:00:00 2001
+From: Michal Rostecki <michal.rostecki@gmail.com>
+Date: Wed, 25 Oct 2017 16:26:11 +0100
+Subject: [PATCH] Add support for CPUTune in Domain
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Signed-off-by: Victoria Efimova <neverpushthisbutton@yandex.ru>
+Signed-off-by: Ivan Shvedunov <ischvedunov@mirantis.com>
+Signed-off-by: Miha Pleško <miha.plesko@xlab.si>
+Signed-off-by: Michal Rostecki <michal.rostecki@gmail.com>
+---
+ domain.go      | 19 +++++++++++++++++++
+ domain_test.go | 20 ++++++++++++++++++++
+ 2 files changed, 39 insertions(+)
+
 diff --git a/domain.go b/domain.go
-index a5d3203..d15af6b 100644
+index bacab11..3efd68c 100644
 --- a/domain.go
 +++ b/domain.go
-@@ -597,6 +597,32 @@ type DomainFeatureList struct {
+@@ -722,6 +722,24 @@ type DomainFeatureList struct {
  	SMM        *DomainFeatureState  `xml:"smm"`
  }
-
+ 
 +type DomainCPUTuneShares struct {
 +	Value uint `xml:",chardata"`
 +}
@@ -24,58 +41,48 @@ index a5d3203..d15af6b 100644
 +	Quota  *DomainCPUTuneQuota  `xml:"quota"`
 +}
 +
-+type DomainMemoryBackingLocked struct {
-+	//empty
-+}
-+
-+type DomainMemoryBacking struct {
-+	Locked *DomainMemoryBackingLocked `xml:"locked"`
-+}
-+
  type DomainQEMUCommandlineArg struct {
  	Value string `xml:"value,attr"`
  }
-@@ -616,24 +642,26 @@ type DomainQEMUCommandline struct {
- // matching the order of XML elements that libvirt
- // will generate when dumping XML.
- type Domain struct {
--	XMLName         xml.Name           `xml:"domain"`
--	Type            string             `xml:"type,attr,omitempty"`
--	Name            string             `xml:"name"`
--	UUID            string             `xml:"uuid,omitempty"`
--	Memory          *DomainMemory      `xml:"memory"`
--	CurrentMemory   *DomainMemory      `xml:"currentMemory"`
--	MaximumMemory   *DomainMaxMemory   `xml:"maxMemory"`
--	VCPU            *DomainVCPU        `xml:"vcpu"`
--	Resource        *DomainResource    `xml:"resource"`
--	SysInfo         *DomainSysInfo     `xml:"sysinfo"`
--	OS              *DomainOS          `xml:"os"`
--	Features        *DomainFeatureList `xml:"features"`
--	CPU             *DomainCPU         `xml:"cpu"`
--	Clock           *DomainClock       `xml:"clock,omitempty"`
--	OnPoweroff      string             `xml:"on_poweroff,omitempty"`
--	OnReboot        string             `xml:"on_reboot,omitempty"`
--	OnCrash         string             `xml:"on_crash,omitempty"`
--	Devices         *DomainDeviceList  `xml:"devices"`
-+	XMLName         xml.Name             `xml:"domain"`
-+	Type            string               `xml:"type,attr,omitempty"`
-+	Name            string               `xml:"name"`
-+	UUID            string               `xml:"uuid,omitempty"`
-+	Memory          *DomainMemory        `xml:"memory"`
-+	CurrentMemory   *DomainMemory        `xml:"currentMemory"`
-+	MaximumMemory   *DomainMaxMemory     `xml:"maxMemory"`
-+	MemoryBacking   *DomainMemoryBacking `xml:"memoryBacking"`
-+	VCPU            *DomainVCPU          `xml:"vcpu"`
+@@ -751,6 +769,7 @@ type Domain struct {
+ 	MemoryBacking   *DomainMemoryBacking `xml:"memoryBacking"`
+ 	VCPU            *DomainVCPU          `xml:"vcpu"`
+ 	VCPUs           *DomainVCPUs         `xml:"vcpus"`
 +	CPUTune         *DomainCPUTune       `xml:"cputune"`
-+	Resource        *DomainResource      `xml:"resource"`
-+	SysInfo         *DomainSysInfo       `xml:"sysinfo"`
-+	OS              *DomainOS            `xml:"os"`
-+	Features        *DomainFeatureList   `xml:"features"`
-+	CPU             *DomainCPU           `xml:"cpu"`
-+	Clock           *DomainClock         `xml:"clock,omitempty"`
-+	OnPoweroff      string               `xml:"on_poweroff,omitempty"`
-+	OnReboot        string               `xml:"on_reboot,omitempty"`
-+	OnCrash         string               `xml:"on_crash,omitempty"`
-+	Devices         *DomainDeviceList    `xml:"devices"`
- 	QEMUCommandline *DomainQEMUCommandline
- }
+ 	Resource        *DomainResource      `xml:"resource"`
+ 	SysInfo         *DomainSysInfo       `xml:"sysinfo"`
+ 	OS              *DomainOS            `xml:"os"`
+diff --git a/domain_test.go b/domain_test.go
+index dbebe42..b427b50 100644
+--- a/domain_test.go
++++ b/domain_test.go
+@@ -1335,6 +1335,26 @@ var domainTestData = []struct {
+ 			`</domain>`,
+ 		},
+ 	},
++	{
++		Object: &Domain{
++			Name: "test",
++			CPUTune: &DomainCPUTune{
++				Shares: &DomainCPUTuneShares{Value: 1024},
++				Period: &DomainCPUTunePeriod{Value: 500000},
++				Quota:  &DomainCPUTuneQuota{Value: -1},
++			},
++		},
++		Expected: []string{
++			`<domain>`,
++			`  <name>test</name>`,
++			`  <cputune>`,
++			`    <shares>1024</shares>`,
++			`    <period>500000</period>`,
++			`    <quota>-1</quota>`,
++			`  </cputune>`,
++			`</domain>`,
++		},
++	},
+ 
+ 	/* Tests for sub-documents that can be hotplugged */
+ 	{
+-- 
+2.13.6
+
