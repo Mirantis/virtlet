@@ -6,7 +6,7 @@
 
 We'd love to accept your patches! Before we can take them, we have to jump a couple of legal hurdles.
 
-After you submit PR automatic bot will check CLA status, you will be asked to sign one if you didn't sign it before.
+After you submit PR automatic bot will check CLA status, you will be asked to sign one if you didn't sign it before. You can find CLA contents [there](https://cla-assistant.io/Mirantis/virtlet).
 
 ### Contributing A Patch
 
