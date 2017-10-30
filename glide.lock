@@ -1,5 +1,5 @@
-hash: f71db26d07e8dd60d258ae0300da4c2db0beb33d42ab15e43af058aededc65a3
-updated: 2017-09-30T01:57:00.317384229+02:00
+hash: 4e765136ebbc14a15220dd6fc26843f816985a7c41c1fe1f5f038ab9084e3add
+updated: 2017-10-25T17:16:40.573474515+01:00
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
@@ -168,10 +168,12 @@ imports:
 - name: github.com/docker/docker
   version: b9f10c951893f9a00865890a5232e85d770c1087
   subpackages:
+  - pkg/ioutils
   - pkg/jsonlog
   - pkg/jsonmessage
   - pkg/longpath
   - pkg/mount
+  - pkg/pools
   - pkg/stdcopy
   - pkg/symlink
   - pkg/system
@@ -200,7 +202,7 @@ imports:
   - sockets
   - tlsconfig
 - name: github.com/docker/go-units
-  version: 0dadbb0345b35ec7ef35e228dabb8de89a65bf52
+  version: e30f1e79f3cd72542f2026ceec18d3bd67ab859c
 - name: github.com/docker/spdystream
   version: 449fdfce4d962303d702fec724ef0ad181c92528
   subpackages:
@@ -241,13 +243,13 @@ imports:
   - protoc-gen-gogo/descriptor
   - sortkeys
 - name: github.com/golang/glog
-  version: 23def4e6c14b4da8ac2ed8007337bc5eb5007998
+  version: 44145f04b68cf362d9c4df2182967c2275eaefed
 - name: github.com/golang/groupcache
   version: 02826c3e79038b59d737d3b1c0a1d937f71a4433
   subpackages:
   - lru
 - name: github.com/golang/protobuf
-  version: 130e6b02ab059e7b717a096f397c5b60111cae74
+  version: 4bd1920723d7b7c925de087aa32e2187708897f7
   subpackages:
   - proto
 - name: github.com/google/cadvisor
@@ -315,7 +317,7 @@ imports:
 - name: github.com/libvirt/libvirt-go
   version: c3209e4ba8b8dda65c85ca0ac04302e55895caf7
 - name: github.com/libvirt/libvirt-go-xml
-  version: 83a754119fc7239caffd1f50e08cb13b1b3825ef
+  version: 118d8d613790f565eacbd8184359fb4968471c0f
 - name: github.com/mailru/easyjson
   version: d5b7844b561a7bc640052f1b935f7b800330d7e0
   subpackages:
