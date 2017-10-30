@@ -42,7 +42,7 @@ func TestDhcpServer(t *testing.T) {
 				Interfaces: []*cnicurrent.Interface{
 					{
 						Name: "eth0",
-						Mac:  "42:a4:a6:22:80:2e",
+						Mac:  clientMacAddress,
 						// TODO: Sandbox
 					},
 				},
@@ -130,7 +130,18 @@ func runDhcpTestCase(t *testing.T, testCase *dhcpTestCase) {
 		t.Fatal(err)
 	}
 
-	g := NewNetTestGroup(t, 1*time.Minute)
+	if err := clientNS.Do(func(ns.NetNS) error {
+		mac, _ := net.ParseMAC(clientMacAddress)
+		if err = nettools.SetHardwareAddr(clientVeth, mac); err != nil {
+			return fmt.Errorf("can not set test mac address on client interface: %v", err)
+		}
+
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	g := NewNetTestGroup(t, 15*time.Second)
 	defer g.Stop()
 	g.Add(serverNS, NewDhcpServerTester(&testCase.info))
 

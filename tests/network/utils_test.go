@@ -185,7 +185,7 @@ func (d *DhcpClient) Name() string { return "dhcp client" }
 func (d *DhcpClient) Fg() bool     { return true }
 
 func (d *DhcpClient) Run(readyCh, stopCh chan struct{}) error {
-	cmd := exec.Command("dhcpcd", "-T")
+	cmd := exec.Command("dhcpcd", "-T", "-t", "2")
 	var b bytes.Buffer
 	cmd.Stdout = &b
 	cmd.Stderr = &b
@@ -205,7 +205,7 @@ func (d *DhcpClient) Run(readyCh, stopCh chan struct{}) error {
 	close(doneCh)
 	outStr := b.String()
 	if err != nil {
-		return fmt.Errorf("dhcpcd -T failed: %v\nout:\n%s", err, outStr)
+		return fmt.Errorf("dhcpcd -T -t 2 failed: %v\nout:\n%s", err, outStr)
 	}
 
 	var missing []string
