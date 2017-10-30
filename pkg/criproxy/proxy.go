@@ -125,23 +125,31 @@ func (c *apiClient) connectNonLocked() chan error {
 			}
 			return err
 		}); err != nil {
+			c.Lock()
+			chErrs := c.connectErrChs
+			c.connectErrChs = nil
+			c.Unlock()
 			glog.Errorf("Failed to find the socket: %v", err)
 			err = fmt.Errorf("failed to find the socket: %v", err)
-			for _, ch := range c.connectErrChs {
+			for _, ch := range chErrs {
 				ch <- err
+				close(ch)
 			}
 			return
 		}
 
 		c.Lock()
-		defer c.Unlock()
 		glog.V(1).Infof("Connected to runtime service %s", c.addr)
 		c.RuntimeServiceClient = runtimeapi.NewRuntimeServiceClient(c.conn)
 		c.ImageServiceClient = runtimeapi.NewImageServiceClient(c.conn)
 		c.state = clientStateConnected
 
-		for _, ch := range c.connectErrChs {
+		chErrs := c.connectErrChs
+		c.connectErrChs = nil
+		c.Unlock()
+		for _, ch := range chErrs {
 			ch <- nil
+			close(ch)
 		}
 	}()
 	return errCh
