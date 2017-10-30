@@ -484,7 +484,7 @@ func updateEbTables(interfaceName, command string) error {
 	return nil
 }
 
-func setHardwareAddr(link netlink.Link, hwAddr net.HardwareAddr) error {
+func SetHardwareAddr(link netlink.Link, hwAddr net.HardwareAddr) error {
 	if err := netlink.LinkSetDown(link); err != nil {
 		return fmt.Errorf("can't bring down the link: %v", err)
 	}
@@ -552,7 +552,7 @@ func SetupContainerSideNetwork(info *cnicurrent.Result) (*ContainerSideNetwork, 
 		hwAddr := contVeth.Attrs().HardwareAddr
 		newHwAddr, err := GenerateMacAddress()
 		if err == nil {
-			err = setHardwareAddr(contVeth, newHwAddr)
+			err = SetHardwareAddr(contVeth, newHwAddr)
 		}
 		if err == nil {
 			err = StripLink(contVeth)
@@ -730,7 +730,7 @@ func (csn *ContainerSideNetwork) Teardown() error {
 			return err
 		}
 
-		if err := setHardwareAddr(contVeth, csn.HardwareAddrs[i]); err != nil {
+		if err := SetHardwareAddr(contVeth, csn.HardwareAddrs[i]); err != nil {
 			return err
 		}
 

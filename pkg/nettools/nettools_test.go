@@ -248,7 +248,7 @@ func withFakeCNIVeth(t *testing.T, toRun func(hostNS, contNS ns.NetNS, origHostV
 			if err != nil {
 				log.Panicf("Error parsing hwaddr %q: %v", hwAddr, err)
 			}
-			err = setHardwareAddr(origHostVeth, hwAddr)
+			err = SetHardwareAddr(origHostVeth, hwAddr)
 
 			// re-query attrs (including new mac)
 			origHostVeth, err = netlink.LinkByName(origHostVeth.Attrs().Name)
@@ -265,7 +265,7 @@ func withFakeCNIVeth(t *testing.T, toRun func(hostNS, contNS ns.NetNS, origHostV
 			if err != nil {
 				log.Panicf("Error parsing hwaddr %q: %v", hwAddr, err)
 			}
-			err = setHardwareAddr(origContVeth, hwAddr)
+			err = SetHardwareAddr(origContVeth, hwAddr)
 
 			// re-query attrs (including new mac)
 			origContVeth, err = netlink.LinkByName(origContVeth.Attrs().Name)
