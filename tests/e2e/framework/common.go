@@ -103,16 +103,24 @@ func waitForConsistentState(f func() error, timing ...time.Duration) error {
 	} else {
 		pollPeriod = timing[1]
 	}
-	if err := waitFor(f, timing[0], pollPeriod, false); err != nil {
-		return err
-	}
-
-	if len(timing) >= 2 {
-		if err := waitFor(f, timing[2], pollPeriod, true); err != nil {
-			return err
+	var err error
+	for timing[0] > 0 {
+		now := time.Now()
+		if err = waitFor(f, timing[0], pollPeriod, false); err != nil {
+			timing[0] -= time.Now().Sub(now)
+			continue
 		}
+
+		if len(timing) >= 2 {
+			now := time.Now()
+			if err = waitFor(f, timing[2], pollPeriod, true); err != nil {
+				timing[0] -= time.Now().Sub(now)
+				continue
+			}
+		}
+		break
 	}
-	return nil
+	return err
 }
 
 // WithTimeout adds timeout to synchronous function
