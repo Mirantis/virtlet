@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"net"
 	"os"
 	"strings"
 	"syscall"
@@ -159,29 +158,27 @@ func main() {
 				glog.Errorf("Can't connect to fd server: %v", err)
 				os.Exit(1)
 			}
-			tapFds, marshaledHwAddrs, err := c.GetFDs(netFdKey)
+			tapFds, marshaledData, err := c.GetFDs(netFdKey)
 			if err != nil {
 				glog.Errorf("Failed to obtain tap fd for key %q: %v", netFdKey, err)
 				os.Exit(1)
 			}
 
-			var hwAddrs []net.HardwareAddr
-			if err := json.Unmarshal(marshaledHwAddrs, &hwAddrs); err != nil {
-				glog.Errorf("Failed to unmarshal info about hardware addressess for network interfaces: %v", err)
-				os.Exit(1)
-			}
-			if len(tapFds) != len(hwAddrs) {
-				glog.Error("The number of open tap fds is different from the number of hardware addresses")
+			var descriptions []tapmanager.InterfaceDescription
+			if err := json.Unmarshal(marshaledData, &descriptions); err != nil {
+				glog.Errorf("Failed to unmarshal info about network interfaces: %v", err)
 				os.Exit(1)
 			}
 
-			for i, addr := range hwAddrs {
-				netArgs = append(netArgs,
-					"-netdev",
-					fmt.Sprintf("tap,id=tap%d,fd=%d", i, tapFds[i]),
-					"-device",
-					fmt.Sprintf("virtio-net-pci,netdev=tap%d,id=net%d,mac=%s", i, i, addr),
-				)
+			for i, desc := range descriptions {
+				if desc.Type == tapmanager.InterfaceTypeTap {
+					netArgs = append(netArgs,
+						"-netdev",
+						fmt.Sprintf("tap,id=tap%d,fd=%d", desc.TapFdIndex, tapFds[desc.TapFdIndex]),
+						"-device",
+						fmt.Sprintf("virtio-net-pci,netdev=tap%d,id=net%d,mac=%s", desc.TapFdIndex, i, desc.HardwareAddr),
+					)
+				}
 			}
 		}
 	}
