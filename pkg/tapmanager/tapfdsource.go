@@ -43,6 +43,21 @@ const (
 	calicoSubnetVar     = "VIRTLET_CALICO_SUBNET"
 )
 
+// InterfaceType presents type of network interface instance
+type InterfaceType int
+
+const (
+	InterfaceTypeTap InterfaceType = iota
+)
+
+// InterfaceDescription contains interface type with additional data
+// needed to identify it
+type InterfaceDescription struct {
+	Type         InterfaceType    `json:"type"`
+	HardwareAddr net.HardwareAddr `json:"mac"`
+	TapFdIndex   int              `json:"tapNo"`
+}
+
 // PodNetworkDesc contains the data that are required by TapFDSource
 // to set up a tap device for a VM
 type PodNetworkDesc struct {
@@ -292,9 +307,17 @@ func (s *TapFDSource) GetInfo(key string) ([]byte, error) {
 	if !found {
 		return nil, fmt.Errorf("bad fd key: %q", key)
 	}
-	data, err := json.Marshal(pn.csn.HardwareAddrs)
+	var descriptions []InterfaceDescription
+	for i, hwAddr := range pn.csn.HardwareAddrs {
+		descriptions = append(descriptions, InterfaceDescription{
+			TapFdIndex:   i,
+			HardwareAddr: hwAddr,
+			Type:         InterfaceTypeTap,
+		})
+	}
+	data, err := json.Marshal(descriptions)
 	if err != nil {
-		return nil, fmt.Errorf("hardware addresses marshaling error: %v", err)
+		return nil, fmt.Errorf("interface descriptions marshaling error: %v", err)
 	}
 	return data, nil
 }
