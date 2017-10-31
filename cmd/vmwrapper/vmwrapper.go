@@ -170,12 +170,18 @@ func main() {
 				glog.Errorf("Failed to unmarshal info about hardware addressess for network interfaces: %v", err)
 				os.Exit(1)
 			}
+			if len(tapFds) != len(hwAddrs) {
+				glog.Error("Received different number of open tap file descriptors than hardware addresses")
+				os.Exit(1)
+			}
 
-			netArgs = []string{
-				"-netdev",
-				fmt.Sprintf("tap,id=tap0,fd=%d", tapFds[0]),
-				"-device",
-				"virtio-net-pci,netdev=tap0,id=net0,mac=" + hwAddrs[0].String(),
+			for i, addr := range hwAddrs {
+				netArgs = append(netArgs,
+					"-netdev",
+					fmt.Sprintf("tap,id=tap%d,fd=%d", i, tapFds[i]),
+					"-device",
+					fmt.Sprintf("virtio-net-pci,netdev=tap%d,id=net%d,mac=%s", i, i, addr),
+				)
 			}
 		}
 	}
