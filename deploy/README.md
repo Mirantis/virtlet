@@ -32,6 +32,19 @@ kubectl get pods -w -n kube-system
 ```
 5. Go to `examples/` directory and follow [the instructions](../examples/README.md) from there.
 
+## Configuring Virtlet
+
+Virtlet can be customized through the `virtlet-config` ConfigMap Kuberenetes object.
+The following keys in the config map are honored by the `virtlet-ds.yaml`:
+
+  * `disable_kvm` - disables KVM support and forces QEMU instead. Use "1" as a value.
+  * `download_protocol` - default image download protocol - either `http` or `https`. The default is https.
+  * `loglevel` - integer log level value for the virtlet written as a string (e.g. "3", "2", "1").
+  * `calico-subnet` - netmask width for the Calico CNI. Default is "24".
+  * `image_regexp_translation` - enables regexp syntax for the image name translation rules.
+  * `disable_logging` - disables log streaming from VMs. Use "1" to disable.
+
+
 ## Removing Virtlet
 
 In order to remove Virtlet, first you need to delete all the VM pods.
