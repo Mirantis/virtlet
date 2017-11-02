@@ -244,15 +244,15 @@
             "ReadOnly": null,
             "Shareable": null,
             "Address": {
-              "Type": "pci",
-              "Controller": null,
-              "Domain": 0,
-              "Bus": 1,
-              "Port": null,
-              "Slot": 1,
-              "Function": 0,
-              "Target": null,
-              "Unit": null
+              "USB": null,
+              "PCI": {
+                "Domain": 0,
+                "Bus": 1,
+                "Slot": 1,
+                "Function": 0
+              },
+              "Drive": null,
+              "DIMM": null
             },
             "Boot": null,
             "WWN": ""
@@ -293,15 +293,15 @@
             "ReadOnly": {},
             "Shareable": null,
             "Address": {
-              "Type": "pci",
-              "Controller": null,
-              "Domain": 0,
-              "Bus": 1,
-              "Port": null,
-              "Slot": 2,
-              "Function": 0,
-              "Target": null,
-              "Unit": null
+              "USB": null,
+              "PCI": {
+                "Domain": 0,
+                "Bus": 1,
+                "Slot": 2,
+                "Function": 0
+              },
+              "Drive": null,
+              "DIMM": null
             },
             "Boot": null,
             "WWN": ""

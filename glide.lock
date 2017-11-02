@@ -1,5 +1,5 @@
-hash: 4e765136ebbc14a15220dd6fc26843f816985a7c41c1fe1f5f038ab9084e3add
-updated: 2017-10-25T17:16:40.573474515+01:00
+hash: e15de000c80dac5742b102aa4d7069f6b93f6d07fb7d5ea46ead4b87ebca91c5
+updated: 2017-11-02T11:06:28.770019431Z
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
@@ -317,7 +317,7 @@ imports:
 - name: github.com/libvirt/libvirt-go
   version: c3209e4ba8b8dda65c85ca0ac04302e55895caf7
 - name: github.com/libvirt/libvirt-go-xml
-  version: 118d8d613790f565eacbd8184359fb4968471c0f
+  version: b80a3ac43b6d354cd28dbf86de016639c0e5cd87
 - name: github.com/mailru/easyjson
   version: d5b7844b561a7bc640052f1b935f7b800330d7e0
   subpackages:
@@ -475,7 +475,7 @@ imports:
   - trace
   - websocket
 - name: golang.org/x/sync
-  version: 8e0aa688b654ef28caa72506fa5ec8dba9fc7690
+  version: fd80eb99c8f653c847d294a001bdf2a3a6f768f5
   subpackages:
   - syncmap
 - name: golang.org/x/sys
