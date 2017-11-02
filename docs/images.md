@@ -29,3 +29,14 @@ Original images are stored in libvirt `default` pool (`/var/lib/libvirt/images` 
 Clones used as boot images are stored in "**volumes**" libvirt pool under `/var/lib/virtlet/volumes`
 during the VM execution time and are automatically garbage collected by Virtlet
 after stopping VM pod environment (sandbox).
+
+## Restrictions and pitfalls
+
+Image name are a subject to the strict validation rules that normally applied to the docker image names. Thus one cannot
+just put arbitrary URL into the image name. In particular, image names cannot have capital letters, colons and some other
+characters that are commonly found in the URLs. Using image name with invalid characters is a common reason for VM
+creation failure with non-obvious error status.
+
+In order to overcome these limitations, virtlet provides alternate technology called `Image name translation` that allows
+to use alias name for the image and define how this alias translates into the URL along with additional transport options
+elsewhere. See [Image Name Translation](image-name-translation.md) document for details.
