@@ -244,15 +244,15 @@
             "ReadOnly": null,
             "Shareable": null,
             "Address": {
-              "Type": "drive",
-              "Controller": 0,
-              "Domain": null,
-              "Bus": 0,
-              "Port": null,
-              "Slot": null,
-              "Function": null,
-              "Target": 0,
-              "Unit": 0
+              "USB": null,
+              "PCI": null,
+              "Drive": {
+                "Controller": 0,
+                "Bus": 0,
+                "Target": 0,
+                "Unit": 0
+              },
+              "DIMM": null
             },
             "Boot": null,
             "WWN": ""
@@ -293,15 +293,15 @@
             "ReadOnly": {},
             "Shareable": null,
             "Address": {
-              "Type": "drive",
-              "Controller": 0,
-              "Domain": null,
-              "Bus": 0,
-              "Port": null,
-              "Slot": null,
-              "Function": null,
-              "Target": 0,
-              "Unit": 1
+              "USB": null,
+              "PCI": null,
+              "Drive": {
+                "Controller": 0,
+                "Bus": 0,
+                "Target": 0,
+                "Unit": 1
+              },
+              "DIMM": null
             },
             "Boot": null,
             "WWN": ""

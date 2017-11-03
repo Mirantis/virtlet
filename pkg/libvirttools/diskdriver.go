@@ -70,17 +70,18 @@ func (d *virtioBlkDriver) target() *libvirtxml.DomainDiskTarget {
 }
 
 func (d *virtioBlkDriver) address() *libvirtxml.DomainAddress {
-	domain := libvirtxml.HexUint(0)
+	domain := uint(0)
 	// use bus1 to have more predictable addressing for virtio devs
-	bus := libvirtxml.HexUint(1)
-	slot := libvirtxml.HexUint(d.n + 1)
-	function := libvirtxml.HexUint(0)
+	bus := uint(1)
+	slot := uint(d.n + 1)
+	function := uint(0)
 	return &libvirtxml.DomainAddress{
-		Type:     "pci",
-		Domain:   &domain,
-		Bus:      &bus,
-		Slot:     &slot,
-		Function: &function,
+		PCI: &libvirtxml.DomainAddressPCI{
+			Domain:   &domain,
+			Bus:      &bus,
+			Slot:     &slot,
+			Function: &function,
+		},
 	}
 }
 
@@ -112,15 +113,16 @@ func (d *scsiDriver) target() *libvirtxml.DomainDiskTarget {
 
 func (d *scsiDriver) address() *libvirtxml.DomainAddress {
 	controller := uint(0)
-	bus := libvirtxml.HexUint(0)
+	bus := uint(0)
 	target := uint(0)
 	unit := uint(d.n)
 	return &libvirtxml.DomainAddress{
-		Type:       "drive",
-		Controller: &controller,
-		Bus:        &bus,
-		Target:     &target,
-		Unit:       &unit,
+		Drive: &libvirtxml.DomainAddressDrive{
+			Controller: &controller,
+			Bus:        &bus,
+			Target:     &target,
+			Unit:       &unit,
+		},
 	}
 }
 

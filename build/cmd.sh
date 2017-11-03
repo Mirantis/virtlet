@@ -328,9 +328,6 @@ function install_vendor_internal {
     if [ ! -d vendor ]; then
         glide install --strip-vendor
     fi
-    if [ ! -f ./vendor/github.com/libvirt/libvirt-go-xml/domain.go.orig ]; then
-        patch -d vendor/github.com/libvirt/libvirt-go-xml -p1 -b -i "${project_dir}/libvirt-xml-go.patch"
-    fi
 }
 
 function run_tests_internal {
