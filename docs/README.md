@@ -11,3 +11,4 @@ This directory holds files containing documentation.
     * [Environment variables](environment-variables.md) support
     * [Image Handling](images.md)
     * [Image Name Translation](image-name-translation.md)
+* [Update notes](update-notes.md)
