@@ -3,7 +3,7 @@ kind: Pod
 metadata:
   name: cirros-vm-rbd
   annotations:
-    kubernetes.io/target-runtime: virtlet
+    kubernetes.io/target-runtime: virtlet.cloud
     # CirrOS doesn't load nocloud data from SCSI CD-ROM for some reason
     VirtletDiskDriver: virtio
     VirtletSSHKeys: |
@@ -20,7 +20,7 @@ spec:
             - virtlet
   containers:
   - name: cirros-vm-rbd
-    image: virtlet/image-service.kube-system/cirros
+    image: virtlet.cloud/image-service.kube-system/cirros
     imagePullPolicy: IfNotPresent
     resources:
       limits:

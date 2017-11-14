@@ -16,14 +16,14 @@ image name / pod id / container id prefixes.
 
 Let's say CRI proxy is started as follows:
 ```
-/usr/local/bin/criproxy -v 3 -alsologtostderr -connect docker,virtlet:/run/virtlet.sock
+/usr/local/bin/criproxy -v 3 -alsologtostderr -connect docker,virtlet.cloud:/run/virtlet.sock
 ```
 
 `-v 3 -alsologtostderr` options here may be quite useful for
 debugging, because they make CRI proxy log detailed info about every
 CRI request going through it, including any errors and the result.
 
-`-connect docker,virtlet:/run/virtlet.sock` specifies the list of
+`-connect docker,virtlet.cloud:/run/virtlet.sock` specifies the list of
 runtimes that the proxy passes requests to.
 
 The `docker` part is a special case, meaning that `criproxy` must
@@ -33,25 +33,25 @@ installations `dockershim` runs as a separate process, although using
 same `criproxy` binary).  It's also possible to specify other primary
 runtime instead, e.g. `/run/some-other-runtime.sock`.
 
-`virtlet:/run/virtlet.sock` denotes an alternative runtime
+`virtlet.cloud:/run/virtlet.sock` denotes an alternative runtime
 socket. This means that image service requests that include image
-names starting with `virtlet/` must be directed to the CRI
+names starting with `virtlet.cloud/` must be directed to the CRI
 implementation listening on a Unix domain socket at
-`/run/virtlet.sock`. Pods that need to run on `virtlet` runtime must
-have `virtlet` as the value of `kubernetes.io/target-runtime`
+`/run/virtlet.sock`. Pods that need to run on `virtlet.cloud` runtime must
+have `virtlet.cloud` as the value of `kubernetes.io/target-runtime`
 annotation.
 
 There can be any number of runtimes, although probably using more than
 a couple of runtimes is a rare use case.
 
-Here's an example of a pod that needs to run on `virtlet` runtime:
+Here's an example of a pod that needs to run on `virtlet.cloud` runtime:
 ```
 apiVersion: v1
 kind: Pod
 metadata:
   name: cirros-vm
   annotations:
-    kubernetes.io/target-runtime: virtlet
+    kubernetes.io/target-runtime: virtlet.cloud
     scheduler.alpha.kubernetes.io/affinity: >
       {
         "nodeAffinity": {
@@ -73,19 +73,19 @@ metadata:
 spec:
   containers:
     - name: cirros-vm
-      image: virtlet/image-service/cirros
+      image: virtlet.cloud/image-service/cirros
 ```
 
-First of all, there's `kubernetes.io/target-runtime: virtlet`
-annotation that directs `RunPodSandbox` requests to `virtlet` runtime.
+First of all, there's `kubernetes.io/target-runtime: virtlet.cloud`
+annotation that directs `RunPodSandbox` requests to `virtlet.cloud` runtime.
 
 There's also `nodeAffinity` spec that makes the pod run only on the
 nodes that have `extraRuntime=virtlet` label. This is not required
 by CRI proxy mechanism itself and is related to deployment mechanism
 being used (more on this in CRI Proxy bootstrap section below).
 
-Another important part is `virtlet/image-service/cirros` image name.
-It means that the image is handled by `virtlet` runtime and actual
+Another important part is `virtlet.cloud/image-service/cirros` image name.
+It means that the image is handled by `virtlet.cloud` runtime and actual
 image name passed to the runtime is `image-service/cirros`. In case of
 virtlet this means downloading QCOW2 image from
 `http://image-service/cirros`.

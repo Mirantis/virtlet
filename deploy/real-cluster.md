@@ -118,7 +118,7 @@ the following content (you can also use `systemctl --force edit criproxy.service
 Description=CRI Proxy
 
 [Service]
-ExecStart=/usr/local/bin/criproxy -v 3 -alsologtostderr -connect /var/run/dockershim.sock,virtlet:/run/virtlet.sock -listen /run/criproxy.sock
+ExecStart=/usr/local/bin/criproxy -v 3 -alsologtostderr -connect /var/run/dockershim.sock,virtlet.cloud:/run/virtlet.sock -listen /run/criproxy.sock
 Restart=always
 StartLimitInterval=0
 RestartSec=10
