@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"net"
@@ -158,22 +159,29 @@ func main() {
 				glog.Errorf("Can't connect to fd server: %v", err)
 				os.Exit(1)
 			}
-			tapFd, hwAddr, err := c.GetFD(netFdKey)
+			tapFds, marshaledHwAddrs, err := c.GetFDs(netFdKey)
 			if err != nil {
 				glog.Errorf("Failed to obtain tap fd for key %q: %v", netFdKey, err)
 				os.Exit(1)
 			}
 
+			var hwAddrs []net.HardwareAddr
+			if err := json.Unmarshal(marshaledHwAddrs, &hwAddrs); err != nil {
+				glog.Errorf("Failed to unmarshal info about hardware addressess for network interfaces: %v", err)
+				os.Exit(1)
+			}
+
 			netArgs = []string{
 				"-netdev",
-				fmt.Sprintf("tap,id=tap0,fd=%d", tapFd),
+				fmt.Sprintf("tap,id=tap0,fd=%d", tapFds[0]),
 				"-device",
-				"virtio-net-pci,netdev=tap0,id=net0,mac=" + net.HardwareAddr(hwAddr).String(),
+				"virtio-net-pci,netdev=tap0,id=net0,mac=" + hwAddrs[0].String(),
 			}
 		}
 	}
 
 	args := append([]string{emulator}, emulatorArgs...)
+	args = append(args, netArgs...)
 	env := os.Environ()
 	if runInAnotherContainer {
 		// re-execute itself because entering mount namespace
@@ -183,7 +191,7 @@ func main() {
 	}
 
 	glog.V(0).Infof("Executing emulator: %s", strings.Join(args, " "))
-	if err := syscall.Exec(args[0], append(args, netArgs...), env); err != nil {
+	if err := syscall.Exec(args[0], args, env); err != nil {
 		glog.Errorf("Can't exec emulator: %v", err)
 		os.Exit(1)
 	}
