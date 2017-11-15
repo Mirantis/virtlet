@@ -4,7 +4,7 @@ set -o nounset
 set -o pipefail
 set -o errtrace
 
-CRIPROXY_DEB_URL="https://github.com/Mirantis/criproxy/releases/download/v0.0.2/criproxy-nodeps_0.0.1_amd64.deb"
+CRIPROXY_DEB_URL="${CRIPROXY_DEB_URL:-https://github.com/Mirantis/criproxy/releases/download/v0.0.2/criproxy-nodeps_0.0.1_amd64.deb}"
 VIRTLET_IMAGE="${VIRTLET_IMAGE:-mirantis/virtlet}"
 VIRTLET_SKIP_RSYNC="${VIRTLET_SKIP_RSYNC:-}"
 VIRTLET_RSYNC_PORT="${VIRTLET_RSYNC_PORT:-18730}"
