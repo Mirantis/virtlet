@@ -346,9 +346,9 @@ func TestExtractLinkInfo(t *testing.T) {
 	})
 }
 
-func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, info *cnicurrent.Result) {
+func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link) {
 	origHwAddr := origContVeth.Attrs().HardwareAddr
-	csn, err := SetupContainerSideNetwork(info)
+	csn, err := SetupContainerSideNetwork(&expectedExtractedLinkInfo)
 	if err != nil {
 		log.Panicf("failed to set up container side network: %v", err)
 	}
@@ -389,24 +389,18 @@ func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, info *c
 	}
 }
 
-func TestSetUpContainerSideNetwork(t *testing.T) {
-	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
-		verifyContainerSideNetwork(t, origContVeth, nil)
-	})
-}
-
 func TestSetUpContainerSideNetworkWithInfo(t *testing.T) {
 	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
 		if err := StripLink(origContVeth); err != nil {
 			log.Panicf("StripLink() failed: %v", err)
 		}
-		verifyContainerSideNetwork(t, origContVeth, &expectedExtractedLinkInfo)
+		verifyContainerSideNetwork(t, origContVeth)
 	})
 }
 
 func TestLoopbackInterface(t *testing.T) {
 	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
-		verifyContainerSideNetwork(t, origContVeth, nil)
+		verifyContainerSideNetwork(t, origContVeth)
 		if out, err := exec.Command("ping", "-c", "1", "127.0.0.1").CombinedOutput(); err != nil {
 			log.Panicf("ping 127.0.0.1 failed:\n%s", out)
 		}
