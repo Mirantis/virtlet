@@ -171,9 +171,8 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 			return nil, nil, errors.New("didn't expect more than one IP config")
 		}
 		if netConfig.IPs[0].Version != "4" {
-			return nil, nil, errors.New("IPv3 config was expected")
+			return nil, nil, errors.New("IPv4 config was expected")
 		}
-		netConfig.IPs[0].Address.Mask = netmaskForCalico()
 		netConfig.IPs[0].Gateway = s.dummyGateway
 		netConfig.Routes = []*cnitypes.Route{
 			{
@@ -196,6 +195,16 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 	var dhcpServer *dhcp.Server
 	doneCh := make(chan error)
 	if err := vmNS.Do(func(ns.NetNS) error {
+		if netConfig == nil {
+			netConfig = &cnicurrent.Result{}
+		}
+		if err := nettools.ValidateAndfixCNIResult(netConfig, pnd.PodNs); err != nil {
+			return fmt.Errorf("error in fixing cni configuration: %v", err)
+		}
+		if s.dummyGateway != nil {
+			netConfig.IPs[0].Address.Mask = netmaskForCalico()
+		}
+
 		var err error
 		if recover {
 			csn, err = nettools.RecreateContainerSideNetwork(netConfig, netNSPath)
@@ -206,24 +215,7 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 			return err
 		}
 
-		// NOTE: older CNI plugins don't include the hardware address
-		// in Result, but it's needed for Cloud-Init based
-		// network setup, so we add it here if it's missing.
-		// Also, some of the plugins may skip adding routes
-		// to the CNI result, so we must add them, too.
-		// Here we try to fix CNI result if it's "a bit broken"
-		// (missing DNS or Interface info), but use our extracted config
-		// if it's missing critical information
-		if len(netConfig.IPs) == 0 || len(netConfig.Routes) == 0 {
-			netConfig = csn.Result
-		} else {
-			fixCNIResult(netConfig, csn)
-		}
-
-		dhcpServer, err = dhcp.NewServer(csn.Result)
-		if err != nil {
-			return err
-		}
+		dhcpServer = dhcp.NewServer(csn.Result)
 		if err := dhcpServer.SetupListener("0.0.0.0"); err != nil {
 			return fmt.Errorf("Failed to set up dhcp listener: %v", err)
 		}
@@ -327,34 +319,6 @@ func (s *TapFDSource) GetInfo(key string) ([]byte, error) {
 		return nil, fmt.Errorf("interface descriptions marshaling error: %v", err)
 	}
 	return data, nil
-}
-
-func fixCNIResult(netConfig *cnicurrent.Result, csn *nettools.ContainerSideNetwork) {
-	if len(netConfig.DNS.Nameservers) == 0 {
-		netConfig.DNS = csn.Result.DNS
-	}
-
-	// If there's no interface info in netConfig, we can assume that we're dealing
-	// with an old-style CNI plugin which only supports a single network interface
-	if len(netConfig.Interfaces) > 0 {
-		return
-	}
-
-	for i, mac := range csn.HardwareAddrs {
-		name := fmt.Sprintf("cni%d", i)
-		iface := &cnicurrent.Interface{
-			Name:    name,
-			Mac:     mac.String(),
-			Sandbox: csn.NsPath,
-		}
-		netConfig.Interfaces = append(netConfig.Interfaces, iface)
-	}
-
-	// TODO: scan interfaces for matching ip addresses instead of setting first interface
-	// as the target for ip address
-	for _, IP := range netConfig.IPs {
-		IP.Interface = 0
-	}
 }
 
 func netmaskForCalico() net.IPMask {

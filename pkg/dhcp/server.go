@@ -46,8 +46,8 @@ type Server struct {
 	listener *dhcp4.Conn
 }
 
-func NewServer(config *cnicurrent.Result) (*Server, error) {
-	return &Server{config: config}, nil
+func NewServer(config *cnicurrent.Result) *Server {
+	return &Server{config: config}
 }
 
 func (s *Server) SetupListener(laddr string) error {

@@ -72,9 +72,9 @@ func TestVmNetwork(t *testing.T) {
 	info := &cnicurrent.Result{
 		Interfaces: []*cnicurrent.Interface{
 			{
-				Name: "eth0",
-				Mac:  clientMacAddress,
-				// TODO: Sandbox
+				Name:    "eth0",
+				Mac:     clientMacAddress,
+				Sandbox: contNS.Path(),
 			},
 		},
 		IPs: []*cnicurrent.IPConfig{
@@ -152,7 +152,7 @@ func TestVmNetwork(t *testing.T) {
 	if err := clientNS.Do(func(ns.NetNS) error {
 		mac, _ := net.ParseMAC(clientMacAddress)
 		if err = nettools.SetHardwareAddr(dhcpClientVeth, mac); err != nil {
-			return fmt.Errorf("can not set test mac address on client interface: %v", err)
+			return fmt.Errorf("can't set test MAC address on client interface: %v", err)
 		}
 		return nil
 	}); err != nil {

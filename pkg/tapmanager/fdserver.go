@@ -484,15 +484,12 @@ func (c *FDClient) GetFDs(key string) ([]int, []byte, error) {
 		return nil, nil, fmt.Errorf("couldn't parse socket control message: %v", err)
 	}
 	if len(scms) != 1 {
-		return nil, nil, fmt.Errorf("unexpected number of socket control messages: %d instead of 0", len(scms))
+		return nil, nil, fmt.Errorf("unexpected number of socket control messages: %d instead of 1", len(scms))
 	}
 
 	fds, err := syscall.ParseUnixRights(&scms[0])
 	if err != nil {
 		return nil, nil, fmt.Errorf("can't decode file descriptors: %v", err)
-	}
-	if len(fds) != 1 {
-		return nil, nil, fmt.Errorf("unexpected number of file descriptors: %d instead of 0", len(fds))
 	}
 	return fds, respData, nil
 }

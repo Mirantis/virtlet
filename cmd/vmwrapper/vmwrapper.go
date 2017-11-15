@@ -160,13 +160,13 @@ func main() {
 			}
 			tapFds, marshaledData, err := c.GetFDs(netFdKey)
 			if err != nil {
-				glog.Errorf("Failed to obtain tap fd for key %q: %v", netFdKey, err)
+				glog.Errorf("Failed to obtain tap fds for key %q: %v", netFdKey, err)
 				os.Exit(1)
 			}
 
 			var descriptions []tapmanager.InterfaceDescription
 			if err := json.Unmarshal(marshaledData, &descriptions); err != nil {
-				glog.Errorf("Failed to unmarshal info about network interfaces: %v", err)
+				glog.Errorf("Failed to unmarshal network interface info", err)
 				os.Exit(1)
 			}
 
