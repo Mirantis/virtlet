@@ -13,7 +13,6 @@ COPY _output/flexvolume_driver /
 # in build/test image and production one
 COPY _output/virtlet /usr/local/bin
 COPY _output/vmwrapper /
-COPY _output/criproxy /
 COPY _output/virtlet-e2e-tests /
 
 CMD ["/start.sh"]

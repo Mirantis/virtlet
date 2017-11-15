@@ -5,6 +5,7 @@ set -o nounset
 set -o pipefail
 set -o errtrace
 
+CRIPROXY_DEB_URL="https://github.com/Mirantis/criproxy/releases/download/v0.0.2/criproxy-nodeps_0.0.1_amd64.deb"
 NONINTERACTIVE="${NONINTERACTIVE:-}"
 NO_VM_CONSOLE="${NO_VM_CONSOLE:-}"
 INJECT_LOCAL_IMAGE="${INJECT_LOCAL_IMAGE:-}"
@@ -115,6 +116,11 @@ function demo::start-dind-cluster {
   demo::ask-before-continuing
   "./${dind_script}" clean
   "./${dind_script}" up
+}
+
+function demo::install-cri-proxy {
+  demo::step "Installing CRI proxy package on ${virtlet_node} container"
+  docker exec "${virtlet_node}" /bin/bash -c "curl -sSL '${CRIPROXY_DEB_URL}' >/criproxy.deb && dpkg -i /criproxy.deb && rm /criproxy.deb"
 }
 
 function demo::inject-local-image {
@@ -358,6 +364,7 @@ fi
 
 demo::get-dind-cluster
 demo::start-dind-cluster
+demo::install-cri-proxy
 if [[ ${INJECT_LOCAL_IMAGE:-} ]]; then
   demo::inject-local-image
 fi

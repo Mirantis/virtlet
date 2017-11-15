@@ -4,6 +4,7 @@ set -o nounset
 set -o pipefail
 set -o errtrace
 
+CRIPROXY_DEB_URL="https://github.com/Mirantis/criproxy/releases/download/v0.0.2/criproxy-nodeps_0.0.1_amd64.deb"
 VIRTLET_IMAGE="${VIRTLET_IMAGE:-mirantis/virtlet}"
 VIRTLET_SKIP_RSYNC="${VIRTLET_SKIP_RSYNC:-}"
 VIRTLET_RSYNC_PORT="${VIRTLET_RSYNC_PORT:-18730}"
@@ -155,7 +156,6 @@ function ensure_build_container {
                -e CIRCLECI="${CIRCLECI:-}" \
                -e CIRCLE_PULL_REQUEST="${CIRCLE_PULL_REQUEST:-}" \
                -e CIRCLE_BRANCH="${CIRCLE_PULL_REQUEST:-}" \
-               -e CRIPROXY_TEST_REMOTE_DOCKER_ENDPOINT="${CRIPROXY_TEST_REMOTE_DOCKER_ENDPOINT:-}" \
                -e VIRTLET_ON_MASTER="${VIRTLET_ON_MASTER:-}" \
                ${docker_cert_args[@]+"${docker_cert_args[@]}"} \
                --name virtlet-build \
@@ -253,6 +253,10 @@ function kvm_ok {
 }
 
 function start_dind {
+    if ! docker exec "${virtlet_node}" dpkg-query -W criproxy-nodeps >&/dev/null; then
+        echo >&2 "Installing CRI proxy package the node container..."
+        docker exec "${virtlet_node}" /bin/bash -c "curl -sSL '${CRIPROXY_DEB_URL}' >/criproxy.deb && dpkg -i /criproxy.deb && rm /criproxy.deb"
+    fi
     if [[ ${VIRTLET_ON_MASTER} ]]; then
         if [[ $(kubectl get node kube-master -o jsonpath='{.spec.taints[?(@.key=="node-role.kubernetes.io/master")]}') ]]; then
             kubectl taint nodes kube-master node-role.kubernetes.io/master-
@@ -345,7 +349,6 @@ function build_internal {
     mkdir -p "${project_dir}/_output"
     go build -i -o "${project_dir}/_output/virtlet" ./cmd/virtlet
     go build -i -o "${project_dir}/_output/vmwrapper" ./cmd/vmwrapper
-    go build -i -o "${project_dir}/_output/criproxy" ./cmd/criproxy
     go build -i -o "${project_dir}/_output/flexvolume_driver" ./cmd/flexvolume_driver
     go test -i -c -o "${project_dir}/_output/virtlet-e2e-tests" ./tests/e2e
 }
