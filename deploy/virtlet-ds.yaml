@@ -31,17 +31,9 @@ spec:
                 - virtlet
 
       initContainers:
-      # The init container first copies virtlet's flexvolume driver
-      # to the default kubelet plugin dir to have it in the proper place by the
-      # time kubelet is restarted by CRI proxy bootstrap procedure.
-      # After that it checks if there's already saved kubelet config
-      # and considers that CRI proxy bootstrap is already done if it exists.
-      # If it doesn't, it drops criproxy binary into /opt/criproxy/bin
-      # if it's not already there and then starts criproxy installation.
-      # The possibility to put criproxy binary in advance into
-      # /opt/criproxy/bin may be helpful for the purpose of
-      # debugging criproxy
-      # At the end it ensures that /var/lib/libvirt/images exists on node.
+      # The init container copies virtlet's flexvolume driver
+      # to the default kubelet plugin dir and ensures that
+      # the directories needed by libvirt & virtlet exist on the host
       - name: prepare-node
         image: mirantis/virtlet
         imagePullPolicy: IfNotPresent
@@ -50,14 +42,10 @@ spec:
         volumeMounts:
         - name: k8s-flexvolume-plugins-dir
           mountPath: /kubelet-volume-plugins
-        - name: criproxybin
-          mountPath: /opt/criproxy/bin
         - name: run
           mountPath: /run
         - name: dockersock
           mountPath: /var/run/docker.sock
-        - name: criproxyconf
-          mountPath: /etc/criproxy
         - name: log
           mountPath: /hostlog
         # for ensuring that /var/lib/libvirt/images exists on node
@@ -240,12 +228,6 @@ spec:
       - hostPath:
           path: /var/lib/cni
         name: cnidata
-      - hostPath:
-          path: /opt/criproxy/bin
-        name: criproxybin
-      - hostPath:
-          path: /etc/criproxy
-        name: criproxyconf
       - hostPath:
           path: /var/log
         name: log
