@@ -337,7 +337,7 @@ func findLinkByAddress(links []netlink.Link, address net.IPNet) (netlink.Link, e
 // ips, routes, interfaces and if something is missing it tries to complement
 // that using patch for Weave or for plugins which return their netConfig
 // in v0.2.0 version of CNI SPEC
-func ValidateAndfixCNIResult(netConfig *cnicurrent.Result) error {
+func ValidateAndfixCNIResult(netConfig *cnicurrent.Result, podNs string) error {
 	allLinks, err := netlink.LinkList()
 	if err != nil {
 		return fmt.Errorf("error listing links: %v", err)
@@ -353,7 +353,7 @@ func ValidateAndfixCNIResult(netConfig *cnicurrent.Result) error {
 		if err != nil {
 			return err
 		}
-		if netConfig, err = ExtractLinkInfo(veth); err != nil {
+		if netConfig, err = ExtractLinkInfo(veth, podNs); err != nil {
 			return err
 		}
 
@@ -394,8 +394,9 @@ func ValidateAndfixCNIResult(netConfig *cnicurrent.Result) error {
 			}
 			if !found {
 				netConfig.Interfaces = append(netConfig.Interfaces, &cnicurrent.Interface{
-					Name: link.Attrs().Name,
-					Mac:  link.Attrs().HardwareAddr.String(),
+					Name:    link.Attrs().Name,
+					Mac:     link.Attrs().HardwareAddr.String(),
+					Sandbox: cni.PodNetNSPath(podNs),
 				})
 				ipConfig.Interface = len(alreadyDefindeLinks)
 				alreadyDefindeLinks = append(alreadyDefindeLinks, link)
@@ -425,6 +426,9 @@ func GetContainerLinks(interfaces []*cnicurrent.Interface) ([]netlink.Link, erro
 
 	var links []netlink.Link
 	for _, iface := range interfaces {
+		if iface.Sandbox == "" {
+			continue
+		}
 		link, err := findLinkByName(allLinks, iface.Name)
 		if err != nil {
 			return nil, err
@@ -473,7 +477,7 @@ func StripLink(link netlink.Link) error {
 // There must be exactly one veth interface in the namespace
 // and exactly one address associated with veth.
 // Returns interface info struct and error, if any.
-func ExtractLinkInfo(link netlink.Link) (*cnicurrent.Result, error) {
+func ExtractLinkInfo(link netlink.Link, podNs string) (*cnicurrent.Result, error) {
 	addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get addresses for link: %v", err)
@@ -485,9 +489,9 @@ func ExtractLinkInfo(link netlink.Link) (*cnicurrent.Result, error) {
 	result := &cnicurrent.Result{
 		Interfaces: []*cnicurrent.Interface{
 			{
-				Name: link.Attrs().Name,
-				Mac:  link.Attrs().HardwareAddr.String(),
-				// TODO: Sandbox?
+				Name:    link.Attrs().Name,
+				Mac:     link.Attrs().HardwareAddr.String(),
+				Sandbox: cni.PodNetNSPath(podNs),
 			},
 		},
 		IPs: []*cnicurrent.IPConfig{
