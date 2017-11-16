@@ -41,7 +41,8 @@ var expectedExtractedLinkInfo = cnicurrent.Result{
 		{
 			Name: "eth0",
 			Mac:  innerHwAddr,
-			// TODO: Sandbox
+			// Sandbox is contNs dependent
+			// so it must be set in runtime
 		},
 	},
 	IPs: []*cnicurrent.IPConfig{
@@ -335,7 +336,14 @@ func TestStripLink(t *testing.T) {
 
 func TestExtractLinkInfo(t *testing.T) {
 	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
-		info, err := ExtractLinkInfo(origContVeth)
+		info, err := ExtractLinkInfo(origContVeth, contNS.Path())
+
+		// Sandbox is contNS dependent so it must be set there
+		// for each interface in expected info
+		for _, iface := range expectedExtractedLinkInfo.Interfaces {
+			iface.Sandbox = contNS.Path()
+		}
+
 		if err != nil {
 			log.Panicf("failed to grab interface info: %v", err)
 		}
