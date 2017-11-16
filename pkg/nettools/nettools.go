@@ -745,26 +745,43 @@ func TeardownBridge(bridge netlink.Link, links []netlink.Link) error {
 }
 
 // ConfigureLink adds to link ip address and routes based on info.
-func ConfigureLink(link netlink.Link, linkNo int, info *cnicurrent.Result) error {
-	if len(info.IPs) < linkNo+1 {
-		return fmt.Errorf("cni result has %d addresses but expected at least %d", len(info.IPs), linkNo+1)
+func ConfigureLink(link netlink.Link, info *cnicurrent.Result) error {
+	linkNo := -1
+	linkMAC := link.Attrs().HardwareAddr.String()
+	for i, iface := range info.Interfaces {
+		if iface.Mac == linkMAC {
+			linkNo = i
+			break
+		}
+	}
+	if linkNo == -1 {
+		return fmt.Errorf("can not find link with MAC %q in saved cni result: %s", linkMAC, spew.Sdump(info))
 	}
 
-	addr := &netlink.Addr{IPNet: &info.IPs[linkNo].Address}
-	if err := netlink.AddrAdd(link, addr); err != nil {
-		return err
-	}
+	for _, addr := range info.IPs {
+		if addr.Interface == linkNo {
+			addr := &netlink.Addr{IPNet: &addr.Address}
+			if err := netlink.AddrAdd(link, addr); err != nil {
+				return err
+			}
 
-	// NOTE: this can fail with multiple interfaces
-	for _, route := range info.Routes {
-		err := netlink.RouteAdd(&netlink.Route{
-			LinkIndex: link.Attrs().Index,
-			Scope:     netlink.SCOPE_UNIVERSE,
-			Dst:       &route.Dst,
-			Gw:        route.GW,
-		})
-		if err != nil {
-			return err
+			for _, route := range info.Routes {
+				// TODO: that's too naive - if there are more than one interfaces which have this gw address
+				// in their subnet - same gw will be added on both of them
+				// in theory this should be ok, but there is can lead to configuration other than prepared
+				// by cni plugins
+				if addr.Contains(route.GW) {
+					err := netlink.RouteAdd(&netlink.Route{
+						LinkIndex: link.Attrs().Index,
+						Scope:     netlink.SCOPE_UNIVERSE,
+						Dst:       &route.Dst,
+						Gw:        route.GW,
+					})
+					if err != nil {
+						return err
+					}
+				}
+			}
 		}
 	}
 
@@ -827,7 +844,11 @@ func (csn *ContainerSideNetwork) Teardown() error {
 			return err
 		}
 
-		if err := ConfigureLink(contLink, i, csn.Result); err != nil {
+		rereadedLink, err := netlink.LinkByName(contLink.Attrs().Name)
+		if err != nil {
+			return err
+		}
+		if err := ConfigureLink(rereadedLink, csn.Result); err != nil {
 			return err
 		}
 	}
