@@ -178,7 +178,7 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 			return nil, nil, errors.New("didn't expect more than one IP config")
 		}
 		if netConfig.IPs[0].Version != "4" {
-			return nil, nil, errors.New("IPv3 config was expected")
+			return nil, nil, errors.New("IPv4 config was expected")
 		}
 		netConfig.IPs[0].Address.Mask = netmaskForCalico()
 		netConfig.IPs[0].Gateway = s.dummyGateway
