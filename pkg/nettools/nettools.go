@@ -396,7 +396,7 @@ func ValidateAndfixCNIResult(netConfig *cnicurrent.Result, podNs string) error {
 				netConfig.Interfaces = append(netConfig.Interfaces, &cnicurrent.Interface{
 					Name:    link.Attrs().Name,
 					Mac:     link.Attrs().HardwareAddr.String(),
-					Sandbox: cni.PodNetNSPath(podNs),
+					Sandbox: podNs,
 				})
 				ipConfig.Interface = len(alreadyDefindeLinks)
 				alreadyDefindeLinks = append(alreadyDefindeLinks, link)
@@ -491,7 +491,7 @@ func ExtractLinkInfo(link netlink.Link, podNs string) (*cnicurrent.Result, error
 			{
 				Name:    link.Attrs().Name,
 				Mac:     link.Attrs().HardwareAddr.String(),
-				Sandbox: cni.PodNetNSPath(podNs),
+				Sandbox: podNs,
 			},
 		},
 		IPs: []*cnicurrent.IPConfig{

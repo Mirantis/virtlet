@@ -43,7 +43,8 @@ func TestDhcpServer(t *testing.T) {
 					{
 						Name: "eth0",
 						Mac:  clientMacAddress,
-						// TODO: Sandbox
+						// Sandbox is clientNS dependent
+						// so it must be set in runtime
 					},
 				},
 				IPs: []*cnicurrent.IPConfig{
@@ -111,6 +112,12 @@ func runDhcpTestCase(t *testing.T, testCase *dhcpTestCase) {
 		t.Fatalf("Failed to create ns for dhcp client: %v", err)
 	}
 	defer clientNS.Close()
+
+	// Sandbox is clientNS dependent so it needs to be set there on all interfaces
+	for _, iface := range testCase.info.Interfaces {
+		iface.Sandbox = clientNS.Path()
+	}
+
 	var clientVeth, serverVeth netlink.Link
 	if err := serverNS.Do(func(ns.NetNS) error {
 		serverVeth, clientVeth, err = nettools.CreateEscapeVethPair(clientNS, "veth0", 1500)
