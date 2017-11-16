@@ -41,6 +41,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"syscall"
 	"unsafe"
 
@@ -62,6 +63,14 @@ const (
 
 	SizeOfIfReq = 40
 	IFNAMSIZ    = 16
+)
+
+// InterfaceType presents type of network interface instance
+type InterfaceType int
+
+const (
+	InterfaceTypeTap InterfaceType = iota
+	InterfaceTypeVF
 )
 
 // Had to duplicate ifReq here as it's not exported
@@ -416,7 +425,7 @@ func findLinkByName(links []netlink.Link, name string) (netlink.Link, error) {
 	return nil, fmt.Errorf("interface with name %q not found in container namespace", name)
 }
 
-// GetContainerLinks locates in container namespac enetwork links
+// GetContainerLinks locates in container namespace network links
 // for provided interfaces
 func GetContainerLinks(interfaces []*cnicurrent.Interface) ([]netlink.Link, error) {
 	allLinks, err := netlink.LinkList()
@@ -426,6 +435,7 @@ func GetContainerLinks(interfaces []*cnicurrent.Interface) ([]netlink.Link, erro
 
 	var links []netlink.Link
 	for _, iface := range interfaces {
+		// if Sandbox is empty interface is on host, not in container netns
 		if iface.Sandbox == "" {
 			continue
 		}
@@ -591,10 +601,39 @@ type ContainerSideNetwork struct {
 	Result *cnicurrent.Result
 	// TapFiles contains a list of open File objects pointing to tap
 	// devices inside the network namespace
-	TapFiles []*os.File
+	Fds []*os.File
 	// HardwareAddrs contains a list of original hardware addresses of
 	// a CNI-created veth links
 	HardwareAddrs []net.HardwareAddr
+	// InterfaceTypes contains a list of interface types corresponding to
+	// list of hardware addresses
+	InterfaceTypes []InterfaceType
+	// PCIAddresses containss a list of pci addresses for sr-iov vf interfaces
+	// or empty strings for other types of interfaces
+	PCIAddresses []string
+}
+
+// verify if device is pci virtual function (in the same way as does
+// that libvirt (src/util/virpci.c:virPCIIsVirtualFunction)
+func isSriovVf(link netlink.Link) bool {
+	_, err := os.Stat(filepath.Join("/sys/class/net", link.Attrs().Name, "device/physfn"))
+	return err == nil
+}
+
+func openVfControlFile(link netlink.Link) (*os.File, error) {
+	return os.OpenFile(filepath.Join("/sys/class/net", link.Attrs().Name, "control"), os.O_RDWR, 0)
+}
+
+func getPCIAddressOfVF(link netlink.Link) (string, error) {
+	linkDestination, err := os.Readlink(filepath.Join("/sys/class/net", link.Attrs().Name, "device"))
+	if err != nil {
+		return "", err
+	}
+	if linkDestination[:7] != "../0000" {
+		return "", fmt.Errorf("unknown address as device symlink: %q", linkDestination)
+	}
+	// we need pci address without leading "0000:"
+	return linkDestination[8:], nil
 }
 
 // SetupContainerSideNetwork sets up networking in container
@@ -605,8 +644,9 @@ type ContainerSideNetwork struct {
 // with X denoting an link index in info.Interfaces list.
 // Each bridge gets assigned a link-local address to be used
 // for dhcp server.
+// For SR-IOV VFs this function only prepares device to pass it to VM.
 // The function should be called from within container namespace.
-// Returns container network struct and an error, if any
+// Returns container network struct and an error, if any.
 func SetupContainerSideNetwork(info *cnicurrent.Result) (*ContainerSideNetwork, error) {
 	contLinks, err := GetContainerLinks(info.Interfaces)
 	if err != nil {
@@ -614,18 +654,44 @@ func SetupContainerSideNetwork(info *cnicurrent.Result) (*ContainerSideNetwork, 
 	}
 
 	var (
-		tapFiles []*os.File
-		hwAddrs  []net.HardwareAddr
+		fds          []*os.File
+		hwAddrs      []net.HardwareAddr
+		ifaceTypes   []InterfaceType
+		pciAddresses []string
 	)
 
 	for i, link := range contLinks {
 		hwAddr := link.Attrs().HardwareAddr
+		hwAddrs = append(hwAddrs, hwAddr)
+
+		if isSriovVf(link) {
+			if err := StripLink(link); err != nil {
+				return nil, err
+			}
+
+			fd, err := openVfControlFile(link)
+			if err != nil {
+				return nil, err
+			}
+			fds = append(fds, fd)
+
+			pciAddress, err := getPCIAddressOfVF(link)
+			if err != nil {
+				return nil, err
+			}
+			pciAddresses = append(pciAddresses, pciAddress)
+
+			ifaceTypes = append(ifaceTypes, InterfaceTypeVF)
+
+			continue
+		}
+
 		newHwAddr, err := GenerateMacAddress()
 		if err == nil {
-			err = SetHardwareAddr(link, newHwAddr)
+			err = StripLink(link)
 		}
 		if err == nil {
-			err = StripLink(link)
+			err = SetHardwareAddr(link, newHwAddr)
 		}
 		if err != nil {
 			return nil, err
@@ -672,11 +738,12 @@ func SetupContainerSideNetwork(info *cnicurrent.Result) (*ContainerSideNetwork, 
 			return nil, fmt.Errorf("failed to open tap: %v", err)
 		}
 
-		hwAddrs = append(hwAddrs, hwAddr)
-		tapFiles = append(tapFiles, tapFile)
+		fds = append(fds, tapFile)
+		pciAddresses = append(pciAddresses, "")
+		ifaceTypes = append(ifaceTypes, InterfaceTypeTap)
 	}
 
-	return &ContainerSideNetwork{info, tapFiles, hwAddrs}, nil
+	return &ContainerSideNetwork{info, fds, hwAddrs, ifaceTypes, pciAddresses}, nil
 }
 
 // RecreateContainerSideNetwork tries to populate ContainerSideNetwork
@@ -686,31 +753,48 @@ func RecreateContainerSideNetwork(info *cnicurrent.Result) (*ContainerSideNetwor
 		return nil, fmt.Errorf("wrong cni configuration - missing interfaces list: %v", spew.Sdump(info))
 	}
 
-	var (
-		tapFiles []*os.File
-		hwAddrs  []net.HardwareAddr
-	)
-
-	for i, iface := range info.Interfaces {
-		if iface.Sandbox == "" {
-			continue
-		}
-		hwAddr, err := net.ParseMAC(iface.Mac)
-		if err != nil {
-			return nil, fmt.Errorf("invalid mac address %q: %v", iface.Mac, err)
-		}
-
-		tapInterfaceName := fmt.Sprintf(tapInterfaceNameTemplate, i)
-		tapFile, err := OpenTAP(tapInterfaceName)
-		if err != nil {
-			return nil, fmt.Errorf("failed to open tap: %v", err)
-		}
-
-		hwAddrs = append(hwAddrs, hwAddr)
-		tapFiles = append(tapFiles, tapFile)
+	contLinks, err := GetContainerLinks(info.Interfaces)
+	if err != nil {
+		return nil, err
 	}
 
-	return &ContainerSideNetwork{info, tapFiles, hwAddrs}, nil
+	var (
+		fds          []*os.File
+		hwAddrs      []net.HardwareAddr
+		ifaceTypes   []InterfaceType
+		pciAddresses []string
+	)
+
+	for i, link := range contLinks {
+		hwAddrs = append(hwAddrs, link.Attrs().HardwareAddr)
+		pciAddress := ""
+
+		if isSriovVf(link) {
+			fd, err := openVfControlFile(link)
+			if err != nil {
+				return nil, err
+			}
+			fds = append(fds, fd)
+
+			pciAddress, err = getPCIAddressOfVF(link)
+			if err != nil {
+				return nil, err
+			}
+
+			ifaceTypes = append(ifaceTypes, InterfaceTypeVF)
+		} else {
+			tapInterfaceName := fmt.Sprintf(tapInterfaceNameTemplate, i)
+			tapFile, err := OpenTAP(tapInterfaceName)
+			if err != nil {
+				return nil, fmt.Errorf("failed to open tap: %v", err)
+			}
+			fds = append(fds, tapFile)
+			ifaceTypes = append(ifaceTypes, InterfaceTypeTap)
+		}
+		pciAddresses = append(pciAddresses, pciAddress)
+	}
+
+	return &ContainerSideNetwork{info, fds, hwAddrs, ifaceTypes, pciAddresses}, nil
 }
 
 // TeardownBridge removes links from bridge and sets it down
@@ -774,7 +858,7 @@ func ConfigureLink(link netlink.Link, info *cnicurrent.Result) error {
 // The end result is the same network configuration in the container network namespace
 // as it was before SetupContainerSideNetwork() call.
 func (csn *ContainerSideNetwork) Teardown() error {
-	for _, f := range csn.TapFiles {
+	for _, f := range csn.Fds {
 		f.Close()
 	}
 	contLinks, err := GetContainerLinks(csn.Result.Interfaces)
@@ -788,40 +872,42 @@ func (csn *ContainerSideNetwork) Teardown() error {
 			return nil
 		}
 
-		tapInterfaceName := fmt.Sprintf(tapInterfaceNameTemplate, i)
-		tap, err := netlink.LinkByName(tapInterfaceName)
-		if err != nil {
-			return err
-		}
+		if !isSriovVf(contLink) {
+			tapInterfaceName := fmt.Sprintf(tapInterfaceNameTemplate, i)
+			tap, err := netlink.LinkByName(tapInterfaceName)
+			if err != nil {
+				return err
+			}
 
-		containerBridgeName := fmt.Sprintf(containerBridgeNameTemplate, i)
-		br, err := netlink.LinkByName(containerBridgeName)
-		if err != nil {
-			return err
-		}
+			containerBridgeName := fmt.Sprintf(containerBridgeNameTemplate, i)
+			br, err := netlink.LinkByName(containerBridgeName)
+			if err != nil {
+				return err
+			}
 
-		if err := netlink.AddrDel(br, mustParseAddr(internalDhcpAddr)); err != nil {
-			return err
-		}
+			if err := netlink.AddrDel(br, mustParseAddr(internalDhcpAddr)); err != nil {
+				return err
+			}
 
-		if err := TeardownBridge(br, []netlink.Link{contLink, tap}); err != nil {
-			return err
-		}
+			if err := TeardownBridge(br, []netlink.Link{contLink, tap}); err != nil {
+				return err
+			}
 
-		if err := netlink.LinkDel(br); err != nil {
-			return err
-		}
+			if err := netlink.LinkDel(br); err != nil {
+				return err
+			}
 
-		if err := netlink.LinkSetDown(tap); err != nil {
-			return err
-		}
+			if err := netlink.LinkSetDown(tap); err != nil {
+				return err
+			}
 
-		if err := netlink.LinkDel(tap); err != nil {
-			return err
-		}
+			if err := netlink.LinkDel(tap); err != nil {
+				return err
+			}
 
-		if err := SetHardwareAddr(contLink, csn.HardwareAddrs[i]); err != nil {
-			return err
+			if err := SetHardwareAddr(contLink, csn.HardwareAddrs[i]); err != nil {
+				return err
+			}
 		}
 
 		rereadedLink, err := netlink.LinkByName(contLink.Attrs().Name)

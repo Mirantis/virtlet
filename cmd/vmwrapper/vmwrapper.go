@@ -21,11 +21,13 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"syscall"
 
 	"github.com/golang/glog"
 
+	"github.com/Mirantis/virtlet/pkg/nettools"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
@@ -118,6 +120,19 @@ const (
 	vmsProcFile     = "/var/lib/virtlet/vms.procfile"
 )
 
+func extractLastUsedPCIAddress(args []string) int {
+	var lastUsed int
+	for _, arg := range args {
+		i := strings.LastIndex(arg, "addr=0x")
+		if i < 0 {
+			continue
+		}
+		parsed, _ := strconv.ParseInt(arg[i+7:], 16, 32)
+		lastUsed = int(parsed)
+	}
+	return lastUsed
+}
+
 func main() {
 	// configure glog (apparently no better way to do it ...)
 	flag.CommandLine.Parse([]string{"-v=3", "-alsologtostderr=true"})
@@ -151,6 +166,8 @@ func main() {
 		emulator = defaultEmulator
 	} else {
 		netFdKey := os.Getenv(netKeyEnvVar)
+		nextToUsePCIAddress := extractLastUsedPCIAddress(os.Args[1:]) + 1
+		nextToUseHostdevNo := 0
 
 		if netFdKey != "" {
 			c := tapmanager.NewFDClient(fdSocketPath)
@@ -158,7 +175,7 @@ func main() {
 				glog.Errorf("Can't connect to fd server: %v", err)
 				os.Exit(1)
 			}
-			tapFds, marshaledData, err := c.GetFDs(netFdKey)
+			fds, marshaledData, err := c.GetFDs(netFdKey)
 			if err != nil {
 				glog.Errorf("Failed to obtain tap fd for key %q: %v", netFdKey, err)
 				os.Exit(1)
@@ -171,13 +188,30 @@ func main() {
 			}
 
 			for i, desc := range descriptions {
-				if desc.Type == tapmanager.InterfaceTypeTap {
+				switch desc.Type {
+				case nettools.InterfaceTypeTap:
 					netArgs = append(netArgs,
 						"-netdev",
-						fmt.Sprintf("tap,id=tap%d,fd=%d", desc.TapFdIndex, tapFds[desc.TapFdIndex]),
+						fmt.Sprintf("tap,id=tap%d,fd=%d", desc.FdIndex, fds[desc.FdIndex]),
 						"-device",
-						fmt.Sprintf("virtio-net-pci,netdev=tap%d,id=net%d,mac=%s", desc.TapFdIndex, i, desc.HardwareAddr),
+						fmt.Sprintf("virtio-net-pci,netdev=tap%d,id=net%d,mac=%s", desc.FdIndex, i, desc.HardwareAddr),
 					)
+				case nettools.InterfaceTypeVF:
+					netArgs = append(netArgs,
+						"-device",
+						fmt.Sprintf("pci-assign,configfd=%d,host=%s,id=hostdev%d,bus=pci.0,addr=0x%x",
+							desc.FdIndex,
+							desc.PCIAddress,
+							nextToUseHostdevNo,
+							nextToUsePCIAddress,
+						),
+					)
+					nextToUseHostdevNo += 1
+					nextToUsePCIAddress += 1
+				default:
+					// Impssible situation when tapmanager is built from other sources than vmwrapper
+					glog.Errorf("Received unknown interface type: %d", int(desc.Type))
+					os.Exit(1)
 				}
 			}
 		}
