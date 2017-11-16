@@ -72,9 +72,9 @@ func TestVmNetwork(t *testing.T) {
 	info := &cnicurrent.Result{
 		Interfaces: []*cnicurrent.Interface{
 			{
-				Name: "eth0",
-				Mac:  clientMacAddress,
-				// TODO: Sandbox
+				Name:    "eth0",
+				Mac:     clientMacAddress,
+				Sandbox: contNS.Path(),
 			},
 		},
 		IPs: []*cnicurrent.IPConfig{
