@@ -692,6 +692,9 @@ func RecreateContainerSideNetwork(info *cnicurrent.Result) (*ContainerSideNetwor
 	)
 
 	for i, iface := range info.Interfaces {
+		if iface.Sandbox == "" {
+			continue
+		}
 		hwAddr, err := net.ParseMAC(iface.Mac)
 		if err != nil {
 			return nil, fmt.Errorf("invalid mac address %q: %v", iface.Mac, err)
