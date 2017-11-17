@@ -34,6 +34,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
 
+	"github.com/Mirantis/virtlet/pkg/dhcp"
 	"github.com/Mirantis/virtlet/pkg/nettools"
 )
 
@@ -48,7 +49,6 @@ const (
 	tcpdumpSubstringWaitCount = 100
 	outerAddr                 = "10.1.90.1/24"
 	clientAddr                = "10.1.90.5/24"
-	clientMacAddress          = "42:a4:a6:22:80:2e"
 )
 
 func TestVmNetwork(t *testing.T) {
@@ -73,7 +73,7 @@ func TestVmNetwork(t *testing.T) {
 		Interfaces: []*cnicurrent.Interface{
 			{
 				Name: "eth0",
-				Mac:  clientMacAddress,
+				Mac:  "42:a4:a6:22:80:2e",
 				// TODO: Sandbox
 			},
 		},
@@ -114,7 +114,7 @@ func TestVmNetwork(t *testing.T) {
 		t.Fatalf("failed to create escape veth pair: %v", err)
 	}
 
-	if err := contNS.Do(func(ns.NetNS) error {
+	if contNS.Do(func(ns.NetNS) error {
 		_, err = nettools.SetupContainerSideNetwork(info)
 		if err != nil {
 			return fmt.Errorf("failed to set up container side network: %v", err)
@@ -149,19 +149,10 @@ func TestVmNetwork(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("failed to set up container-side network: %v", err)
 	}
-	if err := clientNS.Do(func(ns.NetNS) error {
-		mac, _ := net.ParseMAC(clientMacAddress)
-		if err = nettools.SetHardwareAddr(dhcpClientVeth, mac); err != nil {
-			return fmt.Errorf("can not set test mac address on client interface: %v", err)
-		}
-		return nil
-	}); err != nil {
-		t.Fatal(err)
-	}
 
 	outerIP := addAddress(t, hostNS, hostVeth, outerAddr)
 
-	g := NewNetTestGroup(t, 15*time.Second)
+	g := NewNetTestGroup(t, 1*time.Minute)
 	defer g.Stop()
 
 	// tcpdump should catch udp 'ping' but should not
@@ -169,7 +160,10 @@ func TestVmNetwork(t *testing.T) {
 	tcpdump := newTcpdump(hostVeth, "10.1.90.1.4243 > 10.1.90.5.4242: UDP", "BOOTP/DHCP")
 	g.Add(hostNS, tcpdump)
 
-	g.Add(contNS, NewDhcpServerTester(info))
+	g.Add(contNS, NewDhcpServerTester(&dhcp.Config{
+		CNIResult:           *info,
+		PeerHardwareAddress: dhcpClientVeth.Attrs().HardwareAddr,
+	}))
 	// wait for dhcp client to complete so we don't interfere
 	// with the network link too early
 	<-g.Add(clientNS, NewDhcpClient([]string{

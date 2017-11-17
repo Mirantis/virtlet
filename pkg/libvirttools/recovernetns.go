@@ -46,7 +46,7 @@ func (v *VirtualizationTool) RecoverNetworkNamespaces(fdManager tapmanager.FDMan
 			continue
 		}
 
-		if _, err := fdManager.AddFDs(
+		if _, err := fdManager.AddFD(
 			s.GetID(),
 			tapmanager.GetFDPayload{
 				CNIConfig: cniConfig,
