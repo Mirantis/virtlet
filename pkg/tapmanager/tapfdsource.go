@@ -43,21 +43,6 @@ const (
 	calicoSubnetVar     = "VIRTLET_CALICO_SUBNET"
 )
 
-// InterfaceType presents type of network interface instance
-type InterfaceType int
-
-const (
-	InterfaceTypeTap InterfaceType = iota
-)
-
-// InterfaceDescription contains interface type with additional data
-// needed to identify it
-type InterfaceDescription struct {
-	Type         InterfaceType    `json:"type"`
-	HardwareAddr net.HardwareAddr `json:"mac"`
-	TapFdIndex   int              `json:"tapNo"`
-}
-
 // PodNetworkDesc contains the data that are required by TapFDSource
 // to set up a tap device for a VM
 type PodNetworkDesc struct {
@@ -134,11 +119,11 @@ func NewTapFDSource(cniPluginsDir, cniConfigsDir string) (*TapFDSource, error) {
 	return s, nil
 }
 
-// GetFDs implements GetFDs method of FDSource interface
-func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
+// GetFD implements GetFD method of FDSource interface
+func (s *TapFDSource) GetFD(key string, data []byte) (int, []byte, error) {
 	var payload GetFDPayload
 	if err := json.Unmarshal(data, &payload); err != nil {
-		return nil, nil, fmt.Errorf("error unmarshalling GetFD payload: %v", err)
+		return 0, nil, fmt.Errorf("error unmarshalling GetFD payload: %v", err)
 	}
 	pnd := payload.Description
 
@@ -146,12 +131,12 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 
 	if !recover {
 		if err := cni.CreateNetNS(pnd.PodId); err != nil {
-			return nil, nil, fmt.Errorf("error creating new netns for pod %s (%s): %v", pnd.PodName, pnd.PodId, err)
+			return 0, nil, fmt.Errorf("error creating new netns for pod %s (%s): %v", pnd.PodName, pnd.PodId, err)
 		}
 
 		netConfig, err := s.cniClient.AddSandboxToNetwork(pnd.PodId, pnd.PodName, pnd.PodNs)
 		if err != nil {
-			return nil, nil, fmt.Errorf("error adding pod %s (%s) to CNI network: %v", pnd.PodName, pnd.PodId, err)
+			return 0, nil, fmt.Errorf("error adding pod %s (%s) to CNI network: %v", pnd.PodName, pnd.PodId, err)
 		}
 		glog.V(3).Infof("CNI configuration for pod %s (%s): %s", pnd.PodName, pnd.PodId, spew.Sdump(netConfig))
 
@@ -168,10 +153,10 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 	// Calico needs network config to be adjusted for DHCP compatibility
 	if s.dummyGateway != nil {
 		if len(netConfig.IPs) != 1 {
-			return nil, nil, errors.New("didn't expect more than one IP config")
+			return 0, nil, errors.New("didn't expect more than one IP config")
 		}
 		if netConfig.IPs[0].Version != "4" {
-			return nil, nil, errors.New("IPv3 config was expected")
+			return 0, nil, errors.New("IPv4 config was expected")
 		}
 		netConfig.IPs[0].Address.Mask = netmaskForCalico()
 		netConfig.IPs[0].Gateway = s.dummyGateway
@@ -189,7 +174,7 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 	netNSPath := cni.PodNetNSPath(pnd.PodId)
 	vmNS, err := ns.GetNS(netNSPath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to open network namespace at %q: %v", netNSPath, err)
+		return 0, nil, fmt.Errorf("failed to open network namespace at %q: %v", netNSPath, err)
 	}
 
 	var csn *nettools.ContainerSideNetwork
@@ -213,10 +198,15 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 		// to the CNI result, so we must add them, too
 		fixCNIResult(netConfig, csn)
 
-		dhcpServer, err = dhcp.NewServer(csn.Result)
-		if err != nil {
-			return err
+		// TODO: now CNIConfig should always contain interface mac address, so there
+		// is no reason to pass it as separate field in dhcp.Config,
+		// dhcp.NewServer should need only CNIConfig, instead of dhcp.Config
+		// TODO: set up DHCP server for all the interfaces defined in CNIConfig
+		dhcpConfg := &dhcp.Config{
+			CNIResult:           *csn.Result,
+			PeerHardwareAddress: csn.HardwareAddr,
 		}
+		dhcpServer = dhcp.NewServer(dhcpConfg)
 		if err := dhcpServer.SetupListener("0.0.0.0"); err != nil {
 			return fmt.Errorf("Failed to set up dhcp listener: %v", err)
 		}
@@ -235,12 +225,12 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 		time.Sleep(500 * time.Millisecond)
 		return nil
 	}); err != nil {
-		return nil, nil, err
+		return 0, nil, err
 	}
 
 	respData, err := json.Marshal(netConfig)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error marshalling net config: %v", err)
+		return 0, nil, fmt.Errorf("error marshalling net config: %v", err)
 	}
 
 	s.Lock()
@@ -251,11 +241,7 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 		dhcpServer: dhcpServer,
 		doneCh:     doneCh,
 	}
-	var fds []int
-	for _, f := range csn.TapFiles {
-		fds = append(fds, int(f.Fd()))
-	}
-	return fds, respData, nil
+	return int(csn.TapFile.Fd()), respData, nil
 }
 
 // Release implements Release method of FDSource interface
@@ -307,19 +293,7 @@ func (s *TapFDSource) GetInfo(key string) ([]byte, error) {
 	if !found {
 		return nil, fmt.Errorf("bad fd key: %q", key)
 	}
-	var descriptions []InterfaceDescription
-	for i, hwAddr := range pn.csn.HardwareAddrs {
-		descriptions = append(descriptions, InterfaceDescription{
-			TapFdIndex:   i,
-			HardwareAddr: hwAddr,
-			Type:         InterfaceTypeTap,
-		})
-	}
-	data, err := json.Marshal(descriptions)
-	if err != nil {
-		return nil, fmt.Errorf("interface descriptions marshaling error: %v", err)
-	}
-	return data, nil
+	return pn.csn.HardwareAddr, nil
 }
 
 func fixCNIResult(netConfig *cnicurrent.Result, csn *nettools.ContainerSideNetwork) {
@@ -329,19 +303,12 @@ func fixCNIResult(netConfig *cnicurrent.Result, csn *nettools.ContainerSideNetwo
 		return
 	}
 
-	// TODO: get real interface name from links scan for matching mac add
-	// instead of generating fake one
-	for i, mac := range csn.HardwareAddrs {
-		name := fmt.Sprintf("cni%d", i)
-		iface := &cnicurrent.Interface{
-			Name: name,
-			Mac:  mac.String(),
-		}
-		netConfig.Interfaces = append(netConfig.Interfaces, iface)
+	iface := &cnicurrent.Interface{
+		Name: "cni0",
+		Mac:  csn.HardwareAddr.String(),
 	}
+	netConfig.Interfaces = []*cnicurrent.Interface{iface}
 
-	// TODO: scan interfaces for matching ip addresses instead of setting first interface
-	// as the target for ip address
 	for _, IP := range netConfig.IPs {
 		IP.Interface = 0
 	}

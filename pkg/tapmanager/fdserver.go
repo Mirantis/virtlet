@@ -49,8 +49,8 @@ const (
 // FDManager denotes an object that provides 'master'-side
 // functionality of FDClient
 type FDManager interface {
-	AddFDs(key string, data interface{}) ([]byte, error)
-	ReleaseFDs(key string) error
+	AddFD(key string, data interface{}) ([]byte, error)
+	ReleaseFD(key string) error
 }
 
 type fdHeader struct {
@@ -81,16 +81,16 @@ func fdKey(key string) [64]byte {
 // creates and destroys (closes) the file descriptors and
 // associated resources
 type FDSource interface {
-	// GetFDs sets up a file descriptors based on key
-	// and extra data. It should return the file descriptor list,
+	// GetFD sets up a file descriptor based on key
+	// and extra data. It should return the file descriptor,
 	// any data that should be passed back to the client
-	// invoking AddFDs() and an error, if any.
-	GetFDs(key string, data []byte) ([]int, []byte, error)
+	// invoking AddFD() and an error, if any.
+	GetFD(key string, data []byte) (int, []byte, error)
 	// Release destroys (closes) the file descriptor and
 	// any associated resources
 	Release(key string) error
 	// GetInfo returns the information which needs to be
-	// propagated back the FDClient upon GetFDs() call
+	// propagated back the FDClient upon GetFD() call
 	GetInfo(key string) ([]byte, error)
 }
 
@@ -101,14 +101,14 @@ type FDSource interface {
 // (to be fixed in Go 1.10):
 // https://www.weave.works/blog/linux-namespaces-and-go-don-t-mix When
 // the Go namespace problem is resolved, it should be possible to dumb
-// down FDServer by making it only serve GetFDs() requests, performing
+// down FDServer by making it only serve GetFD() requests, performing
 // other actions within the process boundary.
 type FDServer struct {
 	sync.Mutex
 	lst        *net.UnixListener
 	socketPath string
 	source     FDSource
-	fds        map[string][]int
+	fds        map[string]int
 	stopCh     chan struct{}
 }
 
@@ -118,34 +118,34 @@ func NewFDServer(socketPath string, source FDSource) *FDServer {
 	return &FDServer{
 		socketPath: socketPath,
 		source:     source,
-		fds:        make(map[string][]int),
+		fds:        make(map[string]int),
 	}
 }
 
-func (s *FDServer) addFDs(key string, fds []int) bool {
+func (s *FDServer) addFD(key string, fd int) bool {
 	s.Lock()
 	defer s.Unlock()
 	if _, found := s.fds[key]; found {
 		return false
 	}
-	s.fds[key] = fds
+	s.fds[key] = fd
 	return true
 }
 
-func (s *FDServer) removeFDs(key string) {
+func (s *FDServer) removeFD(key string) {
 	s.Lock()
 	defer s.Unlock()
 	delete(s.fds, key)
 }
 
-func (s *FDServer) getFDs(key string) ([]int, error) {
+func (s *FDServer) getFD(key string) (int, error) {
 	s.Lock()
 	defer s.Unlock()
-	fds, found := s.fds[key]
+	fd, found := s.fds[key]
 	if !found {
-		return nil, fmt.Errorf("bad fd key: %q", key)
+		return 0, fmt.Errorf("bad fd key: %q", key)
 	}
-	return fds, nil
+	return fd, nil
 }
 
 // Serve makes FDServer listen on its socket in a new goroutine.
@@ -219,11 +219,11 @@ func (s *FDServer) serveAdd(c *net.UnixConn, hdr *fdHeader) (*fdHeader, []byte, 
 		}
 	}
 	key := hdr.getKey()
-	fds, respData, err := s.source.GetFDs(key, data)
+	fd, respData, err := s.source.GetFD(key, data)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error getting fd: %v", err)
 	}
-	if !s.addFDs(key, fds) {
+	if !s.addFD(key, fd) {
 		return nil, nil, fmt.Errorf("fd key already exists: %q", err)
 	}
 	return &fdHeader{
@@ -239,7 +239,7 @@ func (s *FDServer) serveRelease(hdr *fdHeader) (*fdHeader, error) {
 	if err := s.source.Release(key); err != nil {
 		return nil, fmt.Errorf("error releasing fd: %v", err)
 	}
-	s.removeFDs(key)
+	s.removeFD(key)
 	return &fdHeader{
 		Magic:   fdMagic,
 		Command: fdReleaseResponse,
@@ -249,7 +249,7 @@ func (s *FDServer) serveRelease(hdr *fdHeader) (*fdHeader, error) {
 
 func (s *FDServer) serveGet(c *net.UnixConn, hdr *fdHeader) (*fdHeader, []byte, []byte, error) {
 	key := hdr.getKey()
-	fds, err := s.getFDs(key)
+	fd, err := s.getFD(key)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -257,8 +257,7 @@ func (s *FDServer) serveGet(c *net.UnixConn, hdr *fdHeader) (*fdHeader, []byte, 
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("can't get key info: %v", err)
 	}
-
-	rights := syscall.UnixRights(fds...)
+	rights := syscall.UnixRights(fd)
 	return &fdHeader{
 		Magic:    fdMagic,
 		Command:  fdGetResponse,
@@ -431,10 +430,10 @@ func (c *FDClient) request(hdr *fdHeader, data []byte) (*fdHeader, []byte, []byt
 	return &respHdr, respData, oobData, nil
 }
 
-// AddFDs requests the FDServer to add a new file descriptor
+// AddFD requests the FDServer to add a new file descriptor
 // using its FDSource. It returns the info which is returned
-// by FDSource's GetFDs() call
-func (c *FDClient) AddFDs(key string, data interface{}) ([]byte, error) {
+// by FDSource's GetFD() call
+func (c *FDClient) AddFD(key string, data interface{}) ([]byte, error) {
 	bs, ok := data.([]byte)
 	if !ok {
 		var err error
@@ -457,9 +456,9 @@ func (c *FDClient) AddFDs(key string, data interface{}) ([]byte, error) {
 	return respData, nil
 }
 
-// ReleaseFDs makes FDServer to close the file descriptor and destroy
+// ReleaseFD makes FDServer to close the file descriptor and destroy
 // any associated resources
-func (c *FDClient) ReleaseFDs(key string) error {
+func (c *FDClient) ReleaseFD(key string) error {
 	_, _, _, err := c.request(&fdHeader{
 		Command: fdRelease,
 		Key:     fdKey(key),
@@ -467,32 +466,32 @@ func (c *FDClient) ReleaseFDs(key string) error {
 	return err
 }
 
-// GetFDs requests file descriptors from the FDServer. It returns a
-// list of file descriptors which is valid for current process and any
+// GetFD requests a file descriptor from the FDServer. It returns a
+// file descriptor which is valid for current process and any
 // associated data that was returned from FDSource's GetInfo() call
-func (c *FDClient) GetFDs(key string) ([]int, []byte, error) {
+func (c *FDClient) GetFD(key string) (int, []byte, error) {
 	_, respData, oobData, err := c.request(&fdHeader{
 		Command: fdGet,
 		Key:     fdKey(key),
 	}, nil)
 	if err != nil {
-		return nil, nil, err
+		return 0, nil, err
 	}
 
 	scms, err := syscall.ParseSocketControlMessage(oobData)
 	if err != nil {
-		return nil, nil, fmt.Errorf("couldn't parse socket control message: %v", err)
+		return 0, nil, fmt.Errorf("couldn't parse socket control message: %v", err)
 	}
 	if len(scms) != 1 {
-		return nil, nil, fmt.Errorf("unexpected number of socket control messages: %d instead of 0", len(scms))
+		return 0, nil, fmt.Errorf("unexpected number of socket control messages: %d instead of 1", len(scms))
 	}
 
 	fds, err := syscall.ParseUnixRights(&scms[0])
 	if err != nil {
-		return nil, nil, fmt.Errorf("can't decode file descriptors: %v", err)
+		return 0, nil, fmt.Errorf("can't decode file descriptors: %v", err)
 	}
 	if len(fds) != 1 {
-		return nil, nil, fmt.Errorf("unexpected number of file descriptors: %d instead of 0", len(fds))
+		return 0, nil, fmt.Errorf("unexpected number of file descriptors: %d instead of 1", len(fds))
 	}
-	return fds, respData, nil
+	return fds[0], respData, nil
 }

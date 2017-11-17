@@ -27,6 +27,7 @@ import (
 	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/vishvananda/netlink"
 
+	"github.com/Mirantis/virtlet/pkg/dhcp"
 	"github.com/Mirantis/virtlet/pkg/nettools"
 )
 
@@ -42,7 +43,7 @@ func TestDhcpServer(t *testing.T) {
 				Interfaces: []*cnicurrent.Interface{
 					{
 						Name: "eth0",
-						Mac:  clientMacAddress,
+						Mac:  "42:a4:a6:22:80:2e",
 						// TODO: Sandbox
 					},
 				},
@@ -130,20 +131,12 @@ func runDhcpTestCase(t *testing.T, testCase *dhcpTestCase) {
 		t.Fatal(err)
 	}
 
-	if err := clientNS.Do(func(ns.NetNS) error {
-		mac, _ := net.ParseMAC(clientMacAddress)
-		if err = nettools.SetHardwareAddr(clientVeth, mac); err != nil {
-			return fmt.Errorf("can not set test mac address on client interface: %v", err)
-		}
-
-		return nil
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	g := NewNetTestGroup(t, 15*time.Second)
+	g := NewNetTestGroup(t, 1*time.Minute)
 	defer g.Stop()
-	g.Add(serverNS, NewDhcpServerTester(&testCase.info))
+	g.Add(serverNS, NewDhcpServerTester(&dhcp.Config{
+		CNIResult:           testCase.info,
+		PeerHardwareAddress: clientVeth.Attrs().HardwareAddr,
+	}))
 
 	g.Add(clientNS, NewDhcpClient(testCase.expectedSubstrings))
 	g.Wait()
