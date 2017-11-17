@@ -158,6 +158,27 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 		if netConfig == nil {
 			netConfig = &cnicurrent.Result{}
 		}
+		// Calico needs network config to be adjusted for DHCP compatibility
+		if s.dummyGateway != nil {
+			if len(netConfig.IPs) != 1 {
+				return nil, nil, errors.New("didn't expect more than one IP config")
+			}
+			if netConfig.IPs[0].Version != "4" {
+				return nil, nil, errors.New("IPv4 config was expected")
+			}
+			netConfig.IPs[0].Address.Mask = netmaskForCalico()
+			netConfig.IPs[0].Gateway = s.dummyGateway
+			netConfig.Routes = []*cnitypes.Route{
+				{
+					Dst: net.IPNet{
+						IP:   net.IP{0, 0, 0, 0},
+						Mask: net.IPMask{0, 0, 0, 0},
+					},
+					GW: s.dummyGateway,
+				},
+			}
+		}
+
 		if err := nettools.ValidateAndfixCNIResult(netConfig, pnd.PodNs); err != nil {
 			return nil, nil, fmt.Errorf("error in fixing cni configuration: %v", err)
 		}
@@ -171,27 +192,6 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 	}
 
 	netConfig := payload.CNIConfig
-
-	// Calico needs network config to be adjusted for DHCP compatibility
-	if s.dummyGateway != nil {
-		if len(netConfig.IPs) != 1 {
-			return nil, nil, errors.New("didn't expect more than one IP config")
-		}
-		if netConfig.IPs[0].Version != "4" {
-			return nil, nil, errors.New("IPv4 config was expected")
-		}
-		netConfig.IPs[0].Address.Mask = netmaskForCalico()
-		netConfig.IPs[0].Gateway = s.dummyGateway
-		netConfig.Routes = []*cnitypes.Route{
-			{
-				Dst: net.IPNet{
-					IP:   net.IP{0, 0, 0, 0},
-					Mask: net.IPMask{0, 0, 0, 0},
-				},
-				GW: s.dummyGateway,
-			},
-		}
-	}
 
 	netNSPath := cni.PodNetNSPath(pnd.PodId)
 	vmNS, err := ns.GetNS(netNSPath)
