@@ -5,7 +5,7 @@ set -o nounset
 set -o pipefail
 set -o errtrace
 
-CRIPROXY_DEB_URL="${CRIPROXY_DEB_URL:-https://github.com/Mirantis/criproxy/releases/download/v0.0.2/criproxy-nodeps_0.0.1_amd64.deb}"
+CRIPROXY_DEB_URL="${CRIPROXY_DEB_URL:-https://github.com/Mirantis/criproxy/releases/download/v0.0.3/criproxy-nodeps_0.0.3_amd64.deb}"
 NONINTERACTIVE="${NONINTERACTIVE:-}"
 NO_VM_CONSOLE="${NO_VM_CONSOLE:-}"
 INJECT_LOCAL_IMAGE="${INJECT_LOCAL_IMAGE:-}"
