@@ -155,13 +155,6 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 		}
 		glog.V(3).Infof("CNI configuration for pod %s (%s): %s", pnd.PodName, pnd.PodId, spew.Sdump(netConfig))
 
-		if netConfig == nil {
-			netConfig = &cnicurrent.Result{}
-		}
-		if err := nettools.ValidateAndfixCNIResult(netConfig, pnd.PodNs); err != nil {
-			return nil, nil, fmt.Errorf("error in fixing cni configuration: %v", err)
-		}
-
 		if payload.Description.DNS != nil {
 			netConfig.DNS.Nameservers = pnd.DNS.Nameservers
 			netConfig.DNS.Search = pnd.DNS.Search
@@ -180,7 +173,6 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 		if netConfig.IPs[0].Version != "4" {
 			return nil, nil, errors.New("IPv4 config was expected")
 		}
-		netConfig.IPs[0].Address.Mask = netmaskForCalico()
 		netConfig.IPs[0].Gateway = s.dummyGateway
 		netConfig.Routes = []*cnitypes.Route{
 			{
@@ -203,6 +195,16 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 	var dhcpServer *dhcp.Server
 	doneCh := make(chan error)
 	if err := vmNS.Do(func(ns.NetNS) error {
+		if netConfig == nil {
+			netConfig = &cnicurrent.Result{}
+		}
+		if err := nettools.ValidateAndfixCNIResult(netConfig, pnd.PodNs); err != nil {
+			return fmt.Errorf("error in fixing cni configuration: %v", err)
+		}
+		if s.dummyGateway != nil {
+			netConfig.IPs[0].Address.Mask = netmaskForCalico()
+		}
+
 		var err error
 		if recover {
 			csn, err = nettools.RecreateContainerSideNetwork(netConfig, netNSPath)
