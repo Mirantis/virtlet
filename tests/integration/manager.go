@@ -37,11 +37,11 @@ type fakeFDManager struct{}
 
 var fdManager tapmanager.FDManager
 
-func (m *fakeFDManager) AddFD(key string, data interface{}) ([]byte, error) {
+func (m *fakeFDManager) AddFDs(key string, data interface{}) ([]byte, error) {
 	return nil, nil
 }
 
-func (m *fakeFDManager) ReleaseFD(key string) error {
+func (m *fakeFDManager) ReleaseFDs(key string) error {
 	return nil
 }
 
