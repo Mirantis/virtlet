@@ -156,6 +156,9 @@ e2e: &e2e
         elif [[ ${CIRCLE_JOB} = e2e_flannel ]]; then
           export CNI_PLUGIN=flannel
           echo >&2 "*** Using Flannel CNI"
+        elif [[ ${CIRCLE_JOB} = e2e_weave ]]; then
+          export CNI_PLUGIN=weave
+          echo >&2 "*** Using Weave CNI"
         fi
         SKIP_SNAPSHOT=1 \
           NONINTERACTIVE=1 \
@@ -317,6 +320,9 @@ jobs:
   e2e_flannel:
     <<: *e2e
 
+  e2e_weave:
+    <<: *e2e
+
   push_branch:
     <<: *push_images
 
@@ -374,6 +380,13 @@ workflows:
           tags:
             only:
               - /^v[0-9].*/
+    - e2e_weave:
+        requires:
+        - build
+        filters:
+          tags:
+            only:
+              - /^v[0-9].*/
     - push_branch:
         requires:
         - build
@@ -387,6 +400,7 @@ workflows:
         - e2e
         - e2e_calico
         - e2e_flannel
+        - e2e_weave
         - integration
         filters:
           branches:
