@@ -377,6 +377,8 @@ workflows:
         requires:
         - build
         filters:
+          branches:
+            only: master
           tags:
             only:
               - /^v[0-9].*/
@@ -384,6 +386,8 @@ workflows:
         requires:
         - build
         filters:
+          branches:
+            only: master
           tags:
             only:
               - /^v[0-9].*/
