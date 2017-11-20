@@ -250,7 +250,7 @@ func withFakeCNIVeth(t *testing.T, toRun func(hostNS, contNS ns.NetNS, origHostV
 			if err != nil {
 				log.Panicf("Error parsing hwaddr %q: %v", hwAddr, err)
 			}
-			err = setHardwareAddr(origHostVeth, hwAddr)
+			err = SetHardwareAddr(origHostVeth, hwAddr)
 
 			// re-query attrs (including new mac)
 			origHostVeth, err = netlink.LinkByName(origHostVeth.Attrs().Name)
@@ -267,7 +267,7 @@ func withFakeCNIVeth(t *testing.T, toRun func(hostNS, contNS ns.NetNS, origHostV
 			if err != nil {
 				log.Panicf("Error parsing hwaddr %q: %v", hwAddr, err)
 			}
-			err = setHardwareAddr(origContVeth, hwAddr)
+			err = SetHardwareAddr(origContVeth, hwAddr)
 
 			// re-query attrs (including new mac)
 			origContVeth, err = netlink.LinkByName(origContVeth.Attrs().Name)
@@ -311,7 +311,11 @@ func verifyNoAddressAndRoutes(t *testing.T, link netlink.Link) {
 
 func TestFindVeth(t *testing.T) {
 	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
-		contVeth, err := FindVeth()
+		allLinks, err := netlink.LinkList()
+		if err != nil {
+			log.Panic("LinkList() failed: %v", err)
+		}
+		contVeth, err := FindVeth(allLinks)
 		if err != nil {
 			log.Panicf("FindVeth() failed: %v", err)
 		}
@@ -354,8 +358,8 @@ func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, contNsP
 		t.Errorf("interface info mismatch. Expected:\n%s\nActual:\n%s",
 			spew.Sdump(expectedExtractedLinkInfo), spew.Sdump(*csn.Result))
 	}
-	if !reflect.DeepEqual(origHwAddr, csn.HardwareAddr) {
-		t.Errorf("bad hwaddr returned from SetupContainerSideNetwork: %v instead of %v", csn.HardwareAddr, origHwAddr)
+	if !reflect.DeepEqual(origHwAddr, csn.HardwareAddrs[0]) {
+		t.Errorf("bad hwaddr returned from SetupContainerSideNetwork: %v instead of %v", csn.HardwareAddrs[0], origHwAddr)
 	}
 	// re-query origContVeth attrs
 	origContVeth, err = netlink.LinkByName(origContVeth.Attrs().Name)
@@ -436,7 +440,11 @@ func verifyNoLinks(t *testing.T, linkNames []string) {
 }
 
 func verifyVethHaveConfiguration(t *testing.T, info *cnicurrent.Result) {
-	contVeth, err := FindVeth()
+	allLinks, err := netlink.LinkList()
+	if err != nil {
+		log.Panic("LinkList() failed: %v", err)
+	}
+	contVeth, err := FindVeth(allLinks)
 	if err != nil {
 		log.Panicf("FindVeth() failed: %v", err)
 	}
@@ -496,7 +504,7 @@ func TestTeardownContainerSideNetwork(t *testing.T) {
 		if err != nil {
 			log.Panicf("the original cni veth is gone")
 		}
-		if !reflect.DeepEqual(origContVeth.Attrs().HardwareAddr, csn.HardwareAddr) {
+		if !reflect.DeepEqual(origContVeth.Attrs().HardwareAddr, csn.HardwareAddrs[0]) {
 			t.Errorf("cni veth hardware address wasn't restored")
 		}
 	})
