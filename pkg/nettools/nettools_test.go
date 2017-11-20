@@ -342,9 +342,9 @@ func TestExtractLinkInfo(t *testing.T) {
 	})
 }
 
-func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, info *cnicurrent.Result) {
+func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, contNsPath string, info *cnicurrent.Result) {
 	origHwAddr := origContVeth.Attrs().HardwareAddr
-	csn, err := SetupContainerSideNetwork(info)
+	csn, err := SetupContainerSideNetwork(info, contNsPath)
 	if err != nil {
 		log.Panicf("failed to set up container side network: %v", err)
 	}
@@ -387,7 +387,7 @@ func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, info *c
 
 func TestSetUpContainerSideNetwork(t *testing.T) {
 	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
-		verifyContainerSideNetwork(t, origContVeth, nil)
+		verifyContainerSideNetwork(t, origContVeth, contNS.Path(), nil)
 	})
 }
 
@@ -396,13 +396,13 @@ func TestSetUpContainerSideNetworkWithInfo(t *testing.T) {
 		if err := StripLink(origContVeth); err != nil {
 			log.Panicf("StripLink() failed: %v", err)
 		}
-		verifyContainerSideNetwork(t, origContVeth, &expectedExtractedLinkInfo)
+		verifyContainerSideNetwork(t, origContVeth, contNS.Path(), &expectedExtractedLinkInfo)
 	})
 }
 
 func TestLoopbackInterface(t *testing.T) {
 	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
-		verifyContainerSideNetwork(t, origContVeth, nil)
+		verifyContainerSideNetwork(t, origContVeth, contNS.Path(), nil)
 		if out, err := exec.Command("ping", "-c", "1", "127.0.0.1").CombinedOutput(); err != nil {
 			log.Panicf("ping 127.0.0.1 failed:\n%s", out)
 		}
@@ -477,7 +477,7 @@ func TestTeardownContainerSideNetwork(t *testing.T) {
 		if err := StripLink(origContVeth); err != nil {
 			log.Panicf("StripLink() failed: %v", err)
 		}
-		csn, err := SetupContainerSideNetwork(&expectedExtractedLinkInfo)
+		csn, err := SetupContainerSideNetwork(&expectedExtractedLinkInfo, contNS.Path())
 		if err != nil {
 			log.Panicf("failed to set up container side network: %v", err)
 		}
