@@ -437,7 +437,7 @@ func bringUpLoopback() error {
 	return nil
 }
 
-func updateEbTables(interfaceName, command string) error {
+func updateEbTables(nsPath, interfaceName, command string) error {
 	// block/unblock DHCP traffic from/to CNI-provided link
 	for _, item := range []struct{ chain, opt string }{
 		// dhcp responses originate from bridge itself
@@ -445,10 +445,20 @@ func updateEbTables(interfaceName, command string) error {
 		// dhcp requests originate from the VM
 		{"FORWARD", "--ip-destination-port"},
 	} {
-		if out, err := exec.Command("ebtables", command, item.chain, "-p", "IPV4", "--ip-protocol", "UDP",
+		if out, err := exec.Command(
+			"nsenter", "--net="+nsPath,
+			"ebtables", command, item.chain, "-p", "IPV4", "--ip-protocol", "UDP",
 			item.opt, "67", "--out-if", interfaceName, "-j", "DROP").CombinedOutput(); err != nil {
-			return fmt.Errorf("ebtables failed: %v\nOut:\n%s", err, out)
+			return fmt.Errorf("[netns %q] ebtables failed: %v\nOut:\n%s", nsPath, err, out)
 		}
+	}
+
+	return nil
+}
+
+func disableMacLearning(nsPath string, bridgeName string) error {
+	if out, err := exec.Command("nsenter", "--net="+nsPath, "brctl", "setageing", bridgeName, "0").CombinedOutput(); err != nil {
+		return fmt.Errorf("[netns %q] brctl failed: %v\nOut:\n%s", nsPath, err, out)
 	}
 
 	return nil
@@ -473,6 +483,8 @@ func setHardwareAddr(link netlink.Link, hwAddr net.HardwareAddr) error {
 type ContainerSideNetwork struct {
 	// Result contains CNI result object describing the network settings
 	Result *cnicurrent.Result
+	// Path to the container network namespace
+	NsPath string
 	// TapFile contains an open File object pointing to Tap device inside
 	// the network namespace
 	TapFile *os.File
@@ -491,7 +503,7 @@ type ContainerSideNetwork struct {
 // for dhcp server.
 // The function should be called from within container namespace.
 // Returns container network struct and an error, if any
-func SetupContainerSideNetwork(info *cnicurrent.Result) (*ContainerSideNetwork, error) {
+func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string) (*ContainerSideNetwork, error) {
 	contVeth, err := FindVeth()
 	if err != nil {
 		return nil, err
@@ -551,7 +563,15 @@ func SetupContainerSideNetwork(info *cnicurrent.Result) (*ContainerSideNetwork, 
 	}
 
 	// Add ebtables DHCP blocking rules
-	if err := updateEbTables(contVeth.Attrs().Name, "-A"); err != nil {
+	if err := updateEbTables(nsPath, contVeth.Attrs().Name, "-A"); err != nil {
+		return nil, err
+	}
+
+	// Work around bridge MAC learning problem
+	// https://ubuntuforums.org/showthread.php?t=2329373&s=cf580a41179e0f186ad4e625834a1d61&p=13511965#post13511965
+	// (affects Flannel)
+	// FIXME: s
+	if err := disableMacLearning(nsPath, containerBridgeName); err != nil {
 		return nil, err
 	}
 
@@ -564,12 +584,12 @@ func SetupContainerSideNetwork(info *cnicurrent.Result) (*ContainerSideNetwork, 
 		return nil, fmt.Errorf("failed to open tap: %v", err)
 	}
 
-	return &ContainerSideNetwork{info, tapFile, hwAddr}, nil
+	return &ContainerSideNetwork{info, nsPath, tapFile, hwAddr}, nil
 }
 
 // RecreateContainerSideNetwork tries to populate ContainerSideNetwork
 // structure based on a network namespace that was already adjusted for Virtlet
-func RecreateContainerSideNetwork(info *cnicurrent.Result) (*ContainerSideNetwork, error) {
+func RecreateContainerSideNetwork(info *cnicurrent.Result, nsPath string) (*ContainerSideNetwork, error) {
 	if len(info.Interfaces) == 0 {
 		return nil, fmt.Errorf("wrong cni configuration - missing interfaces list: %v", spew.Sdump(info))
 	}
@@ -584,7 +604,7 @@ func RecreateContainerSideNetwork(info *cnicurrent.Result) (*ContainerSideNetwor
 		return nil, fmt.Errorf("failed to open tap: %v", err)
 	}
 
-	return &ContainerSideNetwork{info, tapFile, hwAddr}, nil
+	return &ContainerSideNetwork{info, nsPath, tapFile, hwAddr}, nil
 }
 
 // TeardownBridge removes links from bridge and sets it down
@@ -641,7 +661,7 @@ func (csn *ContainerSideNetwork) Teardown() error {
 	}
 
 	// Remove ebtables DHCP rules
-	if err := updateEbTables(contVeth.Attrs().Name, "-D"); err != nil {
+	if err := updateEbTables(csn.NsPath, contVeth.Attrs().Name, "-D"); err != nil {
 		return nil
 	}
 

@@ -183,9 +183,9 @@ func (s *TapFDSource) GetFD(key string, data []byte) (int, []byte, error) {
 	if err := vmNS.Do(func(ns.NetNS) error {
 		var err error
 		if recover {
-			csn, err = nettools.RecreateContainerSideNetwork(netConfig)
+			csn, err = nettools.RecreateContainerSideNetwork(netConfig, netNSPath)
 		} else {
-			csn, err = nettools.SetupContainerSideNetwork(netConfig)
+			csn, err = nettools.SetupContainerSideNetwork(netConfig, netNSPath)
 		}
 		if err != nil {
 			return err
