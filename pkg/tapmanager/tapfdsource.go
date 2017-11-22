@@ -309,8 +309,16 @@ func fixCNIResult(netConfig *cnicurrent.Result, csn *nettools.ContainerSideNetwo
 	}
 	netConfig.Interfaces = []*cnicurrent.Interface{iface}
 
+	if len(netConfig.IPs) == 0 {
+		netConfig.IPs = csn.Result.IPs
+	}
+
 	for _, IP := range netConfig.IPs {
 		IP.Interface = 0
+	}
+
+	if len(netConfig.DNS.Nameservers) == 0 {
+		netConfig.DNS = csn.Result.DNS
 	}
 
 	if len(netConfig.Routes) == 0 {
