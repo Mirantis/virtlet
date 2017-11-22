@@ -20,46 +20,22 @@ import (
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strconv"
 	"testing"
 
+	cnitypes "github.com/containernetworking/cni/pkg/types"
+	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ghodss/yaml"
 
-	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 )
-
-var dummyPodSandboxInfoWithFakeNetConf metadata.PodSandboxInfo
-
-func init() {
-	dummyPodSandboxInfoWithFakeNetConf.CNIConfig = `{
-  "cniVersion": "0.3.1",
-  "interfaces": [
-      {
-          "name": "cni0",
-	  "mac": "00:11:22:33:44:55"
-      }
-  ],
-  "ips": [
-      {
-          "version": "4",
-          "address": "1.1.1.1/8",
-          "gateway": "1.2.3.4",
-          "interface": 0
-      }
-  ],
-  "dns": {
-    "nameservers": ["1.2.3.4"],
-    "search": ["some", "search"]
-  }
-}`
-}
 
 type fakeFlexvolume struct {
 	uuid string
@@ -87,6 +63,19 @@ func newFakeFlexvolume(t *testing.T, parentDir string, uuid string, part int) *f
 	}
 }
 
+func buildNetworkedPodConfig(cniResult *cnicurrent.Result) *VMConfig {
+	r, err := json.Marshal(cniResult)
+	if err != nil {
+		panic("failed to marshal CNI result")
+	}
+	return &VMConfig{
+		PodName:           "foo",
+		PodNamespace:      "default",
+		ParsedAnnotations: &VirtletAnnotations{},
+		CNIConfig:         string(r),
+	}
+}
+
 func TestCloudInitGenerator(t *testing.T) {
 	tmpDir, err := ioutil.TempDir("", "fake-flexvol")
 	if err != nil {
@@ -100,12 +89,13 @@ func TestCloudInitGenerator(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		name                string
-		config              *VMConfig
-		volumeMap           map[string]string
-		expectedMetaData    map[string]interface{}
-		expectedUserData    map[string]interface{}
-		expectedUserDataStr string
+		name                  string
+		config                *VMConfig
+		volumeMap             map[string]string
+		expectedMetaData      map[string]interface{}
+		expectedUserData      map[string]interface{}
+		expectedNetworkConfig map[string]interface{}
+		expectedUserDataStr   string
 	}{
 		{
 			name: "plain pod",
@@ -119,6 +109,10 @@ func TestCloudInitGenerator(t *testing.T) {
 				"local-hostname": "foo",
 			},
 			expectedUserData: nil,
+			expectedNetworkConfig: map[string]interface{}{
+				// that's how yaml parses the number
+				"version": float64(1),
+			},
 		},
 		{
 			name: "pod with ssh keys",
@@ -310,27 +304,187 @@ func TestCloudInitGenerator(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "pod with network config",
+			config: buildNetworkedPodConfig(&cnicurrent.Result{
+				Interfaces: []*cnicurrent.Interface{
+					{
+						Name:    "cni0",
+						Mac:     "00:11:22:33:44:55",
+						Sandbox: "/var/run/netns/bae464f1-6ee7-4ee2-826e-33293a9de95e",
+					},
+					{
+						Name:    "ignoreme0",
+						Mac:     "00:12:34:56:78:9a",
+						Sandbox: "", // host interface
+					},
+				},
+				IPs: []*cnicurrent.IPConfig{
+					{
+						Version: "4",
+						Address: net.IPNet{
+							IP:   net.IPv4(1, 1, 1, 1),
+							Mask: net.CIDRMask(8, 32),
+						},
+						Gateway:   net.IPv4(1, 2, 3, 4),
+						Interface: 0,
+					},
+				},
+				Routes: []*cnitypes.Route{
+					{
+						Dst: net.IPNet{
+							IP:   net.IPv4zero,
+							Mask: net.CIDRMask(0, 32),
+						},
+						GW: nil,
+					},
+				},
+				DNS: cnitypes.DNS{
+					Nameservers: []string{"1.2.3.4"},
+					Search:      []string{"some", "search"},
+				},
+			}),
+			expectedNetworkConfig: map[string]interface{}{
+				"version": float64(1),
+				"config": []interface{}{
+					map[string]interface{}{
+						"mac_address": "00:11:22:33:44:55",
+						"name":        "cni0",
+						"subnets": []interface{}{
+							map[string]interface{}{
+								"address":         "1.1.1.1/8",
+								"dns_nameservers": []interface{}{"1.2.3.4"},
+								"dns_search":      []interface{}{"some", "search"},
+								"type":            "static",
+							},
+						},
+						"type": "physical",
+					},
+					map[string]interface{}{
+						"destination": "0.0.0.0/0",
+						"gateway":     "1.2.3.4",
+						"type":        "route",
+					},
+				},
+			},
+		},
+		{
+			name: "pod with multiple network interfaces",
+			config: buildNetworkedPodConfig(&cnicurrent.Result{
+				Interfaces: []*cnicurrent.Interface{
+					{
+						Name:    "cni0",
+						Mac:     "00:11:22:33:44:55",
+						Sandbox: "/var/run/netns/bae464f1-6ee7-4ee2-826e-33293a9de95e",
+					},
+					{
+						Name:    "cni1",
+						Mac:     "00:11:22:33:ab:cd",
+						Sandbox: "/var/run/netns/d920d2e2-5849-4c70-b9a6-5e3cb4f831cb",
+					},
+					{
+						Name:    "ignoreme0",
+						Mac:     "00:12:34:56:78:9a",
+						Sandbox: "", // host interface
+					},
+				},
+				IPs: []*cnicurrent.IPConfig{
+					// Note that Gateway addresses are not used because
+					// there's no routes with nil gateway
+					{
+						Version: "4",
+						Address: net.IPNet{
+							IP:   net.IPv4(1, 1, 1, 1),
+							Mask: net.CIDRMask(8, 32),
+						},
+						Gateway:   net.IPv4(1, 2, 3, 4),
+						Interface: 0,
+					},
+					{
+						Version: "4",
+						Address: net.IPNet{
+							IP:   net.IPv4(192, 168, 100, 42),
+							Mask: net.CIDRMask(24, 32),
+						},
+						Gateway:   net.IPv4(192, 168, 100, 1),
+						Interface: 1,
+					},
+				},
+				Routes: []*cnitypes.Route{
+					{
+						Dst: net.IPNet{
+							IP:   net.IPv4zero,
+							Mask: net.CIDRMask(0, 32),
+						},
+						GW: net.IPv4(1, 2, 3, 4),
+					},
+				},
+				DNS: cnitypes.DNS{
+					Nameservers: []string{"1.2.3.4"},
+					Search:      []string{"some", "search"},
+				},
+			}),
+			expectedNetworkConfig: map[string]interface{}{
+				"version": float64(1),
+				"config": []interface{}{
+					map[string]interface{}{
+						"mac_address": "00:11:22:33:44:55",
+						"name":        "cni0",
+						"subnets": []interface{}{
+							map[string]interface{}{
+								"address":         "1.1.1.1/8",
+								"dns_nameservers": []interface{}{"1.2.3.4"},
+								"dns_search":      []interface{}{"some", "search"},
+								"type":            "static",
+							},
+						},
+						"type": "physical",
+					},
+					map[string]interface{}{
+						"mac_address": "00:11:22:33:ab:cd",
+						"name":        "cni1",
+						"subnets": []interface{}{
+							map[string]interface{}{
+								"address":         "192.168.100.42/24",
+								"dns_nameservers": []interface{}{"1.2.3.4"},
+								"dns_search":      []interface{}{"some", "search"},
+								"type":            "static",
+							},
+						},
+						"type": "physical",
+					},
+					map[string]interface{}{
+						"destination": "0.0.0.0/0",
+						"gateway":     "1.2.3.4",
+						"type":        "route",
+					},
+				},
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// we're not invoking actual iso generation here so "/foobar"
 			// as isoDir will do
-			g := NewCloudInitGenerator(tc.config, tc.volumeMap, "/foobar", nil)
+			g := NewCloudInitGenerator(tc.config, tc.volumeMap, "/foobar")
 
-			metaDataBytes, err := g.generateMetaData()
-			if err != nil {
-				t.Fatalf("GenerateMetaData(): %v", err)
-			}
-			var metaData map[string]interface{}
-			if err := json.Unmarshal(metaDataBytes, &metaData); err != nil {
-				t.Fatalf("Can't unmarshal meta-data: %v", err)
+			if tc.expectedMetaData != nil {
+				metaDataBytes, err := g.generateMetaData()
+				if err != nil {
+					t.Fatalf("generateMetaData(): %v", err)
+				}
+				var metaData map[string]interface{}
+				if err := json.Unmarshal(metaDataBytes, &metaData); err != nil {
+					t.Fatalf("Can't unmarshal meta-data: %v", err)
+				}
+
+				if !reflect.DeepEqual(tc.expectedMetaData, metaData) {
+					t.Errorf("Bad meta-data:\n%s\nUnmarshaled:\n%s", metaDataBytes, spew.Sdump(metaData))
+				}
 			}
 
-			if !reflect.DeepEqual(tc.expectedMetaData, metaData) {
-				t.Errorf("Bad meta-data:\n%s\nUnmarshaled:\n%s", metaDataBytes, spew.Sdump(metaData))
-			}
 			userDataBytes, err := g.generateUserData()
 			if err != nil {
-				t.Fatalf("GenerateUserData(): %v", err)
+				t.Fatalf("generateUserData(): %v", err)
 			}
 			if tc.expectedUserDataStr != "" {
 				if string(userDataBytes) != tc.expectedUserDataStr {
@@ -349,6 +503,20 @@ func TestCloudInitGenerator(t *testing.T) {
 					t.Errorf("Bad user-data:\n%s\nUnmarshaled:\n%s", userDataBytes, spew.Sdump(userData))
 				}
 			}
+
+			if tc.expectedNetworkConfig != nil {
+				networkConfigBytes, err := g.generateNetworkConfiguration()
+				if err != nil {
+					t.Fatalf("generateNetworkConfiguration(): %v", err)
+				}
+				var networkConfig map[string]interface{}
+				if err := yaml.Unmarshal(networkConfigBytes, &networkConfig); err != nil {
+					t.Fatalf("Can't unmarshal user-data: %v", err)
+				}
+				if !reflect.DeepEqual(tc.expectedNetworkConfig, networkConfig) {
+					t.Errorf("Bad network-config:\n%s\nUnmarshaled:\n%s", networkConfigBytes, spew.Sdump(networkConfig))
+				}
+			}
 		})
 	}
 }
@@ -364,7 +532,7 @@ func TestGenerateDisk(t *testing.T) {
 		PodName:           "foo",
 		PodNamespace:      "default",
 		ParsedAnnotations: &VirtletAnnotations{},
-	}, nil, tmpDir, &dummyPodSandboxInfoWithFakeNetConf)
+	}, nil, tmpDir)
 	diskDef, err := g.GenerateDisk()
 	if err != nil {
 		t.Fatalf("GenerateDisk(): %v", err)
@@ -382,9 +550,10 @@ func TestGenerateDisk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("IsoToMap(): %v", err)
 	}
+
 	if !reflect.DeepEqual(m, map[string]interface{}{
 		"meta-data":      "{\"instance-id\":\"foo.default\",\"local-hostname\":\"foo\"}",
-		"network-config": "version: 1\nconfig:\n- mac_address: \"00:11:22:33:44:55\"\n  name: cni0\n  subnets:\n  - address: 1.1.1.1/8\n    dns_nameservers:\n    - 1.2.3.4\n    dns_search:\n    - some\n    - search\n    gateway: 1.2.3.4\n    type: static\n  type: physical\n",
+		"network-config": "version: 1\n",
 		"user-data":      "#cloud-config\n",
 	}) {
 		t.Errorf("Bad iso content:\n%s", spew.Sdump(m))
@@ -397,7 +566,7 @@ func TestEnvDataGeneration(t *testing.T) {
 		Environment: []*VMKeyValue{
 			{Key: "key", Value: "value"},
 		},
-	}, nil, "", nil)
+	}, nil, "")
 
 	output := g.generateEnvVarsContent()
 	if output != expected {

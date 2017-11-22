@@ -65,7 +65,6 @@ type domainSettings struct {
 	cpuQuota         int64
 	rootDiskFilepath string
 	netFdKey         string
-	cniConfig        string
 }
 
 func (ds *domainSettings) createDomain(config *VMConfig) *libvirtxml.Domain {
@@ -556,6 +555,7 @@ func (v *VirtualizationTool) getVMConfigFromMetadata(containerId string) (*VMCon
 	}
 
 	podAnnotations := map[string]string{}
+	cniConfig := ""
 	if containerInfo.SandboxID != "" {
 		sandbox, err := v.metadataStore.PodSandbox(containerInfo.SandboxID).Retrieve()
 		if err != nil {
@@ -563,6 +563,7 @@ func (v *VirtualizationTool) getVMConfigFromMetadata(containerId string) (*VMCon
 			return nil, kubeapi.ContainerState_CONTAINER_UNKNOWN, nil
 		}
 		podAnnotations = sandbox.Annotations
+		cniConfig = sandbox.CNIConfig
 	}
 
 	// TODO: here we're using incomplete VMConfig to tear down the volumes
@@ -575,6 +576,7 @@ func (v *VirtualizationTool) getVMConfigFromMetadata(containerId string) (*VMCon
 		PodAnnotations:       podAnnotations,
 		ContainerAnnotations: containerInfo.Annotations,
 		ContainerLabels:      containerInfo.Labels,
+		CNIConfig:            cniConfig,
 	}
 
 	if err := config.LoadAnnotations(); err != nil {
@@ -944,6 +946,5 @@ func (v *VirtualizationTool) ContainerStatus(containerId string) (*kubeapi.Conta
 func (v *VirtualizationTool) StoragePool() virt.VirtStoragePool           { return v.volumePool }
 func (v *VirtualizationTool) DomainConnection() virt.VirtDomainConnection { return v.domainConn }
 func (v *VirtualizationTool) ImageManager() ImageManager                  { return v.imageManager }
-func (v *VirtualizationTool) MetadataStore() metadata.MetadataStore       { return v.metadataStore }
 func (v *VirtualizationTool) RawDevices() []string                        { return v.rawDevices }
 func (v *VirtualizationTool) KubeletRootDir() string                      { return v.kubeletRootDir }

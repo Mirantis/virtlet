@@ -19,7 +19,6 @@ package libvirttools
 import (
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
-	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/virt"
 )
 
@@ -35,7 +34,6 @@ type VolumeOwner interface {
 	StoragePool() virt.VirtStoragePool
 	DomainConnection() virt.VirtDomainConnection
 	ImageManager() ImageManager
-	MetadataStore() metadata.MetadataStore
 	RawDevices() []string
 	KubeletRootDir() string
 }

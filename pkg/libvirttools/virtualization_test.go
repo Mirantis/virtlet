@@ -150,7 +150,10 @@ func (ct *containerTester) createContainer(sandbox *kubeapi.PodSandboxConfig, mo
 		},
 		SandboxConfig: sandbox,
 	}
-	vmConfig, err := GetVMConfig(req)
+	// Here we pass "" as cniConfig argument of GetVMConfig because we
+	// don't test CNI aspect here. It's taken care of in pkg/manager
+	// and cloud-init part of this package.
+	vmConfig, err := GetVMConfig(req, "")
 	if err != nil {
 		ct.t.Fatalf("GetVMConfig(): %v", err)
 	}
@@ -505,7 +508,7 @@ func TestDomainResourceConstraints(t *testing.T) {
 		},
 		SandboxConfig: sandbox,
 	}
-	vmConfig, err := GetVMConfig(req)
+	vmConfig, err := GetVMConfig(req, "")
 	if err != nil {
 		t.Fatalf("GetVMConfig(): %v", err)
 	}

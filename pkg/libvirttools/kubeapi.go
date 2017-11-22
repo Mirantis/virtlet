@@ -25,8 +25,8 @@ import (
 // TODO: this file should be moved to 'pkg/manager' at some point
 // under a different name
 
-// GetVMConfig translates CRI's CreateContainerRequest to a VMConfig
-func GetVMConfig(in *kubeapi.CreateContainerRequest) (*VMConfig, error) {
+// GetVMConfig translates CRI's CreateContainerRequest and CNI info to a VMConfig
+func GetVMConfig(in *kubeapi.CreateContainerRequest, cniConfig string) (*VMConfig, error) {
 	if in.Config == nil || in.Config.Metadata == nil || in.Config.Metadata.Name == "" || in.Config.Image == nil || in.SandboxConfig == nil || in.SandboxConfig.Metadata == nil {
 		return nil, errors.New("invalid input data")
 	}
@@ -41,6 +41,7 @@ func GetVMConfig(in *kubeapi.CreateContainerRequest) (*VMConfig, error) {
 		PodAnnotations:       in.SandboxConfig.Annotations,
 		ContainerAnnotations: in.Config.Annotations,
 		ContainerLabels:      in.Config.Labels,
+		CNIConfig:            cniConfig,
 	}
 
 	if linuxCfg := in.Config.Linux; linuxCfg != nil && linuxCfg.Resources != nil {
