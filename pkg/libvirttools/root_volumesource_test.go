@@ -19,7 +19,6 @@ package libvirttools
 import (
 	"testing"
 
-	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/virt"
 	"github.com/Mirantis/virtlet/pkg/virt/fake"
 	"github.com/Mirantis/virtlet/tests/gm"
@@ -55,11 +54,9 @@ func TestRootVolumeLifeCycle(t *testing.T) {
 
 	im := fake.NewFakeImageManager(rec.Child("image"), ipool)
 
-	md, _ := metadata.NewFakeMetadataStore()
-
 	volumes, err := GetRootVolume(
 		&VMConfig{DomainUUID: testUuid, Image: "rootfs image name"},
-		newFakeVolumeOwner(spool, im, &md),
+		newFakeVolumeOwner(spool, im),
 	)
 	if err != nil {
 		t.Errorf("GetRootVolume returned an error: %v", err)
@@ -98,21 +95,16 @@ func TestRootVolumeLifeCycle(t *testing.T) {
 }
 
 type fakeVolumeOwner struct {
-	storagePool   *fake.FakeStoragePool
-	imageManager  *fake.FakeImageManager
-	metadataStore *metadata.MetadataStore
+	storagePool  *fake.FakeStoragePool
+	imageManager *fake.FakeImageManager
 }
 
 var _ VolumeOwner = fakeVolumeOwner{}
 
-func newFakeVolumeOwner(storagePool *fake.FakeStoragePool,
-	imageManager *fake.FakeImageManager,
-	metadataStore *metadata.MetadataStore) *fakeVolumeOwner {
-
+func newFakeVolumeOwner(storagePool *fake.FakeStoragePool, imageManager *fake.FakeImageManager) *fakeVolumeOwner {
 	return &fakeVolumeOwner{
-		storagePool:   storagePool,
-		imageManager:  imageManager,
-		metadataStore: metadataStore,
+		storagePool:  storagePool,
+		imageManager: imageManager,
 	}
 }
 
@@ -131,7 +123,3 @@ func (vo fakeVolumeOwner) ImageManager() ImageManager {
 func (vo fakeVolumeOwner) RawDevices() []string { return nil }
 
 func (vo fakeVolumeOwner) KubeletRootDir() string { return "" }
-
-func (vo fakeVolumeOwner) MetadataStore() metadata.MetadataStore {
-	return *vo.metadataStore
-}

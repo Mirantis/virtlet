@@ -388,7 +388,7 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 	}
 
 	fdKey := podSandboxId
-	vmConfig, err := libvirttools.GetVMConfig(in)
+	vmConfig, err := libvirttools.GetVMConfig(in, sandboxInfo.CNIConfig)
 	if err != nil {
 		glog.Errorf("Error getting vm config for container %s: %v", name, err)
 		return nil, err

@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"path"
 	"path/filepath"
@@ -34,7 +35,6 @@ import (
 
 	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/flexvolume"
-	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
@@ -43,20 +43,17 @@ const (
 )
 
 type CloudInitGenerator struct {
-	config         *VMConfig
-	podSandboxInfo *metadata.PodSandboxInfo
-	volumeMap      map[string]string
-	isoDir         string
+	config    *VMConfig
+	volumeMap map[string]string
+	isoDir    string
 }
 
-func NewCloudInitGenerator(config *VMConfig, volumeMap map[string]string,
-	isoDir string, podSandboxInfo *metadata.PodSandboxInfo) *CloudInitGenerator {
+func NewCloudInitGenerator(config *VMConfig, volumeMap map[string]string, isoDir string) *CloudInitGenerator {
 
 	return &CloudInitGenerator{
-		config:         config,
-		podSandboxInfo: podSandboxInfo,
-		volumeMap:      volumeMap,
-		isoDir:         isoDir,
+		config:    config,
+		volumeMap: volumeMap,
+		isoDir:    isoDir,
 	}
 }
 
@@ -116,7 +113,7 @@ func (g *CloudInitGenerator) generateUserData() ([]byte, error) {
 }
 
 func (g *CloudInitGenerator) generateNetworkConfiguration() ([]byte, error) {
-	cniResult, err := cni.BytesToResult([]byte(g.podSandboxInfo.CNIConfig))
+	cniResult, err := cni.BytesToResult([]byte(g.config.CNIConfig))
 	if err != nil {
 		return nil, err
 	}
@@ -127,24 +124,52 @@ func (g *CloudInitGenerator) generateNetworkConfiguration() ([]byte, error) {
 	}
 
 	var config []map[string]interface{}
+	var gateways []net.IP
 
 	// physical interfaces
 	for i, iface := range cniResult.Interfaces {
+		if iface.Sandbox == "" {
+			// skip host interfaces
+			continue
+		}
+		subnets, curGateways := g.getSubnetsAndGatewaysForNthInterface(i, cniResult)
+		gateways = append(gateways, curGateways...)
 		interfaceConf := map[string]interface{}{
 			"type":        "physical",
 			"name":        iface.Name,
 			"mac_address": iface.Mac,
-			"subnets":     g.getSubnetsForNthInterface(i, cniResult),
+			"subnets":     subnets,
 		}
 		config = append(config, interfaceConf)
 	}
 
 	// routes
+	gotDefault := false
 	for _, cniRoute := range cniResult.Routes {
+		gw := cniRoute.GW
+		switch {
+		case gw != nil:
+			// ok
+		case len(gateways) == 0:
+			glog.Warning("cloud-init: no gateways specified but got a route with empty gateway")
+			continue
+		case len(gateways) > 1:
+			gw = gateways[0]
+			glog.Warning("cloud-init: got more than one gateway and a route with empty gateway, using the first gateway: %q", gw)
+		default:
+			gw = gateways[0]
+		}
+		if ones, _ := cniRoute.Dst.Mask.Size(); ones == 0 {
+			if gotDefault {
+				glog.Warning("cloud-init: got more than one default route, using only the first one")
+				continue
+			}
+			gotDefault = true
+		}
 		route := map[string]interface{}{
 			"type":        "route",
 			"destination": cniRoute.Dst.String(),
-			"gateway":     cniRoute.GW.String(),
+			"gateway":     gw.String(),
 		}
 		config = append(config, route)
 	}
@@ -158,8 +183,9 @@ func (g *CloudInitGenerator) generateNetworkConfiguration() ([]byte, error) {
 	return []byte("version: 1\n" + string(r)), nil
 }
 
-func (g *CloudInitGenerator) getSubnetsForNthInterface(interfaceNo int, cniResult *cnicurrent.Result) []map[string]interface{} {
+func (g *CloudInitGenerator) getSubnetsAndGatewaysForNthInterface(interfaceNo int, cniResult *cnicurrent.Result) ([]map[string]interface{}, []net.IP) {
 	var subnets []map[string]interface{}
+	var gateways []net.IP
 	for _, ipConfig := range cniResult.IPs {
 		if ipConfig.Interface == interfaceNo {
 			subnet := map[string]interface{}{
@@ -167,7 +193,12 @@ func (g *CloudInitGenerator) getSubnetsForNthInterface(interfaceNo int, cniResul
 				"address": ipConfig.Address.String(),
 			}
 			if !ipConfig.Gateway.IsUnspecified() {
-				subnet["gateway"] = ipConfig.Gateway.String()
+				gateways = append(gateways, ipConfig.Gateway)
+				// Note that we can't use ipConfig.Gateway as
+				// subnet["gateway"] because according CNI spec,
+				// it must not be used to produce any routes by itself.
+				// The routes must be specified in Routes field
+				// of the CNI result.
 			}
 			// Cloud Init requires dns settings on the subnet level (yeah, I know...)
 			// while we get just one setting for all the IP configurations from CNI,
@@ -189,7 +220,7 @@ func (g *CloudInitGenerator) getSubnetsForNthInterface(interfaceNo int, cniResul
 		})
 	}
 
-	return subnets
+	return subnets, gateways
 }
 
 func (g *CloudInitGenerator) IsoPath() string {

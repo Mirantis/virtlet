@@ -68,6 +68,8 @@ type VMConfig struct {
 	// Host directories corresponding to the volumes which are to
 	// be mounted inside the VM
 	Mounts []*VMMount
+	// CNIConfig stores CNI configuration (CNI result)
+	CNIConfig string
 }
 
 // LoadAnnotations parses pod annotations in the VM config an
