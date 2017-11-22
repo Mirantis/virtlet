@@ -195,8 +195,15 @@ func (s *TapFDSource) GetFD(key string, data []byte) (int, []byte, error) {
 		// in Result, but it's needed for Cloud-Init based
 		// network setup, so we add it here if it's missing.
 		// Also, some of the plugins may skip adding routes
-		// to the CNI result, so we must add them, too
-		fixCNIResult(netConfig, csn)
+		// to the CNI result, so we must add them, too.
+		// Here we try to fix CNI result if it's "a bit broken"
+		// (missing DNS or Interface info), but use our extracted config
+		// if it's missing critical information
+		if len(netConfig.IPs) == 0 || len(netConfig.Routes) == 0 {
+			netConfig = csn.Result
+		} else {
+			fixCNIResult(netConfig, csn)
+		}
 
 		// TODO: now CNIConfig should always contain interface mac address, so there
 		// is no reason to pass it as separate field in dhcp.Config,
@@ -297,6 +304,10 @@ func (s *TapFDSource) GetInfo(key string) ([]byte, error) {
 }
 
 func fixCNIResult(netConfig *cnicurrent.Result, csn *nettools.ContainerSideNetwork) {
+	if len(netConfig.DNS.Nameservers) == 0 {
+		netConfig.DNS = csn.Result.DNS
+	}
+
 	// If there's no interface info in netConfig, we can assume that we're dealing
 	// with an old-style CNI plugin which only supports a single network interface
 	if len(netConfig.Interfaces) > 0 {
@@ -304,17 +315,14 @@ func fixCNIResult(netConfig *cnicurrent.Result, csn *nettools.ContainerSideNetwo
 	}
 
 	iface := &cnicurrent.Interface{
-		Name: "cni0",
-		Mac:  csn.HardwareAddr.String(),
+		Name:    "cni0",
+		Mac:     csn.HardwareAddr.String(),
+		Sandbox: csn.NsPath,
 	}
 	netConfig.Interfaces = []*cnicurrent.Interface{iface}
 
 	for _, IP := range netConfig.IPs {
 		IP.Interface = 0
-	}
-
-	if len(netConfig.Routes) == 0 {
-		netConfig.Routes = csn.Result.Routes
 	}
 }
 

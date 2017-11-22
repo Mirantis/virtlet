@@ -36,34 +36,36 @@ const (
 	outerHwAddr = "42:b5:b7:33:91:3f"
 )
 
-var expectedExtractedLinkInfo = cnicurrent.Result{
-	Interfaces: []*cnicurrent.Interface{
-		{
-			Name: "eth0",
-			Mac:  innerHwAddr,
-			// TODO: Sandbox
-		},
-	},
-	IPs: []*cnicurrent.IPConfig{
-		{
-			Version:   "4",
-			Interface: 0,
-			Address: net.IPNet{
-				IP:   net.IP{10, 1, 90, 5},
-				Mask: net.IPMask{255, 255, 255, 0},
+func expectedExtractedLinkInfo(contNsPath string) *cnicurrent.Result {
+	return &cnicurrent.Result{
+		Interfaces: []*cnicurrent.Interface{
+			{
+				Name:    "eth0",
+				Mac:     innerHwAddr,
+				Sandbox: contNsPath,
 			},
-			Gateway: net.IP{10, 1, 90, 1},
 		},
-	},
-	Routes: []*cnitypes.Route{
-		{
-			Dst: net.IPNet{
-				IP:   net.IP{0, 0, 0, 0},
-				Mask: net.IPMask{0, 0, 0, 0},
+		IPs: []*cnicurrent.IPConfig{
+			{
+				Version:   "4",
+				Interface: 0,
+				Address: net.IPNet{
+					IP:   net.IP{10, 1, 90, 5},
+					Mask: net.IPMask{255, 255, 255, 0},
+				},
+				Gateway: net.IP{10, 1, 90, 1},
 			},
-			GW: net.IP{10, 1, 90, 1},
 		},
-	},
+		Routes: []*cnitypes.Route{
+			{
+				Dst: net.IPNet{
+					IP:   net.IP{0, 0, 0, 0},
+					Mask: net.IPMask{0, 0, 0, 0},
+				},
+				GW: net.IP{10, 1, 90, 1},
+			},
+		},
+	}
 }
 
 // withTemporaryNSAvailable creates a new network namespace and
@@ -331,11 +333,11 @@ func TestStripLink(t *testing.T) {
 
 func TestExtractLinkInfo(t *testing.T) {
 	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
-		info, err := ExtractLinkInfo(origContVeth)
+		info, err := ExtractLinkInfo(origContVeth, contNS.Path())
 		if err != nil {
 			log.Panicf("failed to grab interface info: %v", err)
 		}
-		if !reflect.DeepEqual(*info, expectedExtractedLinkInfo) {
+		if !reflect.DeepEqual(info, expectedExtractedLinkInfo(contNS.Path())) {
 			t.Errorf("interface info mismatch. Expected:\n%s\nActual:\n%s",
 				spew.Sdump(expectedExtractedLinkInfo), spew.Sdump(*info))
 		}
@@ -348,7 +350,7 @@ func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, contNsP
 	if err != nil {
 		log.Panicf("failed to set up container side network: %v", err)
 	}
-	if !reflect.DeepEqual(*csn.Result, expectedExtractedLinkInfo) {
+	if !reflect.DeepEqual(csn.Result, expectedExtractedLinkInfo(contNsPath)) {
 		t.Errorf("interface info mismatch. Expected:\n%s\nActual:\n%s",
 			spew.Sdump(expectedExtractedLinkInfo), spew.Sdump(*csn.Result))
 	}
@@ -396,7 +398,7 @@ func TestSetUpContainerSideNetworkWithInfo(t *testing.T) {
 		if err := StripLink(origContVeth); err != nil {
 			log.Panicf("StripLink() failed: %v", err)
 		}
-		verifyContainerSideNetwork(t, origContVeth, contNS.Path(), &expectedExtractedLinkInfo)
+		verifyContainerSideNetwork(t, origContVeth, contNS.Path(), expectedExtractedLinkInfo(contNS.Path()))
 	})
 }
 
@@ -477,7 +479,7 @@ func TestTeardownContainerSideNetwork(t *testing.T) {
 		if err := StripLink(origContVeth); err != nil {
 			log.Panicf("StripLink() failed: %v", err)
 		}
-		csn, err := SetupContainerSideNetwork(&expectedExtractedLinkInfo, contNS.Path())
+		csn, err := SetupContainerSideNetwork(expectedExtractedLinkInfo(contNS.Path()), contNS.Path())
 		if err != nil {
 			log.Panicf("failed to set up container side network: %v", err)
 		}
@@ -487,7 +489,7 @@ func TestTeardownContainerSideNetwork(t *testing.T) {
 		}
 
 		verifyNoLinks(t, []string{"br0", "tap0"})
-		verifyVethHaveConfiguration(t, &expectedExtractedLinkInfo)
+		verifyVethHaveConfiguration(t, expectedExtractedLinkInfo(contNS.Path()))
 
 		// re-quiry origContVeth attrs
 		origContVeth, err = netlink.LinkByName(origContVeth.Attrs().Name)

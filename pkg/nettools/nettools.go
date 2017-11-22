@@ -361,7 +361,7 @@ func StripLink(link netlink.Link) error {
 // There must be exactly one veth interface in the namespace
 // and exactly one address associated with veth.
 // Returns interface info struct and error, if any.
-func ExtractLinkInfo(link netlink.Link) (*cnicurrent.Result, error) {
+func ExtractLinkInfo(link netlink.Link, nsPath string) (*cnicurrent.Result, error) {
 	addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get addresses for link: %v", err)
@@ -373,9 +373,9 @@ func ExtractLinkInfo(link netlink.Link) (*cnicurrent.Result, error) {
 	result := &cnicurrent.Result{
 		Interfaces: []*cnicurrent.Interface{
 			{
-				Name: link.Attrs().Name,
-				Mac:  link.Attrs().HardwareAddr.String(),
-				// TODO: Sandbox?
+				Name:    link.Attrs().Name,
+				Mac:     link.Attrs().HardwareAddr.String(),
+				Sandbox: nsPath,
 			},
 		},
 		IPs: []*cnicurrent.IPConfig{
@@ -516,7 +516,7 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string) (*Contain
 		if info != nil {
 			dnsInfo = info.DNS
 		}
-		info, err = ExtractLinkInfo(contVeth)
+		info, err = ExtractLinkInfo(contVeth, nsPath)
 		if err != nil {
 			return nil, err
 		}
