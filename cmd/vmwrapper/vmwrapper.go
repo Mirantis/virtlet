@@ -45,6 +45,7 @@ import (
 #include <fcntl.h>
 #include <sched.h>
 #include <unistd.h>
+#include <sys/mount.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <linux/limits.h>
@@ -102,12 +103,19 @@ __attribute__((constructor (200))) void vmwrapper_handle_reexec(void) {
 	vmwrapper_setns(my_pid, target_pid, CLONE_NEWUTS, "uts");
 	vmwrapper_setns(my_pid, target_pid, CLONE_NEWIPC, "ipc");
 
+	// remount /sys for new netns
+	if (umount2("/sys", MNT_DETACH) < 0)
+		vmwrapper_perr("umount2()");
+	if (mount("none", "/sys", "sysfs", 0, NULL) < 0)
+		vmwrapper_perr("mount()");
+
+	// below part commented for sriov tests
 	// permanently drop privs
-	fprintf(stderr, "vmwrapper reexec: dropping privs\n");
-	if (setgid(getgid()) < 0)
-		vmwrapper_perr("setgid()");
-	if (setuid(getuid()) < 0)
-		vmwrapper_perr("setuid()");
+	// fprintf(stderr, "vmwrapper reexec: dropping privs\n");
+	// if (setgid(getgid()) < 0)
+	//	vmwrapper_perr("setgid()");
+	// if (setuid(getuid()) < 0)
+	//	vmwrapper_perr("setuid()");
 }
 */
 import "C"
@@ -199,9 +207,10 @@ func main() {
 				case nettools.InterfaceTypeVF:
 					netArgs = append(netArgs,
 						"-device",
-						fmt.Sprintf("pci-assign,configfd=%d,host=%s,id=hostdev%d,bus=pci.0,addr=0x%x",
-							desc.FdIndex,
-							desc.PCIAddress,
+						// fmt.Sprintf("pci-assign,configfd=%d,host=%s,id=hostdev%d,bus=pci.0,addr=0x%x",
+						fmt.Sprintf("pci-assign,host=%s,id=hostdev%d,bus=pci.0,addr=0x%x",
+							// desc.FdIndex,
+							desc.PCIAddress[5:],
 							nextToUseHostdevNo,
 							nextToUsePCIAddress,
 						),
@@ -227,7 +236,8 @@ func main() {
 		args = append([]string{os.Args[0]}, args...)
 	}
 
-	glog.V(0).Infof("Executing emulator: %s", strings.Join(args, " "))
+	// below log hides any possible error in returned by libvirt virError
+	// glog.V(0).Infof("Executing emulator: %s", strings.Join(args, " "))
 	if err := syscall.Exec(args[0], args, env); err != nil {
 		glog.Errorf("Can't exec emulator: %v", err)
 		os.Exit(1)
