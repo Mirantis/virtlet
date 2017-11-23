@@ -206,7 +206,7 @@ spec:
             - virtlet
   containers:
     - name: cirros-vm-rbd
-      image: virtlet.cloud/image-service.kube-system/cirros
+      image: virtlet.cloud/cirros
   volumes:
     - name: test
       flexVolume:
@@ -272,7 +272,7 @@ spec:
             - virtlet
   containers:
     - name: cirros-vm-rbd
-      image: virtlet.cloud/image-service.kube-system/cirros
+      image: virtlet.cloud/cirros
   volumes:
     - name: test
       persistentVolumeClaim:
