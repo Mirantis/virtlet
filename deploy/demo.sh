@@ -329,12 +329,6 @@ function demo::start-nginx {
   "${kubectl}" run nginx --image=nginx --expose --port 80
 }
 
-function demo::start-image-server {
-  demo::step "Starting Image Server"
-  "${kubectl}" create -f "${BASE_LOCATION}/examples/image-server.yaml" -f "${BASE_LOCATION}/examples/image-service.yaml"
-  demo::wait-for "Image Service" demo::service-ready image-service
-}
-
 function demo::start-vm {
   demo::step "Starting sample CirrOS VM"
   "${kubectl}" create -f "${BASE_LOCATION}/examples/cirros-vm.yaml"
@@ -371,5 +365,4 @@ fi
 demo::label-and-untaint-node
 demo::start-virtlet
 demo::start-nginx
-demo::start-image-server
 demo::start-vm

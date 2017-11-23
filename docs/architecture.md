@@ -12,10 +12,10 @@ Virtlet consists of the following components:
 * [vmwrapper](../cmd/vmwrapper) which is responsible for setting up the environment for emulator
 * emulator, currently [qemu](http://www.qemu-project.org/) with KVM support (with possibility to disable KVM)
 
-In addition to the above, our example setup provides the following:
-
-* [Image service](../deploy/image-service.yaml) which provides VM images accessible through HTTP in local cluster environment. It's only used as an optional helper, because Virtlet manager can pull images from any HTTP server accessible from the node.
-* [CRI proxy](../cmd/criproxy) which provides the possibility to mix docker-shim and VM based workloads on the same k8s node.
+In addition to the above, our example setup uses
+[CRI proxy](https://github.com/Mirantis/criproxy) which provides the
+possibility to mix docker-shim and VM based workloads on the same k8s
+node.
 
 ## Virtlet manager
 
