@@ -124,14 +124,14 @@ use.
 This approach is the same as the previous one except that we also use
 Docker cgroups for VM containers. In this case, libvirt cgroups just
 don't do anything and we use the mechanisms closely resembling those
-used in standard kubelet docker-shim for resource limits and
+used in standard kubelet dockershim for resource limits and
 monitoring.
 
 Pros:
 * Provides better level of security than single container for all VMs
   as escaping the VM will only lead to compromise of a single container
 * Resources are managed in standard Kubernetes way, we just mimic
-  kubelet's docker-shim
+  kubelet's dockershim
 
 Cons:
 * Harder to implement than single container for all VMs

@@ -7,8 +7,6 @@ digraph criproxy {
                 color=black;
                 label="CRI Proxy Process";
                 criproxy [label="CRI Proxy\nServer"];
-                docker_shim [label="docker-shim\nServer"];
-                criproxy -> docker_shim [label=" CRI API (gRPC)  "];
         }
         cni [shape=rectangle, label="Container\nNetwork\nInterface"];
         subgraph cluster_1 {
@@ -35,6 +33,8 @@ digraph criproxy {
         }
         kubelet [shape=rectangle];
         docker [shape=rectangle];
+        docker_shim [label="dockershim\nServer"];
+        criproxy -> docker_shim [label=" CRI API (gRPC)  "];
         tapmanager -> cni [label=" Uses                             \nfor VM pod                             \nnetwork                             \n configuration                             "];
         kubelet -> cni [label=" Uses for pod\n network configuration"];
         kubelet -> criproxy [label=" CRI API (gRPC)"];

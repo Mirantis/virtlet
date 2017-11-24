@@ -54,58 +54,7 @@ You can remove Virtlet DaemonSet with the following command:
 kubectl delete daemonset -R -n kube-system virtlet
 ```
 
-To undo the changes made by CRI proxy bootstrap, first remove the
-configmaps for the nodes that run Virtlet, e.g. for node named
-`kube-node-1` this is done using the following command:
-```
-kubectl delete configmap -n kube-system kubelet-kube-node-1
-```
-
-Then restart kubelet on the nodes, remove criproxy containers and the
-saved kubelet config:
-```
-systemctl restart kubelet
-docker rm -fv $(docker ps -qf label=criproxy=true)
-rm /etc/criproxy/kubelet.conf
-```
-
-## Increasing CRI proxy verbosity level after the bootstrap
-
-You can use the following command to restart CRI proxy in a more
-verbose mode:
-
-```bash
-docker rm -f $(docker ps -q --filter=label=criproxy=true)
-docker run -d --privileged \
-      -l criproxy=true \
-      --restart always \
-       --log-opt max-size=100m \
-       --name criproxy \
-       --net=host \
-       --pid=host \
-       --uts=host \
-       --userns=host \
-       mirantis/virtlet \
-       nsenter --mount=/proc/1/ns/mnt -- \
-       /opt/criproxy/bin/criproxy \
-       -v 3 -alsologtostderr \
-       -connect docker,virtlet.cloud:/run/virtlet.sock
-```
-
-`-v` option of `criproxy` controls the verbosity here. 0-1 means some
-very basic logging during startup and displaying serious errors, 2 is
-the same as 1 plus logging of CRI request errors and 3 causes dumping
-of actual CRI requests and responses except for `ListPodSandbox`,
-`ListContainers` and `ListImages` requests in addition to what's
-logged on level 2. Level 4 adds dumping `List*` requests which may
-cause the log to grow fast. `--log-opt` docker option controls the
-maximum size of the docker log for CRI proxy container.
-
-## Concerns about restarting Virtlet on a node
-
-If virtlet pod restarts on a node when some VM pods are active on it,
-these VM pods will enter `ContainerCreating` state and remain in it
-for a period of up to several minutes before going back to `Running`
-state. You may restart CRI proxy on the node to make the VM pods
-return to `Running` state immediately. This issue is to be fixed
-later.
+After that you can remove CRI Proxy if you're not going to use the
+node for Virtlet again by undoing the steps you made to install it
+(see CRI Proxy
+[documentation](https://github.com/Mirantis/criproxy/)).
