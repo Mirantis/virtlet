@@ -14,7 +14,7 @@ Virtlet consists of the following components:
 
 In addition to the above, our example setup uses
 [CRI proxy](https://github.com/Mirantis/criproxy) which provides the
-possibility to mix docker-shim and VM based workloads on the same k8s
+possibility to mix dockershim and VM based workloads on the same k8s
 node.
 
 ## Virtlet manager
@@ -56,10 +56,9 @@ arguments needed by the emulator to use the tap device and then
 
 ## CRI Proxy
 
-CRI Proxy provides a way to run multiple CRI implementations on the
-same node, e.g. Virtlet and docker-shim. This is handy for running
-infrastructure pods such as kube-proxy. CRI Proxy reuses docker-shim
-component from kubelet to make it possible to have Docker as one of
-CRI implementations on the multi-runtime nodes.
-See [CRI Proxy design document](criproxy.md) for more detailed
-description.
+[CRI Proxy](https://github.com/Mirantis/criproxy) is an external
+project provides a way to run multiple CRI implementations on the same
+node, e.g. Virtlet and dockershim. This is handy for running
+infrastructure pods such as kube-proxy. It's possible to reuse
+dockershim component from kubelet to make it possible to have Docker
+as one of CRI implementations on the multi-runtime nodes.
