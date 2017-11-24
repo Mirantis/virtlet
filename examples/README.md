@@ -1,34 +1,22 @@
-# Virtlet image server and pod example
+# Virtlet pod example
 
 In order to try out the example, do the following on a cluster that
 has nodes with Virtlet on it (see [the instructions](../deploy/README.md) in
 `deploy/` directory):
 
-1. Create image server Deployment and Service:
-```
-kubectl create -f image-server.yaml -f image-service.yaml
-```
-2. Wait for image-server pod to become `Running`:
-```
-kubectl get pods -w
-```
-3. Create a sample VM:
+1. Create a sample VM:
 ```
 kubectl create -f cirros-vm.yaml
 ```
-4. Wait for `cirros-vm` pod to become `Running`:
+2. Wait for `cirros-vm` pod to become `Running`:
 ```
 kubectl get pods -w
 ```
-5. List libvirt domains:
+3. Connect to the VM console:
 ```
-./virsh.sh list
+kubectl attach -it cirros-vm
 ```
-6. Connect to the VM console:
-```
-./virsh.sh console @cirros-vm
-```
-7. As soon as the VM has booted, you can use the `vmssh.sh` script to access it using ssh:
+4. As soon as the VM has booted, you can use the `vmssh.sh` script to access it using ssh:
 ```
 ./vmssh.sh cirros@cirros-vm [command...]
 ```
@@ -50,8 +38,7 @@ kubectl create -f k8s.yaml
 
 Watch progress of the cluster setup via the VM console:
 ```
-./virsh.sh list
-./virsh.sh console @k8s-0
+kubectl attach k8s-0
 ```
 
 After it's complete you can log into the master node:

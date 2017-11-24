@@ -17,7 +17,7 @@ spec:
   containers:
     - name: cirros-vm
       imagePullPolicy: IfNotPresent
-      image: virtlet.cloud/image-service/cirros
+      image: virtlet.cloud/cirros
       # tty and stdin required for `kubectl attach -t` to work
       tty: true
       stdin: true

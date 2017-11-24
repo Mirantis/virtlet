@@ -55,7 +55,7 @@ The demo script will check for KVM support on the host and will make Virtlet use
 
 The demo is based on [kubeadm-dind-cluster](https://github.com/Mirantis/kubeadm-dind-cluster) project. **Docker btrfs storage driver is currently unsupported.** Please refer to `kubeadm-dind-cluster` documentation for more info.
 
-You can remove the test cluster with `./dind-cluster-v1.7.sh clean` when you no longer need it.
+You can remove the test cluster with `./dind-cluster-v1.8.sh clean` when you no longer need it.
 
 ## External projects using Virtlet
 There are some external projects using Virtlet already.

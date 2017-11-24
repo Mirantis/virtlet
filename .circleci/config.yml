@@ -4,8 +4,8 @@ defaults: &defaults
   working_directory: ~/virtlet
   environment:
     DOCKER_VERSION: "17.03.0-ce"
-    KUBECTL_VERSION: "v1.7.8"
-    KUBECTL_SHA1: "0c3a28ac6551ee340b838e406f32fafe3124a5d5"
+    KUBECTL_VERSION: "v1.8.4"
+    KUBECTL_SHA1: "8e2314db816b9b4465c5f713c1152cb0603db15e"
 
 prereqs: &prereqs
   name: Install prerequisites

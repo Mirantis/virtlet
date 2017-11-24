@@ -9,8 +9,8 @@ LABEL virtlet.image="build-base"
 ENV DOCKER_CLIENT_VERSION 1.12.6
 ENV DOCKER_CLIENT_DOWNLOAD_URL_BASE https://get.docker.com/builds
 ENV DOCKER_CLIENT_SHA256 cce8aa52a33f007673b9c7ed0cb786359aa6f3f8a9875aaf69799c71f86e8a43
-ENV KUBECTL_VERSION v1.7.8
-ENV KUBECTL_SHA1 0c3a28ac6551ee340b838e406f32fafe3124a5d5
+ENV KUBECTL_VERSION v1.8.4
+ENV KUBECTL_SHA1 8e2314db816b9b4465c5f713c1152cb0603db15e
 
 # Go installation commands are based on official Go container:
 # https://github.com/docker-library/golang/blob/18ee81a2ec649dd7b3d5126b24eef86bc9c86d80/1.7/Dockerfile
