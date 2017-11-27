@@ -198,7 +198,7 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 		if netConfig == nil {
 			netConfig = &cnicurrent.Result{}
 		}
-		if err := nettools.ValidateAndfixCNIResult(netConfig, pnd.PodNs); err != nil {
+		if err := nettools.ValidateAndFixCNIResult(netConfig, pnd.PodNs); err != nil {
 			return fmt.Errorf("error in fixing cni configuration: %v", err)
 		}
 		if s.dummyGateway != nil {

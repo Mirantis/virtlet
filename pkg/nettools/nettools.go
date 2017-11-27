@@ -334,11 +334,11 @@ func findLinkByAddress(links []netlink.Link, address net.IPNet) (netlink.Link, e
 	return nil, fmt.Errorf("interface with address %q not found in container namespace", address.String())
 }
 
-// ValidateAndfixCNIResult verifies that netConfig contains proper list of
+// ValidateAndFixCNIResult verifies that netConfig contains proper list of
 // ips, routes, interfaces and if something is missing it tries to complement
 // that using patch for Weave or for plugins which return their netConfig
 // in v0.2.0 version of CNI SPEC
-func ValidateAndfixCNIResult(netConfig *cnicurrent.Result, podNs string) error {
+func ValidateAndFixCNIResult(netConfig *cnicurrent.Result, podNs string) error {
 	allLinks, err := netlink.LinkList()
 	if err != nil {
 		return fmt.Errorf("error listing links: %v", err)
