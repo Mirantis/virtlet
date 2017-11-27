@@ -198,12 +198,13 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 		if netConfig == nil {
 			netConfig = &cnicurrent.Result{}
 		}
-		if err := nettools.ValidateAndFixCNIResult(netConfig, pnd.PodNs); err != nil {
+		if netConfig, err = nettools.ValidateAndFixCNIResult(netConfig, pnd.PodNs); err != nil {
 			return fmt.Errorf("error in fixing cni configuration: %v", err)
 		}
 		if s.dummyGateway != nil {
 			netConfig.IPs[0].Address.Mask = netmaskForCalico()
 		}
+		glog.V(3).Infof("CNI Result after fix:\n%s", spew.Sdump(netConfig))
 
 		var err error
 		if recover {

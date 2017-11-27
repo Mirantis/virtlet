@@ -338,10 +338,10 @@ func findLinkByAddress(links []netlink.Link, address net.IPNet) (netlink.Link, e
 // ips, routes, interfaces and if something is missing it tries to complement
 // that using patch for Weave or for plugins which return their netConfig
 // in v0.2.0 version of CNI SPEC
-func ValidateAndFixCNIResult(netConfig *cnicurrent.Result, podNs string) error {
+func ValidateAndFixCNIResult(netConfig *cnicurrent.Result, podNs string) (*cnicurrent.Result, error) {
 	allLinks, err := netlink.LinkList()
 	if err != nil {
-		return fmt.Errorf("error listing links: %v", err)
+		return nil, fmt.Errorf("error listing links: %v", err)
 	}
 
 	// If there are no routes provided, we consider it a broken
@@ -352,21 +352,21 @@ func ValidateAndFixCNIResult(netConfig *cnicurrent.Result, podNs string) error {
 
 		veth, err := FindVeth(allLinks)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if netConfig, err = ExtractLinkInfo(veth, podNs); err != nil {
-			return err
+			return nil, err
 		}
 
 		// extracted netConfig doesn't have DNS information, so
 		// still try to extract it from CNI-provided data
 		netConfig.DNS = dnsInfo
 
-		return nil
+		return netConfig, nil
 	}
 
 	if len(netConfig.IPs) == 0 {
-		return fmt.Errorf("cni result does not have any IP addresses")
+		return nil, fmt.Errorf("cni result does not have any IP addresses")
 	}
 
 	// If on list of interfaces are missing elements matching these mentioned
@@ -376,13 +376,13 @@ func ValidateAndFixCNIResult(netConfig *cnicurrent.Result, podNs string) error {
 	if len(netConfig.Interfaces) == 0 {
 		alreadyDefindeLinks, err := GetContainerLinks(netConfig.Interfaces)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		for _, ipConfig := range netConfig.IPs {
 			link, err := findLinkByAddress(allLinks, ipConfig.Address)
 			if err != nil {
-				return err
+				return nil, err
 			}
 
 			found := false
@@ -405,7 +405,7 @@ func ValidateAndFixCNIResult(netConfig *cnicurrent.Result, podNs string) error {
 		}
 	}
 
-	return nil
+	return netConfig, nil
 }
 
 func findLinkByName(links []netlink.Link, name string) (netlink.Link, error) {
