@@ -42,11 +42,11 @@ var (
 )
 
 type Server struct {
-	config   *Config
+	config   *cnicurrent.Result
 	listener *dhcp4.Conn
 }
 
-func NewServer(config *Config) *Server {
+func NewServer(config *cnicurrent.Result) *Server {
 	return &Server{config: config}
 }
 
@@ -142,20 +142,31 @@ func interfaceIP(intf *net.Interface) (net.IP, error) {
 	return nil, errors.New("no usable unicast address configured on interface")
 }
 
+func (s *Server) getInterfaceNo(hwAddr net.HardwareAddr) int {
+	addr := hwAddr.String()
+	for i, permitted := range s.config.Interfaces {
+		if permitted.Mac == addr {
+			return i
+		}
+	}
+	return -1
+}
+
 func (s *Server) prepareResponse(pkt *dhcp4.Packet, serverIP net.IP, mt dhcp4.MessageType) (*dhcp4.Packet, error) {
-	if !bytes.Equal(pkt.HardwareAddr, s.config.PeerHardwareAddress) {
+	interfaceNo := s.getInterfaceNo(pkt.HardwareAddr)
+	if interfaceNo < 0 {
 		return nil, fmt.Errorf("unexpected packet from %v", pkt.HardwareAddr)
 	}
 
 	var cfg *cnicurrent.IPConfig
-	for _, curCfg := range s.config.CNIResult.IPs {
-		if curCfg.Version == "4" {
+	for _, curCfg := range s.config.IPs {
+		if curCfg.Version == "4" && curCfg.Interface == interfaceNo {
 			cfg = curCfg
 		}
 	}
 
 	if cfg == nil {
-		return nil, fmt.Errorf("IPv4 config is not specified in CNI config")
+		return nil, fmt.Errorf("IPv4 config for interface %s is not specified in CNI config", pkt.HardwareAddr.String())
 	}
 
 	p := &dhcp4.Packet{
@@ -198,11 +209,11 @@ func (s *Server) prepareResponse(pkt *dhcp4.Packet, serverIP net.IP, mt dhcp4.Me
 	p.Options[dhcp4.OptRebindingTime] = []byte{0, 0, 253, 32}
 
 	// TODO: include more dns options
-	if len(s.config.CNIResult.DNS.Nameservers) == 0 {
+	if len(s.config.DNS.Nameservers) == 0 {
 		p.Options[dhcp4.OptDNSServers] = defaultDNS
 	} else {
 		var b bytes.Buffer
-		for _, nsIP := range s.config.CNIResult.DNS.Nameservers {
+		for _, nsIP := range s.config.DNS.Nameservers {
 			ip := net.ParseIP(nsIP).To4()
 			if ip == nil {
 				glog.Warningf("failed to parse nameserver ip %q", nsIP)
@@ -216,9 +227,9 @@ func (s *Server) prepareResponse(pkt *dhcp4.Packet, serverIP net.IP, mt dhcp4.Me
 			p.Options[dhcp4.OptDNSServers] = defaultDNS
 		}
 	}
-	if len(s.config.CNIResult.DNS.Search) != 0 {
+	if len(s.config.DNS.Search) != 0 {
 		// https://tools.ietf.org/search/rfc3397
-		p.Options[119], err = compressedDomainList(s.config.CNIResult.DNS.Search)
+		p.Options[119], err = compressedDomainList(s.config.DNS.Search)
 		if err != nil {
 			return nil, err
 		}
@@ -236,12 +247,12 @@ func (s *Server) ackDHCP(pkt *dhcp4.Packet, serverIP net.IP) (*dhcp4.Packet, err
 }
 
 func (s *Server) getStaticRoutes() (router, routes []byte, err error) {
-	if len(s.config.CNIResult.Routes) == 0 {
+	if len(s.config.Routes) == 0 {
 		return nil, nil, nil
 	}
 
 	var b bytes.Buffer
-	for _, route := range s.config.CNIResult.Routes {
+	for _, route := range s.config.Routes {
 		if route.Dst.IP == nil {
 			return nil, nil, fmt.Errorf("invalid route: %#v", route)
 		}
@@ -250,7 +261,7 @@ func (s *Server) getStaticRoutes() (router, routes []byte, err error) {
 		if gw == nil {
 			// FIXME: this should not be really needed for newer CNI
 			var cfg *cnicurrent.IPConfig
-			for _, curCfg := range s.config.CNIResult.IPs {
+			for _, curCfg := range s.config.IPs {
 				if curCfg.Version == "4" {
 					cfg = curCfg
 				}

@@ -34,7 +34,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
 
-	"github.com/Mirantis/virtlet/pkg/dhcp"
 	"github.com/Mirantis/virtlet/pkg/nettools"
 )
 
@@ -49,6 +48,7 @@ const (
 	tcpdumpSubstringWaitCount = 100
 	outerAddr                 = "10.1.90.1/24"
 	clientAddr                = "10.1.90.5/24"
+	clientMacAddress          = "42:a4:a6:22:80:2e"
 )
 
 func TestVmNetwork(t *testing.T) {
@@ -72,9 +72,9 @@ func TestVmNetwork(t *testing.T) {
 	info := &cnicurrent.Result{
 		Interfaces: []*cnicurrent.Interface{
 			{
-				Name: "eth0",
-				Mac:  "42:a4:a6:22:80:2e",
-				// TODO: Sandbox
+				Name:    "eth0",
+				Mac:     clientMacAddress,
+				Sandbox: contNS.Path(),
 			},
 		},
 		IPs: []*cnicurrent.IPConfig{
@@ -107,14 +107,14 @@ func TestVmNetwork(t *testing.T) {
 	}
 
 	var dhcpClientVeth, hostVeth netlink.Link
-	if hostNS.Do(func(ns.NetNS) (err error) {
+	if err := hostNS.Do(func(ns.NetNS) (err error) {
 		hostVeth, _, err = nettools.CreateEscapeVethPair(contNS, "eth0", 1500)
 		return
 	}); err != nil {
 		t.Fatalf("failed to create escape veth pair: %v", err)
 	}
 
-	if contNS.Do(func(ns.NetNS) error {
+	if err := contNS.Do(func(ns.NetNS) error {
 		_, err = nettools.SetupContainerSideNetwork(info, contNS.Path())
 		if err != nil {
 			return fmt.Errorf("failed to set up container side network: %v", err)
@@ -149,10 +149,19 @@ func TestVmNetwork(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("failed to set up container-side network: %v", err)
 	}
+	if err := clientNS.Do(func(ns.NetNS) error {
+		mac, _ := net.ParseMAC(clientMacAddress)
+		if err = nettools.SetHardwareAddr(dhcpClientVeth, mac); err != nil {
+			return fmt.Errorf("can't set test MAC address on client interface: %v", err)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	outerIP := addAddress(t, hostNS, hostVeth, outerAddr)
 
-	g := NewNetTestGroup(t, 1*time.Minute)
+	g := NewNetTestGroup(t, 15*time.Second)
 	defer g.Stop()
 
 	// tcpdump should catch udp 'ping' but should not
@@ -160,10 +169,7 @@ func TestVmNetwork(t *testing.T) {
 	tcpdump := newTcpdump(hostVeth, "10.1.90.1.4243 > 10.1.90.5.4242: UDP", "BOOTP/DHCP")
 	g.Add(hostNS, tcpdump)
 
-	g.Add(contNS, NewDhcpServerTester(&dhcp.Config{
-		CNIResult:           *info,
-		PeerHardwareAddress: dhcpClientVeth.Attrs().HardwareAddr,
-	}))
+	g.Add(contNS, NewDhcpServerTester(info))
 	// wait for dhcp client to complete so we don't interfere
 	// with the network link too early
 	<-g.Add(clientNS, NewDhcpClient([]string{

@@ -48,15 +48,16 @@ import (
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
 
 	"github.com/Mirantis/virtlet/pkg/cni"
 )
 
 const (
-	tapInterfaceName      = "tap0"
-	containerBridgeName   = "br0"
-	loopbackInterfaceName = "lo"
+	tapInterfaceNameTemplate    = "tap%d"
+	containerBridgeNameTemplate = "br%d"
+	loopbackInterfaceName       = "lo"
 	// Address for dhcp server internal interface
 	internalDhcpAddr = "169.254.254.2/24"
 
@@ -101,7 +102,7 @@ func OpenTAP(devName string) (*os.File, error) {
 	// Raw protocol ethernet frame.
 	// This extra 4-byte header breaks connectivity as in this case kernel truncates initial package
 	req.Flags = uint16(syscall.IFF_TAP | syscall.IFF_NO_PI | syscall.IFF_ONE_QUEUE)
-	copy(req.Name[:15], "tap0")
+	copy(req.Name[:15], devName)
 	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, tapFile.Fd(), uintptr(syscall.TUNSETIFF), uintptr(unsafe.Pointer(&req)))
 	if errno != 0 {
 		return nil, fmt.Errorf("tuntap IOCTL TUNSETIFF failed, errno %v", errno)
@@ -299,13 +300,9 @@ func SetupBridge(bridgeName string, links []netlink.Link) (*netlink.Bridge, erro
 	return br, nil
 }
 
-// FindVeth locates veth link in the current network namespace.
-// There must be exactly one veth interface in the namespace.
-func FindVeth() (netlink.Link, error) {
-	links, err := netlink.LinkList()
-	if err != nil {
-		return nil, fmt.Errorf("error listing links: %v", err)
-	}
+// FindVeth locates single veth link in the list of provided links.
+// There must be exactly one veth interface in the list.
+func FindVeth(links []netlink.Link) (netlink.Link, error) {
 	var veth netlink.Link
 	for _, link := range links {
 		if link.Type() != "veth" {
@@ -320,6 +317,126 @@ func FindVeth() (netlink.Link, error) {
 		return nil, errors.New("no veth interface found")
 	}
 	return veth, nil
+}
+
+func findLinkByAddress(links []netlink.Link, address net.IPNet) (netlink.Link, error) {
+	for _, link := range links {
+		addresses, err := netlink.AddrList(link, netlink.FAMILY_ALL)
+		if err != nil {
+			return nil, err
+		}
+		for _, addr := range addresses {
+			if addr.IPNet.String() == address.String() {
+				return link, nil
+			}
+		}
+	}
+	return nil, fmt.Errorf("interface with address %q not found in container namespace", address.String())
+}
+
+// ValidateAndFixCNIResult verifies that netConfig contains proper list of
+// ips, routes, interfaces and if something is missing it tries to complement
+// that using patch for Weave or for plugins which return their netConfig
+// in v0.2.0 version of CNI SPEC
+func ValidateAndFixCNIResult(netConfig *cnicurrent.Result, podNs string) (*cnicurrent.Result, error) {
+	allLinks, err := netlink.LinkList()
+	if err != nil {
+		return nil, fmt.Errorf("error listing links: %v", err)
+	}
+
+	// If there are no routes provided, we consider it a broken
+	// config and extract interface config instead. That's the
+	// case with Weave CNI plugin.
+	if cni.GetPodIP(netConfig) == "" || len(netConfig.Routes) == 0 {
+		dnsInfo := netConfig.DNS
+
+		veth, err := FindVeth(allLinks)
+		if err != nil {
+			return nil, err
+		}
+		if netConfig, err = ExtractLinkInfo(veth, podNs); err != nil {
+			return nil, err
+		}
+
+		// extracted netConfig doesn't have DNS information, so
+		// still try to extract it from CNI-provided data
+		netConfig.DNS = dnsInfo
+
+		return netConfig, nil
+	}
+
+	if len(netConfig.IPs) == 0 {
+		return nil, fmt.Errorf("cni result does not have any IP addresses")
+	}
+
+	// If on list of interfaces are missing elements matching these mentioned
+	// by interface index in elements of ip list and for all elements
+	// of this list which have value -1 for interface index - add them to list
+	// of interfaces and fix its index in ip list entry
+	if len(netConfig.Interfaces) == 0 {
+		alreadyDefindeLinks, err := GetContainerLinks(netConfig.Interfaces)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, ipConfig := range netConfig.IPs {
+			link, err := findLinkByAddress(allLinks, ipConfig.Address)
+			if err != nil {
+				return nil, err
+			}
+
+			found := false
+			for i, l := range alreadyDefindeLinks {
+				if l == link {
+					ipConfig.Interface = i
+					found = true
+					break
+				}
+			}
+			if !found {
+				netConfig.Interfaces = append(netConfig.Interfaces, &cnicurrent.Interface{
+					Name:    link.Attrs().Name,
+					Mac:     link.Attrs().HardwareAddr.String(),
+					Sandbox: podNs,
+				})
+				ipConfig.Interface = len(alreadyDefindeLinks)
+				alreadyDefindeLinks = append(alreadyDefindeLinks, link)
+			}
+		}
+	}
+
+	return netConfig, nil
+}
+
+func findLinkByName(links []netlink.Link, name string) (netlink.Link, error) {
+	for _, link := range links {
+		if link.Attrs().Name == name {
+			return link, nil
+		}
+	}
+	return nil, fmt.Errorf("interface with name %q not found in container namespace", name)
+}
+
+// GetContainerLinks locates in container namespac enetwork links
+// for provided interfaces
+func GetContainerLinks(interfaces []*cnicurrent.Interface) ([]netlink.Link, error) {
+	allLinks, err := netlink.LinkList()
+	if err != nil {
+		return nil, fmt.Errorf("error listing links: %v", err)
+	}
+
+	var links []netlink.Link
+	for _, iface := range interfaces {
+		if iface.Sandbox == "" {
+			continue
+		}
+		link, err := findLinkByName(allLinks, iface.Name)
+		if err != nil {
+			return nil, err
+		}
+		links = append(links, link)
+	}
+	return links, nil
 }
 
 // StripLink removes addresses from the link
@@ -464,7 +581,7 @@ func disableMacLearning(nsPath string, bridgeName string) error {
 	return nil
 }
 
-func setHardwareAddr(link netlink.Link, hwAddr net.HardwareAddr) error {
+func SetHardwareAddr(link netlink.Link, hwAddr net.HardwareAddr) error {
 	if err := netlink.LinkSetDown(link); err != nil {
 		return fmt.Errorf("can't bring down the link: %v", err)
 	}
@@ -483,108 +600,104 @@ func setHardwareAddr(link netlink.Link, hwAddr net.HardwareAddr) error {
 type ContainerSideNetwork struct {
 	// Result contains CNI result object describing the network settings
 	Result *cnicurrent.Result
-	// Path to the container network namespace
+	// NsPath specifies the path to the container network namespace
 	NsPath string
-	// TapFile contains an open File object pointing to Tap device inside
-	// the network namespace
-	TapFile *os.File
-	// HardwareAddr stores the original hardware address of the
-	// CNI veth interface
-	HardwareAddr net.HardwareAddr
+	// TapFiles contains a list of open File objects pointing to tap
+	// devices inside the network namespace
+	TapFiles []*os.File
+	// HardwareAddrs contains a list of original hardware addresses of
+	// CNI-created veth links
+	HardwareAddrs []net.HardwareAddr
 }
 
 // SetupContainerSideNetwork sets up networking in container
-// namespace.  It does so by calling ExtractLinkInfo() first unless
-// non-nil info argument is provided and then preparing the following
+// namespace.  It does so by preparing the following
 // network interfaces in container ns:
-//     tap0      - tap interface for the VM
-//     br0       - a bridge that joins tap0 and original CNI veth
-// The bridge (br0) gets assigned a link-local address to be used
+//     tapX      - tap interface for the each interface to pass to VM
+//     brX       - a bridge that joins above tapX and original CNI interface
+// with X denoting an link index in info.Interfaces list.
+// Each bridge gets assigned a link-local address to be used
 // for dhcp server.
 // The function should be called from within container namespace.
 // Returns container network struct and an error, if any
 func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string) (*ContainerSideNetwork, error) {
-	contVeth, err := FindVeth()
+	contLinks, err := GetContainerLinks(info.Interfaces)
 	if err != nil {
 		return nil, err
 	}
-	// If there are no routes provided, we consider it a broken
-	// config and extract interface config instead. That's the
-	// case with Weave CNI plugin.
-	if info == nil || cni.GetPodIP(info) == "" || len(info.Routes) == 0 {
-		var dnsInfo cnitypes.DNS
-		if info != nil {
-			dnsInfo = info.DNS
+
+	var (
+		tapFiles []*os.File
+		hwAddrs  []net.HardwareAddr
+	)
+
+	for i, link := range contLinks {
+		hwAddr := link.Attrs().HardwareAddr
+		newHwAddr, err := GenerateMacAddress()
+		if err == nil {
+			err = SetHardwareAddr(link, newHwAddr)
 		}
-		info, err = ExtractLinkInfo(contVeth, nsPath)
+		if err == nil {
+			err = StripLink(link)
+		}
 		if err != nil {
 			return nil, err
 		}
-		// extracted info doesn't have DNS information, so
-		// still try to extract it from CNI-provided data
-		info.DNS = dnsInfo
+
+		tapInterfaceName := fmt.Sprintf(tapInterfaceNameTemplate, i)
+		tap := &netlink.Tuntap{
+			LinkAttrs: netlink.LinkAttrs{
+				Name:  tapInterfaceName,
+				Flags: net.FlagUp,
+				MTU:   link.Attrs().MTU,
+			},
+			Mode: netlink.TUNTAP_MODE_TAP,
+		}
+		if err := netlink.LinkAdd(tap); err != nil {
+			return nil, fmt.Errorf("failed to create tap interface: %v", err)
+		}
+
+		if err := netlink.LinkSetUp(tap); err != nil {
+			return nil, fmt.Errorf("failed to set %q up: %v", tapInterfaceName, err)
+		}
+
+		containerBridgeName := fmt.Sprintf(containerBridgeNameTemplate, i)
+		br, err := SetupBridge(containerBridgeName, []netlink.Link{link, tap})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create bridge: %v", err)
+		}
+
+		if err := netlink.AddrAdd(br, mustParseAddr(internalDhcpAddr)); err != nil {
+			return nil, fmt.Errorf("failed to set address for the bridge: %v", err)
+		}
+
+		// Add ebtables DHCP blocking rules
+		if err := updateEbTables(nsPath, link.Attrs().Name, "-A"); err != nil {
+			return nil, err
+		}
+
+		// Work around bridge MAC learning problem
+		// https://ubuntuforums.org/showthread.php?t=2329373&s=cf580a41179e0f186ad4e625834a1d61&p=13511965#post13511965
+		// (affects Flannel)
+		if err := disableMacLearning(nsPath, containerBridgeName); err != nil {
+			return nil, err
+		}
+
+		if err := bringUpLoopback(); err != nil {
+			return nil, err
+		}
+
+		glog.V(3).Infof("Opening tap interface %q for link %q", tapInterfaceName, link.Attrs().Name)
+		tapFile, err := OpenTAP(tapInterfaceName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open tap: %v", err)
+		}
+
+		hwAddrs = append(hwAddrs, hwAddr)
+		tapFiles = append(tapFiles, tapFile)
 	}
 
-	hwAddr := contVeth.Attrs().HardwareAddr
-	newHwAddr, err := GenerateMacAddress()
-	if err == nil {
-		err = setHardwareAddr(contVeth, newHwAddr)
-	}
-	if err == nil {
-		err = StripLink(contVeth)
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	tap := &netlink.Tuntap{
-		LinkAttrs: netlink.LinkAttrs{
-			Name:  tapInterfaceName,
-			Flags: net.FlagUp,
-			MTU:   contVeth.Attrs().MTU,
-		},
-		Mode: netlink.TUNTAP_MODE_TAP,
-	}
-	if err := netlink.LinkAdd(tap); err != nil {
-		return nil, fmt.Errorf("failed to create tap interface: %v", err)
-	}
-
-	if err := netlink.LinkSetUp(tap); err != nil {
-		return nil, fmt.Errorf("failed to set %q up: %v", tapInterfaceName, err)
-	}
-
-	br, err := SetupBridge(containerBridgeName, []netlink.Link{contVeth, tap})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create bridge: %v", err)
-	}
-
-	if err := netlink.AddrAdd(br, mustParseAddr(internalDhcpAddr)); err != nil {
-		return nil, fmt.Errorf("failed to set address for the bridge: %v", err)
-	}
-
-	// Add ebtables DHCP blocking rules
-	if err := updateEbTables(nsPath, contVeth.Attrs().Name, "-A"); err != nil {
-		return nil, err
-	}
-
-	// Work around bridge MAC learning problem
-	// https://ubuntuforums.org/showthread.php?t=2329373&s=cf580a41179e0f186ad4e625834a1d61&p=13511965#post13511965
-	// (affects Flannel)
-	// FIXME: s
-	if err := disableMacLearning(nsPath, containerBridgeName); err != nil {
-		return nil, err
-	}
-
-	if err := bringUpLoopback(); err != nil {
-		return nil, err
-	}
-
-	tapFile, err := OpenTAP(tapInterfaceName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open tap: %v", err)
-	}
-
-	return &ContainerSideNetwork{info, nsPath, tapFile, hwAddr}, nil
+	return &ContainerSideNetwork{info, nsPath, tapFiles, hwAddrs}, nil
 }
 
 // RecreateContainerSideNetwork tries to populate ContainerSideNetwork
@@ -594,17 +707,31 @@ func RecreateContainerSideNetwork(info *cnicurrent.Result, nsPath string) (*Cont
 		return nil, fmt.Errorf("wrong cni configuration - missing interfaces list: %v", spew.Sdump(info))
 	}
 
-	hwAddr, err := net.ParseMAC(info.Interfaces[0].Mac)
-	if err != nil {
-		return nil, fmt.Errorf("invalid mac address %q: %v", info.Interfaces[0].Mac, err)
+	var (
+		tapFiles []*os.File
+		hwAddrs  []net.HardwareAddr
+	)
+
+	for i, iface := range info.Interfaces {
+		if iface.Sandbox == "" {
+			continue
+		}
+		hwAddr, err := net.ParseMAC(iface.Mac)
+		if err != nil {
+			return nil, fmt.Errorf("invalid mac address %q: %v", iface.Mac, err)
+		}
+
+		tapInterfaceName := fmt.Sprintf(tapInterfaceNameTemplate, i)
+		tapFile, err := OpenTAP(tapInterfaceName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open tap: %v", err)
+		}
+
+		hwAddrs = append(hwAddrs, hwAddr)
+		tapFiles = append(tapFiles, tapFile)
 	}
 
-	tapFile, err := OpenTAP(tapInterfaceName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open tap: %v", err)
-	}
-
-	return &ContainerSideNetwork{info, nsPath, tapFile, hwAddr}, nil
+	return &ContainerSideNetwork{info, nsPath, tapFiles, hwAddrs}, nil
 }
 
 // TeardownBridge removes links from bridge and sets it down
@@ -620,28 +747,42 @@ func TeardownBridge(bridge netlink.Link, links []netlink.Link) error {
 
 // ConfigureLink adds to link ip address and routes based on info.
 func ConfigureLink(link netlink.Link, info *cnicurrent.Result) error {
-	var addr *netlink.Addr
-	for _, ip := range info.IPs {
-		if ip.Version == "4" {
-			addr = &netlink.Addr{IPNet: &ip.Address}
+	linkNo := -1
+	linkMAC := link.Attrs().HardwareAddr.String()
+	for i, iface := range info.Interfaces {
+		if iface.Mac == linkMAC {
+			linkNo = i
+			break
 		}
 	}
-	if addr == nil {
-		return fmt.Errorf("can't get IP from cni result: %v", info)
-	}
-	if err := netlink.AddrAdd(link, addr); err != nil {
-		return err
+	if linkNo == -1 {
+		return fmt.Errorf("can not find link with MAC %q in saved cni result: %s", linkMAC, spew.Sdump(info))
 	}
 
-	for _, route := range info.Routes {
-		err := netlink.RouteAdd(&netlink.Route{
-			LinkIndex: link.Attrs().Index,
-			Scope:     netlink.SCOPE_UNIVERSE,
-			Dst:       &route.Dst,
-			Gw:        route.GW,
-		})
-		if err != nil {
-			return err
+	for _, addr := range info.IPs {
+		if addr.Interface == linkNo {
+			addr := &netlink.Addr{IPNet: &addr.Address}
+			if err := netlink.AddrAdd(link, addr); err != nil {
+				return err
+			}
+
+			for _, route := range info.Routes {
+				// TODO: that's too naive - if there are more than one interfaces which have this gw address
+				// in their subnet - same gw will be added on both of them
+				// in theory this should be ok, but there is can lead to configuration other than prepared
+				// by cni plugins
+				if addr.Contains(route.GW) {
+					err := netlink.RouteAdd(&netlink.Route{
+						LinkIndex: link.Attrs().Index,
+						Scope:     netlink.SCOPE_UNIVERSE,
+						Dst:       &route.Dst,
+						Gw:        route.GW,
+					})
+					if err != nil {
+						return err
+					}
+				}
+			}
 		}
 	}
 
@@ -654,52 +795,66 @@ func ConfigureLink(link netlink.Link, info *cnicurrent.Result) error {
 // The end result is the same network configuration in the container network namespace
 // as it was before SetupContainerSideNetwork() call.
 func (csn *ContainerSideNetwork) Teardown() error {
-	csn.TapFile.Close()
-	contVeth, err := FindVeth()
+	for _, f := range csn.TapFiles {
+		f.Close()
+	}
+	contLinks, err := GetContainerLinks(csn.Result.Interfaces)
 	if err != nil {
 		return err
 	}
 
-	// Remove ebtables DHCP rules
-	if err := updateEbTables(csn.NsPath, contVeth.Attrs().Name, "-D"); err != nil {
-		return nil
+	for i, contLink := range contLinks {
+		// Remove ebtables DHCP rules
+		if err := updateEbTables(csn.NsPath, contLink.Attrs().Name, "-D"); err != nil {
+			return nil
+		}
+
+		tapInterfaceName := fmt.Sprintf(tapInterfaceNameTemplate, i)
+		tap, err := netlink.LinkByName(tapInterfaceName)
+		if err != nil {
+			return err
+		}
+
+		containerBridgeName := fmt.Sprintf(containerBridgeNameTemplate, i)
+		br, err := netlink.LinkByName(containerBridgeName)
+		if err != nil {
+			return err
+		}
+
+		if err := netlink.AddrDel(br, mustParseAddr(internalDhcpAddr)); err != nil {
+			return err
+		}
+
+		if err := TeardownBridge(br, []netlink.Link{contLink, tap}); err != nil {
+			return err
+		}
+
+		if err := netlink.LinkDel(br); err != nil {
+			return err
+		}
+
+		if err := netlink.LinkSetDown(tap); err != nil {
+			return err
+		}
+
+		if err := netlink.LinkDel(tap); err != nil {
+			return err
+		}
+
+		if err := SetHardwareAddr(contLink, csn.HardwareAddrs[i]); err != nil {
+			return err
+		}
+
+		rereadedLink, err := netlink.LinkByName(contLink.Attrs().Name)
+		if err != nil {
+			return err
+		}
+		if err := ConfigureLink(rereadedLink, csn.Result); err != nil {
+			return err
+		}
 	}
 
-	tap, err := netlink.LinkByName(tapInterfaceName)
-	if err != nil {
-		return err
-	}
-
-	br, err := netlink.LinkByName(containerBridgeName)
-	if err != nil {
-		return err
-	}
-
-	if err := netlink.AddrDel(br, mustParseAddr(internalDhcpAddr)); err != nil {
-		return err
-	}
-
-	if err := TeardownBridge(br, []netlink.Link{contVeth, tap}); err != nil {
-		return err
-	}
-
-	if err := netlink.LinkDel(br); err != nil {
-		return err
-	}
-
-	if err := netlink.LinkSetDown(tap); err != nil {
-		return err
-	}
-
-	if err := netlink.LinkDel(tap); err != nil {
-		return err
-	}
-
-	if err := setHardwareAddr(contVeth, csn.HardwareAddr); err != nil {
-		return err
-	}
-
-	return ConfigureLink(contVeth, csn.Result)
+	return nil
 }
 
 // copied from:

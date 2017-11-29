@@ -20,18 +20,21 @@ import (
 	"bytes"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/containernetworking/cni/pkg/ns"
+	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 
 	"github.com/Mirantis/virtlet/pkg/dhcp"
 )
 
 const (
 	maxNetTestMembers = 32
+	dhcpcdTimeout     = 2
 )
 
 type NetTester interface {
@@ -135,10 +138,10 @@ func (g *NetTestGroup) Wait() {
 }
 
 type DhcpServerTester struct {
-	config *dhcp.Config
+	config *cnicurrent.Result
 }
 
-func NewDhcpServerTester(config *dhcp.Config) *DhcpServerTester {
+func NewDhcpServerTester(config *cnicurrent.Result) *DhcpServerTester {
 	return &DhcpServerTester{config}
 }
 
@@ -181,7 +184,8 @@ func (d *DhcpClient) Name() string { return "dhcp client" }
 func (d *DhcpClient) Fg() bool     { return true }
 
 func (d *DhcpClient) Run(readyCh, stopCh chan struct{}) error {
-	cmd := exec.Command("dhcpcd", "-T")
+	args := []string{"-T", "-t", strconv.Itoa(dhcpcdTimeout)}
+	cmd := exec.Command("dhcpcd", args...)
 	var b bytes.Buffer
 	cmd.Stdout = &b
 	cmd.Stderr = &b
@@ -201,7 +205,7 @@ func (d *DhcpClient) Run(readyCh, stopCh chan struct{}) error {
 	close(doneCh)
 	outStr := b.String()
 	if err != nil {
-		return fmt.Errorf("dhcpcd -T failed: %v\nout:\n%s", err, outStr)
+		return fmt.Errorf("dhcpcd %s failed: %v\nout:\n%s", strings.Join(args, " "), err, outStr)
 	}
 
 	var missing []string

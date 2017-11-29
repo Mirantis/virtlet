@@ -17,9 +17,9 @@ limitations under the License.
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
-	"net"
 	"os"
 	"strings"
 	"syscall"
@@ -158,22 +158,33 @@ func main() {
 				glog.Errorf("Can't connect to fd server: %v", err)
 				os.Exit(1)
 			}
-			tapFd, hwAddr, err := c.GetFD(netFdKey)
+			tapFds, marshaledData, err := c.GetFDs(netFdKey)
 			if err != nil {
-				glog.Errorf("Failed to obtain tap fd for key %q: %v", netFdKey, err)
+				glog.Errorf("Failed to obtain tap fds for key %q: %v", netFdKey, err)
 				os.Exit(1)
 			}
 
-			netArgs = []string{
-				"-netdev",
-				fmt.Sprintf("tap,id=tap0,fd=%d", tapFd),
-				"-device",
-				"virtio-net-pci,netdev=tap0,id=net0,mac=" + net.HardwareAddr(hwAddr).String(),
+			var descriptions []tapmanager.InterfaceDescription
+			if err := json.Unmarshal(marshaledData, &descriptions); err != nil {
+				glog.Errorf("Failed to unmarshal network interface info", err)
+				os.Exit(1)
+			}
+
+			for i, desc := range descriptions {
+				if desc.Type == tapmanager.InterfaceTypeTap {
+					netArgs = append(netArgs,
+						"-netdev",
+						fmt.Sprintf("tap,id=tap%d,fd=%d", desc.TapFdIndex, tapFds[desc.TapFdIndex]),
+						"-device",
+						fmt.Sprintf("virtio-net-pci,netdev=tap%d,id=net%d,mac=%s", desc.TapFdIndex, i, desc.HardwareAddr),
+					)
+				}
 			}
 		}
 	}
 
 	args := append([]string{emulator}, emulatorArgs...)
+	args = append(args, netArgs...)
 	env := os.Environ()
 	if runInAnotherContainer {
 		// re-execute itself because entering mount namespace
@@ -183,7 +194,7 @@ func main() {
 	}
 
 	glog.V(0).Infof("Executing emulator: %s", strings.Join(args, " "))
-	if err := syscall.Exec(args[0], append(args, netArgs...), env); err != nil {
+	if err := syscall.Exec(args[0], args, env); err != nil {
 		glog.Errorf("Can't exec emulator: %v", err)
 		os.Exit(1)
 	}
