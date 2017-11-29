@@ -28,24 +28,24 @@ import (
 )
 
 type Client struct {
-	pluginsInterface libcni.CNIConfig
-	configuration    *libcni.NetworkConfig
+	cniConfig     *libcni.CNIConfig
+	netConfigList *libcni.NetworkConfigList
 }
 
 func NewClient(pluginsDir, configsDir string) (*Client, error) {
-	configuration, err := ReadConfiguration(configsDir)
-	glog.V(3).Infof("CNI config: name: %q type: %q", configuration.Network.Name, configuration.Network.Type)
+	netConfigList, err := ReadConfiguration(configsDir)
+	glog.V(3).Infof("CNI config: name: %q type: %q", netConfigList.Plugins[0].Network.Name, netConfigList.Plugins[0].Network.Type)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read CNI configuration: %v", err)
 	}
 
 	return &Client{
-		pluginsInterface: libcni.CNIConfig{Path: []string{pluginsDir}},
-		configuration:    configuration,
+		cniConfig:     &libcni.CNIConfig{Path: []string{pluginsDir}},
+		netConfigList: netConfigList,
 	}, nil
 }
 
-func (c *Client) Type() string { return c.configuration.Network.Type }
+func (c *Client) Type() string { return c.netConfigList.Plugins[0].Network.Type }
 
 func (c *Client) cniRuntimeConf(podId, podName, podNs string) *libcni.RuntimeConf {
 	r := &libcni.RuntimeConf{
@@ -79,10 +79,10 @@ func (c *Client) GetDummyNetwork() (*cnicurrent.Result, error) {
 }
 
 func (c *Client) AddSandboxToNetwork(podId, podName, podNs string) (*cnicurrent.Result, error) {
-	cniConf := c.cniRuntimeConf(podId, podName, podNs)
-	glog.V(3).Infof("AddSandboxToNetwork: podId %q, podName %q, podNs %q, config:\n%s",
-		podId, podName, podNs, spew.Sdump(cniConf))
-	result, err := c.pluginsInterface.AddNetwork(c.configuration, cniConf)
+	rtConf := c.cniRuntimeConf(podId, podName, podNs)
+	glog.V(3).Infof("AddSandboxToNetwork: podId %q, podName %q, podNs %q, runtime config:\n%s",
+		podId, podName, podNs, spew.Sdump(rtConf))
+	result, err := c.cniConfig.AddNetworkList(c.netConfigList, rtConf)
 	if err == nil {
 		glog.V(3).Infof("AddSandboxToNetwork: podId %q, podName %q, podNs %q: result:\n%s",
 			podId, podName, podNs, spew.Sdump(result))
@@ -100,7 +100,7 @@ func (c *Client) AddSandboxToNetwork(podId, podName, podNs string) (*cnicurrent.
 
 func (c *Client) RemoveSandboxFromNetwork(podId, podName, podNs string) error {
 	glog.V(3).Infof("RemoveSandboxFromNetwork: podId %q, podName %q, podNs %q", podId, podName, podNs)
-	err := c.pluginsInterface.DelNetwork(c.configuration, c.cniRuntimeConf(podId, podName, podNs))
+	err := c.cniConfig.DelNetworkList(c.netConfigList, c.cniRuntimeConf(podId, podName, podNs))
 	if err == nil {
 		glog.V(3).Infof("RemoveSandboxFromNetwork: podId %q, podName %q, podNs %q: success",
 			podId, podName, podNs)
