@@ -330,7 +330,7 @@ func (v *VirtletManager) PodSandboxStatus(ctx context.Context, in *kubeapi.PodSa
 
 func (v *VirtletManager) ListPodSandbox(ctx context.Context, in *kubeapi.ListPodSandboxRequest) (*kubeapi.ListPodSandboxResponse, error) {
 	filter := in.GetFilter()
-	glog.V(3).Infof("Listing sandboxes with filter: %s", spew.Sdump(filter))
+	glog.V(4).Infof("Listing sandboxes with filter: %s", spew.Sdump(filter))
 	sandboxes, err := v.metadataStore.ListPodSandboxes(filter)
 	if err != nil {
 		glog.Errorf("Error when listing (with filter: %s) pod sandboxes: %v", spew.Sdump(filter), err)
@@ -347,7 +347,7 @@ func (v *VirtletManager) ListPodSandbox(ctx context.Context, in *kubeapi.ListPod
 		}
 	}
 	response := &kubeapi.ListPodSandboxResponse{Items: podSandboxList}
-	glog.V(3).Infof("ListPodSandbox response: %s", spew.Sdump(response))
+	glog.V(4).Infof("ListPodSandbox response: %s", spew.Sdump(response))
 	return response, nil
 }
 
@@ -448,20 +448,20 @@ func (v *VirtletManager) RemoveContainer(ctx context.Context, in *kubeapi.Remove
 
 func (v *VirtletManager) ListContainers(ctx context.Context, in *kubeapi.ListContainersRequest) (*kubeapi.ListContainersResponse, error) {
 	filter := in.GetFilter()
-	glog.V(3).Infof("Listing containers with filter: %s", spew.Sdump(filter))
-	glog.V(3).Infof("ListContainers: %s", spew.Sdump(in))
+	glog.V(4).Infof("Listing containers with filter: %s", spew.Sdump(filter))
+	glog.V(4).Infof("ListContainers: %s", spew.Sdump(in))
 	containers, err := v.libvirtVirtualizationTool.ListContainers(filter)
 	if err != nil {
 		glog.Errorf("Error when listing containers with filter %s: %v", spew.Sdump(filter), err)
 		return nil, err
 	}
 	response := &kubeapi.ListContainersResponse{Containers: containers}
-	glog.V(3).Infof("ListContainers response:\n%s\n", spew.Sdump(response))
+	glog.V(4).Infof("ListContainers response:\n%s\n", spew.Sdump(response))
 	return response, nil
 }
 
 func (v *VirtletManager) ContainerStatus(ctx context.Context, in *kubeapi.ContainerStatusRequest) (*kubeapi.ContainerStatusResponse, error) {
-	glog.V(3).Infof("ContainerStatus: %s", spew.Sdump(in))
+	glog.V(4).Infof("ContainerStatus: %s", spew.Sdump(in))
 	status, err := v.libvirtVirtualizationTool.ContainerStatus(in.ContainerId)
 	if err != nil {
 		glog.Errorf("Error when getting container '%s' status: %v", in.ContainerId, err)
@@ -469,7 +469,7 @@ func (v *VirtletManager) ContainerStatus(ctx context.Context, in *kubeapi.Contai
 	}
 
 	response := &kubeapi.ContainerStatusResponse{Status: status}
-	glog.V(3).Infof("ContainerStatus response: %s", spew.Sdump(response))
+	glog.V(4).Infof("ContainerStatus response: %s", spew.Sdump(response))
 	return response, nil
 }
 
@@ -583,7 +583,7 @@ func (v *VirtletManager) ListImages(ctx context.Context, in *kubeapi.ListImagesR
 	}
 
 	response := &kubeapi.ListImagesResponse{Images: images}
-	glog.V(3).Infof("ListImages response: %s", spew.Sdump(response))
+	glog.V(4).Infof("ListImages response: %s", spew.Sdump(response))
 	return response, err
 }
 
