@@ -54,6 +54,8 @@ type qcow2Volume struct {
 	uuid         string
 }
 
+var _ VMVolume = &qcow2Volume{}
+
 func newQCOW2Volume(volumeName, configPath string, config *VMConfig, owner VolumeOwner) (VMVolume, error) {
 	var err error
 	var opts qcow2VolumeOptions
@@ -90,7 +92,7 @@ func (v *qcow2Volume) Uuid() string {
 	return v.uuid
 }
 
-func (v *qcow2Volume) Setup(volumeMap map[string]string) (*libvirtxml.DomainDisk, error) {
+func (v *qcow2Volume) Setup() (*libvirtxml.DomainDisk, error) {
 	vol, err := v.createQCOW2Volume(uint64(v.capacity), v.capacityUnit)
 	if err != nil {
 		return nil, fmt.Errorf("error during creation of volume '%s' with virtlet description %s: %v", v.volumeName(), v.name, err)

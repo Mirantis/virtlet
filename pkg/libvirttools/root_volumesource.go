@@ -29,6 +29,8 @@ type rootVolume struct {
 	volumeBase
 }
 
+var _ VMVolume = &rootVolume{}
+
 func GetRootVolume(config *VMConfig, owner VolumeOwner) ([]VMVolume, error) {
 	return []VMVolume{
 		&rootVolume{
@@ -53,7 +55,7 @@ func (v *rootVolume) cloneVolume(name string, from virt.VirtStorageVolume) (virt
 
 func (v *rootVolume) Uuid() string { return "" }
 
-func (v *rootVolume) Setup(volumeMap map[string]string) (*libvirtxml.DomainDisk, error) {
+func (v *rootVolume) Setup() (*libvirtxml.DomainDisk, error) {
 	imageVolume, err := v.owner.ImageManager().GetImageVolume(v.config.Image)
 	if err != nil {
 		return nil, err

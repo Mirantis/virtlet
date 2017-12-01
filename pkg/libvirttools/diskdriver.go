@@ -33,7 +33,7 @@ const (
 )
 
 type diskDriver interface {
-	devPath() string
+	devPath(domainDef *libvirtxml.Domain) string
 	target() *libvirtxml.DomainDiskTarget
 	address() *libvirtxml.DomainAddress
 }
@@ -58,7 +58,8 @@ func virtioBlkDriverFactory(n int) (diskDriver, error) {
 	return &virtioBlkDriver{n, diskChar}, nil
 }
 
-func (d *virtioBlkDriver) devPath() string {
+func (d *virtioBlkDriver) devPath(domainDef *libvirtxml.Domain) string {
+	// XXX: use /dev/disk/by-path
 	return fmt.Sprintf("/dev/vd%c", d.diskChar)
 }
 
@@ -98,7 +99,7 @@ func scsiDriverFactory(n int) (diskDriver, error) {
 	return &scsiDriver{n, diskChar}, nil
 }
 
-func (d *scsiDriver) devPath() string {
+func (d *scsiDriver) devPath(domainDef *libvirtxml.Domain) string {
 	// FIXME: in case of cdrom, that's actually sr0, but we're
 	// only using cdrom for nocloud drive currently
 	return fmt.Sprintf("/dev/sd%c", d.diskChar)

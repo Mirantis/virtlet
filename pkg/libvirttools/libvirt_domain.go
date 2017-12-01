@@ -185,6 +185,18 @@ func (domain *LibvirtDomain) Name() (string, error) {
 	return domain.d.GetName()
 }
 
+func (domain *LibvirtDomain) Xml() (*libvirtxml.Domain, error) {
+	desc, err := domain.d.GetXMLDesc(libvirt.DOMAIN_XML_INACTIVE)
+	if err != nil {
+		return nil, err
+	}
+	var d libvirtxml.Domain
+	if err := d.Unmarshal(desc); err != nil {
+		return nil, fmt.Errorf("error unmarshalling domain definition: %v", err)
+	}
+	return &d, nil
+}
+
 type LibvirtSecret struct {
 	s *libvirt.Secret
 }

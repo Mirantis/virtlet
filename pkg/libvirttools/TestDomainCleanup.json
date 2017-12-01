@@ -80,7 +80,7 @@
     "data": {
       "XMLName": {
         "Space": "",
-        "Local": ""
+        "Local": "domain"
       },
       "Type": "",
       "Name": "virtlet-5edfe2ad-9852-container1",
@@ -110,7 +110,7 @@
     "data": {
       "XMLName": {
         "Space": "",
-        "Local": ""
+        "Local": "domain"
       },
       "Type": "",
       "Name": "virtlet-8a6163c3-e4ee-container1",
@@ -140,7 +140,7 @@
     "data": {
       "XMLName": {
         "Space": "",
-        "Local": ""
+        "Local": "domain"
       },
       "Type": "",
       "Name": "virtlet-13f51f8d-0f4e-container1",
@@ -170,7 +170,7 @@
     "data": {
       "XMLName": {
         "Space": "",
-        "Local": ""
+        "Local": "domain"
       },
       "Type": "",
       "Name": "other-than-virtlet-domain",

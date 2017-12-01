@@ -111,19 +111,11 @@
     }
   },
   {
-    "name": "domain conn: iso image",
-    "data": {
-      "meta-data": "{\"instance-id\":\"testName_0.default\",\"local-hostname\":\"testName_0\"}",
-      "network-config": "version: 1\n",
-      "user-data": "#cloud-config\n"
-    }
-  },
-  {
     "name": "domain conn: DefineDomain",
     "data": {
       "XMLName": {
         "Space": "",
-        "Local": ""
+        "Local": "domain"
       },
       "Type": "kvm",
       "Name": "virtlet-231700d5-c9a6-container1",
@@ -203,7 +195,7 @@
           {
             "XMLName": {
               "Space": "",
-              "Local": ""
+              "Local": "controller"
             },
             "Type": "scsi",
             "Index": 0,
@@ -215,7 +207,7 @@
           {
             "XMLName": {
               "Space": "",
-              "Local": ""
+              "Local": "disk"
             },
             "Type": "file",
             "Device": "disk",
@@ -264,7 +256,7 @@
           {
             "XMLName": {
               "Space": "",
-              "Local": ""
+              "Local": "disk"
             },
             "Type": "file",
             "Device": "cdrom",
@@ -317,7 +309,7 @@
           {
             "XMLName": {
               "Space": "",
-              "Local": ""
+              "Local": "serial"
             },
             "Type": "unix",
             "Source": {
@@ -338,7 +330,7 @@
           {
             "XMLName": {
               "Space": "",
-              "Local": ""
+              "Local": "input"
             },
             "Type": "tablet",
             "Bus": "usb",
@@ -349,7 +341,7 @@
           {
             "XMLName": {
               "Space": "",
-              "Local": ""
+              "Local": "graphics"
             },
             "Type": "vnc",
             "AutoPort": "",
@@ -376,7 +368,7 @@
           {
             "XMLName": {
               "Space": "",
-              "Local": ""
+              "Local": "video"
             },
             "Model": {
               "Type": "cirrus",
@@ -397,8 +389,8 @@
       },
       "QEMUCommandline": {
         "XMLName": {
-          "Space": "",
-          "Local": ""
+          "Space": "http://libvirt.org/schemas/domain/qemu/1.0",
+          "Local": "commandline"
         },
         "Args": null,
         "Envs": [
@@ -473,6 +465,14 @@
   },
   {
     "name": "domain conn: virtlet-231700d5-c9a6-container1: Create"
+  },
+  {
+    "name": "domain conn: virtlet-231700d5-c9a6-container1: iso image",
+    "data": {
+      "meta-data": "{\"instance-id\":\"testName_0.default\",\"local-hostname\":\"testName_0\"}",
+      "network-config": "version: 1\n",
+      "user-data": "#cloud-config\n"
+    }
   },
   {
     "name": "container status after the container is started",

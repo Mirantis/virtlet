@@ -43,17 +43,14 @@ const (
 )
 
 type CloudInitGenerator struct {
-	config    *VMConfig
-	volumeMap map[string]string
-	isoDir    string
+	config *VMConfig
+	isoDir string
 }
 
-func NewCloudInitGenerator(config *VMConfig, volumeMap map[string]string, isoDir string) *CloudInitGenerator {
-
+func NewCloudInitGenerator(config *VMConfig, isoDir string) *CloudInitGenerator {
 	return &CloudInitGenerator{
-		config:    config,
-		volumeMap: volumeMap,
-		isoDir:    isoDir,
+		config: config,
+		isoDir: isoDir,
 	}
 }
 
@@ -79,7 +76,7 @@ func (g *CloudInitGenerator) generateMetaData() ([]byte, error) {
 	return r, nil
 }
 
-func (g *CloudInitGenerator) generateUserData() ([]byte, error) {
+func (g *CloudInitGenerator) generateUserData(volumeMap map[string]string) ([]byte, error) {
 	if g.config.ParsedAnnotations.UserDataScript != "" {
 		return []byte(g.config.ParsedAnnotations.UserDataScript), nil
 	}
@@ -96,7 +93,7 @@ func (g *CloudInitGenerator) generateUserData() ([]byte, error) {
 	writeFilesManipulator.AddConfigMapEntries()
 	writeFilesManipulator.AddFileLikeMounts()
 
-	mounts := utils.Merge(userData["mounts"], g.generateMounts()).([]interface{})
+	mounts := utils.Merge(userData["mounts"], g.generateMounts(volumeMap)).([]interface{})
 	if len(mounts) > 0 {
 		userData["mounts"] = mounts
 	}
@@ -227,23 +224,33 @@ func (g *CloudInitGenerator) IsoPath() string {
 	return filepath.Join(g.isoDir, fmt.Sprintf("nocloud-%s.iso", g.config.DomainUUID))
 }
 
-func (g *CloudInitGenerator) GenerateDisk() (*libvirtxml.DomainDisk, error) {
+func (g *CloudInitGenerator) DiskDef() *libvirtxml.DomainDisk {
+	return &libvirtxml.DomainDisk{
+		Type:     "file",
+		Device:   "cdrom",
+		Driver:   &libvirtxml.DomainDiskDriver{Name: "qemu", Type: "raw"},
+		Source:   &libvirtxml.DomainDiskSource{File: g.IsoPath()},
+		ReadOnly: &libvirtxml.DomainDiskReadOnly{},
+	}
+}
+
+func (g *CloudInitGenerator) GenerateImage(volumeMap map[string]string) error {
 	tmpDir, err := ioutil.TempDir("", "nocloud-")
 	if err != nil {
-		return nil, fmt.Errorf("can't create temp dir for nocloud: %v", err)
+		return fmt.Errorf("can't create temp dir for nocloud: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
 	var metaData, userData, networkConfiguration []byte
 	metaData, err = g.generateMetaData()
 	if err == nil {
-		userData, err = g.generateUserData()
+		userData, err = g.generateUserData(volumeMap)
 	}
 	if err == nil {
 		networkConfiguration, err = g.generateNetworkConfiguration()
 	}
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if err := utils.WriteFiles(tmpDir, map[string][]byte{
@@ -251,28 +258,21 @@ func (g *CloudInitGenerator) GenerateDisk() (*libvirtxml.DomainDisk, error) {
 		"meta-data":      metaData,
 		"network-config": networkConfiguration,
 	}); err != nil {
-		return nil, fmt.Errorf("can't write user-data: %v", err)
+		return fmt.Errorf("can't write user-data: %v", err)
 	}
 
 	if err := os.MkdirAll(g.isoDir, 0777); err != nil {
-		return nil, fmt.Errorf("error making iso directory %q: %v", g.isoDir, err)
+		return fmt.Errorf("error making iso directory %q: %v", g.isoDir, err)
 	}
 
 	if err := utils.GenIsoImage(g.IsoPath(), "cidata", tmpDir); err != nil {
 		if rmErr := os.Remove(g.IsoPath()); rmErr != nil {
 			glog.Warningf("Error removing iso file %s: %v", g.IsoPath(), rmErr)
 		}
-		return nil, fmt.Errorf("error generating iso image: %v", err)
+		return fmt.Errorf("error generating iso image: %v", err)
 	}
 
-	diskDef := &libvirtxml.DomainDisk{
-		Type:     "file",
-		Device:   "cdrom",
-		Driver:   &libvirtxml.DomainDiskDriver{Name: "qemu", Type: "raw"},
-		Source:   &libvirtxml.DomainDiskSource{File: g.IsoPath()},
-		ReadOnly: &libvirtxml.DomainDiskReadOnly{},
-	}
-	return diskDef, nil
+	return nil
 }
 
 func (g *CloudInitGenerator) generateEnvVarsContent() string {
@@ -308,7 +308,7 @@ func (g *CloudInitGenerator) addEnvVarsFileToWriteFiles(userData map[string]inte
 	})
 }
 
-func (g *CloudInitGenerator) generateMounts() []interface{} {
+func (g *CloudInitGenerator) generateMounts(volumeMap map[string]string) []interface{} {
 	var r []interface{}
 	for _, m := range g.config.Mounts {
 		uuid, part, err := flexvolume.GetFlexvolumeInfo(m.HostPath)
@@ -316,7 +316,7 @@ func (g *CloudInitGenerator) generateMounts() []interface{} {
 			glog.Errorf("Can't mount directory %q to %q inside the VM: can't get flexvolume uuid: %v", m.HostPath, m.ContainerPath, err)
 			continue
 		}
-		devPath, found := g.volumeMap[uuid]
+		devPath, found := volumeMap[uuid]
 		if !found {
 			glog.Errorf("Can't mount directory %q to %q inside the VM: no device found for flexvolume uuid %q", m.HostPath, m.ContainerPath, uuid)
 			continue
