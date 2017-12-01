@@ -11,5 +11,8 @@ elif [[ -e /dev/kvm ]]; then
   chown libvirt-qemu.kvm /dev/kvm
 fi
 
+# FIXME: temporary hack for sr-iov
+chmod u+s /usr/bin/qemu-system-x86_64
+
 echo "$$ $(cut -d' ' -f22 /proc/$$/stat)" >/var/lib/virtlet/vms.procfile
 sleep Infinity

@@ -24,6 +24,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/containernetworking/cni/pkg/ns"
@@ -43,19 +44,13 @@ const (
 	calicoSubnetVar     = "VIRTLET_CALICO_SUBNET"
 )
 
-// InterfaceType presents type of network interface instance
-type InterfaceType int
-
-const (
-	InterfaceTypeTap InterfaceType = iota
-)
-
 // InterfaceDescription contains interface type with additional data
 // needed to identify it
 type InterfaceDescription struct {
-	Type         InterfaceType    `json:"type"`
-	HardwareAddr net.HardwareAddr `json:"mac"`
-	TapFdIndex   int              `json:"tapNo"`
+	Type         nettools.InterfaceType `json:"type"`
+	HardwareAddr net.HardwareAddr       `json:"mac"`
+	FdIndex      int                    `json:"fdIndex"`
+	PCIAddress   string                 `json:"pciAddress"`
 }
 
 // PodNetworkDesc contains the data that are required by TapFDSource
@@ -195,6 +190,17 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 	var dhcpServer *dhcp.Server
 	doneCh := make(chan error)
 	if err := vmNS.Do(func(ns.NetNS) error {
+		// switch /sys to corresponding one in netns
+		if err := syscall.Mount("none", "/sys", "sysfs", 0, ""); err != nil {
+			return err
+		}
+		defer func() {
+			err := syscall.Unmount("/sys", syscall.MNT_DETACH)
+			if err != nil {
+				glog.V(3).Infof("Warning, error during umount of /sys: %v", err)
+			}
+		}()
+
 		if netConfig == nil {
 			netConfig = &cnicurrent.Result{}
 		}
@@ -252,7 +258,7 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 		doneCh:     doneCh,
 	}
 	var fds []int
-	for _, f := range csn.TapFiles {
+	for _, f := range csn.Fds {
 		fds = append(fds, int(f.Fd()))
 	}
 	return fds, respData, nil
@@ -310,9 +316,10 @@ func (s *TapFDSource) GetInfo(key string) ([]byte, error) {
 	var descriptions []InterfaceDescription
 	for i, hwAddr := range pn.csn.HardwareAddrs {
 		descriptions = append(descriptions, InterfaceDescription{
-			TapFdIndex:   i,
+			FdIndex:      i,
 			HardwareAddr: hwAddr,
-			Type:         InterfaceTypeTap,
+			Type:         pn.csn.InterfaceTypes[i],
+			PCIAddress:   pn.csn.PCIAddresses[i],
 		})
 	}
 	data, err := json.Marshal(descriptions)
