@@ -17,13 +17,16 @@ limitations under the License.
 package main
 
 import (
+	"math/rand"
 	"os"
+	"time"
 
 	"github.com/Mirantis/virtlet/pkg/flexvolume"
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 func main() {
+	rand.Seed(time.Now().UnixNano())
 	driver := flexvolume.NewFlexVolumeDriver(utils.NewUuid, flexvolume.NewLinuxMounter())
 	os.Stdout.WriteString(driver.Run(os.Args[1:]))
 }
