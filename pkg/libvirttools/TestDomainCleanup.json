@@ -101,7 +101,35 @@
       "OnPoweroff": "",
       "OnReboot": "",
       "OnCrash": "",
-      "Devices": null,
+      "Devices": {
+        "Emulator": "",
+        "Controllers": [
+          {
+            "XMLName": {
+              "Space": "",
+              "Local": ""
+            },
+            "Type": "pci",
+            "Index": null,
+            "Model": "pci-root",
+            "Address": null
+          }
+        ],
+        "Disks": null,
+        "Filesystems": null,
+        "Interfaces": null,
+        "Serials": null,
+        "Consoles": null,
+        "Inputs": null,
+        "Graphics": null,
+        "Videos": null,
+        "Channels": null,
+        "MemBalloon": null,
+        "Sounds": null,
+        "RNGs": null,
+        "Hostdevs": null,
+        "Memorydevs": null
+      },
       "QEMUCommandline": null
     }
   },
@@ -131,7 +159,35 @@
       "OnPoweroff": "",
       "OnReboot": "",
       "OnCrash": "",
-      "Devices": null,
+      "Devices": {
+        "Emulator": "",
+        "Controllers": [
+          {
+            "XMLName": {
+              "Space": "",
+              "Local": ""
+            },
+            "Type": "pci",
+            "Index": null,
+            "Model": "pci-root",
+            "Address": null
+          }
+        ],
+        "Disks": null,
+        "Filesystems": null,
+        "Interfaces": null,
+        "Serials": null,
+        "Consoles": null,
+        "Inputs": null,
+        "Graphics": null,
+        "Videos": null,
+        "Channels": null,
+        "MemBalloon": null,
+        "Sounds": null,
+        "RNGs": null,
+        "Hostdevs": null,
+        "Memorydevs": null
+      },
       "QEMUCommandline": null
     }
   },
@@ -161,7 +217,35 @@
       "OnPoweroff": "",
       "OnReboot": "",
       "OnCrash": "",
-      "Devices": null,
+      "Devices": {
+        "Emulator": "",
+        "Controllers": [
+          {
+            "XMLName": {
+              "Space": "",
+              "Local": ""
+            },
+            "Type": "pci",
+            "Index": null,
+            "Model": "pci-root",
+            "Address": null
+          }
+        ],
+        "Disks": null,
+        "Filesystems": null,
+        "Interfaces": null,
+        "Serials": null,
+        "Consoles": null,
+        "Inputs": null,
+        "Graphics": null,
+        "Videos": null,
+        "Channels": null,
+        "MemBalloon": null,
+        "Sounds": null,
+        "RNGs": null,
+        "Hostdevs": null,
+        "Memorydevs": null
+      },
       "QEMUCommandline": null
     }
   },
@@ -191,7 +275,35 @@
       "OnPoweroff": "",
       "OnReboot": "",
       "OnCrash": "",
-      "Devices": null,
+      "Devices": {
+        "Emulator": "",
+        "Controllers": [
+          {
+            "XMLName": {
+              "Space": "",
+              "Local": ""
+            },
+            "Type": "pci",
+            "Index": null,
+            "Model": "pci-root",
+            "Address": null
+          }
+        ],
+        "Disks": null,
+        "Filesystems": null,
+        "Interfaces": null,
+        "Serials": null,
+        "Consoles": null,
+        "Inputs": null,
+        "Graphics": null,
+        "Videos": null,
+        "Channels": null,
+        "MemBalloon": null,
+        "Sounds": null,
+        "RNGs": null,
+        "Hostdevs": null,
+        "Memorydevs": null
+      },
       "QEMUCommandline": null
     }
   },

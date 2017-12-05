@@ -74,7 +74,9 @@ func (dc *FakeDomainConnection) removeSecret(s *FakeSecret) {
 }
 
 func (dc *FakeDomainConnection) DefineDomain(def *libvirtxml.Domain) (virt.VirtDomain, error) {
-	dc.rec.Rec("DefineDomain", copyDomain(def))
+	def = copyDomain(def)
+	dc.rec.Rec("DefineDomain", def)
+	addPciRoot(def)
 	assignFakePCIAddressesToControllers(def)
 	// TODO: dump any ISOs mentioned in disks (Type=file) as json
 	// Include file name (base) in rec name
@@ -291,19 +293,35 @@ func copyDomain(def *libvirtxml.Domain) *libvirtxml.Domain {
 	return &copy
 }
 
+func addPciRoot(def *libvirtxml.Domain) {
+	if def.Devices == nil {
+		def.Devices = &libvirtxml.DomainDeviceList{}
+	}
+	for _, c := range def.Devices.Controllers {
+		if c.Type == "pci" {
+			return
+		}
+	}
+	def.Devices.Controllers = append(def.Devices.Controllers, libvirtxml.DomainController{
+		Type:  "pci",
+		Model: "pci-root",
+	})
+}
+
 func assignFakePCIAddressesToControllers(def *libvirtxml.Domain) {
 	if def.Devices == nil {
 		return
 	}
 	domain := uint(0)
-	bus := uint(2)
+	bus := uint(0)
 	function := uint(0)
 	for n, c := range def.Devices.Controllers {
-		if c.Address != nil {
+		if c.Type == "pci" || c.Address != nil {
 			continue
 		}
 		slot := uint(n + 1)
-		c.Address = &libvirtxml.DomainAddress{
+		// note that c is not a pointer
+		def.Devices.Controllers[n].Address = &libvirtxml.DomainAddress{
 			PCI: &libvirtxml.DomainAddressPCI{
 				Domain:   &domain,
 				Bus:      &bus,

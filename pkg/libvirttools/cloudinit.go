@@ -325,7 +325,7 @@ func (g *CloudInitGenerator) generateMounts(volumeMap map[string]string) []inter
 			part = 1
 		}
 		if part != 0 {
-			devPath = fmt.Sprintf("%s%d", devPath, part)
+			devPath = fmt.Sprintf("%s-part%d", devPath, part)
 		}
 		r = append(r, []interface{}{devPath, m.ContainerPath})
 	}

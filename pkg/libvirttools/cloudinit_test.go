@@ -288,9 +288,9 @@ func TestCloudInitGenerator(t *testing.T) {
 				},
 			},
 			volumeMap: map[string]string{
-				vols[0].uuid: "/dev/sdb",
-				vols[1].uuid: "/dev/sdc",
-				vols[2].uuid: "/dev/sdd",
+				vols[0].uuid: "/dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:1",
+				vols[1].uuid: "/dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:2",
+				vols[2].uuid: "/dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:3",
 			},
 			expectedMetaData: map[string]interface{}{
 				"instance-id":    "foo.default",
@@ -298,9 +298,9 @@ func TestCloudInitGenerator(t *testing.T) {
 			},
 			expectedUserData: map[string]interface{}{
 				"mounts": []interface{}{
-					[]interface{}{"/dev/sdb1", "/opt"},
-					[]interface{}{"/dev/sdc", "/var/lib/whatever"},
-					[]interface{}{"/dev/sdd2", "/var/lib/foobar"},
+					[]interface{}{"/dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:1-part1", "/opt"},
+					[]interface{}{"/dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:2", "/var/lib/whatever"},
+					[]interface{}{"/dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:3-part2", "/var/lib/foobar"},
 				},
 			},
 		},

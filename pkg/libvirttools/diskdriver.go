@@ -19,7 +19,9 @@ package libvirttools
 import (
 	"errors"
 	"fmt"
+	"sort"
 
+	"github.com/davecgh/go-spew/spew"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 )
 
@@ -32,8 +34,25 @@ const (
 	maxScsiBlockDevChar   = 'z'
 )
 
+type diskPath struct {
+	// devPath denotes path to the device under /dev, e.g.
+	// /dev/disk/by-path/virtio-pci-0000:00:03.0-scsi-0:0:0:0 or
+	// /dev/disk/by-path/pci-0000:00:03.0-virtio-pci-0000:01:01.0
+	devPath string
+	// sysfsPath denotes a path to a directory in sysfs that
+	// contains a file with the same name as the device in /dev, e.g.
+	// /sys/devices/pci0000:00/0000:00:03.0/0000:01:01.0/virtio*/block/ or
+	// /sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:0/block/sda
+	// (note that in the latter case * is used instead of host because host number appear
+	// to be wrong in sysfs for some reason)
+	// The path needs to be globbed and the single file name from there
+	// should be used as device name, e.g.
+	// ls -l /dev/`ls /sys/devices/pci0000:00/0000:00:03.0/0000:01:01.0/virtio*/block/`
+	sysfsPath string
+}
+
 type diskDriver interface {
-	devPath(domainDef *libvirtxml.Domain) string
+	diskPath(domainDef *libvirtxml.Domain) (*diskPath, error)
 	target() *libvirtxml.DomainDiskTarget
 	address() *libvirtxml.DomainAddress
 }
@@ -58,19 +77,32 @@ func virtioBlkDriverFactory(n int) (diskDriver, error) {
 	return &virtioBlkDriver{n, diskChar}, nil
 }
 
-func (d *virtioBlkDriver) devPath(domainDef *libvirtxml.Domain) string {
-	// XXX: use /dev/disk/by-path
-	return fmt.Sprintf("/dev/vd%c", d.diskChar)
+func (d *virtioBlkDriver) diskPath(domainDef *libvirtxml.Domain) (*diskPath, error) {
+	disk, err := findDisk(domainDef, d.devName())
+	if err != nil {
+		return nil, err
+	}
+	devPath, sysfsPath, err := pciPath(domainDef, disk.Address)
+	if err != nil {
+		return nil, err
+	}
+	return &diskPath{devPath, sysfsPath + "/virtio*/block/"}, nil
+}
+
+func (d *virtioBlkDriver) devName() string {
+	return fmt.Sprintf("vd%c", d.diskChar)
 }
 
 func (d *virtioBlkDriver) target() *libvirtxml.DomainDiskTarget {
 	return &libvirtxml.DomainDiskTarget{
-		Dev: fmt.Sprintf("vd%c", d.diskChar),
+		Dev: d.devName(),
 		Bus: "virtio",
 	}
 }
 
 func (d *virtioBlkDriver) address() *libvirtxml.DomainAddress {
+	// FIXME: we can let libvirt auto-assign the addresses.
+	// We'll have to add auto-assignment logic to fake_domain.go though
 	domain := uint(0)
 	// use bus1 to have more predictable addressing for virtio devs
 	bus := uint(1)
@@ -99,20 +131,59 @@ func scsiDriverFactory(n int) (diskDriver, error) {
 	return &scsiDriver{n, diskChar}, nil
 }
 
-func (d *scsiDriver) devPath(domainDef *libvirtxml.Domain) string {
-	// FIXME: in case of cdrom, that's actually sr0, but we're
-	// only using cdrom for nocloud drive currently
-	return fmt.Sprintf("/dev/sd%c", d.diskChar)
+func (d *scsiDriver) diskPath(domainDef *libvirtxml.Domain) (*diskPath, error) {
+	scsiControllers := findControllers(domainDef, "scsi")
+	switch {
+	case len(scsiControllers) == 0:
+		return nil, errors.New("no scsi controllers found")
+	case len(scsiControllers) > 1:
+		// linux kernel reports wrong host number in sysfs for some reason
+		return nil, errors.New("more than one scsi controller is not supported")
+	}
+
+	disk, err := findDisk(domainDef, d.devName())
+	if err != nil {
+		return nil, err
+	}
+	if disk.Address.Drive == nil || disk.Address.Drive.Controller == nil || disk.Address.Drive.Bus == nil || disk.Address.Drive.Target == nil || disk.Address.Drive.Unit == nil {
+		return nil, fmt.Errorf("bad disk address for scsi disk %q", d.devName())
+	}
+	if *disk.Address.Drive.Controller != 0 {
+		return nil, fmt.Errorf("bad controller index for scsi disk %q", d.devName())
+	}
+
+	devPath, sysfsPath, err := pciPath(domainDef, scsiControllers[0].Address)
+	if err != nil {
+		panic("XXX\n" + spew.Sdump(domainDef) + "\n" + err.Error())
+		return nil, err
+	}
+	return &diskPath{
+		fmt.Sprintf("%s-scsi-0:%d:%d:%d", devPath, *disk.Address.Drive.Bus, *disk.Address.Drive.Target, *disk.Address.Drive.Unit),
+		// host number are wrong in sysfs for some reason
+		fmt.Sprintf("%s/virtio*/host*/target*:%d:%d/*:%d:%d:%d/block/",
+			sysfsPath,
+			*disk.Address.Drive.Bus,
+			*disk.Address.Drive.Target,
+			*disk.Address.Drive.Bus,
+			*disk.Address.Drive.Target,
+			*disk.Address.Drive.Unit),
+	}, nil
+}
+
+func (d *scsiDriver) devName() string {
+	return fmt.Sprintf("sd%c", d.diskChar)
 }
 
 func (d *scsiDriver) target() *libvirtxml.DomainDiskTarget {
 	return &libvirtxml.DomainDiskTarget{
-		Dev: fmt.Sprintf("sd%c", d.diskChar),
+		Dev: d.devName(),
 		Bus: "scsi",
 	}
 }
 
 func (d *scsiDriver) address() *libvirtxml.DomainAddress {
+	// FIXME: we can let libvirt auto-assign the addresses.
+	// We'll have to add auto-assignment logic to fake_domain.go though
 	controller := uint(0)
 	bus := uint(0)
 	target := uint(0)
@@ -132,4 +203,79 @@ func getDiskDriverFactory(name DiskDriver) (diskDriverFactory, error) {
 		return f, nil
 	}
 	return nil, fmt.Errorf("bad disk driver name: %q", name)
+}
+
+func findDisk(domainDef *libvirtxml.Domain, dev string) (*libvirtxml.DomainDisk, error) {
+	if domainDef.Devices != nil {
+		for _, d := range domainDef.Devices.Disks {
+			if d.Target != nil && d.Target.Dev == dev {
+				return &d, nil
+			}
+		}
+	}
+	return nil, fmt.Errorf("disk %q not found in the domain", dev)
+}
+
+func findControllers(domainDef *libvirtxml.Domain, controllerType string) []libvirtxml.DomainController {
+	if domainDef.Devices == nil {
+		return nil
+	}
+	// make an empty slice instead of nil because the effects of
+	// calling sort.SliceStable() on nil slice are unspecified
+	r := []libvirtxml.DomainController{}
+	for _, c := range domainDef.Devices.Controllers {
+		if c.Type == controllerType {
+			r = append(r, c)
+		}
+	}
+	sort.SliceStable(r, func(i, j int) bool {
+		var a, b uint
+		if r[i].Index != nil {
+			a = *r[i].Index
+		}
+		if r[j].Index != nil {
+			b = *r[j].Index
+		}
+		return a < b
+	})
+
+	return r
+}
+
+func pciPath(domainDef *libvirtxml.Domain, address *libvirtxml.DomainAddress) (string, string, error) {
+	pciControllers := findControllers(domainDef, "pci")
+	devPath := "/dev/disk/by-path/"
+	sysfsPath := "/sys/devices"
+	var recurse func(*libvirtxml.DomainAddress, string, int) error
+	recurse = func(address *libvirtxml.DomainAddress, pathPrefix string, depth int) error {
+		if depth > 256 { // 256 is big enough here, we're not expecting that many hops
+			return fmt.Errorf("can't make path for device address %#v: loop detected", address)
+		}
+		if address == nil || address.PCI == nil || address.PCI.Domain == nil || address.PCI.Bus == nil || address.PCI.Slot == nil || address.PCI.Function == nil {
+			return fmt.Errorf("can't make path for device address %#v", address)
+		}
+		if *address.PCI.Bus > uint(len(pciControllers)) {
+			return fmt.Errorf("bad PCI bus number: %#v", address)
+		}
+		ctl := pciControllers[*address.PCI.Bus]
+		if ctl.Address != nil && ctl.Address.PCI != nil {
+			if err := recurse(ctl.Address, "pci", depth+1); err != nil {
+				return err
+			}
+		} else {
+			// pci-root is not mentioned in devPath, but is present in sysfsPath
+			sysfsPath += fmt.Sprintf("/pci%04x:%02x", *address.PCI.Domain, *address.PCI.Bus)
+		}
+		addressStr := fmt.Sprintf("%04x:%02x:%02x.%01x", *address.PCI.Domain, *address.PCI.Bus, *address.PCI.Slot, *address.PCI.Function)
+		if devPath[len(devPath)-1] != '/' {
+			devPath += "-"
+		}
+		devPath += pathPrefix + "-" + addressStr
+		sysfsPath += "/" + addressStr
+		return nil
+	}
+	if err := recurse(address, "virtio-pci", 0); err != nil {
+		return "", "", fmt.Errorf("pciPath for %#v: %v", address, err)
+	}
+	return devPath, sysfsPath, nil
 }

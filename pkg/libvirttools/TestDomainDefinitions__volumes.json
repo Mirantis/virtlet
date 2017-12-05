@@ -307,6 +307,26 @@
             "Type": "scsi",
             "Index": 0,
             "Model": "virtio-scsi",
+            "Address": {
+              "USB": null,
+              "PCI": {
+                "Domain": 0,
+                "Bus": 0,
+                "Slot": 1,
+                "Function": 0
+              },
+              "Drive": null,
+              "DIMM": null
+            }
+          },
+          {
+            "XMLName": {
+              "Space": "",
+              "Local": ""
+            },
+            "Type": "pci",
+            "Index": null,
+            "Model": "pci-root",
             "Address": null
           }
         ],

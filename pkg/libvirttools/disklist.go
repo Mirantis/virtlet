@@ -103,7 +103,11 @@ func (dl *diskList) writeImages(domain virt.VirtDomain) error {
 	for _, item := range dl.items {
 		uuid := item.volume.Uuid()
 		if uuid != "" {
-			volumeMap[uuid] = item.driver.devPath(domainDesc)
+			diskPath, err := item.driver.diskPath(domainDesc)
+			if err != nil {
+				return err
+			}
+			volumeMap[uuid] = diskPath.devPath
 		}
 	}
 
