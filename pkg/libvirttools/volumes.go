@@ -44,7 +44,7 @@ type VMVolumeSource func(config *VMConfig, owner VolumeOwner) ([]VMVolume, error
 type VMVolume interface {
 	Uuid() string
 	Setup() (*libvirtxml.DomainDisk, error)
-	WriteImage(volumeMap map[string]string) error
+	WriteImage(diskPathMap) error
 	Teardown() error
 }
 
@@ -53,8 +53,8 @@ type volumeBase struct {
 	owner  VolumeOwner
 }
 
-func (v *volumeBase) WriteImage(volumeMap map[string]string) error { return nil }
-func (v *volumeBase) Teardown() error                              { return nil }
+func (v *volumeBase) WriteImage(diskPathMap) error { return nil }
+func (v *volumeBase) Teardown() error              { return nil }
 
 func CombineVMVolumeSources(srcs ...VMVolumeSource) VMVolumeSource {
 	return func(config *VMConfig, owner VolumeOwner) ([]VMVolume, error) {

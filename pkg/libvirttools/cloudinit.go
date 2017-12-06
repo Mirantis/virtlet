@@ -26,6 +26,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
@@ -39,7 +40,9 @@ import (
 )
 
 const (
-	EnvFileLocation = "/etc/cloud/environment"
+	EnvFileLocation   = "/etc/cloud/environment"
+	MountFileLocation = "/etc/cloud/mount-volumes.sh"
+	MountScriptSubst  = "@virtlet-mount-script@"
 )
 
 type CloudInitGenerator struct {
@@ -76,9 +79,11 @@ func (g *CloudInitGenerator) generateMetaData() ([]byte, error) {
 	return r, nil
 }
 
-func (g *CloudInitGenerator) generateUserData(volumeMap map[string]string) ([]byte, error) {
-	if g.config.ParsedAnnotations.UserDataScript != "" {
-		return []byte(g.config.ParsedAnnotations.UserDataScript), nil
+func (g *CloudInitGenerator) generateUserData(volumeMap diskPathMap) ([]byte, error) {
+	mounts, mountScript := g.generateMounts(volumeMap)
+
+	if userDataScript := g.config.ParsedAnnotations.UserDataScript; userDataScript != "" {
+		return []byte(strings.Replace(userDataScript, MountScriptSubst, mountScript, -1)), nil
 	}
 
 	userData := make(map[string]interface{})
@@ -86,17 +91,22 @@ func (g *CloudInitGenerator) generateUserData(volumeMap map[string]string) ([]by
 		userData[k] = v
 	}
 
-	g.addEnvVarsFileToWriteFiles(userData)
-
-	writeFilesManipulator := NewWriteFilesManipulator(userData, g.config.Mounts)
-	writeFilesManipulator.AddSecrets()
-	writeFilesManipulator.AddConfigMapEntries()
-	writeFilesManipulator.AddFileLikeMounts()
-
-	mounts := utils.Merge(userData["mounts"], g.generateMounts(volumeMap)).([]interface{})
-	if len(mounts) > 0 {
+	mounts = utils.Merge(userData["mounts"], mounts).([]interface{})
+	if len(mounts) != 0 {
 		userData["mounts"] = mounts
 	}
+
+	writeFilesUpdater := newWriteFilesUpdater(g.config.Mounts)
+	writeFilesUpdater.addSecrets()
+	writeFilesUpdater.addConfigMapEntries()
+	writeFilesUpdater.addFileLikeMounts()
+	if mountScript != "" {
+		writeFilesUpdater.addMountScript(mountScript)
+	}
+	if envContent := g.generateEnvVarsContent(); envContent != "" {
+		writeFilesUpdater.addEnvironmentFile(envContent)
+	}
+	writeFilesUpdater.updateUserData(userData)
 
 	r := []byte{}
 	if len(userData) != 0 {
@@ -234,7 +244,7 @@ func (g *CloudInitGenerator) DiskDef() *libvirtxml.DomainDisk {
 	}
 }
 
-func (g *CloudInitGenerator) GenerateImage(volumeMap map[string]string) error {
+func (g *CloudInitGenerator) GenerateImage(volumeMap diskPathMap) error {
 	tmpDir, err := ioutil.TempDir("", "nocloud-")
 	if err != nil {
 		return fmt.Errorf("can't create temp dir for nocloud: %v", err)
@@ -284,39 +294,16 @@ func (g *CloudInitGenerator) generateEnvVarsContent() string {
 	return buffer.String()
 }
 
-func (g *CloudInitGenerator) addEnvVarsFileToWriteFiles(userData map[string]interface{}) {
-	content := g.generateEnvVarsContent()
-	if content == "" {
-		return
-	}
-
-	// TODO: use merge algorithm instead
-	var oldWriteFiles []interface{}
-	oldWriteFilesRaw, _ := userData["write_files"]
-	if oldWriteFilesRaw != nil {
-		var ok bool
-		oldWriteFiles, ok = oldWriteFilesRaw.([]interface{})
-		if !ok {
-			glog.Warning("Malformed write_files entry in user-data, can't add env vars")
-			return
-		}
-	}
-
-	userData["write_files"] = append(oldWriteFiles, map[string]interface{}{
-		"path":    EnvFileLocation,
-		"content": content,
-	})
-}
-
-func (g *CloudInitGenerator) generateMounts(volumeMap map[string]string) []interface{} {
+func (g *CloudInitGenerator) generateMounts(volumeMap diskPathMap) ([]interface{}, string) {
 	var r []interface{}
+	var mountScriptLines []string
 	for _, m := range g.config.Mounts {
 		uuid, part, err := flexvolume.GetFlexvolumeInfo(m.HostPath)
 		if err != nil {
 			glog.Errorf("Can't mount directory %q to %q inside the VM: can't get flexvolume uuid: %v", m.HostPath, m.ContainerPath, err)
 			continue
 		}
-		devPath, found := volumeMap[uuid]
+		dpath, found := volumeMap[uuid]
 		if !found {
 			glog.Errorf("Can't mount directory %q to %q inside the VM: no device found for flexvolume uuid %q", m.HostPath, m.ContainerPath, uuid)
 			continue
@@ -324,36 +311,80 @@ func (g *CloudInitGenerator) generateMounts(volumeMap map[string]string) []inter
 		if part < 0 {
 			part = 1
 		}
+		devPath := dpath.devPath
+		mountDevSuffix := ""
 		if part != 0 {
-			devPath = fmt.Sprintf("%s-part%d", devPath, part)
+			devPath += fmt.Sprintf("-part%d", part)
+			mountDevSuffix += strconv.Itoa(part)
 		}
 		r = append(r, []interface{}{devPath, m.ContainerPath})
+		mountScriptLines = append(
+			mountScriptLines,
+			// TODO: do better job at escaping m.ContainerPath
+			fmt.Sprintf("if ! mountpoint '%s'; then mkdir -p '%s' && mount /dev/`ls %s`%s '%s'; fi",
+				m.ContainerPath, m.ContainerPath, dpath.sysfsPath, mountDevSuffix, m.ContainerPath))
 	}
-	return r
+	mountScript := ""
+	if len(mountScriptLines) != 0 {
+		mountScript = fmt.Sprintf("#!/bin/sh\n%s\n", strings.Join(mountScriptLines, "\n"))
+	}
+	return r, mountScript
 }
 
-type WriteFilesManipulator struct {
-	userData map[string]interface{}
-	mounts   []*VMMount
+type writeFilesUpdater struct {
+	entries []interface{}
+	mounts  []*VMMount
 }
 
-func NewWriteFilesManipulator(userData map[string]interface{}, mounts []*VMMount) *WriteFilesManipulator {
-	return &WriteFilesManipulator{
-		userData: userData,
-		mounts:   mounts,
+func newWriteFilesUpdater(mounts []*VMMount) *writeFilesUpdater {
+	return &writeFilesUpdater{
+		mounts: mounts,
 	}
 }
 
-func (m *WriteFilesManipulator) AddSecrets() {
-	m.addFilesForVolumeType("secret")
+func (u *writeFilesUpdater) put(entry interface{}) {
+	u.entries = append(u.entries, entry)
 }
 
-func (m *WriteFilesManipulator) AddConfigMapEntries() {
-	m.addFilesForVolumeType("configmap")
+func (u *writeFilesUpdater) putPlainText(path string, content string, perms os.FileMode) {
+	u.put(map[string]interface{}{
+		"path":        path,
+		"content":     content,
+		"permissions": fmt.Sprintf("%#o", uint32(perms)),
+	})
 }
 
-func (m *WriteFilesManipulator) AddFileLikeMounts() {
-	m.processMounts(func(path string) bool {
+func (u *writeFilesUpdater) putBase64(path string, content []byte, perms os.FileMode) {
+	encodedContent := base64.StdEncoding.EncodeToString(content)
+	u.put(map[string]interface{}{
+		"path":        path,
+		"content":     encodedContent,
+		"encoding":    "b64",
+		"permissions": fmt.Sprintf("%#o", uint32(perms)),
+	})
+}
+
+func (u *writeFilesUpdater) updateUserData(userData map[string]interface{}) {
+	if len(u.entries) == 0 {
+		return
+	}
+
+	writeFiles := utils.Merge(userData["write_files"], u.entries).([]interface{})
+	if len(writeFiles) != 0 {
+		userData["write_files"] = writeFiles
+	}
+}
+
+func (u *writeFilesUpdater) addSecrets() {
+	u.addFilesForVolumeType("secret")
+}
+
+func (u *writeFilesUpdater) addConfigMapEntries() {
+	u.addFilesForVolumeType("configmap")
+}
+
+func (u *writeFilesUpdater) addFileLikeMounts() {
+	for _, mount := range u.filterMounts(func(path string) bool {
 		fi, err := os.Stat(path)
 		switch {
 		case err != nil:
@@ -362,60 +393,69 @@ func (m *WriteFilesManipulator) AddFileLikeMounts() {
 			return true
 		}
 		return false
-	}, func(mount *VMMount) []interface{} {
+	}) {
 		content, err := ioutil.ReadFile(mount.HostPath)
 		if err != nil {
 			glog.Warningf("Error during reading content of '%s' file: %v", mount.HostPath, err)
-			return nil
+			continue
 		}
 
 		glog.V(3).Infof("Adding file '%s' as volume: %s", mount.HostPath, mount.ContainerPath)
-		encodedContent := base64.StdEncoding.EncodeToString(content)
-		return []interface{}{map[string]interface{}{
-			"path":        mount.ContainerPath,
-			"content":     encodedContent,
-			"encoding":    "b64",
-			"permissions": "0644",
-		}}
-	})
+		u.putBase64(mount.ContainerPath, content, 0644)
+	}
 }
 
-func (m *WriteFilesManipulator) AddNetworkConfiguration() {
-}
-
-func (m *WriteFilesManipulator) addFilesForVolumeType(suffix string) {
+func (u *writeFilesUpdater) addFilesForVolumeType(suffix string) {
 	filter := "volumes/kubernetes.io~" + suffix + "/"
-
-	m.processMounts(func(path string) bool {
+	for _, mount := range u.filterMounts(func(path string) bool {
 		return strings.Contains(path, filter)
-	}, func(mount *VMMount) []interface{} {
-		return m.addFilesForMount(mount)
-	})
+	}) {
+		u.addFilesForMount(mount)
+	}
 }
 
-func (m *WriteFilesManipulator) processMounts(filter func(string) bool, generateEntries func(*VMMount) []interface{}) {
-	var oldWriteFiles []interface{}
-	oldWriteFilesRaw, _ := m.userData["write_files"]
-	if oldWriteFilesRaw != nil {
-		var ok bool
-		oldWriteFiles, ok = oldWriteFilesRaw.([]interface{})
-		if !ok {
-			glog.Warning("Malformed write_files entry in user-data, can't add new entries")
-			return
+func (u *writeFilesUpdater) addMountScript(content string) {
+	u.putPlainText(MountFileLocation, content, 0755)
+}
+
+func (u *writeFilesUpdater) addEnvironmentFile(content string) {
+	u.putPlainText(EnvFileLocation, content, 0644)
+}
+
+func (u *writeFilesUpdater) addFilesForMount(mount *VMMount) []interface{} {
+	var writeFiles []interface{}
+
+	addFileContent := func(fullPath string) error {
+		content, err := ioutil.ReadFile(fullPath)
+		if err != nil {
+			return err
 		}
+		stat, err := os.Stat(fullPath)
+		if err != nil {
+			return err
+		}
+		relativePath := fullPath[len(mount.HostPath)+1:]
+		u.putBase64(path.Join(mount.ContainerPath, relativePath), content, stat.Mode())
+		return nil
 	}
 
-	var writeFiles []interface{}
-	for _, mount := range m.mounts {
-		if !filter(mount.HostPath) {
-			continue
+	glog.V(3).Infof("Scanning %s for files", mount.HostPath)
+	if err := scanDirectory(mount.HostPath, addFileContent); err != nil {
+		glog.Errorf("Error while scanning directory %s: %v", mount.HostPath, err)
+	}
+	glog.V(3).Infof("Found %d entries", len(writeFiles))
+
+	return writeFiles
+}
+
+func (u *writeFilesUpdater) filterMounts(filter func(string) bool) []*VMMount {
+	var r []*VMMount
+	for _, mount := range u.mounts {
+		if filter(mount.HostPath) {
+			r = append(r, mount)
 		}
-		entries := generateEntries(mount)
-		writeFiles = append(writeFiles, entries...)
 	}
-	if writeFiles != nil {
-		m.userData["write_files"] = append(oldWriteFiles, writeFiles...)
-	}
+	return r
 }
 
 func scanDirectory(dirPath string, callback func(string) error) error {
@@ -469,38 +509,4 @@ func scanDirectory(dirPath string, callback func(string) error) error {
 	}
 
 	return nil
-}
-
-func (m *WriteFilesManipulator) addFilesForMount(mount *VMMount) []interface{} {
-	var writeFiles []interface{}
-
-	addFileContent := func(fullPath string) error {
-		content, err := ioutil.ReadFile(fullPath)
-		if err != nil {
-			return err
-		}
-		stat, err := os.Stat(fullPath)
-		if err != nil {
-			return err
-		}
-		relativePath := fullPath[len(mount.HostPath)+1:]
-
-		encodedContent := base64.StdEncoding.EncodeToString(content)
-		writeFiles = append(writeFiles, map[string]interface{}{
-			"path":        path.Join(mount.ContainerPath, relativePath),
-			"content":     encodedContent,
-			"encoding":    "b64",
-			"permissions": fmt.Sprintf("%#o", uint32(stat.Mode())),
-		})
-
-		return nil
-	}
-
-	glog.V(3).Infof("Scanning %s for files", mount.HostPath)
-	if err := scanDirectory(mount.HostPath, addFileContent); err != nil {
-		glog.Errorf("Error while scanning directory %s: %v", mount.HostPath, err)
-	}
-	glog.V(3).Infof("Found %d entries", len(writeFiles))
-
-	return writeFiles
 }

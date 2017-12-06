@@ -540,7 +540,7 @@
     "data": {
       "meta-data": "{\"instance-id\":\"testName_0.default\",\"local-hostname\":\"testName_0\"}",
       "network-config": "version: 1\n",
-      "user-data": "#cloud-config\nmounts:\n- - /dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:1-part1\n  - /var/lib/whatever\n"
+      "user-data": "#cloud-config\nmounts:\n- - /dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:1-part1\n  - /var/lib/whatever\nwrite_files:\n- content: |\n    #!/bin/sh\n    if ! mountpoint '/var/lib/whatever'; then mkdir -p '/var/lib/whatever' \u0026\u0026 mount /dev/`ls /sys/devices/pci0000:00/0000:00:01.0/virtio*/host*/target*:0:0/*:0:0:1/block/`1 '/var/lib/whatever'; fi\n  path: /etc/cloud/mount-volumes.sh\n  permissions: \"0755\"\n"
     }
   },
   {

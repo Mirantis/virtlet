@@ -91,7 +91,7 @@ func TestCloudInitGenerator(t *testing.T) {
 	for _, tc := range []struct {
 		name                  string
 		config                *VMConfig
-		volumeMap             map[string]string
+		volumeMap             diskPathMap
 		expectedMetaData      map[string]interface{}
 		expectedUserData      map[string]interface{}
 		expectedNetworkConfig map[string]interface{}
@@ -196,8 +196,9 @@ func TestCloudInitGenerator(t *testing.T) {
 			expectedUserData: map[string]interface{}{
 				"write_files": []interface{}{
 					map[string]interface{}{
-						"path":    "/etc/cloud/environment",
-						"content": "foo=bar\nbaz=abc\n",
+						"path":        "/etc/cloud/environment",
+						"content":     "foo=bar\nbaz=abc\n",
+						"permissions": "0644",
 					},
 				},
 			},
@@ -243,8 +244,9 @@ func TestCloudInitGenerator(t *testing.T) {
 						"content": "whatever",
 					},
 					map[string]interface{}{
-						"path":    "/etc/cloud/environment",
-						"content": "foo=bar\nbaz=abc\n",
+						"path":        "/etc/cloud/environment",
+						"content":     "foo=bar\nbaz=abc\n",
+						"permissions": "0644",
 					},
 				},
 			},
@@ -287,10 +289,19 @@ func TestCloudInitGenerator(t *testing.T) {
 					},
 				},
 			},
-			volumeMap: map[string]string{
-				vols[0].uuid: "/dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:1",
-				vols[1].uuid: "/dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:2",
-				vols[2].uuid: "/dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:3",
+			volumeMap: diskPathMap{
+				vols[0].uuid: {
+					devPath:   "/dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:1",
+					sysfsPath: "/sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:1/block/",
+				},
+				vols[1].uuid: {
+					devPath:   "/dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:2",
+					sysfsPath: "/sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:2/block/",
+				},
+				vols[2].uuid: {
+					devPath:   "/dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:3",
+					sysfsPath: "/sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:3/block/",
+				},
 			},
 			expectedMetaData: map[string]interface{}{
 				"instance-id":    "foo.default",
@@ -302,7 +313,46 @@ func TestCloudInitGenerator(t *testing.T) {
 					[]interface{}{"/dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:2", "/var/lib/whatever"},
 					[]interface{}{"/dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:3-part2", "/var/lib/foobar"},
 				},
+				"write_files": []interface{}{
+					map[string]interface{}{
+						"path":        "/etc/cloud/mount-volumes.sh",
+						"permissions": "0755",
+						"content": "#!/bin/sh\n" +
+							"if ! mountpoint '/opt'; then mkdir -p '/opt' && mount /dev/`ls /sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:1/block/`1 '/opt'; fi\n" +
+							"if ! mountpoint '/var/lib/whatever'; then mkdir -p '/var/lib/whatever' && mount /dev/`ls /sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:2/block/` '/var/lib/whatever'; fi\n" +
+							"if ! mountpoint '/var/lib/foobar'; then mkdir -p '/var/lib/foobar' && mount /dev/`ls /sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:3/block/`2 '/var/lib/foobar'; fi\n",
+					},
+				},
 			},
+		},
+		{
+			name: "injecting mount script into user data script",
+			config: &VMConfig{
+				PodName:      "foo",
+				PodNamespace: "default",
+				ParsedAnnotations: &VirtletAnnotations{
+					UserDataScript: "#!/bin/sh\necho hi\n@virtlet-mount-script@",
+				},
+				Mounts: []*VMMount{
+					{
+						ContainerPath: "/opt",
+						HostPath:      vols[0].path,
+					},
+				},
+			},
+			volumeMap: diskPathMap{
+				vols[0].uuid: {
+					devPath:   "/dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:1",
+					sysfsPath: "/sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:1/block/",
+				},
+			},
+			expectedMetaData: map[string]interface{}{
+				"instance-id":    "foo.default",
+				"local-hostname": "foo",
+			},
+			expectedUserDataStr: "#!/bin/sh\necho hi\n" +
+				"#!/bin/sh\n" +
+				"if ! mountpoint '/opt'; then mkdir -p '/opt' && mount /dev/`ls /sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:1/block/`1 '/opt'; fi\n",
 		},
 		{
 			name: "pod with network config",
@@ -584,131 +634,95 @@ func TestEnvDataGeneration(t *testing.T) {
 	}
 }
 
-func TestAddingSecrets(t *testing.T) {
+func verifyWriteFiles(t *testing.T, u *writeFilesUpdater, expectedWriteFiles ...interface{}) {
+	userData := make(map[string]interface{})
+	u.updateUserData(userData)
+	expectedUserData := map[string]interface{}{"write_files": expectedWriteFiles}
+	if !reflect.DeepEqual(userData, expectedUserData) {
+		t.Errorf("Bad user-data:\n%s\nExpected:\n%s", spew.Sdump(userData), spew.Sdump(expectedUserData))
+	}
+}
+
+func withFakeVolumeDir(t *testing.T, subdir string, perms os.FileMode, toRun func(location string)) {
 	tmpDir, err := ioutil.TempDir("", "")
 	if err != nil {
 		t.Fatalf("Can't create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
-	location := filepath.Join(tmpDir, "volumes/kubernetes.io~secret/test-volume")
-	if err := os.MkdirAll(location, 0755); err != nil {
-		t.Fatalf("Can't create secrets directory in temp dir: %v", err)
+	var location, filePath string
+	if subdir != "" {
+		location = filepath.Join(tmpDir, subdir)
+		if err := os.MkdirAll(location, 0755); err != nil {
+			t.Fatalf("Can't create secrets directory in temp dir: %v", err)
+		}
+		filePath = filepath.Join(location, "file")
+	} else {
+		filePath = filepath.Join(tmpDir, "file")
+		location = filePath
 	}
 
-	f, err := os.Create(filepath.Join(location, "file"))
+	f, err := os.Create(filePath)
 	if err != nil {
 		t.Fatalf("Can't create sample file in temp directory: %v", err)
 	}
-	f.Chmod(0640)
-	defer f.Close()
 	if _, err := f.WriteString("test content"); err != nil {
-		t.Fatalf("Error during write to test file: %v", err)
+		f.Close()
+		t.Fatalf("Error writing test file: %v", err)
+	}
+	if perms != 0 {
+		if err := f.Chmod(perms); err != nil {
+			t.Fatalf("Chmod(): %v", err)
+		}
+	}
+	if err := f.Close(); err != nil {
+		t.Fatalf("Error closing test file: %v", err)
 	}
 
-	userData := make(map[string]interface{})
-	g := NewWriteFilesManipulator(userData, []*VMMount{
-		{ContainerPath: "/container", HostPath: location},
+	toRun(location)
+}
+
+func TestAddingSecrets(t *testing.T) {
+	withFakeVolumeDir(t, "volumes/kubernetes.io~secret/test-volume", 0640, func(location string) {
+		u := newWriteFilesUpdater([]*VMMount{
+			{ContainerPath: "/container", HostPath: location},
+		})
+		u.addSecrets()
+		verifyWriteFiles(t, u, map[string]interface{}{
+			"path":        "/container/file",
+			"content":     "dGVzdCBjb250ZW50",
+			"encoding":    "b64",
+			"permissions": "0640",
+		})
 	})
-
-	g.AddSecrets()
-
-	expectedUserData := map[string]interface{}{
-		"write_files": []interface{}{
-			map[string]interface{}{
-				"path":        "/container/file",
-				"content":     "dGVzdCBjb250ZW50",
-				"encoding":    "b64",
-				"permissions": "0640",
-			},
-		},
-	}
-
-	if !reflect.DeepEqual(userData, expectedUserData) {
-		t.Errorf("Bad user-data:\n%s\nExpected:\n%s", spew.Sdump(userData), spew.Sdump(expectedUserData))
-	}
 }
 
 func TestAddingConfigMap(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatal("Can't create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	location := filepath.Join(tmpDir, "volumes/kubernetes.io~configmap/test-volume")
-	if err := os.MkdirAll(location, 0755); err != nil {
-		t.Fatal("Can't create secrets directory in temp dir: %v", err)
-	}
-
-	f, err := os.Create(filepath.Join(location, "file"))
-	if err != nil {
-		t.Fatal("Can't create sample file in temp directory: %v", err)
-	}
-	defer f.Close()
-	if _, err := f.WriteString("test content"); err != nil {
-		t.Fatal("Error during write to test file: %v", err)
-	}
-
-	userData := make(map[string]interface{})
-	g := NewWriteFilesManipulator(userData, []*VMMount{
-		{ContainerPath: "/container", HostPath: location},
+	withFakeVolumeDir(t, "volumes/kubernetes.io~configmap/test-volume", 0, func(location string) {
+		u := newWriteFilesUpdater([]*VMMount{
+			{ContainerPath: "/container", HostPath: location},
+		})
+		u.addConfigMapEntries()
+		verifyWriteFiles(t, u, map[string]interface{}{
+			"path":        "/container/file",
+			"content":     "dGVzdCBjb250ZW50",
+			"encoding":    "b64",
+			"permissions": "0644",
+		})
 	})
-
-	g.AddConfigMapEntries()
-
-	expectedUserData := map[string]interface{}{
-		"write_files": []interface{}{
-			map[string]interface{}{
-				"path":        "/container/file",
-				"content":     "dGVzdCBjb250ZW50",
-				"encoding":    "b64",
-				"permissions": "0644",
-			},
-		},
-	}
-
-	if !reflect.DeepEqual(userData, expectedUserData) {
-		t.Errorf("Bad user-data:\n%s\nExpected:\n%s", spew.Sdump(userData), spew.Sdump(expectedUserData))
-	}
 }
 
 func TestAddingFileLikeMount(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatal("Can't create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	fname := filepath.Join(tmpDir, "file")
-	f, err := os.Create(fname)
-	if err != nil {
-		t.Fatal("Can't create sample file in temp directory: %v", err)
-	}
-	defer f.Close()
-	if _, err := f.WriteString("test content"); err != nil {
-		t.Fatal("Error during write to test file: %v", err)
-	}
-
-	userData := make(map[string]interface{})
-	g := NewWriteFilesManipulator(userData, []*VMMount{
-		{ContainerPath: "/container", HostPath: fname},
+	withFakeVolumeDir(t, "", 0, func(location string) {
+		u := newWriteFilesUpdater([]*VMMount{
+			{ContainerPath: "/container", HostPath: location},
+		})
+		u.addFileLikeMounts()
+		verifyWriteFiles(t, u, map[string]interface{}{
+			"path":        "/container",
+			"content":     "dGVzdCBjb250ZW50",
+			"encoding":    "b64",
+			"permissions": "0644",
+		})
 	})
-
-	g.AddFileLikeMounts()
-
-	expectedUserData := map[string]interface{}{
-		"write_files": []interface{}{
-			map[string]interface{}{
-				"path":        "/container",
-				"content":     "dGVzdCBjb250ZW50",
-				"encoding":    "b64",
-				"permissions": "0644",
-			},
-		},
-	}
-
-	if !reflect.DeepEqual(userData, expectedUserData) {
-		t.Errorf("Bad user-data:\n%s\nExpected:\n%s", spew.Sdump(userData), spew.Sdump(expectedUserData))
-	}
 }

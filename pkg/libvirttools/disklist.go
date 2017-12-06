@@ -99,7 +99,7 @@ func (dl *diskList) writeImages(domain virt.VirtDomain) error {
 		return fmt.Errorf("couldn't get domain xml: %v", err)
 	}
 
-	volumeMap := make(map[string]string)
+	volumeMap := make(diskPathMap)
 	for _, item := range dl.items {
 		uuid := item.volume.Uuid()
 		if uuid != "" {
@@ -107,7 +107,7 @@ func (dl *diskList) writeImages(domain virt.VirtDomain) error {
 			if err != nil {
 				return err
 			}
-			volumeMap[uuid] = diskPath.devPath
+			volumeMap[uuid] = *diskPath
 		}
 	}
 

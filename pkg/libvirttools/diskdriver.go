@@ -34,23 +34,6 @@ const (
 	maxScsiBlockDevChar   = 'z'
 )
 
-type diskPath struct {
-	// devPath denotes path to the device under /dev, e.g.
-	// /dev/disk/by-path/virtio-pci-0000:00:03.0-scsi-0:0:0:0 or
-	// /dev/disk/by-path/pci-0000:00:03.0-virtio-pci-0000:01:01.0
-	devPath string
-	// sysfsPath denotes a path to a directory in sysfs that
-	// contains a file with the same name as the device in /dev, e.g.
-	// /sys/devices/pci0000:00/0000:00:03.0/0000:01:01.0/virtio*/block/ or
-	// /sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:0/block/sda
-	// (note that in the latter case * is used instead of host because host number appear
-	// to be wrong in sysfs for some reason)
-	// The path needs to be globbed and the single file name from there
-	// should be used as device name, e.g.
-	// ls -l /dev/`ls /sys/devices/pci0000:00/0000:00:03.0/0000:01:01.0/virtio*/block/`
-	sysfsPath string
-}
-
 type diskDriver interface {
 	diskPath(domainDef *libvirtxml.Domain) (*diskPath, error)
 	target() *libvirtxml.DomainDiskTarget

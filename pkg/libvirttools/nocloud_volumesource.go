@@ -54,7 +54,7 @@ func (v *nocloudVolume) Setup() (*libvirtxml.DomainDisk, error) {
 	return v.cloudInitGenerator().DiskDef(), nil
 }
 
-func (v *nocloudVolume) WriteImage(volumeMap map[string]string) error {
+func (v *nocloudVolume) WriteImage(volumeMap diskPathMap) error {
 	return v.cloudInitGenerator().GenerateImage(volumeMap)
 }
 
