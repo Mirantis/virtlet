@@ -37,7 +37,6 @@ var _ = Describe("Container volume mounts", func() {
 		)
 
 		BeforeAll(func() {
-			requireCloudInit()
 			virtletNodeName, err := controller.VirtletNodeName()
 			Expect(err).NotTo(HaveOccurred())
 			nodeExecutor, err = controller.DinDNodeExecutor(virtletNodeName)
@@ -79,7 +78,6 @@ var _ = Describe("Container volume mounts", func() {
 		)
 
 		BeforeAll(func() {
-			requireCloudInit()
 			vm = makeVolumeMountVM(map[string]string{
 				"type":     "qcow2",
 				"capacity": "10MB",
@@ -234,9 +232,13 @@ func makeVolumeMountVM(flexvolOptions map[string]string, nodeName string) *frame
 			MountPath: "/foo",
 		})
 	}
-	vm := controller.VM("ubuntu-vm")
+	vm := controller.VM("mount-vm")
 	vm.Create(VMOptions{
 		NodeName: nodeName,
+		// TODO: should also have an option to test using
+		// ubuntu image with volumes mounted using cloud-init
+		// userdata 'mounts' section
+		UserDataScript: "@virtlet-mount-script@",
 	}.applyDefaults(), time.Minute*5, podCustomization)
 	_, err := vm.Pod()
 	Expect(err).NotTo(HaveOccurred())
