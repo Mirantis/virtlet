@@ -31,10 +31,12 @@ import (
 )
 
 var (
-	vmImageLocation       = flag.String("image", defaultVMImageLocation, "VM image URL (*without http(s)://*")
+	vmImageLocation       = flag.String("image", defaultLiteImageLocation, "Lite VM image URL (*without http(s)://*")
+	heavyVMImageLocation  = flag.String("heavy-image", defaultHeavyImageLocation, "VM cloud-init (heavy) image with  URL (*without http(s)://*")
 	sshUser               = flag.String("sshuser", defaultSSHUser, "default SSH user for VMs")
-	includeCloudInitTests = flag.Bool("include-cloud-init-tests", false, "include Cloud-Init tests")
-	memoryLimit           = flag.Int("memoryLimit", 160, "default VM memory limit (in MiB)")
+	includeCloudInitTests = flag.Bool("include-cloud-init-tests", true, "include Cloud-Init tests")
+	memoryLimit           = flag.Int("memory-limit", 128, "default VM memory limit (in MiB)")
+	memoryLimitHeavy      = flag.Int("memory-limit-heavy", 256, "default VM memory limit for heavy image (in MiB)")
 )
 
 // scheduleWaitSSH schedules SSH interface initialization before the test context starts
@@ -116,10 +118,14 @@ func do(value interface{}, extra ...interface{}) interface{} {
 
 type VMOptions framework.VMOptions
 
-func (o VMOptions) applyDefaults() framework.VMOptions {
+func (o VMOptions) applyDefaults(useCloudInitImage bool) framework.VMOptions {
 	res := framework.VMOptions(o)
 	if res.Image == "" {
-		res.Image = *vmImageLocation
+		if useCloudInitImage {
+			res.Image = *heavyVMImageLocation
+		} else {
+			res.Image = *vmImageLocation
+		}
 	}
 	if res.SSHKey == "" && res.SSHKeySource == "" {
 		res.SSHKey = sshPublicKey
@@ -134,7 +140,11 @@ func (o VMOptions) applyDefaults() framework.VMOptions {
 		res.Limits = map[string]string{}
 	}
 	if res.Limits["memory"] == "" {
-		res.Limits["memory"] = fmt.Sprintf("%dMi", *memoryLimit)
+		lim := *memoryLimit
+		if useCloudInitImage {
+			lim = *memoryLimitHeavy
+		}
+		res.Limits["memory"] = fmt.Sprintf("%dMi", lim)
 	}
 
 	return res

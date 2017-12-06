@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -42,8 +43,9 @@ func newSSHInterface(vmInterface *VMInterface, user, secret string) (*sshInterfa
 	}
 
 	config := &ssh.ClientConfig{
-		User: user,
-		Auth: []ssh.AuthMethod{authMethod},
+		User:    user,
+		Auth:    []ssh.AuthMethod{authMethod},
+		Timeout: time.Second * 10,
 	}
 
 	vmPod, err := vmInterface.Pod()
@@ -62,7 +64,7 @@ func newSSHInterface(vmInterface *VMInterface, user, secret string) (*sshInterfa
 
 	client, server := net.Pipe()
 	go func() {
-		container.Exec([]string{"nc", "-q0", vmPod.Pod.Status.PodIP, "22"}, server, server, os.Stderr)
+		container.Exec([]string{"nc", "-w10", "-q0", vmPod.Pod.Status.PodIP, "22"}, server, server, os.Stderr)
 		client.Close()
 	}()
 

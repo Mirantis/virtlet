@@ -237,7 +237,7 @@ func makeVolumeMountVM(flexvolOptions map[string]string, nodeName string) *frame
 	vm := controller.VM("ubuntu-vm")
 	vm.Create(VMOptions{
 		NodeName: nodeName,
-	}.applyDefaults(), time.Minute*5, podCustomization)
+	}.applyDefaults(true), time.Minute*5, podCustomization)
 	_, err := vm.Pod()
 	Expect(err).NotTo(HaveOccurred())
 	return vm
