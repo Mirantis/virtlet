@@ -16,9 +16,12 @@ metadata:
     VirtletSSHKeys: |
       ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCaJEcFDXEK2ZbX0ZLS1EIYFZRbDAcRfuVjpstSc0De8+sV1aiu+dePxdkuDRwqFtCyk6dEZkssjOkBXtri00MECLkir6FcH3kKOJtbJ6vy3uaJc9w1ERo+wyl6SkAh/+JTJkp7QRXj8oylW5E20LsbnA/dIwWzAF51PPwF7A7FtNg9DnwPqMkxFo1Th/buOMKbP5ZA1mmNNtmzbMpMfJATvVyiv3ccsSJKOiyQr6UG+j7sc/7jMVz5Xk34Vd0l8GwcB0334MchHckmqDB142h/NCWTr8oLakDNvkfC1YneAfAO41hDkUbxPtVBG5M/o7P4fxoqiHEX+ZLfRxDtHB53 me@localhost
     # cloud-init user data
+    # @virtlet-mount-script@ is replaced with commands that mount
+    # volumes into this VM
     VirtletCloudInitUserDataScript: |
       #!/bin/sh
       echo "Hi there"
+      @virtlet-mount-script@
 spec:
   # This nodeAffinity specification tells Kubernetes to run this
   # pod only on the nodes that have extraRuntime=virtlet label.
@@ -55,3 +58,19 @@ spec:
       limits:
         # This memory limit is applied to the libvirt domain definition
         memory: 160Mi
+    # volumeMounts are handled by means of @virtlet-mount-script@ here.
+    # They can also be handled by means of cloud-init if the image supports it,
+    # but this is not the case with CirrOS.
+    volumeMounts:
+    - name: somevol
+      mountPath: /somevol
+  volumes:
+  # Define an ephemeral volume to be mounted under /somevol
+  # This can only be used to add some extra disk space
+  # as it'll be removed with this VM.
+  - name: somevol
+    flexVolume:
+      driver: "virtlet/flexvolume_driver"
+      options:
+        type: qcow2
+        capacity: 40MB
