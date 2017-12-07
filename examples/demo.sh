@@ -1,0 +1,1 @@
+../deploy/demo.sh
