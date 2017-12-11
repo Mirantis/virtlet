@@ -41,6 +41,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"strconv"
 	"syscall"
 	"unsafe"
 
@@ -63,6 +64,9 @@ const (
 
 	SizeOfIfReq = 40
 	IFNAMSIZ    = 16
+
+	calicoDefaultSubnet = 24
+	calicoSubnetVar     = "VIRTLET_CALICO_SUBNET"
 )
 
 // Had to duplicate ifReq here as it's not exported
@@ -512,6 +516,11 @@ func ExtractLinkInfo(link netlink.Link, nsPath string) (*cnicurrent.Result, erro
 		switch {
 		case route.Protocol == syscall.RTPROT_KERNEL:
 			// route created by kernel
+		case route.Gw == nil:
+			// these routes can't be represented properly
+			// by CNI result because CNI will consider
+			// them having IP's default Gateway value as
+			// Gw
 		case (route.Dst == nil || route.Dst.IP == nil) && route.Gw == nil:
 			// route has only Src
 		case (route.Dst == nil || route.Dst.IP == nil):
@@ -872,4 +881,101 @@ func GenerateMacAddress() (net.HardwareAddr, error) {
 	}
 
 	return mac, nil
+}
+
+var calicoGatewayIP = net.IP{169, 254, 1, 1}
+
+// DetectCalico checks if the specified link in the current network
+// namespace is configured by Calico. It returns two boolean values
+// where the first one denotes whether Calico is used for the specified
+// link and the second one denotes whether Calico's default route
+// needs to be used. This approach is needed for multiple CNI use case
+// when the types of individual CNI plugins are not available.
+func DetectCalico(link netlink.Link) (bool, bool, error) {
+	haveCalico, haveCalicoGateway := false, false
+	routes, err := netlink.RouteList(link, netlink.FAMILY_V4)
+	if err != nil {
+		return false, false, fmt.Errorf("failed to list routes: %v", err)
+	}
+	for _, route := range routes {
+		switch {
+		case route.Protocol == syscall.RTPROT_KERNEL:
+			// route created by kernel
+		case route.LinkIndex == link.Attrs().Index && route.Gw == nil && route.Dst.IP.Equal(calicoGatewayIP):
+			haveCalico = true
+		case (route.Dst == nil || route.Dst.IP == nil) && route.Gw.Equal(calicoGatewayIP):
+			haveCalicoGateway = true
+		}
+	}
+	return haveCalico, haveCalico && haveCalicoGateway, nil
+}
+
+// FixCalicoNetworking updates netConfig to make Calico work with
+// Virtlet's DHCP-server based scheme. It does so by throwing away
+// Calico's gateway and dev route and using a fake gateway instead.
+// The fake gateway provided by getDummyGateway() is just an IP
+// address allocated by Calico IPAM, it's needed for proper ARP
+// responses for VMs.
+// This function must be called from within the container network
+// namespace.
+func FixCalicoNetworking(netConfig *cnicurrent.Result, getDummyGateway func() (net.IP, error)) error {
+	contLinks, err := GetContainerLinks(netConfig.Interfaces)
+	if err != nil {
+		return err
+	}
+	for n, link := range contLinks {
+		haveCalico, haveCalicoGateway, err := DetectCalico(link)
+		if err != nil {
+			return err
+		}
+		if !haveCalico {
+			continue
+		}
+		if n > len(netConfig.IPs) {
+			return errors.New("too many container links")
+		}
+		if netConfig.IPs[n].Version != "4" {
+			return errors.New("IPv4 config was expected")
+		}
+		netConfig.IPs[n].Address.Mask = netmaskForCalico()
+		if haveCalicoGateway {
+			dummyGateway, err := getDummyGateway()
+			if err != nil {
+				return err
+			}
+			netConfig.IPs[n].Gateway = dummyGateway
+			var newRoutes []*cnitypes.Route
+			// remove the deault gateway
+			for _, r := range netConfig.Routes {
+				if r.Dst.Mask != nil {
+					ones, _ := r.Dst.Mask.Size()
+					if ones == 0 {
+						continue
+					}
+				}
+				newRoutes = append(newRoutes, r)
+			}
+			netConfig.Routes = append(newRoutes, &cnitypes.Route{
+				Dst: net.IPNet{
+					IP:   net.IP{0, 0, 0, 0},
+					Mask: net.IPMask{0, 0, 0, 0},
+				},
+				GW: dummyGateway,
+			})
+		}
+	}
+	return nil
+}
+
+func netmaskForCalico() net.IPMask {
+	n := calicoDefaultSubnet
+	subnetStr := os.Getenv(calicoSubnetVar)
+	if subnetStr != "" {
+		n, err := strconv.Atoi(subnetStr)
+		if err != nil || n <= 0 || n > 30 {
+			glog.Warningf("bad calico subnet %q, using /%d", subnetStr, calicoDefaultSubnet)
+			n = calicoDefaultSubnet
+		}
+	}
+	return net.CIDRMask(n, 32)
 }
