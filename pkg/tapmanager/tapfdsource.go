@@ -18,11 +18,8 @@ package tapmanager
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
-	"os"
-	"strconv"
 	"sync"
 	"time"
 
@@ -36,12 +33,6 @@ import (
 	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/dhcp"
 	"github.com/Mirantis/virtlet/pkg/nettools"
-)
-
-const (
-	calicoNetType       = "calico"
-	calicoDefaultSubnet = 24
-	calicoSubnetVar     = "VIRTLET_CALICO_SUBNET"
 )
 
 // InterfaceType presents type of network interface instance
@@ -97,7 +88,7 @@ type TapFDSource struct {
 	sync.Mutex
 
 	cniClient    *cni.Client
-	dummyGateway net.IP
+	dummyNetwork *cnicurrent.Result
 	fdMap        map[string]*podNetwork
 }
 
@@ -116,23 +107,20 @@ func NewTapFDSource(cniPluginsDir, cniConfigsDir string) (*TapFDSource, error) {
 		fdMap:     make(map[string]*podNetwork),
 	}
 
-	// Calico needs special treatment here.
-	// We need to make network config DHCP-compatible by throwing away
-	// Calico's gateway and dev route and using a fake gateway instead.
-	// The fake gateway is just an IP address allocated by Calico IPAM,
-	// it's needed for proper ARP resppnses for VMs.
-	if cniClient.Type() == calicoNetType {
-		dummyResult, err := cniClient.GetDummyNetwork()
+	return s, nil
+}
+
+func (s *TapFDSource) getDummyNetwork() (*cnicurrent.Result, error) {
+	if s.dummyNetwork == nil {
+		var err error
+		s.dummyNetwork, err = s.cniClient.GetDummyNetwork()
 		if err != nil {
 			return nil, err
 		}
-		if len(dummyResult.IPs) != 1 {
-			return nil, fmt.Errorf("expected 1 ip for the dummy network, but got %d", len(dummyResult.IPs))
-		}
-		s.dummyGateway = dummyResult.IPs[0].Address.IP
-	}
+		// s.dummyGateway = dummyResult.IPs[0].Address.IP
 
-	return s, nil
+	}
+	return s.dummyNetwork, nil
 }
 
 // GetFDs implements GetFDs method of FDSource interface
@@ -166,26 +154,6 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 
 	netConfig := payload.CNIConfig
 
-	// Calico needs network config to be adjusted for DHCP compatibility
-	if s.dummyGateway != nil {
-		if len(netConfig.IPs) != 1 {
-			return nil, nil, errors.New("didn't expect more than one IP config")
-		}
-		if netConfig.IPs[0].Version != "4" {
-			return nil, nil, errors.New("IPv4 config was expected")
-		}
-		netConfig.IPs[0].Gateway = s.dummyGateway
-		netConfig.Routes = []*cnitypes.Route{
-			{
-				Dst: net.IPNet{
-					IP:   net.IP{0, 0, 0, 0},
-					Mask: net.IPMask{0, 0, 0, 0},
-				},
-				GW: s.dummyGateway,
-			},
-		}
-	}
-
 	netNSPath := cni.PodNetNSPath(pnd.PodId)
 	vmNS, err := ns.GetNS(netNSPath)
 	if err != nil {
@@ -207,8 +175,9 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 		if netConfig, err = nettools.ValidateAndFixCNIResult(netConfig, pnd.PodNs, allLinks); err != nil {
 			return fmt.Errorf("error in fixing cni configuration: %v", err)
 		}
-		if s.dummyGateway != nil {
-			netConfig.IPs[0].Address.Mask = netmaskForCalico()
+		if err := nettools.FixCalicoNetworking(netConfig, s.getDummyNetwork); err != nil {
+			// don't fail in this case because there may be even no Calico
+			glog.Warningf("Calico detection/fix didn't work: %v", err)
 		}
 		glog.V(3).Infof("CNI Result after fix:\n%s", spew.Sdump(netConfig))
 
@@ -325,17 +294,4 @@ func (s *TapFDSource) GetInfo(key string) ([]byte, error) {
 		return nil, fmt.Errorf("interface descriptions marshaling error: %v", err)
 	}
 	return data, nil
-}
-
-func netmaskForCalico() net.IPMask {
-	n := calicoDefaultSubnet
-	subnetStr := os.Getenv(calicoSubnetVar)
-	if subnetStr != "" {
-		n, err := strconv.Atoi(subnetStr)
-		if err != nil || n <= 0 || n > 30 {
-			glog.Warningf("bad calico subnet %q, using /%d", subnetStr, calicoDefaultSubnet)
-			n = calicoDefaultSubnet
-		}
-	}
-	return net.CIDRMask(n, 32)
 }

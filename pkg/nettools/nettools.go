@@ -41,6 +41,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"strconv"
 	"syscall"
 	"unsafe"
 
@@ -63,6 +64,9 @@ const (
 
 	SizeOfIfReq = 40
 	IFNAMSIZ    = 16
+
+	calicoDefaultSubnet = 24
+	calicoSubnetVar     = "VIRTLET_CALICO_SUBNET"
 )
 
 // Had to duplicate ifReq here as it's not exported
@@ -364,12 +368,11 @@ func ValidateAndFixCNIResult(netConfig *cnicurrent.Result, podNs string, allLink
 		return nil, fmt.Errorf("cni result does not have any IP addresses")
 	}
 
-	// If on list of interfaces are missing elements matching these mentioned
-	// by interface index in elements of ip list and for all elements
-	// of this list which have value -1 for interface index - add them to list
-	// of interfaces and fix its index in ip list entry
+	// Try to fix missing interface references in netConfig.IPs
+	// and add entries to Interfaces for links that need to be
+	// there but aren't
 	if len(netConfig.Interfaces) == 0 {
-		alreadyDefinedLinks, err := GetContainerLinks(netConfig.Interfaces, allLinks)
+		alreadyDefinedLinks, err := GetContainerLinks(netConfig.Interfaces)
 		if err != nil {
 			return nil, err
 		}
@@ -403,24 +406,15 @@ func ValidateAndFixCNIResult(netConfig *cnicurrent.Result, podNs string, allLink
 	return netConfig, nil
 }
 
-func findLinkByName(links []netlink.Link, name string) (netlink.Link, error) {
-	for _, link := range links {
-		if link.Attrs().Name == name {
-			return link, nil
-		}
-	}
-	return nil, fmt.Errorf("interface with name %q not found in container namespace", name)
-}
-
-// GetContainerLinks filters provided list of links looking for container links
-// from provided interfaces list
-func GetContainerLinks(interfaces []*cnicurrent.Interface, allLinks []netlink.Link) ([]netlink.Link, error) {
+// GetContainerLinks finds links that correspond to interfaces in the current
+// network namespace
+func GetContainerLinks(interfaces []*cnicurrent.Interface) ([]netlink.Link, error) {
 	var links []netlink.Link
 	for _, iface := range interfaces {
 		if iface.Sandbox == "" {
 			continue
 		}
-		link, err := findLinkByName(allLinks, iface.Name)
+		link, err := netlink.LinkByName(iface.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -502,6 +496,11 @@ func ExtractLinkInfo(link netlink.Link, nsPath string) (*cnicurrent.Result, erro
 		switch {
 		case route.Protocol == syscall.RTPROT_KERNEL:
 			// route created by kernel
+		case route.Gw == nil:
+			// these routes can't be represented properly
+			// by CNI result because CNI will consider
+			// them having IP's default Gateway value as
+			// Gw
 		case (route.Dst == nil || route.Dst.IP == nil) && route.Gw == nil:
 			// route has only Src
 		case (route.Dst == nil || route.Dst.IP == nil):
@@ -611,7 +610,7 @@ type ContainerSideNetwork struct {
 // The function should be called from within container namespace.
 // Returns container network struct and an error, if any
 func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks []netlink.Link) (*ContainerSideNetwork, error) {
-	contLinks, err := GetContainerLinks(info.Interfaces, allLinks)
+	contLinks, err := GetContainerLinks(info.Interfaces)
 	if err != nil {
 		return nil, err
 	}
@@ -788,12 +787,8 @@ func (csn *ContainerSideNetwork) Teardown() error {
 	for _, f := range csn.TapFiles {
 		f.Close()
 	}
-	allLinks, err := netlink.LinkList()
-	if err != nil {
-		return fmt.Errorf("error listing links: %v", err)
-	}
 
-	contLinks, err := GetContainerLinks(csn.Result.Interfaces, allLinks)
+	contLinks, err := GetContainerLinks(csn.Result.Interfaces)
 	if err != nil {
 		return err
 	}
@@ -867,4 +862,146 @@ func GenerateMacAddress() (net.HardwareAddr, error) {
 	}
 
 	return mac, nil
+}
+
+var calicoGatewayIP = net.IP{169, 254, 1, 1}
+
+// DetectCalico checks if the specified link in the current network
+// namespace is configured by Calico. It returns two boolean values
+// where the first one denotes whether Calico is used for the specified
+// link and the second one denotes whether Calico's default route
+// needs to be used. This approach is needed for multiple CNI use case
+// when the types of individual CNI plugins are not available.
+func DetectCalico(link netlink.Link) (bool, bool, error) {
+	haveCalico, haveCalicoGateway := false, false
+	routes, err := netlink.RouteList(link, netlink.FAMILY_V4)
+	if err != nil {
+		return false, false, fmt.Errorf("failed to list routes: %v", err)
+	}
+	for _, route := range routes {
+		switch {
+		case route.Protocol == syscall.RTPROT_KERNEL:
+			// route created by kernel
+		case route.LinkIndex == link.Attrs().Index && route.Gw == nil && route.Dst.IP.Equal(calicoGatewayIP):
+			haveCalico = true
+		case (route.Dst == nil || route.Dst.IP == nil) && route.Gw.Equal(calicoGatewayIP):
+			haveCalicoGateway = true
+		}
+	}
+	return haveCalico, haveCalico && haveCalicoGateway, nil
+}
+
+func getLinkForIPConfig(netConfig *cnicurrent.Result, ipConfigIndex int) (netlink.Link, error) {
+	if ipConfigIndex > len(netConfig.IPs) {
+		return nil, fmt.Errorf("ip config index out of range: %d", ipConfigIndex)
+	}
+
+	ipConfig := netConfig.IPs[ipConfigIndex]
+	if ipConfig.Interface >= len(netConfig.Interfaces) {
+		return nil, errors.New("interface index out of range in the CNI result")
+	}
+
+	if ipConfig.Version != "4" {
+		return nil, errors.New("skipping non-IPv4 config")
+	}
+
+	iface := netConfig.Interfaces[ipConfig.Interface]
+	if iface.Sandbox == "" {
+		return nil, errors.New("error: IP config has non-sandboxed interace")
+	}
+
+	link, err := netlink.LinkByName(iface.Name)
+	if err != nil {
+		return nil, fmt.Errorf("can't get link %q: %v", iface.Name, err)
+	}
+
+	return link, nil
+}
+
+func getDummyGateway(dummyNetwork *cnicurrent.Result) (net.IP, error) {
+	for n, ipConfig := range dummyNetwork.IPs {
+		var haveCalico bool
+		link, err := getLinkForIPConfig(dummyNetwork, n)
+		if err == nil {
+			haveCalico, _, err = DetectCalico(link)
+		}
+		if err != nil {
+			glog.Warning("Calico fix: dummy network: skipping link for config %d: %v", n, err)
+			continue
+		}
+		if haveCalico {
+			return ipConfig.Address.IP, nil
+		}
+	}
+	return nil, errors.New("Calico fix: couldn't find dummy gateway")
+}
+
+// FixCalicoNetworking updates netConfig to make Calico work with
+// Virtlet's DHCP-server based scheme. It does so by throwing away
+// Calico's gateway and dev route and using a fake gateway instead.
+// The fake gateway provided by getDummyGateway() is just an IP
+// address allocated by Calico IPAM, it's needed for proper ARP
+// responses for VMs.
+// This function must be called from within the container network
+// namespace.
+func FixCalicoNetworking(netConfig *cnicurrent.Result, getDummyNetwork func() (*cnicurrent.Result, error)) error {
+	// linkNameMap := make(map[string]*cnicurrent.IPConfig)
+	for n, ipConfig := range netConfig.IPs {
+		link, err := getLinkForIPConfig(netConfig, n)
+		if err != nil {
+			glog.Warning("Calico fix: skipping link for config %d: %v", n, err)
+			continue
+		}
+		haveCalico, haveCalicoGateway, err := DetectCalico(link)
+		if err != nil {
+			return err
+		}
+		if !haveCalico {
+			continue
+		}
+		ipConfig.Address.Mask = netmaskForCalico()
+		if haveCalicoGateway {
+			dummyNetwork, err := getDummyNetwork()
+			if err != nil {
+				return err
+			}
+			dummyGateway, err := getDummyGateway(dummyNetwork)
+			if err != nil {
+				return err
+			}
+			ipConfig.Gateway = dummyGateway
+			var newRoutes []*cnitypes.Route
+			// remove the deault gateway
+			for _, r := range netConfig.Routes {
+				if r.Dst.Mask != nil {
+					ones, _ := r.Dst.Mask.Size()
+					if ones == 0 {
+						continue
+					}
+				}
+				newRoutes = append(newRoutes, r)
+			}
+			netConfig.Routes = append(newRoutes, &cnitypes.Route{
+				Dst: net.IPNet{
+					IP:   net.IP{0, 0, 0, 0},
+					Mask: net.IPMask{0, 0, 0, 0},
+				},
+				GW: dummyGateway,
+			})
+		}
+	}
+	return nil
+}
+
+func netmaskForCalico() net.IPMask {
+	n := calicoDefaultSubnet
+	subnetStr := os.Getenv(calicoSubnetVar)
+	if subnetStr != "" {
+		n, err := strconv.Atoi(subnetStr)
+		if err != nil || n <= 0 || n > 30 {
+			glog.Warningf("bad calico subnet %q, using /%d", subnetStr, calicoDefaultSubnet)
+			n = calicoDefaultSubnet
+		}
+	}
+	return net.CIDRMask(n, 32)
 }
