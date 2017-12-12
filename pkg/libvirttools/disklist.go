@@ -46,7 +46,7 @@ type diskList struct {
 	items  []*diskItem
 }
 
-// newDiskSet creates a diskList for the specified VMConfig, volume
+// newDiskList creates a diskList for the specified VMConfig, volume
 // source and volume owner
 func newDiskList(config *VMConfig, source VMVolumeSource, owner VolumeOwner) (*diskList, error) {
 	vmVols, err := source(config, owner)
@@ -70,8 +70,8 @@ func newDiskList(config *VMConfig, source VMVolumeSource, owner VolumeOwner) (*d
 	return &diskList{config, items}, nil
 }
 
-// setupVolumes performs the setup procedure on each volume in the
-// diskList and returns a list of libvirtxml DomainDisk structs
+// setup performs the setup procedure on each volume in the diskList
+// and returns a list of libvirtxml DomainDisk structs
 func (dl *diskList) setup() ([]libvirtxml.DomainDisk, error) {
 	var domainDisks []libvirtxml.DomainDisk
 	for n, item := range dl.items {
@@ -90,9 +90,9 @@ func (dl *diskList) setup() ([]libvirtxml.DomainDisk, error) {
 	return domainDisks, nil
 }
 
-// writeVolumeImages writes images for volumes that are based on
-// generated images (such as cloud-init nocloud datasource).  It must
-// be passed a VirtDomain for which images are being generated.
+// writeImages writes images for volumes that are based on generated
+// images (such as cloud-init nocloud datasource).  It must be passed
+// a VirtDomain for which images are being generated.
 func (dl *diskList) writeImages(domain virt.VirtDomain) error {
 	domainDesc, err := domain.Xml()
 	if err != nil {
