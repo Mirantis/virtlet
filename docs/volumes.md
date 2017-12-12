@@ -66,24 +66,16 @@ CD-ROM and all the flexvolume types that Virtlet supports.
 </domain>
 ```
 
-Virtlet tries to do its best so as to make the disk names specified in
-the domain definition to match the devices inside VM in case of Linux
-system.  This will be the case with most Linux images when using
-`virtio-scsi` driver, but in case of `virtio-blk` it depends on
-whether the device naming/numbering in the VM follows the numbering of
-PCI slots used for `virtio-blk` devices. We didn't study this part
-well enough yet.
-
 3. The attached disks are visible by the OS inside VM as hard disk
    devices `/dev/sdb`, `/dev/sdc` and so on (`/dev/vdb`, `/dev/vdc`
-   and so on in case of `virtio-blk`). As said above there is no fixed
-   behavior for device names and their order on the PCI bus.
-4. As with the majority of other guest OS functionality, Virtlet
-   doesn't give any guarantee about the possibility of mounting
-   flexvolumes into the VM. This depends on the cloud-init
-   functionality supported by the image used. Also note that Virtlet
-   doesn't perform any checks on the guest OS side to ensure that
-   volume mounting succeeded.
+   and so on in case of `virtio-blk`). Note that the naming of the
+   devices inside guest OS is usually unpredictable.  The use of
+   Virtlet-generated
+   [cloud-init data](cloud-init-data-generation.md#workarounds) is
+   recommended for mounting of the volumes. Virtlet uses udev-provided
+   `/dev/disk/by-path/...` or, failing that, sysfs information for
+   finding the device inside the virtual machine. Note that both
+   mechanisms are Linux-specific.
 
 ## Flexvolume driver
 
