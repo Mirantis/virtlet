@@ -37,6 +37,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -647,8 +648,26 @@ func getPCIAddressOfVF(devName string) (string, error) {
 	if linkDestination[:13] != "../../../0000" {
 		return "", fmt.Errorf("unknown address as device symlink: %q", linkDestination)
 	}
-	// we need pci address without leading "0000:"
+	// we need pci address without leading "../../../"
 	return linkDestination[9:], nil
+}
+
+func getDevNameByPCIAddress(address string) (string, error) {
+	desiredLinkLocation := "../../../" + address
+	devices, err := ioutil.ReadDir("/sys/class/net")
+	if err != nil {
+		return "", err
+	}
+	for _, fi := range devices {
+		linkDestination, err := os.Readlink(filepath.Join("/sys/class/net", fi.Name(), "device"))
+		if err != nil {
+			return "", err
+		}
+		if linkDestination == desiredLinkLocation {
+			return fi.Name(), nil
+		}
+	}
+	return "", fmt.Errorf("can't find network device with pci address %q", address)
 }
 
 func writeStringToFile(s, path string, mode os.FileMode) error {
@@ -888,7 +907,7 @@ func ConfigureLink(link netlink.Link, info *cnicurrent.Result) error {
 		}
 	}
 	if linkNo == -1 {
-		return fmt.Errorf("can not find link with MAC %q in saved cni result: %s", linkMAC, spew.Sdump(info))
+		return fmt.Errorf("can't find link with MAC %q in saved cni result: %s", linkMAC, spew.Sdump(info))
 	}
 
 	for _, addr := range info.IPs {
@@ -919,23 +938,6 @@ func ConfigureLink(link netlink.Link, info *cnicurrent.Result) error {
 	}
 
 	return nil
-}
-
-func renameLink(mac, name string) error {
-	links, err := netlink.LinkList()
-	if err != nil {
-		return err
-	}
-
-	for _, link := range links {
-		if link.Attrs().HardwareAddr.String() == mac {
-			if err := netlink.LinkSetName(link, name); err != nil {
-				return err
-			}
-		}
-	}
-
-	return fmt.Errorf("link with mac address %q not found, can't rename it to %q", mac, name)
 }
 
 // Teardown cleans up container network configuration.
@@ -994,20 +996,46 @@ func (csn *ContainerSideNetwork) Teardown() error {
 			if err := SetHardwareAddr(contLink, csn.HardwareAddrs[i]); err != nil {
 				return err
 			}
-		} else {
-			if err := rebindDriverToDevice(csn.PCIAddresses[i]); err != nil {
-				return err
-			}
-			if err := renameLink(csn.HardwareAddrs[i].String(), csn.InterfaceNames[i]); err != nil {
-				return err
-			}
 		}
 
-		rereadedLink, err := netlink.LinkByName(contLink.Attrs().Name)
+		rereadLink, err := netlink.LinkByName(contLink.Attrs().Name)
 		if err != nil {
 			return err
 		}
-		if err := ConfigureLink(rereadedLink, csn.Result); err != nil {
+		if err := ConfigureLink(rereadLink, csn.Result); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// ReconstructVFs iterating over stored pci addresses rebinds each interface
+// to it's host driver, changes mac address and name to stored values,
+// than moves it to container namespace
+func (csn *ContainerSideNetwork) ReconstructVFs(ns ns.NetNS) error {
+	for i, ifType := range csn.InterfaceTypes {
+		if ifType != InterfaceTypeVF {
+			continue
+		}
+		if err := rebindDriverToDevice(csn.PCIAddresses[i]); err != nil {
+			return err
+		}
+		devName, err := getDevNameByPCIAddress(csn.PCIAddresses[i])
+		if err != nil {
+			return err
+		}
+		link, err := netlink.LinkByName(devName)
+		if err != nil {
+			return err
+		}
+		if err := netlink.LinkSetHardwareAddr(link, csn.HardwareAddrs[i]); err != nil {
+			return err
+		}
+		if err := netlink.LinkSetName(link, csn.InterfaceNames[i]); err != nil {
+			return err
+		}
+		if err := netlink.LinkSetNsFd(link, int(ns.Fd())); err != nil {
 			return err
 		}
 	}
