@@ -26,6 +26,25 @@ Besides [cirros-vm.yaml](cirros-vm.yaml), there's also [ubuntu-vm.yaml](ubuntu-v
 ./vmssh.sh root@ubuntu-vm [command...]
 ```
 
+Another way to access a vm is to use `virsh.sh` tool. It can be used to access a vm only when logging is disabled. See [vm-logging](https://github.com/Mirantis/virtlet/blob/master/docs/devel/vm-logging.md) for more details.
+You can list libvirt domains with `virsh.sh`:
+```bash
+./virsh.sh list
+```
+
+And then connect to console:
+
+```
+$ ./virsh.sh console @cirros-vm
+Connected to domain 411c70b0-1df3-46be-4838-c85474a1b44a-cirros-vm
+Escape character is ^]
+login as 'cirros' user. default password: 'cubswin:)'. use 'sudo' for root.
+cirros-vm login: cirros
+Password:
+$
+```
+
+
 # Kubernetes on VM-based StatefulSet
 
 [Another example](k8s.yaml) involves starting several VMs using `StatefulSet` and deploying
