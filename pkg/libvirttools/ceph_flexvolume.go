@@ -49,6 +49,8 @@ type cephVolume struct {
 	opts       *cephFlexvolumeOptions
 }
 
+var _ VMVolume = &cephVolume{}
+
 func newCephVolume(volumeName, configPath string, config *VMConfig, owner VolumeOwner) (VMVolume, error) {
 	v := &cephVolume{
 		volumeBase: volumeBase{config, owner},
@@ -90,7 +92,7 @@ func (v *cephVolume) Uuid() string {
 	return v.opts.Uuid
 }
 
-func (v *cephVolume) Setup(volumeMap map[string]string) (*libvirtxml.DomainDisk, error) {
+func (v *cephVolume) Setup() (*libvirtxml.DomainDisk, error) {
 	ipPortPair := strings.Split(v.opts.Monitor, ":")
 	if len(ipPortPair) != 2 {
 		return nil, fmt.Errorf("invalid format of ceph monitor setting: %s. Expected ip:port", v.opts.Monitor)

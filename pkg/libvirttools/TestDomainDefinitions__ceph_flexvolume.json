@@ -130,19 +130,11 @@
     "data": "66 6f 6f 62 61 72 0a"
   },
   {
-    "name": "domain conn: iso image",
-    "data": {
-      "meta-data": "{\"instance-id\":\"testName_0.default\",\"local-hostname\":\"testName_0\"}",
-      "network-config": "version: 1\n",
-      "user-data": "#cloud-config\nmounts:\n- - /dev/sdb1\n  - /var/lib/whatever\n"
-    }
-  },
-  {
     "name": "domain conn: DefineDomain",
     "data": {
       "XMLName": {
         "Space": "",
-        "Local": ""
+        "Local": "domain"
       },
       "Type": "kvm",
       "Name": "virtlet-231700d5-c9a6-container1",
@@ -222,11 +214,31 @@
           {
             "XMLName": {
               "Space": "",
-              "Local": ""
+              "Local": "controller"
             },
             "Type": "scsi",
             "Index": 0,
             "Model": "virtio-scsi",
+            "Address": {
+              "USB": null,
+              "PCI": {
+                "Domain": 0,
+                "Bus": 0,
+                "Slot": 1,
+                "Function": 0
+              },
+              "Drive": null,
+              "DIMM": null
+            }
+          },
+          {
+            "XMLName": {
+              "Space": "",
+              "Local": ""
+            },
+            "Type": "pci",
+            "Index": null,
+            "Model": "pci-root",
             "Address": null
           }
         ],
@@ -234,7 +246,7 @@
           {
             "XMLName": {
               "Space": "",
-              "Local": ""
+              "Local": "disk"
             },
             "Type": "file",
             "Device": "disk",
@@ -283,7 +295,7 @@
           {
             "XMLName": {
               "Space": "",
-              "Local": ""
+              "Local": "disk"
             },
             "Type": "network",
             "Device": "disk",
@@ -346,7 +358,7 @@
           {
             "XMLName": {
               "Space": "",
-              "Local": ""
+              "Local": "disk"
             },
             "Type": "file",
             "Device": "cdrom",
@@ -399,7 +411,7 @@
           {
             "XMLName": {
               "Space": "",
-              "Local": ""
+              "Local": "serial"
             },
             "Type": "unix",
             "Source": {
@@ -420,7 +432,7 @@
           {
             "XMLName": {
               "Space": "",
-              "Local": ""
+              "Local": "input"
             },
             "Type": "tablet",
             "Bus": "usb",
@@ -431,7 +443,7 @@
           {
             "XMLName": {
               "Space": "",
-              "Local": ""
+              "Local": "graphics"
             },
             "Type": "vnc",
             "AutoPort": "",
@@ -458,7 +470,7 @@
           {
             "XMLName": {
               "Space": "",
-              "Local": ""
+              "Local": "video"
             },
             "Model": {
               "Type": "cirrus",
@@ -479,8 +491,8 @@
       },
       "QEMUCommandline": {
         "XMLName": {
-          "Space": "",
-          "Local": ""
+          "Space": "http://libvirt.org/schemas/domain/qemu/1.0",
+          "Local": "commandline"
         },
         "Args": null,
         "Envs": [
@@ -519,6 +531,20 @@
         ]
       }
     }
+  },
+  {
+    "name": "domain conn: virtlet-231700d5-c9a6-container1: Create"
+  },
+  {
+    "name": "domain conn: virtlet-231700d5-c9a6-container1: iso image",
+    "data": {
+      "meta-data": "{\"instance-id\":\"testName_0.default\",\"local-hostname\":\"testName_0\"}",
+      "network-config": "version: 1\n",
+      "user-data": "#cloud-config\nmounts:\n- - /dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:1-part1\n  - /var/lib/whatever\nwrite_files:\n- content: |\n    #!/bin/sh\n    if ! mountpoint '/var/lib/whatever'; then mkdir -p '/var/lib/whatever' \u0026\u0026 mount /dev/`ls /sys/devices/pci0000:00/0000:00:01.0/virtio*/host*/target*:0:0/*:0:0:1/block/`1 '/var/lib/whatever'; fi\n  path: /etc/cloud/mount-volumes.sh\n  permissions: \"0755\"\n"
+    }
+  },
+  {
+    "name": "domain conn: virtlet-231700d5-c9a6-container1: Destroy"
   },
   {
     "name": "domain conn: virtlet-231700d5-c9a6-container1: Undefine"
