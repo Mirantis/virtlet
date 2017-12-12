@@ -402,6 +402,10 @@ so it's treated as a string when parsing yaml. Below is an example:
         part: "2"
 ```
 
+For guest OSes with limited cloud-init support, there's workaround for
+mounting the volumes by means of user data script. See
+[Workarounds for volume mounting](cloud-init-data-generation.md#workarounds).
+
 ## Injecting Secret and ConfigMap content into the VMs as files
 
 Virtlet supports the standard `volumeMounts` notation for placing ConfigMap

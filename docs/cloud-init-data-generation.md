@@ -204,11 +204,12 @@ The `user-data` content is generated as follows:
   container and pod's volumes that are `flexVolume`s and use
   `virtlet/flexvolume_driver`. These are seen as block devices by the
   VM and Virtlet mounts them into appropriate directories
-* `write_files` are generated based on configmaps and secrets
-  mounted into the container. It also includes `/etc/cloud/environment` file
-  (see [Environment variable support](environment-variables.md) for more info)
-  and optionally `/etc/cloud/mount-volumes.sh` that can be used to
-  mount volumes on systems without udev (see Workarounds for volume mounting below)
+* `write_files` are generated based on configmaps and secrets mounted
+  into the container. It also includes `/etc/cloud/environment` file
+  (see [Environment variable support](environment-variables.md) for
+  more info) and optionally `/etc/cloud/mount-volumes.sh` that can be
+  used to mount volumes on systems without udev (see
+  [Workarounds for volume mounting](#workarounds) below)
 * the yaml content specified using optional `VirtletCloudInitUserData`
   annotation as well as the content from Secret or ConfigMap specified
   using another optional `VirtletCloudInitUserDataSource` annotation
@@ -226,8 +227,8 @@ The `user-data` content is generated as follows:
   useful if you want to pass a script there which may be necessary for
   older/simpler cloud-init implementations such as one used by CirrOS.
   Within the content of this script, `@virtlet-mount-script@` can be
-  replaced with volume mounting shell commands (see Workarounds for
-  volume mounting below)
+  replaced with volume mounting shell commands (see
+  [Workarounds for volume mounting](#workarounds) below)
 
 ## Propagating user-data from kubernetes objects
 
@@ -247,7 +248,7 @@ containing SSH keys in the same format in `VirtletSSHKeys`. The `key` part is op
 `virtlet` will look for the `authorized_keys` key. As with the `user-data` `VirtletSSHKeys` keys are going to be appended to those from
 `VirtletSSHKeySource` unless it is set to overwrite them by `VirtletCloudInitUserData: "true"`.
 
-## Workarounds for volume mounting
+## <a name="workarounds"></a>Workarounds for volume mounting
 
 Currenly Virtlet uses `/dev/disk/by-path` to mount volumes specified
 using Virtlet flexvolume driver. There's a problem with this approach
