@@ -83,15 +83,20 @@ You can list libvirt domains with `virsh.sh`:
 
 And then connect to console:
 ```
-$ ./virsh.sh console @cirros-vm
-Connected to domain 411c70b0-1df3-46be-4838-c85474a1b44a-cirros-vm
-Escape character is ^]
+$ kubectl attach -it cirros-vm
+If you don't see a command prompt, try pressing enter.
+```
 
+Press enter and you will see:
+
+```
 login as 'cirros' user. default password: 'cubswin:)'. use 'sudo' for root.
 cirros-vm login: cirros
 Password:
 $
 ```
+
+Escape character is ^]
 
 You can also ssh into the VM:
 
