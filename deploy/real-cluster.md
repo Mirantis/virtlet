@@ -52,48 +52,39 @@ kubectl get pods --all-namespaces -o wide -w
 
 ## Testing the installation
 
-There's a couple of scripts that you can use to access the VM. You can
-download them from Virtlet repository along with test ssh key:
-```
-wget https://raw.githubusercontent.com/Mirantis/virtlet/master/examples/{virsh.sh,vmssh.sh,vmkey}
-chmod +x virsh.sh vmssh.sh
-chmod 600 vmkey
-```
-
-Both utilities need `kubectl` to be configured to access your cluster.
-
-`virsh.sh` can be used to access a VM console. `virsh.sh` currently assumes
-single Virtlet node per cluster, which will be fixed soon. It supports
-convenience notation `@podname[:namespace]` that can be used to refer
-to libvirt domain that corresponds to the pod. It also supports additional
-command `./virsh.sh poddomain @podname[:namespace]` that displays libvirt
-domain id for a pod.
-`vmssh.sh` provides ssh access to VM pods.
-
 To test your Virtlet installation, start a sample VM:
 ```bash
 kubectl create -f https://raw.githubusercontent.com/Mirantis/virtlet/master/examples/cirros-vm.yaml
 kubectl get pods --all-namespaces -o wide -w
 ```
 
-You can list libvirt domains with `virsh.sh`:
-```bash
-./virsh.sh list
-```
-
 And then connect to console:
 ```
-$ ./virsh.sh console @cirros-vm
-Connected to domain 411c70b0-1df3-46be-4838-c85474a1b44a-cirros-vm
-Escape character is ^]
+$ kubectl attach -it cirros-vm
+If you don't see a command prompt, try pressing enter.
+```
 
+Press enter and you will see:
+
+```
 login as 'cirros' user. default password: 'cubswin:)'. use 'sudo' for root.
 cirros-vm login: cirros
 Password:
 $
 ```
 
-You can also ssh into the VM:
+Escape character is ^]
+
+You can also ssh into the VM.
+There's a scripts vmssh.sh that you can use to access the VM. You can
+download it from Virtlet repository along with test ssh key:
+```
+wget https://raw.githubusercontent.com/Mirantis/virtlet/master/examples/{vmssh.sh,vmkey}
+chmod +x vmssh.sh
+chmod 600 vmkey
+```
+
+vmssh.sh needs `kubectl` to be configured to access your cluster.
 
 ```
 ./vmssh.sh cirros@cirros-vm
