@@ -345,8 +345,9 @@ func findLinkByAddress(links []netlink.Link, address net.IPNet) (netlink.Link, e
 func ValidateAndFixCNIResult(netConfig *cnicurrent.Result, podNs string, allLinks []netlink.Link) (*cnicurrent.Result, error) {
 	// If there are no routes provided, we consider it a broken
 	// config and extract interface config instead. That's the
-	// case with Weave CNI plugin.
-	if cni.GetPodIP(netConfig) == "" || len(netConfig.Routes) == 0 {
+	// case with Weave CNI plugin. We don't do this for multiple CNI
+	// at this point.
+	if len(netConfig.IPs) == 1 && (cni.GetPodIP(netConfig) == "" || len(netConfig.Routes) == 0) {
 		dnsInfo := netConfig.DNS
 
 		veth, err := FindVeth(allLinks)
