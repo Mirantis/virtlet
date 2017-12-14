@@ -280,6 +280,10 @@ func (s *TapFDSource) Release(key string) error {
 		return fmt.Errorf("failed to open network namespace at %q: %v", netNSPath, err)
 	}
 
+	if err := pn.csn.ReconstructVFs(vmNS); err != nil {
+		return fmt.Errorf("failed to reconstruct SR-IOV devices: %v", err)
+	}
+
 	if err := vmNS.Do(func(ns.NetNS) error {
 		if err := pn.dhcpServer.Close(); err != nil {
 			return fmt.Errorf("failed to stop dhcp server: %v", err)
