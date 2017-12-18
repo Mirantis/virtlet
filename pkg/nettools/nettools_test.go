@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -32,8 +32,10 @@ import (
 )
 
 const (
-	innerHwAddr = "42:a4:a6:22:80:2e"
-	outerHwAddr = "42:b5:b7:33:91:3f"
+	innerHwAddr       = "42:a4:a6:22:80:2e"
+	outerHwAddr       = "42:b5:b7:33:91:3f"
+	secondInnerHwAddr = "42:a4:a6:22:80:2f"
+	secondOuterHwAddr = "42:b5:b7:33:91:3e"
 )
 
 func expectedExtractedLinkInfo(contNsPath string) *cnicurrent.Result {
@@ -237,6 +239,24 @@ func addTestRoute(t *testing.T, route *netlink.Route) {
 	}
 }
 
+func setupLink(hwAddrAsText string, link netlink.Link) netlink.Link {
+	hwAddr, err := net.ParseMAC(hwAddrAsText)
+	if err != nil {
+		log.Panicf("Error parsing hwaddr %q: %v", hwAddr, err)
+	}
+	if err := SetHardwareAddr(link, hwAddr); err != nil {
+		log.Panicf("Error setting hardware address: %v", err)
+	}
+
+	// re-query attrs (including new mac)
+	link, err = netlink.LinkByName(link.Attrs().Name)
+	if err != nil {
+		log.Panicf("cannot locate link: %s", link.Attrs().Name)
+	}
+
+	return link
+}
+
 func withFakeCNIVeth(t *testing.T, toRun func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link)) {
 	withHostAndContNS(t, func(hostNS, contNS ns.NetNS) {
 		origHostVeth, origContVeth, err := CreateEscapeVethPair(contNS, "eth0", 1500)
@@ -246,38 +266,11 @@ func withFakeCNIVeth(t *testing.T, toRun func(hostNS, contNS ns.NetNS, origHostV
 		// need to force hostNS here because of side effects of NetNS.Do()
 		// See https://github.com/vishvananda/netns/issues/17
 		inNS(hostNS, "hostNS", func() {
-			hwAddr, err := net.ParseMAC(outerHwAddr)
-			if err != nil {
-				log.Panicf("Error parsing hwaddr %q: %v", hwAddr, err)
-			}
-			err = SetHardwareAddr(origHostVeth, hwAddr)
-
-			// re-query attrs (including new mac)
-			origHostVeth, err = netlink.LinkByName(origHostVeth.Attrs().Name)
-			if err != nil {
-				log.Panicf("cannot locate link: %s", origHostVeth.Attrs().Name)
-			}
-
-			if err = netlink.LinkSetUp(origHostVeth); err != nil {
-				log.Panicf("failed to bring up origHostVeth: %v", err)
-			}
+			origHostVeth = setupLink(outerHwAddr, origHostVeth)
 		})
 		inNS(contNS, "contNS", func() {
-			hwAddr, err := net.ParseMAC(innerHwAddr)
-			if err != nil {
-				log.Panicf("Error parsing hwaddr %q: %v", hwAddr, err)
-			}
-			err = SetHardwareAddr(origContVeth, hwAddr)
+			origContVeth = setupLink(innerHwAddr, origContVeth)
 
-			// re-query attrs (including new mac)
-			origContVeth, err = netlink.LinkByName(origContVeth.Attrs().Name)
-			if err != nil {
-				log.Panicf("cannot locate link: %s", origContVeth.Attrs().Name)
-			}
-
-			if err = netlink.LinkSetUp(origContVeth); err != nil {
-				log.Panicf("failed to bring up origContVeth: %v", err)
-			}
 			if err = netlink.AddrAdd(origContVeth, parseAddr("10.1.90.5/24")); err != nil {
 				log.Panicf("failed to add addr for origContVeth: %v", err)
 			}
@@ -313,7 +306,7 @@ func TestFindVeth(t *testing.T) {
 	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
 		allLinks, err := netlink.LinkList()
 		if err != nil {
-			log.Panic("LinkList() failed: %v", err)
+			log.Panicf("LinkList() failed: %v", err)
 		}
 		contVeth, err := FindVeth(allLinks)
 		if err != nil {
@@ -350,9 +343,14 @@ func TestExtractLinkInfo(t *testing.T) {
 }
 
 func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, contNsPath string) {
+	allLinks, err := netlink.LinkList()
+	if err != nil {
+		log.Panicf("error listing links: %v", err)
+	}
+
 	origHwAddr := origContVeth.Attrs().HardwareAddr
 	expectedInfo := expectedExtractedLinkInfo(contNsPath)
-	csn, err := SetupContainerSideNetwork(expectedInfo, contNsPath)
+	csn, err := SetupContainerSideNetwork(expectedInfo, contNsPath, allLinks)
 	if err != nil {
 		log.Panicf("failed to set up container side network: %v", err)
 	}
@@ -439,7 +437,7 @@ func verifyNoLinks(t *testing.T, linkNames []string) {
 func verifyVethHaveConfiguration(t *testing.T, info *cnicurrent.Result) {
 	allLinks, err := netlink.LinkList()
 	if err != nil {
-		log.Panic("LinkList() failed: %v", err)
+		log.Panicf("LinkList() failed: %v", err)
 	}
 	contVeth, err := FindVeth(allLinks)
 	if err != nil {
@@ -484,7 +482,12 @@ func TestTeardownContainerSideNetwork(t *testing.T) {
 		if err := StripLink(origContVeth); err != nil {
 			log.Panicf("StripLink() failed: %v", err)
 		}
-		csn, err := SetupContainerSideNetwork(expectedExtractedLinkInfo(contNS.Path()), contNS.Path())
+		allLinks, err := netlink.LinkList()
+		if err != nil {
+			log.Panicf("error listing links: %v", err)
+		}
+
+		csn, err := SetupContainerSideNetwork(expectedExtractedLinkInfo(contNS.Path()), contNS.Path(), allLinks)
 		if err != nil {
 			log.Panicf("failed to set up container side network: %v", err)
 		}
@@ -503,6 +506,133 @@ func TestTeardownContainerSideNetwork(t *testing.T) {
 		}
 		if !reflect.DeepEqual(origContVeth.Attrs().HardwareAddr, csn.HardwareAddrs[0]) {
 			t.Errorf("cni veth hardware address wasn't restored")
+		}
+	})
+}
+
+func TestFindingLinkByAddress(t *testing.T) {
+	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+		expectedInfo := expectedExtractedLinkInfo(contNS.Path())
+		allLinks, err := netlink.LinkList()
+		if err != nil {
+			log.Panicf("LinkList() failed: %v", err)
+		}
+
+		link, err := findLinkByAddress(allLinks, expectedInfo.IPs[0].Address)
+		if err != nil {
+			t.Errorf("didn't found preconfigured link: %v", err)
+		}
+		if link == nil {
+			t.Errorf("<nil> where configured link was expected")
+		}
+
+		link, err = findLinkByAddress(allLinks, *parseAddr("1.2.3.4/8").IPNet)
+		if link != nil {
+			t.Errorf("found link with dummy address")
+		}
+		if err == nil {
+			t.Errorf("expected error but received <nil>")
+		}
+	})
+}
+
+func withMultipleInterfacesConfigured(t *testing.T, toRun func(contNS ns.NetNS, innerLinks []netlink.Link)) {
+	withHostAndContNS(t, func(hostNS, contNS ns.NetNS) {
+		origHostVeth0, origContVeth0, err := CreateEscapeVethPair(contNS, "eth0", 1500)
+		if err != nil {
+			log.Panicf("failed to create first veth pair: %v", err)
+		}
+		origHostVeth1, origContVeth1, err := CreateEscapeVethPair(contNS, "eth1", 1500)
+		if err != nil {
+			log.Panicf("failed to create second veth pair: %v", err)
+		}
+		// need to force hostNS here because of side effects of NetNS.Do()
+		// See https://github.com/vishvananda/netns/issues/17
+		inNS(hostNS, "hostNS", func() {
+			origHostVeth0 = setupLink(outerHwAddr, origHostVeth0)
+			origHostVeth1 = setupLink(secondOuterHwAddr, origHostVeth1)
+		})
+		inNS(contNS, "contNS", func() {
+			origContVeth0 = setupLink(innerHwAddr, origContVeth0)
+			origContVeth1 = setupLink(secondInnerHwAddr, origContVeth1)
+
+			if err = netlink.AddrAdd(origContVeth0, parseAddr("10.1.90.5/24")); err != nil {
+				log.Panicf("failed to add addr for origContVeth0: %v", err)
+			}
+
+			if err = netlink.AddrAdd(origContVeth1, parseAddr("192.168.37.8/16")); err != nil {
+				log.Panicf("failed to add addr for origContVeth1: %v", err)
+			}
+
+			gwAddr := parseAddr("10.1.90.1/24")
+
+			addTestRoute(t, &netlink.Route{
+				LinkIndex: origContVeth0.Attrs().Index,
+				Gw:        gwAddr.IPNet.IP,
+				Scope:     netlink.SCOPE_UNIVERSE,
+			})
+
+			toRun(contNS, []netlink.Link{origContVeth0, origContVeth1})
+		})
+	})
+}
+
+func expectedExtractedLinkInfoForMultipleInterfaces(contNsPath string) *cnicurrent.Result {
+	expectedInfo := expectedExtractedLinkInfo(contNsPath)
+	expectedInfo.IPs = append(expectedInfo.IPs, &cnicurrent.IPConfig{
+		Version:   "4",
+		Interface: 1,
+		Address: net.IPNet{
+			IP:   net.IP{192, 168, 37, 8},
+			Mask: net.IPMask{255, 255, 0, 0},
+		},
+	})
+	expectedInfo.Interfaces = append(expectedInfo.Interfaces, &cnicurrent.Interface{
+		Name:    "eth1",
+		Mac:     secondInnerHwAddr,
+		Sandbox: contNsPath,
+	})
+	return expectedInfo
+}
+
+func expectedExtractedLinkInfoWithMissingInterface(contNsPath string) *cnicurrent.Result {
+	expectedInfo := expectedExtractedLinkInfo(contNsPath)
+	expectedInfo.IPs = append(expectedInfo.IPs, &cnicurrent.IPConfig{
+		Version:   "4",
+		Interface: -1,
+		Address: net.IPNet{
+			IP:   net.IP{192, 168, 37, 8},
+			Mask: net.IPMask{255, 255, 0, 0},
+		},
+	})
+	return expectedInfo
+}
+
+func TestMultiInterfaces(t *testing.T) {
+	withMultipleInterfacesConfigured(t, func(contNS ns.NetNS, innerLinks []netlink.Link) {
+		expectedInfo := expectedExtractedLinkInfoForMultipleInterfaces(contNS.Path())
+		result, err := ValidateAndFixCNIResult(expectedInfo, contNS.Path(), innerLinks)
+		if err != nil {
+			t.Errorf("error during validate/fix cni result: %v", err)
+		}
+		if !reflect.DeepEqual(result, expectedInfo) {
+			t.Errorf("result different than expected: %\nActual:\n%s\nExpected:\n%s",
+				spew.Sdump(result), spew.Sdump(expectedInfo))
+		}
+	})
+}
+
+func TestMultiInterfacesWithMissingInterface(t *testing.T) {
+	withMultipleInterfacesConfigured(t, func(contNS ns.NetNS, innerLinks []netlink.Link) {
+		infoToFix := expectedExtractedLinkInfoForMultipleInterfaces(contNS.Path())
+		expectedInfo := expectedExtractedLinkInfoForMultipleInterfaces(contNS.Path())
+		result, err := ValidateAndFixCNIResult(infoToFix, contNS.Path(), innerLinks)
+		if err != nil {
+			t.Errorf("error during validate/fix cni result: %v", err)
+		}
+		if !reflect.DeepEqual(result, expectedInfo) {
+			t.Errorf("result different than expected: %\nActual:\n%s\nExpected:\n%s",
+				spew.Sdump(result), spew.Sdump(expectedInfo))
 		}
 	})
 }
