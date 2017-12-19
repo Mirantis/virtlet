@@ -160,7 +160,7 @@ func (ds *domainSettings) createDomain(config *VMConfig) *libvirtxml.Domain {
 
 	if os.Getenv("VIRTLET_SRIOV_SUPPORT") != "" {
 		domain.QEMUCommandline.Envs = append(domain.QEMUCommandline.Envs,
-			libvirtxml.DomainQEMUCommandlineEnv{Name: "VMWRAPPER_SRIOV_SUPPORT", Value: "1"})
+			libvirtxml.DomainQEMUCommandlineEnv{Name: "VMWRAPPER_KEEP_PRIVS", Value: "1"})
 	}
 	return domain
 }

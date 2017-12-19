@@ -110,7 +110,7 @@ __attribute__((constructor (200))) void vmwrapper_handle_reexec(void) {
 		vmwrapper_perr("mount()");
 
 	// permanently drop privs if SR-IOV support is not enabled
-	if (getenv("VMWRAPPER_SRIOV_SUPPORT") == NULL) {
+	if (getenv("VMWRAPPER_KEEP_PRIVS") == NULL) {
 		fprintf(stderr, "vmwrapper reexec: dropping privs\n");
 		if (setgid(getgid()) < 0)
 			vmwrapper_perr("setgid()");
