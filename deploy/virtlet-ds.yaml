@@ -172,6 +172,12 @@ spec:
               name: virtlet-config
               key: disable_logging
               optional: true
+        - name: VIRTLET_SRIOV_SUPPORT
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: sriov_support
+              optional: true
         - name: IMAGE_TRANSLATIONS_DIR
           value: /etc/virtlet/images
         - name: KUBERNETES_POD_LOGS

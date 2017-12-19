@@ -76,7 +76,7 @@ func (ds *domainSettings) createDomain(config *VMConfig) *libvirtxml.Domain {
 	}
 
 	scsiControllerIndex := uint(0)
-	return &libvirtxml.Domain{
+	domain := &libvirtxml.Domain{
 		Devices: &libvirtxml.DomainDeviceList{
 			Emulator: "/vmwrapper",
 			Inputs: []libvirtxml.DomainInput{
@@ -157,6 +157,12 @@ func (ds *domainSettings) createDomain(config *VMConfig) *libvirtxml.Domain {
 			},
 		},
 	}
+
+	if os.Getenv("VIRTLET_SRIOV_SUPPORT") != "" {
+		domain.QEMUCommandline.Envs = append(domain.QEMUCommandline.Envs,
+			libvirtxml.DomainQEMUCommandlineEnv{Name: "VMWRAPPER_SRIOV_SUPPORT", Value: "1"})
+	}
+	return domain
 }
 
 func canUseKvm() bool {
