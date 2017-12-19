@@ -352,7 +352,7 @@ func findLinkByAddress(links []netlink.Link, address net.IPNet) (netlink.Link, e
 // ips, routes, interfaces and if something is missing it tries to complement
 // that using patch for Weave or for plugins which return their netConfig
 // in v0.2.0 version of CNI SPEC
-func ValidateAndFixCNIResult(netConfig *cnicurrent.Result, podNs string, allLinks []netlink.Link) (*cnicurrent.Result, error) {
+func ValidateAndFixCNIResult(netConfig *cnicurrent.Result, nsPath string, allLinks []netlink.Link) (*cnicurrent.Result, error) {
 	// If there are no routes provided, we consider it a broken
 	// config and extract interface config instead. That's the
 	// case with Weave CNI plugin. We don't do this for multiple CNI
@@ -364,7 +364,7 @@ func ValidateAndFixCNIResult(netConfig *cnicurrent.Result, podNs string, allLink
 		if err != nil {
 			return nil, err
 		}
-		if netConfig, err = ExtractLinkInfo(veth, podNs); err != nil {
+		if netConfig, err = ExtractLinkInfo(veth, nsPath); err != nil {
 			return nil, err
 		}
 
@@ -379,38 +379,30 @@ func ValidateAndFixCNIResult(netConfig *cnicurrent.Result, podNs string, allLink
 		return nil, fmt.Errorf("cni result does not have any IP addresses")
 	}
 
-	// Try to fix missing interface references in netConfig.IPs
-	// and add entries to Interfaces for links that need to be
-	// there but aren't
-	if len(netConfig.Interfaces) == 0 {
-		alreadyDefinedLinks, err := GetContainerLinks(netConfig.Interfaces)
+	// Interfaces contain broken info more often than not, so we
+	// replace them here with what we can deduce from the network
+	// links in the container netns
+	for _, ipConfig := range netConfig.IPs {
+		link, err := findLinkByAddress(allLinks, ipConfig.Address)
 		if err != nil {
 			return nil, err
 		}
 
-		for _, ipConfig := range netConfig.IPs {
-			link, err := findLinkByAddress(allLinks, ipConfig.Address)
-			if err != nil {
-				return nil, err
+		found := false
+		for i, iface := range netConfig.Interfaces {
+			if iface.Name == link.Attrs().Name {
+				ipConfig.Interface = i
+				found = true
+				break
 			}
-
-			found := false
-			for i, l := range alreadyDefinedLinks {
-				if l == link {
-					ipConfig.Interface = i
-					found = true
-					break
-				}
-			}
-			if !found {
-				netConfig.Interfaces = append(netConfig.Interfaces, &cnicurrent.Interface{
-					Name:    link.Attrs().Name,
-					Mac:     link.Attrs().HardwareAddr.String(),
-					Sandbox: podNs,
-				})
-				ipConfig.Interface = len(alreadyDefinedLinks)
-				alreadyDefinedLinks = append(alreadyDefinedLinks, link)
-			}
+		}
+		if !found {
+			ipConfig.Interface = len(netConfig.Interfaces)
+			netConfig.Interfaces = append(netConfig.Interfaces, &cnicurrent.Interface{
+				Name:    link.Attrs().Name,
+				Mac:     link.Attrs().HardwareAddr.String(),
+				Sandbox: nsPath,
+			})
 		}
 	}
 
