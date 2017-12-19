@@ -538,41 +538,44 @@ func TestFindingLinkByAddress(t *testing.T) {
 
 func withMultipleInterfacesConfigured(t *testing.T, toRun func(contNS ns.NetNS, innerLinks []netlink.Link)) {
 	withHostAndContNS(t, func(hostNS, contNS ns.NetNS) {
-		origHostVeth0, origContVeth0, err := CreateEscapeVethPair(contNS, "eth0", 1500)
+		var origHostVeths [2]netlink.Link
+		var origContVeths [2]netlink.Link
+		var err error
+		origHostVeths[0], origContVeths[0], err = CreateEscapeVethPair(contNS, "eth0", 1500)
 		if err != nil {
 			log.Panicf("failed to create first veth pair: %v", err)
 		}
-		origHostVeth1, origContVeth1, err := CreateEscapeVethPair(contNS, "eth1", 1500)
+		origHostVeths[1], origContVeths[1], err = CreateEscapeVethPair(contNS, "eth1", 1500)
 		if err != nil {
 			log.Panicf("failed to create second veth pair: %v", err)
 		}
 		// need to force hostNS here because of side effects of NetNS.Do()
 		// See https://github.com/vishvananda/netns/issues/17
 		inNS(hostNS, "hostNS", func() {
-			origHostVeth0 = setupLink(outerHwAddr, origHostVeth0)
-			origHostVeth1 = setupLink(secondOuterHwAddr, origHostVeth1)
+			origHostVeths[0] = setupLink(outerHwAddr, origHostVeths[0])
+			origHostVeths[1] = setupLink(secondOuterHwAddr, origHostVeths[1])
 		})
 		inNS(contNS, "contNS", func() {
-			origContVeth0 = setupLink(innerHwAddr, origContVeth0)
-			origContVeth1 = setupLink(secondInnerHwAddr, origContVeth1)
+			origContVeths[0] = setupLink(innerHwAddr, origContVeths[0])
+			origContVeths[1] = setupLink(secondInnerHwAddr, origContVeths[1])
 
-			if err = netlink.AddrAdd(origContVeth0, parseAddr("10.1.90.5/24")); err != nil {
+			if err = netlink.AddrAdd(origContVeths[0], parseAddr("10.1.90.5/24")); err != nil {
 				log.Panicf("failed to add addr for origContVeth0: %v", err)
 			}
 
-			if err = netlink.AddrAdd(origContVeth1, parseAddr("192.168.37.8/16")); err != nil {
+			if err = netlink.AddrAdd(origContVeths[1], parseAddr("192.168.37.8/16")); err != nil {
 				log.Panicf("failed to add addr for origContVeth1: %v", err)
 			}
 
 			gwAddr := parseAddr("10.1.90.1/24")
 
 			addTestRoute(t, &netlink.Route{
-				LinkIndex: origContVeth0.Attrs().Index,
+				LinkIndex: origContVeths[0].Attrs().Index,
 				Gw:        gwAddr.IPNet.IP,
 				Scope:     netlink.SCOPE_UNIVERSE,
 			})
 
-			toRun(contNS, []netlink.Link{origContVeth0, origContVeth1})
+			toRun(contNS, []netlink.Link{origContVeths[0], origContVeths[1]})
 		})
 	})
 }
