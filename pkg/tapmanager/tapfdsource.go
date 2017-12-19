@@ -31,6 +31,7 @@ import (
 	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
+	"github.com/vishvananda/netlink"
 
 	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/dhcp"
@@ -198,7 +199,12 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 		if netConfig == nil {
 			netConfig = &cnicurrent.Result{}
 		}
-		if netConfig, err = nettools.ValidateAndFixCNIResult(netConfig, pnd.PodNs); err != nil {
+		allLinks, err := netlink.LinkList()
+		if err != nil {
+			return fmt.Errorf("error listing links: %v", err)
+		}
+
+		if netConfig, err = nettools.ValidateAndFixCNIResult(netConfig, pnd.PodNs, allLinks); err != nil {
 			return fmt.Errorf("error in fixing cni configuration: %v", err)
 		}
 		if s.dummyGateway != nil {
@@ -206,11 +212,10 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 		}
 		glog.V(3).Infof("CNI Result after fix:\n%s", spew.Sdump(netConfig))
 
-		var err error
 		if recover {
 			csn, err = nettools.RecreateContainerSideNetwork(netConfig, netNSPath)
 		} else {
-			csn, err = nettools.SetupContainerSideNetwork(netConfig, netNSPath)
+			csn, err = nettools.SetupContainerSideNetwork(netConfig, netNSPath, allLinks)
 		}
 		if err != nil {
 			return err

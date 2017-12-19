@@ -338,12 +338,7 @@ func findLinkByAddress(links []netlink.Link, address net.IPNet) (netlink.Link, e
 // ips, routes, interfaces and if something is missing it tries to complement
 // that using patch for Weave or for plugins which return their netConfig
 // in v0.2.0 version of CNI SPEC
-func ValidateAndFixCNIResult(netConfig *cnicurrent.Result, podNs string) (*cnicurrent.Result, error) {
-	allLinks, err := netlink.LinkList()
-	if err != nil {
-		return nil, fmt.Errorf("error listing links: %v", err)
-	}
-
+func ValidateAndFixCNIResult(netConfig *cnicurrent.Result, podNs string, allLinks []netlink.Link) (*cnicurrent.Result, error) {
 	// If there are no routes provided, we consider it a broken
 	// config and extract interface config instead. That's the
 	// case with Weave CNI plugin.
@@ -374,7 +369,7 @@ func ValidateAndFixCNIResult(netConfig *cnicurrent.Result, podNs string) (*cnicu
 	// of this list which have value -1 for interface index - add them to list
 	// of interfaces and fix its index in ip list entry
 	if len(netConfig.Interfaces) == 0 {
-		alreadyDefindeLinks, err := GetContainerLinks(netConfig.Interfaces)
+		alreadyDefinedLinks, err := GetContainerLinks(netConfig.Interfaces, allLinks)
 		if err != nil {
 			return nil, err
 		}
@@ -386,7 +381,7 @@ func ValidateAndFixCNIResult(netConfig *cnicurrent.Result, podNs string) (*cnicu
 			}
 
 			found := false
-			for i, l := range alreadyDefindeLinks {
+			for i, l := range alreadyDefinedLinks {
 				if l == link {
 					ipConfig.Interface = i
 					found = true
@@ -399,8 +394,8 @@ func ValidateAndFixCNIResult(netConfig *cnicurrent.Result, podNs string) (*cnicu
 					Mac:     link.Attrs().HardwareAddr.String(),
 					Sandbox: podNs,
 				})
-				ipConfig.Interface = len(alreadyDefindeLinks)
-				alreadyDefindeLinks = append(alreadyDefindeLinks, link)
+				ipConfig.Interface = len(alreadyDefinedLinks)
+				alreadyDefinedLinks = append(alreadyDefinedLinks, link)
 			}
 		}
 	}
@@ -417,14 +412,9 @@ func findLinkByName(links []netlink.Link, name string) (netlink.Link, error) {
 	return nil, fmt.Errorf("interface with name %q not found in container namespace", name)
 }
 
-// GetContainerLinks locates in container namespac enetwork links
-// for provided interfaces
-func GetContainerLinks(interfaces []*cnicurrent.Interface) ([]netlink.Link, error) {
-	allLinks, err := netlink.LinkList()
-	if err != nil {
-		return nil, fmt.Errorf("error listing links: %v", err)
-	}
-
+// GetContainerLinks filters provided list of links looking for container links
+// from provided interfaces list
+func GetContainerLinks(interfaces []*cnicurrent.Interface, allLinks []netlink.Link) ([]netlink.Link, error) {
 	var links []netlink.Link
 	for _, iface := range interfaces {
 		if iface.Sandbox == "" {
@@ -620,8 +610,8 @@ type ContainerSideNetwork struct {
 // for dhcp server.
 // The function should be called from within container namespace.
 // Returns container network struct and an error, if any
-func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string) (*ContainerSideNetwork, error) {
-	contLinks, err := GetContainerLinks(info.Interfaces)
+func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks []netlink.Link) (*ContainerSideNetwork, error) {
+	contLinks, err := GetContainerLinks(info.Interfaces, allLinks)
 	if err != nil {
 		return nil, err
 	}
@@ -798,7 +788,12 @@ func (csn *ContainerSideNetwork) Teardown() error {
 	for _, f := range csn.TapFiles {
 		f.Close()
 	}
-	contLinks, err := GetContainerLinks(csn.Result.Interfaces)
+	allLinks, err := netlink.LinkList()
+	if err != nil {
+		return fmt.Errorf("error listing links: %v", err)
+	}
+
+	contLinks, err := GetContainerLinks(csn.Result.Interfaces, allLinks)
 	if err != nil {
 		return err
 	}
