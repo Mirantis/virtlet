@@ -919,7 +919,7 @@ func getDummyGateway(dummyNetwork *cnicurrent.Result) (net.IP, error) {
 			haveCalico, _, err = DetectCalico(link)
 		}
 		if err != nil {
-			glog.Warning("Calico fix: dummy network: skipping link for config %d: %v", n, err)
+			glog.Warningf("Calico fix: dummy network: skipping link for config %d: %v", n, err)
 			continue
 		}
 		if haveCalico {
@@ -937,12 +937,12 @@ func getDummyGateway(dummyNetwork *cnicurrent.Result) (net.IP, error) {
 // responses for VMs.
 // This function must be called from within the container network
 // namespace.
-func FixCalicoNetworking(netConfig *cnicurrent.Result, getDummyNetwork func() (*cnicurrent.Result, error)) error {
+func FixCalicoNetworking(netConfig *cnicurrent.Result, getDummyNetwork func() (*cnicurrent.Result, string, error)) error {
 	// linkNameMap := make(map[string]*cnicurrent.IPConfig)
 	for n, ipConfig := range netConfig.IPs {
 		link, err := getLinkForIPConfig(netConfig, n)
 		if err != nil {
-			glog.Warning("Calico fix: skipping link for config %d: %v", n, err)
+			glog.Warningf("Calico fix: skipping link for config %d: %v", n, err)
 			continue
 		}
 		haveCalico, haveCalicoGateway, err := DetectCalico(link)
@@ -954,17 +954,35 @@ func FixCalicoNetworking(netConfig *cnicurrent.Result, getDummyNetwork func() (*
 		}
 		ipConfig.Address.Mask = netmaskForCalico()
 		if haveCalicoGateway {
-			dummyNetwork, err := getDummyNetwork()
+			dummyNetwork, nsPath, err := getDummyNetwork()
 			if err != nil {
 				return err
 			}
-			dummyGateway, err := getDummyGateway(dummyNetwork)
+			dummyNS, err := ns.GetNS(nsPath)
 			if err != nil {
 				return err
 			}
-			ipConfig.Gateway = dummyGateway
+			if err := dummyNS.Do(func(ns.NetNS) error {
+				allLinks, err := netlink.LinkList()
+				if err != nil {
+					return fmt.Errorf("failed to list links inside the dummy netns: %v", err)
+				}
+				dummyNetwork, err := ValidateAndFixCNIResult(dummyNetwork, nsPath, allLinks)
+				if err != nil {
+					return err
+				}
+				dummyGateway, err := getDummyGateway(dummyNetwork)
+				if err != nil {
+					return err
+				}
+				ipConfig.Gateway = dummyGateway
+				return nil
+			}); err != nil {
+				return err
+			}
+
 			var newRoutes []*cnitypes.Route
-			// remove the deault gateway
+			// remove the default gateway
 			for _, r := range netConfig.Routes {
 				if r.Dst.Mask != nil {
 					ones, _ := r.Dst.Mask.Size()
@@ -979,7 +997,7 @@ func FixCalicoNetworking(netConfig *cnicurrent.Result, getDummyNetwork func() (*
 					IP:   net.IP{0, 0, 0, 0},
 					Mask: net.IPMask{0, 0, 0, 0},
 				},
-				GW: dummyGateway,
+				GW: ipConfig.Gateway,
 			})
 		}
 	}

@@ -87,9 +87,10 @@ type podNetwork struct {
 type TapFDSource struct {
 	sync.Mutex
 
-	cniClient    *cni.Client
-	dummyNetwork *cnicurrent.Result
-	fdMap        map[string]*podNetwork
+	cniClient          *cni.Client
+	dummyNetwork       *cnicurrent.Result
+	dummyNetworkNsPath string
+	fdMap              map[string]*podNetwork
 }
 
 var _ FDSource = &TapFDSource{}
@@ -110,17 +111,17 @@ func NewTapFDSource(cniPluginsDir, cniConfigsDir string) (*TapFDSource, error) {
 	return s, nil
 }
 
-func (s *TapFDSource) getDummyNetwork() (*cnicurrent.Result, error) {
+func (s *TapFDSource) getDummyNetwork() (*cnicurrent.Result, string, error) {
 	if s.dummyNetwork == nil {
 		var err error
-		s.dummyNetwork, err = s.cniClient.GetDummyNetwork()
+		s.dummyNetwork, s.dummyNetworkNsPath, err = s.cniClient.GetDummyNetwork()
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		// s.dummyGateway = dummyResult.IPs[0].Address.IP
 
 	}
-	return s.dummyNetwork, nil
+	return s.dummyNetwork, s.dummyNetworkNsPath, nil
 }
 
 // GetFDs implements GetFDs method of FDSource interface
