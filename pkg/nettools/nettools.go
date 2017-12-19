@@ -660,7 +660,9 @@ func getDevNameByPCIAddress(address string) (string, error) {
 	}
 	for _, fi := range devices {
 		linkDestination, err := os.Readlink(filepath.Join("/sys/class/net", fi.Name(), "device"))
-		if err != nil {
+		if os.IsNotExist(err) {
+			continue
+		} else if err != nil {
 			return "", err
 		}
 		if linkDestination == desiredLinkLocation {
