@@ -169,11 +169,10 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 		}
 		allLinks, err := netlink.LinkList()
 		if err != nil {
-			return fmt.Errorf("error listing links: %v", err)
+			return fmt.Errorf("error listing the links: %v", err)
 		}
-
-		if netConfig, err = nettools.ValidateAndFixCNIResult(netConfig, pnd.PodNs, allLinks); err != nil {
-			return fmt.Errorf("error in fixing cni configuration: %v", err)
+		if netConfig, err = nettools.ValidateAndFixCNIResult(netConfig, netNSPath, allLinks); err != nil {
+			return fmt.Errorf("error fixing cni configuration: %v", err)
 		}
 		if err := nettools.FixCalicoNetworking(netConfig, s.getDummyNetwork); err != nil {
 			// don't fail in this case because there may be even no Calico
