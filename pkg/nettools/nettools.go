@@ -368,33 +368,35 @@ func ValidateAndFixCNIResult(netConfig *cnicurrent.Result, podNs string, allLink
 	// by interface index in elements of ip list and for all elements
 	// of this list which have value -1 for interface index - add them to list
 	// of interfaces and fix its index in ip list entry
-	alreadyDefinedLinks, err := GetContainerLinks(netConfig.Interfaces, allLinks)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, ipConfig := range netConfig.IPs {
-		link, err := findLinkByAddress(allLinks, ipConfig.Address)
+	if len(netConfig.Interfaces) == 0 {
+		alreadyDefinedLinks, err := GetContainerLinks(netConfig.Interfaces, allLinks)
 		if err != nil {
 			return nil, err
 		}
 
-		found := false
-		for i, l := range alreadyDefinedLinks {
-			if l == link {
-				ipConfig.Interface = i
-				found = true
-				break
+		for _, ipConfig := range netConfig.IPs {
+			link, err := findLinkByAddress(allLinks, ipConfig.Address)
+			if err != nil {
+				return nil, err
 			}
-		}
-		if !found {
-			netConfig.Interfaces = append(netConfig.Interfaces, &cnicurrent.Interface{
-				Name:    link.Attrs().Name,
-				Mac:     link.Attrs().HardwareAddr.String(),
-				Sandbox: podNs,
-			})
-			ipConfig.Interface = len(alreadyDefinedLinks)
-			alreadyDefinedLinks = append(alreadyDefinedLinks, link)
+
+			found := false
+			for i, l := range alreadyDefinedLinks {
+				if l == link {
+					ipConfig.Interface = i
+					found = true
+					break
+				}
+			}
+			if !found {
+				netConfig.Interfaces = append(netConfig.Interfaces, &cnicurrent.Interface{
+					Name:    link.Attrs().Name,
+					Mac:     link.Attrs().HardwareAddr.String(),
+					Sandbox: podNs,
+				})
+				ipConfig.Interface = len(alreadyDefinedLinks)
+				alreadyDefinedLinks = append(alreadyDefinedLinks, link)
+			}
 		}
 	}
 
