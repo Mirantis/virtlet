@@ -1131,7 +1131,6 @@ func getDummyGateway(dummyNetwork *cnicurrent.Result) (net.IP, error) {
 // This function must be called from within the container network
 // namespace.
 func FixCalicoNetworking(netConfig *cnicurrent.Result, getDummyNetwork func() (*cnicurrent.Result, string, error)) error {
-	// linkNameMap := make(map[string]*cnicurrent.IPConfig)
 	for n, ipConfig := range netConfig.IPs {
 		link, err := getLinkForIPConfig(netConfig, n)
 		if err != nil {
