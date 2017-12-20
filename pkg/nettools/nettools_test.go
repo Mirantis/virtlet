@@ -36,8 +36,8 @@ const (
 	outerHwAddr       = "42:b5:b7:33:91:3f"
 	secondInnerHwAddr = "42:a4:a6:22:80:2f"
 	secondOuterHwAddr = "42:b5:b7:33:91:3e"
-	dummyInnerHwAddr  = "42:a4:a6:22:80:30"
-	dummyOuterHwAddr  = "42:b5:b7:33:91:3f"
+	dummyInnerHwAddr  = "42:a4:a6:22:80:40"
+	dummyOuterHwAddr  = "42:b5:b7:33:91:4f"
 )
 
 func expectedExtractedLinkInfo(contNsPath string) *cnicurrent.Result {
