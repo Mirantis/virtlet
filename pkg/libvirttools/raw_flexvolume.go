@@ -44,6 +44,8 @@ type rawDeviceVolume struct {
 	opts *rawVolumeOptions
 }
 
+var _ VMVolume = &rawDeviceVolume{}
+
 func newRawDeviceVolume(volumeName, configPath string, config *VMConfig, owner VolumeOwner) (VMVolume, error) {
 	var opts rawVolumeOptions
 	if err := utils.ReadJson(configPath, &opts); err != nil {
@@ -77,7 +79,7 @@ func (v *rawDeviceVolume) Uuid() string {
 	return v.opts.Uuid
 }
 
-func (v *rawDeviceVolume) Setup(volumeMap map[string]string) (*libvirtxml.DomainDisk, error) {
+func (v *rawDeviceVolume) Setup() (*libvirtxml.DomainDisk, error) {
 	if err := v.verifyRawDeviceWhitelisted(v.opts.Path); err != nil {
 		return nil, err
 	}
@@ -92,8 +94,6 @@ func (v *rawDeviceVolume) Setup(volumeMap map[string]string) (*libvirtxml.Domain
 		Driver: &libvirtxml.DomainDiskDriver{Name: "qemu", Type: "raw"},
 	}, nil
 }
-
-func (v *rawDeviceVolume) Teardown() error { return nil }
 
 func init() {
 	AddFlexvolumeSource("raw", newRawDeviceVolume)

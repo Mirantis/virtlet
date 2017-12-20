@@ -30,15 +30,16 @@ import (
 var _ = Describe("Container volume mounts", func() {
 	Context("Of raw volumes", func() {
 		var (
-			vm           *framework.VMInterface
-			nodeExecutor framework.Executor
-			devPath      string
-			ssh          framework.Executor
+			err             error
+			virtletNodeName string
+			vm              *framework.VMInterface
+			nodeExecutor    framework.Executor
+			devPath         string
+			ssh             framework.Executor
 		)
 
 		BeforeAll(func() {
-			requireCloudInit()
-			virtletNodeName, err := controller.VirtletNodeName()
+			virtletNodeName, err = controller.VirtletNodeName()
 			Expect(err).NotTo(HaveOccurred())
 			nodeExecutor, err = controller.DinDNodeExecutor(virtletNodeName)
 			Expect(err).NotTo(HaveOccurred())
@@ -49,26 +50,51 @@ var _ = Describe("Container volume mounts", func() {
 			Expect(err).NotTo(HaveOccurred())
 			devPath, err = framework.ExecSimple(nodeExecutor, "losetup", "-f", "/rawdevtest", "--show")
 			Expect(err).NotTo(HaveOccurred())
+		})
 
-			vm = makeVolumeMountVM(map[string]string{
-				"type": "raw",
-				"path": devPath,
-				"part": "0",
-			}, virtletNodeName)
+		AfterEach(func() {
+			if ssh != nil {
+				ssh.Close()
+			}
+			if vm != nil {
+				deleteVM(vm)
+			}
 		})
 
 		AfterAll(func() {
-			deleteVM(vm)
 			// The loopback device is detached by itself upon
 			// success (TODO: check why it happens), so we
 			// ignore errors here
 			framework.ExecSimple(nodeExecutor, "losetup", "-d", devPath)
 		})
 
-		scheduleWaitSSH(&vm, &ssh)
-
 		It("Should be handled inside the VM", func() {
-			shouldBeMounted(ssh)
+			vm = makeVolumeMountVM(virtletNodeName, func(pod *framework.PodInterface) {
+				addFlexvolMount(pod, "blockdev", "/foo", map[string]string{
+					"type": "raw",
+					"path": devPath,
+					"part": "0",
+				})
+			})
+			ssh = waitSSH(vm)
+			shouldBeMounted(ssh, "/foo")
+		})
+
+		It("Should be handled inside the VM together with another volume mount", func() {
+			vm = makeVolumeMountVM(virtletNodeName, func(pod *framework.PodInterface) {
+				addFlexvolMount(pod, "blockdev1", "/foo", map[string]string{
+					"type": "raw",
+					"path": devPath,
+					"part": "0",
+				})
+				addFlexvolMount(pod, "blockdev2", "/bar", map[string]string{
+					"type":     "qcow2",
+					"capacity": "10MB",
+				})
+			})
+			ssh = waitSSH(vm)
+			shouldBeMounted(ssh, "/foo")
+			shouldBeMounted(ssh, "/bar")
 		})
 	})
 
@@ -79,11 +105,12 @@ var _ = Describe("Container volume mounts", func() {
 		)
 
 		BeforeAll(func() {
-			requireCloudInit()
-			vm = makeVolumeMountVM(map[string]string{
-				"type":     "qcow2",
-				"capacity": "10MB",
-			}, "")
+			vm = makeVolumeMountVM("", func(pod *framework.PodInterface) {
+				addFlexvolMount(pod, "blockdev", "/foo", map[string]string{
+					"type":     "qcow2",
+					"capacity": "10MB",
+				})
+			})
 		})
 
 		AfterAll(func() {
@@ -92,7 +119,7 @@ var _ = Describe("Container volume mounts", func() {
 
 		scheduleWaitSSH(&vm, &ssh)
 		It("Should be handled inside the VM [Conformance]", func() {
-			shouldBeMounted(ssh)
+			shouldBeMounted(ssh, "/foo")
 		})
 	})
 
@@ -218,33 +245,38 @@ var _ = Describe("Container volume mounts", func() {
 
 })
 
-func makeVolumeMountVM(flexvolOptions map[string]string, nodeName string) *framework.VMInterface {
-	podCustomization := func(pod *framework.PodInterface) {
-		pod.Pod.Spec.Volumes = append(pod.Pod.Spec.Volumes, v1.Volume{
-			Name: "blockdev",
-			VolumeSource: v1.VolumeSource{
-				FlexVolume: &v1.FlexVolumeSource{
-					Driver:  "virtlet/flexvolume_driver",
-					Options: flexvolOptions,
-				},
+func addFlexvolMount(pod *framework.PodInterface, name string, mountPath string, flexvolOptions map[string]string) {
+	pod.Pod.Spec.Volumes = append(pod.Pod.Spec.Volumes, v1.Volume{
+		Name: name,
+		VolumeSource: v1.VolumeSource{
+			FlexVolume: &v1.FlexVolumeSource{
+				Driver:  "virtlet/flexvolume_driver",
+				Options: flexvolOptions,
 			},
-		})
-		pod.Pod.Spec.Containers[0].VolumeMounts = append(pod.Pod.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
-			Name:      "blockdev",
-			MountPath: "/foo",
-		})
-	}
-	vm := controller.VM("ubuntu-vm")
+		},
+	})
+	pod.Pod.Spec.Containers[0].VolumeMounts = append(pod.Pod.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
+		Name:      name,
+		MountPath: mountPath,
+	})
+}
+
+func makeVolumeMountVM(nodeName string, podCustomization func(*framework.PodInterface)) *framework.VMInterface {
+	vm := controller.VM("mount-vm")
 	vm.Create(VMOptions{
 		NodeName: nodeName,
+		// TODO: should also have an option to test using
+		// ubuntu image with volumes mounted using cloud-init
+		// userdata 'mounts' section
+		UserDataScript: "@virtlet-mount-script@",
 	}.applyDefaults(), time.Minute*5, podCustomization)
 	_, err := vm.Pod()
 	Expect(err).NotTo(HaveOccurred())
 	return vm
 }
 
-func shouldBeMounted(ssh framework.Executor) {
+func shouldBeMounted(ssh framework.Executor, path string) {
 	Eventually(func() (string, error) {
-		return framework.ExecSimple(ssh, "ls -l /foo")
+		return framework.ExecSimple(ssh, "ls -l "+path)
 	}, 60).Should(ContainSubstring("lost+found"))
 }

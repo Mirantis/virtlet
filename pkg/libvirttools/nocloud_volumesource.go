@@ -34,6 +34,8 @@ type nocloudVolume struct {
 	volumeBase
 }
 
+var _ VMVolume = &nocloudVolume{}
+
 func GetNocloudVolume(config *VMConfig, owner VolumeOwner) ([]VMVolume, error) {
 	return []VMVolume{
 		&nocloudVolume{
@@ -44,17 +46,20 @@ func GetNocloudVolume(config *VMConfig, owner VolumeOwner) ([]VMVolume, error) {
 
 func (v *nocloudVolume) Uuid() string { return "" }
 
-func (v *nocloudVolume) Setup(volumeMap map[string]string) (*libvirtxml.DomainDisk, error) {
-	g := NewCloudInitGenerator(v.config, volumeMap, nocloudIsoDir)
-	nocloudDiskDef, err := g.GenerateDisk()
-	if err != nil {
-		return nil, err
-	}
-	return nocloudDiskDef, nil
+func (v *nocloudVolume) cloudInitGenerator() *CloudInitGenerator {
+	return NewCloudInitGenerator(v.config, nocloudIsoDir)
+}
+
+func (v *nocloudVolume) Setup() (*libvirtxml.DomainDisk, error) {
+	return v.cloudInitGenerator().DiskDef(), nil
+}
+
+func (v *nocloudVolume) WriteImage(volumeMap diskPathMap) error {
+	return v.cloudInitGenerator().GenerateImage(volumeMap)
 }
 
 func (v *nocloudVolume) Teardown() error {
-	isoPath := NewCloudInitGenerator(v.config, nil, nocloudIsoDir).IsoPath()
+	isoPath := v.cloudInitGenerator().IsoPath()
 	if err := os.Remove(isoPath); err != nil && !os.IsNotExist(err) {
 		glog.Warningf("Cannot remove temporary nocloud file %q: %v", isoPath, err)
 	}

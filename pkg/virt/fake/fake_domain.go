@@ -56,14 +56,14 @@ func (dc *FakeDomainConnection) SetIgnoreShutdown(ignoreShutdown bool) {
 }
 
 func (dc *FakeDomainConnection) removeDomain(d *FakeDomain) {
-	if _, found := dc.domains[d.name]; !found {
-		log.Panicf("domain %q not found", d.name)
+	if _, found := dc.domains[d.def.Name]; !found {
+		log.Panicf("domain %q not found", d.def.Name)
 	}
-	delete(dc.domains, d.name)
-	if _, found := dc.domainsByUuid[d.uuid]; !found {
-		log.Panicf("domain uuid %q not found (name %q)", d.uuid, d.name)
+	delete(dc.domains, d.def.Name)
+	if _, found := dc.domainsByUuid[d.def.UUID]; !found {
+		log.Panicf("domain uuid %q not found (name %q)", d.def.UUID, d.def.Name)
 	}
-	delete(dc.domainsByUuid, d.uuid)
+	delete(dc.domainsByUuid, d.def.UUID)
 }
 
 func (dc *FakeDomainConnection) removeSecret(s *FakeSecret) {
@@ -74,22 +74,10 @@ func (dc *FakeDomainConnection) removeSecret(s *FakeSecret) {
 }
 
 func (dc *FakeDomainConnection) DefineDomain(def *libvirtxml.Domain) (virt.VirtDomain, error) {
-	if def.Devices != nil {
-		for _, disk := range def.Devices.Disks {
-			if disk.Type != "file" || disk.Source == nil {
-				continue
-			}
-			origPath := disk.Source.File
-			if filepath.Ext(origPath) == ".iso" || strings.HasPrefix(filepath.Base(origPath), "nocloud-iso") {
-				m, err := testutils.IsoToMap(origPath)
-				if err != nil {
-					return nil, fmt.Errorf("bad iso image: %q", origPath)
-				}
-				dc.rec.Rec("iso image", m)
-			}
-		}
-	}
+	def = copyDomain(def)
 	dc.rec.Rec("DefineDomain", def)
+	addPciRoot(def)
+	assignFakePCIAddressesToControllers(def)
 	// TODO: dump any ISOs mentioned in disks (Type=file) as json
 	// Include file name (base) in rec name
 	if _, found := dc.domains[def.Name]; found {
@@ -101,7 +89,7 @@ func (dc *FakeDomainConnection) DefineDomain(def *libvirtxml.Domain) (virt.VirtD
 	if def.UUID == "" {
 		return nil, fmt.Errorf("domain %q has empty uuid", def.Name)
 	}
-	d := newFakeDomain(dc, def.Name, def.UUID)
+	d := newFakeDomain(dc, def)
 	dc.domains[def.Name] = d
 	dc.domainsByUuid[def.UUID] = d
 	return d, nil
@@ -168,27 +156,40 @@ type FakeDomain struct {
 	removed bool
 	created bool
 	state   virt.DomainState
-	name    string
-	uuid    string
+	def     *libvirtxml.Domain
 }
 
-func newFakeDomain(dc *FakeDomainConnection, name, uuid string) *FakeDomain {
+func newFakeDomain(dc *FakeDomainConnection, def *libvirtxml.Domain) *FakeDomain {
 	return &FakeDomain{
-		rec:   NewChildRecorder(dc.rec, name),
+		rec:   NewChildRecorder(dc.rec, def.Name),
 		dc:    dc,
 		state: virt.DOMAIN_SHUTOFF,
-		name:  name,
-		uuid:  uuid,
+		def:   def,
 	}
 }
 
 func (d *FakeDomain) Create() error {
 	d.rec.Rec("Create", nil)
+	if d.def.Devices != nil {
+		for _, disk := range d.def.Devices.Disks {
+			if disk.Type != "file" || disk.Source == nil {
+				continue
+			}
+			origPath := disk.Source.File
+			if filepath.Ext(origPath) == ".iso" || strings.HasPrefix(filepath.Base(origPath), "nocloud-iso") {
+				m, err := testutils.IsoToMap(origPath)
+				if err != nil {
+					return fmt.Errorf("bad iso image: %q", origPath)
+				}
+				d.rec.Rec("iso image", m)
+			}
+		}
+	}
 	if d.removed {
-		return fmt.Errorf("Create() called on a removed (undefined) domain %q", d.name)
+		return fmt.Errorf("Create() called on a removed (undefined) domain %q", d.def.Name)
 	}
 	if d.created {
-		return fmt.Errorf("trying to re-create domain %q", d.name)
+		return fmt.Errorf("trying to re-create domain %q", d.def.Name)
 	}
 	if d.state != virt.DOMAIN_SHUTOFF {
 		return fmt.Errorf("invalid domain state %d", d.state)
@@ -201,7 +202,7 @@ func (d *FakeDomain) Create() error {
 func (d *FakeDomain) Destroy() error {
 	d.rec.Rec("Destroy", nil)
 	if d.removed {
-		return fmt.Errorf("Destroy() called on a removed (undefined) domain %q", d.name)
+		return fmt.Errorf("Destroy() called on a removed (undefined) domain %q", d.def.Name)
 	}
 	d.state = virt.DOMAIN_SHUTOFF
 	return nil
@@ -210,7 +211,7 @@ func (d *FakeDomain) Destroy() error {
 func (d *FakeDomain) Undefine() error {
 	d.rec.Rec("Undefine", nil)
 	if d.removed {
-		return fmt.Errorf("Undefine(): domain %q already removed", d.name)
+		return fmt.Errorf("Undefine(): domain %q already removed", d.def.Name)
 	}
 	d.removed = true
 	d.dc.removeDomain(d)
@@ -224,7 +225,7 @@ func (d *FakeDomain) Shutdown() error {
 		d.rec.Rec("Shutdown", nil)
 	}
 	if d.removed {
-		return fmt.Errorf("Shutdown() called on a removed (undefined) domain %q", d.name)
+		return fmt.Errorf("Shutdown() called on a removed (undefined) domain %q", d.def.Name)
 	}
 	if !d.dc.ignoreShutdown {
 		// TODO: need to test DOMAIN_SHUTDOWN stage too
@@ -235,20 +236,24 @@ func (d *FakeDomain) Shutdown() error {
 
 func (d *FakeDomain) State() (virt.DomainState, error) {
 	if d.removed {
-		return virt.DOMAIN_NOSTATE, fmt.Errorf("State() called on a removed (undefined) domain %q", d.name)
+		return virt.DOMAIN_NOSTATE, fmt.Errorf("State() called on a removed (undefined) domain %q", d.def.Name)
 	}
 	return d.state, nil
 }
 
 func (d *FakeDomain) UUIDString() (string, error) {
 	if d.removed {
-		return "", fmt.Errorf("UUIDString() called on a removed (undefined) domain %q", d.name)
+		return "", fmt.Errorf("UUIDString() called on a removed (undefined) domain %q", d.def.Name)
 	}
-	return d.uuid, nil
+	return d.def.UUID, nil
 }
 
 func (d *FakeDomain) Name() (string, error) {
-	return d.name, nil
+	return d.def.Name, nil
+}
+
+func (d *FakeDomain) Xml() (*libvirtxml.Domain, error) {
+	return d.def, nil
 }
 
 type FakeSecret struct {
@@ -274,4 +279,55 @@ func (s *FakeSecret) Remove() error {
 	s.rec.Rec("Remove", nil)
 	s.dc.removeSecret(s)
 	return nil
+}
+
+func copyDomain(def *libvirtxml.Domain) *libvirtxml.Domain {
+	s, err := def.Marshal()
+	if err != nil {
+		log.Panicf("failed to marshal libvirt domain: %v", err)
+	}
+	var copy libvirtxml.Domain
+	if err := copy.Unmarshal(s); err != nil {
+		log.Panicf("failed to unmarshal libvirt domain: %v", err)
+	}
+	return &copy
+}
+
+func addPciRoot(def *libvirtxml.Domain) {
+	if def.Devices == nil {
+		def.Devices = &libvirtxml.DomainDeviceList{}
+	}
+	for _, c := range def.Devices.Controllers {
+		if c.Type == "pci" {
+			return
+		}
+	}
+	def.Devices.Controllers = append(def.Devices.Controllers, libvirtxml.DomainController{
+		Type:  "pci",
+		Model: "pci-root",
+	})
+}
+
+func assignFakePCIAddressesToControllers(def *libvirtxml.Domain) {
+	if def.Devices == nil {
+		return
+	}
+	domain := uint(0)
+	bus := uint(0)
+	function := uint(0)
+	for n, c := range def.Devices.Controllers {
+		if c.Type == "pci" || c.Address != nil {
+			continue
+		}
+		slot := uint(n + 1)
+		// note that c is not a pointer
+		def.Devices.Controllers[n].Address = &libvirtxml.DomainAddress{
+			PCI: &libvirtxml.DomainAddressPCI{
+				Domain:   &domain,
+				Bus:      &bus,
+				Slot:     &slot,
+				Function: &function,
+			},
+		}
+	}
 }

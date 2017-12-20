@@ -68,7 +68,7 @@ func TestRootVolumeLifeCycle(t *testing.T) {
 
 	rootVol := volumes[0]
 
-	vol, err := rootVol.Setup(nil)
+	vol, err := rootVol.Setup()
 	if err != nil {
 		t.Errorf("Setup returned an error: %v", err)
 	}

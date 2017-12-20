@@ -465,6 +465,9 @@ func TestDomainDefinitions(t *testing.T) {
 				})
 			}
 			containerId := ct.createContainer(sandbox, mounts)
+			// startContainer will cause fake VirtDomain
+			// to dump the cloudinit iso content
+			ct.startContainer(containerId)
 			ct.removeContainer(containerId)
 			gm.Verify(t, ct.rec.Content())
 		})

@@ -80,7 +80,7 @@
     "data": {
       "XMLName": {
         "Space": "",
-        "Local": ""
+        "Local": "domain"
       },
       "Type": "",
       "Name": "virtlet-5edfe2ad-9852-container1",
@@ -101,7 +101,35 @@
       "OnPoweroff": "",
       "OnReboot": "",
       "OnCrash": "",
-      "Devices": null,
+      "Devices": {
+        "Emulator": "",
+        "Controllers": [
+          {
+            "XMLName": {
+              "Space": "",
+              "Local": ""
+            },
+            "Type": "pci",
+            "Index": null,
+            "Model": "pci-root",
+            "Address": null
+          }
+        ],
+        "Disks": null,
+        "Filesystems": null,
+        "Interfaces": null,
+        "Serials": null,
+        "Consoles": null,
+        "Inputs": null,
+        "Graphics": null,
+        "Videos": null,
+        "Channels": null,
+        "MemBalloon": null,
+        "Sounds": null,
+        "RNGs": null,
+        "Hostdevs": null,
+        "Memorydevs": null
+      },
       "QEMUCommandline": null
     }
   },
@@ -110,7 +138,7 @@
     "data": {
       "XMLName": {
         "Space": "",
-        "Local": ""
+        "Local": "domain"
       },
       "Type": "",
       "Name": "virtlet-8a6163c3-e4ee-container1",
@@ -131,7 +159,35 @@
       "OnPoweroff": "",
       "OnReboot": "",
       "OnCrash": "",
-      "Devices": null,
+      "Devices": {
+        "Emulator": "",
+        "Controllers": [
+          {
+            "XMLName": {
+              "Space": "",
+              "Local": ""
+            },
+            "Type": "pci",
+            "Index": null,
+            "Model": "pci-root",
+            "Address": null
+          }
+        ],
+        "Disks": null,
+        "Filesystems": null,
+        "Interfaces": null,
+        "Serials": null,
+        "Consoles": null,
+        "Inputs": null,
+        "Graphics": null,
+        "Videos": null,
+        "Channels": null,
+        "MemBalloon": null,
+        "Sounds": null,
+        "RNGs": null,
+        "Hostdevs": null,
+        "Memorydevs": null
+      },
       "QEMUCommandline": null
     }
   },
@@ -140,7 +196,7 @@
     "data": {
       "XMLName": {
         "Space": "",
-        "Local": ""
+        "Local": "domain"
       },
       "Type": "",
       "Name": "virtlet-13f51f8d-0f4e-container1",
@@ -161,7 +217,35 @@
       "OnPoweroff": "",
       "OnReboot": "",
       "OnCrash": "",
-      "Devices": null,
+      "Devices": {
+        "Emulator": "",
+        "Controllers": [
+          {
+            "XMLName": {
+              "Space": "",
+              "Local": ""
+            },
+            "Type": "pci",
+            "Index": null,
+            "Model": "pci-root",
+            "Address": null
+          }
+        ],
+        "Disks": null,
+        "Filesystems": null,
+        "Interfaces": null,
+        "Serials": null,
+        "Consoles": null,
+        "Inputs": null,
+        "Graphics": null,
+        "Videos": null,
+        "Channels": null,
+        "MemBalloon": null,
+        "Sounds": null,
+        "RNGs": null,
+        "Hostdevs": null,
+        "Memorydevs": null
+      },
       "QEMUCommandline": null
     }
   },
@@ -170,7 +254,7 @@
     "data": {
       "XMLName": {
         "Space": "",
-        "Local": ""
+        "Local": "domain"
       },
       "Type": "",
       "Name": "other-than-virtlet-domain",
@@ -191,7 +275,35 @@
       "OnPoweroff": "",
       "OnReboot": "",
       "OnCrash": "",
-      "Devices": null,
+      "Devices": {
+        "Emulator": "",
+        "Controllers": [
+          {
+            "XMLName": {
+              "Space": "",
+              "Local": ""
+            },
+            "Type": "pci",
+            "Index": null,
+            "Model": "pci-root",
+            "Address": null
+          }
+        ],
+        "Disks": null,
+        "Filesystems": null,
+        "Interfaces": null,
+        "Serials": null,
+        "Consoles": null,
+        "Inputs": null,
+        "Graphics": null,
+        "Videos": null,
+        "Channels": null,
+        "MemBalloon": null,
+        "Sounds": null,
+        "RNGs": null,
+        "Hostdevs": null,
+        "Memorydevs": null
+      },
       "QEMUCommandline": null
     }
   },

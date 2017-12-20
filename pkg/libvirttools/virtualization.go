@@ -222,67 +222,6 @@ func (v *VirtualizationTool) SetKubeletRootDir(kubeletRootDir string) {
 	v.kubeletRootDir = kubeletRootDir
 }
 
-func (v *VirtualizationTool) getVMVolumes(config *VMConfig) ([]VMVolume, error) {
-	return v.volumeSource(config, v)
-}
-
-func (v *VirtualizationTool) setupVolumes(config *VMConfig, domainDef *libvirtxml.Domain) error {
-	vmVols, err := v.getVMVolumes(config)
-	if err != nil {
-		return err
-	}
-	diskDriverFactory, err := getDiskDriverFactory(config.ParsedAnnotations.DiskDriver)
-	if err != nil {
-		return err
-	}
-	volumeMap := make(map[string]string)
-	var diskDrivers []diskDriver
-	for n, vmVol := range vmVols {
-		driver, err := diskDriverFactory(n)
-		if err != nil {
-			return err
-		}
-		diskDrivers = append(diskDrivers, driver)
-		uuid := vmVol.Uuid()
-		if uuid != "" {
-			volumeMap[uuid] = driver.devPath()
-		}
-	}
-	for n, vmVol := range vmVols {
-		diskDef, err := vmVol.Setup(volumeMap)
-		if err != nil {
-			// try to tear down volumes that were already set up
-			for _, vmVol := range vmVols[:n] {
-				if err := vmVol.Teardown(); err != nil {
-					glog.Warningf("Failed to tear down a volume on error: %v", err)
-				}
-			}
-			return err
-		}
-		diskDef.Target = diskDrivers[n].target()
-		diskDef.Address = diskDrivers[n].address()
-		domainDef.Devices.Disks = append(domainDef.Devices.Disks, *diskDef)
-	}
-	return nil
-}
-
-func (v *VirtualizationTool) teardownVolumes(config *VMConfig) error {
-	vmVols, err := v.getVMVolumes(config)
-	if err != nil {
-		return err
-	}
-	var errs []string
-	for _, vmVol := range vmVols {
-		if err := vmVol.Teardown(); err != nil {
-			errs = append(errs, err.Error())
-		}
-	}
-	if errs != nil {
-		return fmt.Errorf("failed to tear down some of the volumes:\n%s", strings.Join(errs, "\n"))
-	}
-	return nil
-}
-
 func loggingDisabled() bool {
 	disabled := os.Getenv("VIRTLET_DISABLE_LOGGING")
 	return utils.GetBoolFromString(disabled)
@@ -346,9 +285,14 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netFdKey string) 
 	}
 
 	settings.useKvm = v.forceKVM || canUseKvm()
-	domainConf := settings.createDomain(config)
+	domainDef := settings.createDomain(config)
 
-	if err := v.setupVolumes(config, domainConf); err != nil {
+	diskList, err := newDiskList(config, v.volumeSource, v)
+	if err != nil {
+		return "", err
+	}
+	domainDef.Devices.Disks, err = diskList.setup()
+	if err != nil {
 		return "", err
 	}
 
@@ -360,10 +304,13 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netFdKey string) 
 		if err := v.removeDomain(settings.domainUUID, config, kubeapi.ContainerState_CONTAINER_UNKNOWN, true); err != nil {
 			glog.Warningf("Failed to remove domain %q: %v", settings.domainUUID, err)
 		}
+		if err := diskList.teardown(); err != nil {
+			glog.Warningf("error tearing down volumes after an error: %v", err)
+		}
 	}()
 
 	containerAttempt := config.Attempt
-	if err := v.addSerialDevicesToDomain(config.PodSandboxId, config.Name, containerAttempt, domainConf, settings); err != nil {
+	if err := v.addSerialDevicesToDomain(config.PodSandboxId, config.Name, containerAttempt, domainDef, settings); err != nil {
 		return "", err
 	}
 
@@ -376,17 +323,10 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netFdKey string) 
 	labels[kubetypes.KubernetesPodUIDLabel] = config.PodSandboxId
 	labels[kubetypes.KubernetesContainerNameLabel] = config.Name
 
-	if _, err := v.domainConn.DefineDomain(domainConf); err != nil {
-		return "", err
-	}
-
-	domain, err := v.domainConn.LookupDomainByUUIDString(settings.domainUUID)
+	domain, err := v.domainConn.DefineDomain(domainDef)
 	if err == nil {
-		// FIXME: do we really need this?
-		// (this causes an GetInfo() call on the domain in case of libvirt)
-		_, err = domain.State()
+		err = diskList.writeImages(domain)
 	}
-
 	if err == nil {
 		// FIXME: store VMConfig + VMStatus (to be added)
 		err = v.metadataStore.Container(settings.domainUUID).Save(
@@ -595,7 +535,6 @@ func (v *VirtualizationTool) getVMConfigFromMetadata(containerId string) (*VMCon
 
 func (v *VirtualizationTool) cleanupVolumes(containerId string) error {
 	config, _, err := v.getVMConfigFromMetadata(containerId)
-
 	if err != nil {
 		return err
 	}
@@ -605,7 +544,12 @@ func (v *VirtualizationTool) cleanupVolumes(containerId string) error {
 		return nil
 	}
 
-	if err := v.teardownVolumes(config); err != nil {
+	diskList, err := newDiskList(config, v.volumeSource, v)
+	if err == nil {
+		err = diskList.teardown()
+	}
+
+	if err != nil {
 		glog.Errorf("Volume teardown failed for domain %q: %v", containerId, err)
 		return err
 
@@ -614,7 +558,7 @@ func (v *VirtualizationTool) cleanupVolumes(containerId string) error {
 	return nil
 }
 
-func (v *VirtualizationTool) removeDomain(containerId string, config *VMConfig, state kubeapi.ContainerState, disallowVolumesTeardownFailure bool) error {
+func (v *VirtualizationTool) removeDomain(containerId string, config *VMConfig, state kubeapi.ContainerState, failUponVolumeTeardownFailure bool) error {
 	// Give a chance to gracefully stop domain
 	// TODO: handle errors - there could be e.g. lost connection error
 	domain, err := v.domainConn.LookupDomainByUUIDString(containerId)
@@ -647,15 +591,20 @@ func (v *VirtualizationTool) removeDomain(containerId string, config *VMConfig, 
 		}
 	}
 
-	if err := v.teardownVolumes(config); err != nil {
-		if disallowVolumesTeardownFailure {
-			return err
-		} else {
-			glog.Warningf("Error during volumes teardown for container %s: %v", containerId, err)
-		}
+	diskList, err := newDiskList(config, v.volumeSource, v)
+	if err == nil {
+		err = diskList.teardown()
 	}
 
-	return nil
+	switch {
+	case err == nil:
+		return nil
+	case failUponVolumeTeardownFailure:
+		return err
+	default:
+		glog.Warningf("Error during volume teardown for container %s: %v", containerId, err)
+		return nil
+	}
 }
 
 // RemoveContainer tries to gracefully stop domain, then forcibly removes it

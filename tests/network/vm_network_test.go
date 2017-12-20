@@ -115,7 +115,11 @@ func TestVmNetwork(t *testing.T) {
 	}
 
 	if err := contNS.Do(func(ns.NetNS) error {
-		_, err = nettools.SetupContainerSideNetwork(info, contNS.Path())
+		allLinks, err := netlink.LinkList()
+		if err != nil {
+			return fmt.Errorf("LinkList() failed: %v", err)
+		}
+		_, err = nettools.SetupContainerSideNetwork(info, contNS.Path(), allLinks)
 		if err != nil {
 			return fmt.Errorf("failed to set up container side network: %v", err)
 		}

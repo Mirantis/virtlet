@@ -461,7 +461,7 @@ func (v *VirtletManager) ListContainers(ctx context.Context, in *kubeapi.ListCon
 }
 
 func (v *VirtletManager) ContainerStatus(ctx context.Context, in *kubeapi.ContainerStatusRequest) (*kubeapi.ContainerStatusResponse, error) {
-	glog.V(3).Infof("ContainerStatus: %s", spew.Sdump(in))
+	glog.V(4).Infof("ContainerStatus: %s", spew.Sdump(in))
 	status, err := v.libvirtVirtualizationTool.ContainerStatus(in.ContainerId)
 	if err != nil {
 		glog.Errorf("Error when getting container '%s' status: %v", in.ContainerId, err)
@@ -469,7 +469,7 @@ func (v *VirtletManager) ContainerStatus(ctx context.Context, in *kubeapi.Contai
 	}
 
 	response := &kubeapi.ContainerStatusResponse{Status: status}
-	glog.V(3).Infof("ContainerStatus response: %s", spew.Sdump(response))
+	glog.V(4).Infof("ContainerStatus response: %s", spew.Sdump(response))
 	return response, nil
 }
 

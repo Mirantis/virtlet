@@ -99,8 +99,10 @@ type VirtDomain interface {
 	Shutdown() error
 	// State obtains the current state of the domain
 	State() (DomainState, error)
-	// UUIDString() returns UUID string for this domain
+	// UUIDString returns UUID string for this domain
 	UUIDString() (string, error)
-	// Name() returns the name of this domain
+	// Name returns the name of this domain
 	Name() (string, error)
+	// Xml retrieves xml definition of the domain
+	Xml() (*libvirtxml.Domain, error)
 }
