@@ -14,14 +14,14 @@ and `--cni-conf-dir` as described in kubelet network plugins
 ```
 +--------------------------------------------------------------------------------------------------------------------------------------------------------------+
 |               +-------------------+                                                                                             Virlet                       |
-|               | VM                |                                                                                             network                      |
-|               |                   | Qemu process                                                                                namespace                    |
-|               | +---+ eth0        |                                                                                                                          |
-|               | +---+ ip addr set |                                                                                                                          |
-|               |   /\              |                                                                                                                          |
+|               | VM                 |                                                                                            network                      |
+|               |                    | Qemu process                                                                               namespace                    |
+|               | +---+ eth{0,1,...} |                                                                                                                         |
+|               | +---+ ip addr set  |                                                                                                                         |
+|               |   /\               |                                                                                                                         |
 |               +---||--------------+                                                                                                                          |
 |                   \/                                                                                                                                         |
-|               FD of the tap device                                                                                                                           |
+|               FDs of the tap devices                                                                                                                         |
 |                                                                                                                                                              |
 |                                                                                                                                                              |
 |               +--------------------------------------------------------------------------------------------------+                                           |
@@ -32,6 +32,9 @@ and `--cni-conf-dir` as described in kubelet network plugins
 |               |          +---+                 +---+                 +---+                                       |           +---+                           |
 |               |                              169.254.254.2/24                                                    |                                           |
 |               |                                                                                                  |                                           |
+|               |                                                      +---+ SR-IOV VF                             |           +---+ SR-IOV host master device |
+|               |                                                      |   |---------------------------------------------------|   |                           |
+|               |                                                      +---+                                       |           +---+                           |
 |               |                                                                                                  |                                           |
 |               |                +-------------------+                                                             |                                           |
 |               |                |local dhcp server  |                                                             |                                           |
@@ -42,7 +45,9 @@ and `--cni-conf-dir` as described in kubelet network plugins
 ```
 
 Virtlet uses the specified CNI plugin which is expected to create veth
-pair with one end belonging to the pod network namespace.
+pairs for each configured network with one end belonging to the pod network
+namespace. A special case is SR-IOV plugin which puts a [Virtual Function](https://en.wikipedia.org/wiki/Single-root_input/output_virtualization)
+into the pod network namespace.
 1. On `RunPodSandBox` request Virtlet requests `tapmanager` process to
    set up the networking for the VM by sending it a command over its
    Unix domain socket
@@ -54,9 +59,10 @@ pair with one end belonging to the pod network namespace.
    which it passes `VIRTLET_NET_KEY` environment variable containing the key
    the was used by `tapmanager` to set up the network.
 1. `vmwrapper` uses the key to ask `tapmanager` to send it the file
-   descriptor for the tap interface over `tapmanager`'s Unix domain
-   socket. It then extends emulator command line arguments to make it
-   use the tap device and then `exec`s the emulator.
+   descriptors for the tap interfaces or the description of SR-IOV VFs
+   over `tapmanager`'s Unix domain socket. It then extends emulator
+   command line arguments to make it use tap devices/VFs and then
+   `exec`s the emulator.
 1. Upon `StopPodSandbox`, Virtlet requests `tapmanager` to tear down
    the VM network.
 
@@ -90,5 +96,11 @@ be set for Calico-based virtlet installations. It's controlled by
 `calico-subnet` key Virtlet configmap (denoting the number of 1s in
 the netmask) and defaults to `24`.
 
+[SR-IOV](https://github.com/hustcat/sriov-cni) CNI plugin requires running
+qemu emulator with full root privileges, so that needs to be manually enabled
+during Virtlet deployment by setting `VIRTLET_SRIOV_SUPPORT` environment
+variable to a non-empty value for the `virtlet` container.
+In case if standard deploy/virtlet-ds.yaml is used, this can be done by settingsriov_support=true in virtlet-config ConfigMap.
+
 **NOTE:** Virtlet doesn't support `hostNetwork` pod setting because it
-cannot be impelemnted for VM in a meaningful way.
+cannot be implemented for VM in a meaningful way.

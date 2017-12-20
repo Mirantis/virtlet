@@ -109,13 +109,19 @@ __attribute__((constructor (200))) void vmwrapper_handle_reexec(void) {
 	if (mount("none", "/sys", "sysfs", 0, NULL) < 0)
 		vmwrapper_perr("mount()");
 
-	// below part commented for sriov tests
-	// permanently drop privs
-	// fprintf(stderr, "vmwrapper reexec: dropping privs\n");
-	// if (setgid(getgid()) < 0)
-	//	vmwrapper_perr("setgid()");
-	// if (setuid(getuid()) < 0)
-	//	vmwrapper_perr("setuid()");
+	// permanently drop privs if SR-IOV support is not enabled
+	if (getenv("VMWRAPPER_KEEP_PRIVS") == NULL) {
+		fprintf(stderr, "vmwrapper reexec: dropping privs\n");
+		if (setgid(getgid()) < 0)
+			vmwrapper_perr("setgid()");
+		if (setuid(getuid()) < 0)
+			vmwrapper_perr("setuid()");
+	} else {
+		if (setgid(0) < 0)
+			vmwrapper_perr("setgid()");
+		if (setuid(0) < 0)
+			vmwrapper_perr("setuid()");
+	}
 }
 */
 import "C"
