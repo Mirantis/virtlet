@@ -20,7 +20,7 @@ To try out Virtlet follow the instructions from [Running local environment](docs
 
 ### Virtlet introduction video
 
-You can watch and listen to Virtlet introduction and description video that was recorded on Kubernetes Community Meeting [here](https://youtu.be/x5uBq-ugoio?t=38).
+You can watch and listen to Virtlet demo video that was recorded on Kubernetes Community Meeting [here](https://youtu.be/Sl1Y0N-Tj1A?t=94).
 
 ### Virtlet usage demo
 
