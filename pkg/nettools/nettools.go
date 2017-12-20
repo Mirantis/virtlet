@@ -660,7 +660,9 @@ func getDevNameByPCIAddress(address string) (string, error) {
 	}
 	for _, fi := range devices {
 		linkDestination, err := os.Readlink(filepath.Join("/sys/class/net", fi.Name(), "device"))
-		if err != nil {
+		if os.IsNotExist(err) {
+			continue
+		} else if err != nil {
 			return "", err
 		}
 		if linkDestination == desiredLinkLocation {
@@ -1013,7 +1015,7 @@ func (csn *ContainerSideNetwork) Teardown() error {
 // ReconstructVFs iterates over stored PCI addresses, rebinding each
 // corresponding interface to its host driver, changing its MAC address
 // to the stored value and then moving it into the container namespace
-func (csn *ContainerSideNetwork) ReconstructVFs(ns ns.NetNS) error {
+func (csn *ContainerSideNetwork) ReconstructVFs(netns ns.NetNS) error {
 	for i, ifType := range csn.InterfaceTypes {
 		if ifType != InterfaceTypeVF {
 			continue
@@ -1027,17 +1029,22 @@ func (csn *ContainerSideNetwork) ReconstructVFs(ns ns.NetNS) error {
 		}
 		link, err := netlink.LinkByName(devName)
 		if err != nil {
-			return err
+			return fmt.Errorf("can't find link with name %q: %v", err)
 		}
 		if err := netlink.LinkSetHardwareAddr(link, csn.HardwareAddrs[i]); err != nil {
-			return err
+			return fmt.Errorf("can't set hwaddr %q on device %q: %v", csn.HardwareAddrs[i], devName, err)
 		}
-		if err := netlink.LinkSetName(link, csn.InterfaceNames[i]); err != nil {
-			return err
+		if err := netlink.LinkSetNsFd(link, int(netns.Fd())); err != nil {
+			return fmt.Errorf("can't move link %q to netns %q: %v", csn.InterfaceNames[i], netns.Path(), err)
 		}
-		if err := netlink.LinkSetNsFd(link, int(ns.Fd())); err != nil {
-			return err
-		}
+		netns.Do(func(ns.NetNS) error {
+			if link.Attrs().Name != csn.InterfaceNames[i] {
+				if err := netlink.LinkSetName(link, csn.InterfaceNames[i]); err != nil {
+					return fmt.Errorf("can't rename device %q to %q: %v", devName, csn.InterfaceNames[i], err)
+				}
+			}
+			return nil
+		})
 	}
 
 	return nil
