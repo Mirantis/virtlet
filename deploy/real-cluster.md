@@ -52,6 +52,8 @@ kubectl get pods --all-namespaces -o wide -w
 
 ## Testing the installation
 
+### Validation of basic pod starting
+
 To test your Virtlet installation, start a sample VM:
 ```bash
 kubectl create -f https://raw.githubusercontent.com/Mirantis/virtlet/master/examples/cirros-vm.yaml
@@ -75,6 +77,8 @@ $
 
 Escape character is ^]
 
+### Validation of ssh access to pod
+
 You can also ssh into the VM.
 There's a scripts vmssh.sh that you can use to access the VM. You can
 download it from Virtlet repository along with test ssh key:
@@ -88,6 +92,28 @@ vmssh.sh needs `kubectl` to be configured to access your cluster.
 
 ```
 ./vmssh.sh cirros@cirros-vm
+```
+
+### Validation of pod access to cluster services
+
+After connecting to VM using one of above method you can validate VM access to
+cluster services. Use below command to display an IP address of kubernetes
+api service:
+
+```
+nslookup kubernetes.default.svc.cluster.local
+```
+
+Use below command to try to access this service:
+
+```
+curl -k https://kubernetes.default.svc.cluster.local
+```
+
+Using the same method you can verify access to any service from internet, e.x.:
+
+```
+curl -k https://google.com
 ```
 
 ## Removing Virtlet
