@@ -67,7 +67,7 @@ If you don't see a command prompt, try pressing enter.
 Press enter and you will see:
 
 ```
-login as 'cirros' user. default password: 'cubswin:)'. use 'sudo' for root.
+login as 'cirros' user. default password: 'gosubsgo'. use 'sudo' for root.
 cirros-vm login: cirros
 Password:
 $
