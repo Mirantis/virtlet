@@ -52,6 +52,8 @@ kubectl get pods --all-namespaces -o wide -w
 
 ## Testing the installation
 
+### Checking basic pod startup
+
 To test your Virtlet installation, start a sample VM:
 ```bash
 kubectl create -f https://raw.githubusercontent.com/Mirantis/virtlet/master/examples/cirros-vm.yaml
@@ -75,6 +77,8 @@ $
 
 Escape character is ^]
 
+### Verifying ssh access to a VM pod
+
 You can also ssh into the VM.
 There's a scripts vmssh.sh that you can use to access the VM. You can
 download it from Virtlet repository along with test ssh key:
@@ -89,6 +93,40 @@ vmssh.sh needs `kubectl` to be configured to access your cluster.
 ```
 ./vmssh.sh cirros@cirros-vm
 ```
+
+### Verifying accessing services from a VM pod
+
+After connecting to the VM using one of the above methods you can check access
+from the VM to cluster services. To check DNS resolution of cluster services,
+use the following command:
+
+```
+nslookup kubernetes.default.svc.cluster.local
+```
+
+The following command may be used to check service connectivity (note that
+it'll give you an authentication error):
+
+```
+curl -k https://kubernetes.default.svc.cluster.local
+```
+
+You can also verify Internet access from the VM:
+
+```
+curl -k https://google.com
+ping -c 1 8.8.8.8
+```
+
+If you have Kubernetes Dashboard installed (it's present in
+kubeadm-dind-cluster installations for example), you can check
+dashboard access using this command:
+
+```
+curl http://kubernetes-dashboard.kube-system.svc.cluster.local
+```
+
+This should display some html from the dashboard's main page.
 
 ## Removing Virtlet
 
