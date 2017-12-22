@@ -84,6 +84,7 @@ func (c *Client) GetDummyNetwork() (*cnicurrent.Result, string, error) {
 
 func (c *Client) AddSandboxToNetwork(podId, podName, podNs string) (*cnicurrent.Result, error) {
 	rtConf := c.cniRuntimeConf(podId, podName, podNs)
+	// NOTE: this annotation is only need by CNI Genie
 	rtConf.Args = append(rtConf.Args, [2]string{
 		"K8S_ANNOT", `{"cni": "calico"}`,
 	})
