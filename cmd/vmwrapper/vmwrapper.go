@@ -21,11 +21,13 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"syscall"
 
 	"github.com/golang/glog"
 
+	"github.com/Mirantis/virtlet/pkg/nettools"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
@@ -43,6 +45,7 @@ import (
 #include <fcntl.h>
 #include <sched.h>
 #include <unistd.h>
+#include <sys/mount.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <linux/limits.h>
@@ -100,12 +103,25 @@ __attribute__((constructor (200))) void vmwrapper_handle_reexec(void) {
 	vmwrapper_setns(my_pid, target_pid, CLONE_NEWUTS, "uts");
 	vmwrapper_setns(my_pid, target_pid, CLONE_NEWIPC, "ipc");
 
-	// permanently drop privs
-	fprintf(stderr, "vmwrapper reexec: dropping privs\n");
-	if (setgid(getgid()) < 0)
-		vmwrapper_perr("setgid()");
-	if (setuid(getuid()) < 0)
-		vmwrapper_perr("setuid()");
+	// remount /sys for new netns
+	if (umount2("/sys", MNT_DETACH) < 0)
+		vmwrapper_perr("umount2()");
+	if (mount("none", "/sys", "sysfs", 0, NULL) < 0)
+		vmwrapper_perr("mount()");
+
+	// permanently drop privs if SR-IOV support is not enabled
+	if (getenv("VMWRAPPER_KEEP_PRIVS") == NULL) {
+		fprintf(stderr, "vmwrapper reexec: dropping privs\n");
+		if (setgid(getgid()) < 0)
+			vmwrapper_perr("setgid()");
+		if (setuid(getuid()) < 0)
+			vmwrapper_perr("setuid()");
+	} else {
+		if (setgid(0) < 0)
+			vmwrapper_perr("setgid()");
+		if (setuid(0) < 0)
+			vmwrapper_perr("setuid()");
+	}
 }
 */
 import "C"
@@ -117,6 +133,19 @@ const (
 	netKeyEnvVar    = "VIRTLET_NET_KEY"
 	vmsProcFile     = "/var/lib/virtlet/vms.procfile"
 )
+
+func extractLastUsedPCIAddress(args []string) int {
+	var lastUsed int
+	for _, arg := range args {
+		i := strings.LastIndex(arg, "addr=0x")
+		if i < 0 {
+			continue
+		}
+		parsed, _ := strconv.ParseInt(arg[i+7:], 16, 32)
+		lastUsed = int(parsed)
+	}
+	return lastUsed
+}
 
 func main() {
 	// configure glog (apparently no better way to do it ...)
@@ -151,6 +180,8 @@ func main() {
 		emulator = defaultEmulator
 	} else {
 		netFdKey := os.Getenv(netKeyEnvVar)
+		nextToUsePCIAddress := extractLastUsedPCIAddress(os.Args[1:]) + 1
+		nextToUseHostdevNo := 0
 
 		if netFdKey != "" {
 			c := tapmanager.NewFDClient(fdSocketPath)
@@ -158,7 +189,7 @@ func main() {
 				glog.Errorf("Can't connect to fd server: %v", err)
 				os.Exit(1)
 			}
-			tapFds, marshaledData, err := c.GetFDs(netFdKey)
+			fds, marshaledData, err := c.GetFDs(netFdKey)
 			if err != nil {
 				glog.Errorf("Failed to obtain tap fds for key %q: %v", netFdKey, err)
 				os.Exit(1)
@@ -171,13 +202,31 @@ func main() {
 			}
 
 			for i, desc := range descriptions {
-				if desc.Type == tapmanager.InterfaceTypeTap {
+				switch desc.Type {
+				case nettools.InterfaceTypeTap:
 					netArgs = append(netArgs,
 						"-netdev",
-						fmt.Sprintf("tap,id=tap%d,fd=%d", desc.TapFdIndex, tapFds[desc.TapFdIndex]),
+						fmt.Sprintf("tap,id=tap%d,fd=%d", desc.FdIndex, fds[desc.FdIndex]),
 						"-device",
-						fmt.Sprintf("virtio-net-pci,netdev=tap%d,id=net%d,mac=%s", desc.TapFdIndex, i, desc.HardwareAddr),
+						fmt.Sprintf("virtio-net-pci,netdev=tap%d,id=net%d,mac=%s", desc.FdIndex, i, desc.HardwareAddr),
 					)
+				case nettools.InterfaceTypeVF:
+					netArgs = append(netArgs,
+						"-device",
+						// fmt.Sprintf("pci-assign,configfd=%d,host=%s,id=hostdev%d,bus=pci.0,addr=0x%x",
+						fmt.Sprintf("pci-assign,host=%s,id=hostdev%d,bus=pci.0,addr=0x%x",
+							// desc.FdIndex,
+							desc.PCIAddress[5:],
+							nextToUseHostdevNo,
+							nextToUsePCIAddress,
+						),
+					)
+					nextToUseHostdevNo += 1
+					nextToUsePCIAddress += 1
+				default:
+					// Impssible situation when tapmanager is built from other sources than vmwrapper
+					glog.Errorf("Received unknown interface type: %d", int(desc.Type))
+					os.Exit(1)
 				}
 			}
 		}
@@ -193,7 +242,8 @@ func main() {
 		args = append([]string{os.Args[0]}, args...)
 	}
 
-	glog.V(0).Infof("Executing emulator: %s", strings.Join(args, " "))
+	// below log hides any possible error in returned by libvirt virError
+	// glog.V(0).Infof("Executing emulator: %s", strings.Join(args, " "))
 	if err := syscall.Exec(args[0], args, env); err != nil {
 		glog.Errorf("Can't exec emulator: %v", err)
 		os.Exit(1)
