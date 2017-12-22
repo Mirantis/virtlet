@@ -103,13 +103,15 @@ __attribute__((constructor (200))) void vmwrapper_handle_reexec(void) {
 	vmwrapper_setns(my_pid, target_pid, CLONE_NEWUTS, "uts");
 	vmwrapper_setns(my_pid, target_pid, CLONE_NEWIPC, "ipc");
 
-	// remount /sys for new netns
+	// remount /sys for the new netns
 	if (umount2("/sys", MNT_DETACH) < 0)
 		vmwrapper_perr("umount2()");
 	if (mount("none", "/sys", "sysfs", 0, NULL) < 0)
 		vmwrapper_perr("mount()");
 
-	// permanently drop privs if SR-IOV support is not enabled
+	// Permanently drop privs unless not to do so.
+	// Currently we don't drop privs when SR-IOV support is enabled
+	// because of an unresolved emulator permission problem.
 	if (getenv("VMWRAPPER_KEEP_PRIVS") == NULL) {
 		fprintf(stderr, "vmwrapper reexec: dropping privs\n");
 		if (setgid(getgid()) < 0)
