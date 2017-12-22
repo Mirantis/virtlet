@@ -44,7 +44,6 @@ The following keys in the config map are honored by the `virtlet-ds.yaml`:
   * `image_regexp_translation` - enables regexp syntax for the image name translation rules.
   * `disable_logging` - disables log streaming from VMs. Use "1" to disable.
 
-
 ## Removing Virtlet
 
 In order to remove Virtlet, first you need to delete all the VM pods.
