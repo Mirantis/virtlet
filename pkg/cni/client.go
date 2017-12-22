@@ -66,20 +66,28 @@ func (c *Client) cniRuntimeConf(podId, podName, podNs string) *libcni.RuntimeCon
 
 // GetDummyNetwork creates a dummy network using CNI plugin.
 // It's used for making a dummy gateway for Calico CNI plugin.
-func (c *Client) GetDummyNetwork() (*cnicurrent.Result, error) {
+func (c *Client) GetDummyNetwork() (*cnicurrent.Result, string, error) {
 	// TODO: virtlet pod restarts should not grab another address for
 	// the gateway. That's not a big problem usually though
 	// as the IPs are not returned to Calico so both old
 	// IPs on existing VMs and new ones should work.
 	podId := utils.NewUuid()
 	if err := CreateNetNS(podId); err != nil {
-		return nil, fmt.Errorf("couldn't create netns for fake pod %q: %v", podId, err)
+		return nil, "", fmt.Errorf("couldn't create netns for fake pod %q: %v", podId, err)
 	}
-	return c.AddSandboxToNetwork(podId, "", "")
+	r, err := c.AddSandboxToNetwork(podId, "", "")
+	if err != nil {
+		return nil, "", fmt.Errorf("couldn't set up CNI for fake pod %q: %v", podId, err)
+	}
+	return r, PodNetNSPath(podId), nil
 }
 
 func (c *Client) AddSandboxToNetwork(podId, podName, podNs string) (*cnicurrent.Result, error) {
 	rtConf := c.cniRuntimeConf(podId, podName, podNs)
+	// NOTE: this annotation is only need by CNI Genie
+	rtConf.Args = append(rtConf.Args, [2]string{
+		"K8S_ANNOT", `{"cni": "calico"}`,
+	})
 	glog.V(3).Infof("AddSandboxToNetwork: podId %q, podName %q, podNs %q, runtime config:\n%s",
 		podId, podName, podNs, spew.Sdump(rtConf))
 	result, err := c.cniConfig.AddNetworkList(c.netConfigList, rtConf)

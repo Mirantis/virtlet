@@ -22,7 +22,6 @@ import (
 	"net"
 	"os/exec"
 	"reflect"
-	"strconv"
 	"testing"
 
 	"github.com/containernetworking/cni/pkg/ns"
@@ -37,6 +36,8 @@ const (
 	outerHwAddr       = "42:b5:b7:33:91:3f"
 	secondInnerHwAddr = "42:a4:a6:22:80:2f"
 	secondOuterHwAddr = "42:b5:b7:33:91:3e"
+	dummyInnerHwAddr  = "42:a4:a6:22:80:40"
+	dummyOuterHwAddr  = "42:b5:b7:33:91:4f"
 )
 
 func expectedExtractedLinkInfo(contNsPath string) *cnicurrent.Result {
@@ -276,16 +277,62 @@ func withFakeCNIVeth(t *testing.T, toRun func(hostNS, contNS ns.NetNS, origHostV
 				log.Panicf("failed to add addr for origContVeth: %v", err)
 			}
 
-			gwAddr := parseAddr("10.1.90.1/24")
-
-			addTestRoute(t, &netlink.Route{
-				LinkIndex: origContVeth.Attrs().Index,
-				Gw:        gwAddr.IPNet.IP,
-				Scope:     netlink.SCOPE_UNIVERSE,
-			})
-
 			toRun(hostNS, contNS, origHostVeth, origContVeth)
 		})
+	})
+}
+
+func addCalicoRoutes(t *testing.T, origContVeth netlink.Link) {
+	addTestRoute(t, &netlink.Route{
+		Dst:       parseAddr("169.254.1.1/32").IPNet,
+		Scope:     netlink.SCOPE_LINK,
+		LinkIndex: origContVeth.Attrs().Index,
+	})
+	addTestRoute(t, &netlink.Route{
+		Gw:    parseAddr("169.254.1.1/32").IPNet.IP,
+		Scope: netlink.SCOPE_UNIVERSE,
+	})
+}
+
+func withDummyNetworkNamespace(t *testing.T, toRun func(dummyNS ns.NetNS, dummyInfo *cnicurrent.Result)) {
+	withHostAndContNS(t, func(hostNS, contNS ns.NetNS) {
+		origHostVeth, origContVeth, err := CreateEscapeVethPair(contNS, "eth0", 1500)
+		if err != nil {
+			log.Panicf("failed to create veth pair: %v", err)
+		}
+		// need to force hostNS here because of side effects of NetNS.Do()
+		// See https://github.com/vishvananda/netns/issues/17
+		inNS(hostNS, "hostNS", func() {
+			origHostVeth = setupLink(outerHwAddr, origHostVeth)
+		})
+		var dummyInfo *cnicurrent.Result
+		inNS(contNS, "contNS", func() {
+			origContVeth = setupLink(innerHwAddr, origContVeth)
+
+			if err = netlink.AddrAdd(origContVeth, parseAddr("10.1.90.100/24")); err != nil {
+				log.Panicf("failed to add addr for origContVeth: %v", err)
+			}
+
+			addCalicoRoutes(t, origContVeth)
+
+			dummyInfo, err = ExtractLinkInfo(origContVeth, contNS.Path())
+			if err != nil {
+				log.Panicf("failed to grab dummy interface info: %v", err)
+			}
+		})
+		toRun(contNS, dummyInfo)
+	})
+
+}
+
+func withFakeCNIVethAndGateway(t *testing.T, toRun func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link)) {
+	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+		addTestRoute(t, &netlink.Route{
+			Gw:    parseAddr("10.1.90.1/24").IPNet.IP,
+			Scope: netlink.SCOPE_UNIVERSE,
+		})
+
+		toRun(hostNS, contNS, origHostVeth, origContVeth)
 	})
 }
 
@@ -304,7 +351,7 @@ func verifyNoAddressAndRoutes(t *testing.T, link netlink.Link) {
 }
 
 func TestFindVeth(t *testing.T) {
-	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+	withFakeCNIVethAndGateway(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
 		allLinks, err := netlink.LinkList()
 		if err != nil {
 			log.Panicf("LinkList() failed: %v", err)
@@ -321,7 +368,7 @@ func TestFindVeth(t *testing.T) {
 }
 
 func TestStripLink(t *testing.T) {
-	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+	withFakeCNIVethAndGateway(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
 		if err := StripLink(origContVeth); err != nil {
 			log.Panicf("StripLink() failed: %v", err)
 		}
@@ -330,7 +377,7 @@ func TestStripLink(t *testing.T) {
 }
 
 func TestExtractLinkInfo(t *testing.T) {
-	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+	withFakeCNIVethAndGateway(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
 		info, err := ExtractLinkInfo(origContVeth, contNS.Path())
 		if err != nil {
 			log.Panicf("failed to grab interface info: %v", err)
@@ -394,7 +441,7 @@ func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, contNsP
 }
 
 func TestSetUpContainerSideNetworkWithInfo(t *testing.T) {
-	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+	withFakeCNIVethAndGateway(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
 		if err := StripLink(origContVeth); err != nil {
 			log.Panicf("StripLink() failed: %v", err)
 		}
@@ -403,7 +450,7 @@ func TestSetUpContainerSideNetworkWithInfo(t *testing.T) {
 }
 
 func TestLoopbackInterface(t *testing.T) {
-	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+	withFakeCNIVethAndGateway(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
 		verifyContainerSideNetwork(t, origContVeth, contNS.Path())
 		if out, err := exec.Command("ping", "-c", "1", "127.0.0.1").CombinedOutput(); err != nil {
 			log.Panicf("ping 127.0.0.1 failed:\n%s", out)
@@ -479,7 +526,7 @@ func verifyVethHaveConfiguration(t *testing.T, info *cnicurrent.Result) {
 }
 
 func TestTeardownContainerSideNetwork(t *testing.T) {
-	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+	withFakeCNIVethAndGateway(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
 		if err := StripLink(origContVeth); err != nil {
 			log.Panicf("StripLink() failed: %v", err)
 		}
@@ -539,37 +586,33 @@ func TestFindingLinkByAddress(t *testing.T) {
 
 func withMultipleInterfacesConfigured(t *testing.T, toRun func(contNS ns.NetNS, innerLinks []netlink.Link)) {
 	withHostAndContNS(t, func(hostNS, contNS ns.NetNS) {
-		var origHostVeths [2]netlink.Link
 		var origContVeths [2]netlink.Link
-		var err error
-		for i := 0; i < 2; i++ {
-			origHostVeths[i], origContVeths[i], err = CreateEscapeVethPair(contNS, "eth"+strconv.Itoa(i), 1500)
+		for n, vp := range []struct {
+			name        string
+			outerHwAddr string
+			innerHwAddr string
+			ip          string
+		}{
+			{"eth0", outerHwAddr, innerHwAddr, "10.1.90.5/24"},
+			{"eth1", secondOuterHwAddr, secondInnerHwAddr, "192.168.37.8/16"},
+		} {
+			origHostVeth, origContVeth, err := CreateEscapeVethPair(contNS, vp.name, 1500)
 			if err != nil {
-				log.Panicf("failed to create veth pair: %v", err)
+				log.Panicf("failed to create veth pair %q: %v", vp.name, err)
 			}
-		}
-		// need to force hostNS here because of side effects of NetNS.Do()
-		// See https://github.com/vishvananda/netns/issues/17
-		inNS(hostNS, "hostNS", func() {
-			origHostVeths[0] = setupLink(outerHwAddr, origHostVeths[0])
-			origHostVeths[1] = setupLink(secondOuterHwAddr, origHostVeths[1])
-		})
-		inNS(contNS, "contNS", func() {
-			origContVeths[0] = setupLink(innerHwAddr, origContVeths[0])
-			origContVeths[1] = setupLink(secondInnerHwAddr, origContVeths[1])
-
-			for n, addr := range []string{"10.1.90.5/24", "192.168.37.8/16"} {
-				if err = netlink.AddrAdd(origContVeths[n], parseAddr(addr)); err != nil {
-					log.Panicf("failed to add addr for origContVeth%d: %v", n, err)
+			inNS(hostNS, "hostNS", func() { setupLink(vp.outerHwAddr, origHostVeth) })
+			inNS(contNS, "contNS", func() {
+				origContVeths[n] = setupLink(vp.innerHwAddr, origContVeth)
+				if err = netlink.AddrAdd(origContVeths[n], parseAddr(vp.ip)); err != nil {
+					log.Panicf("failed to add addr for %q: %v", vp.name, err)
 				}
-			}
-
+			})
+		}
+		inNS(contNS, "contNS", func() {
 			gwAddr := parseAddr("10.1.90.1/24")
-
 			addTestRoute(t, &netlink.Route{
-				LinkIndex: origContVeths[0].Attrs().Index,
-				Gw:        gwAddr.IPNet.IP,
-				Scope:     netlink.SCOPE_UNIVERSE,
+				Gw:    gwAddr.IPNet.IP,
+				Scope: netlink.SCOPE_UNIVERSE,
 			})
 
 			toRun(contNS, origContVeths[:])
@@ -623,7 +666,6 @@ func TestMultiInterfaces(t *testing.T) {
 }
 
 func TestMultiInterfacesWithMissingInterface(t *testing.T) {
-	t.Skip("Temporary skip for missing functionality")
 	withMultipleInterfacesConfigured(t, func(contNS ns.NetNS, innerLinks []netlink.Link) {
 		infoToFix := expectedExtractedLinkInfoForMultipleInterfaces(contNS.Path())
 		expectedInfo := expectedExtractedLinkInfoForMultipleInterfaces(contNS.Path())
@@ -635,5 +677,128 @@ func TestMultiInterfacesWithMissingInterface(t *testing.T) {
 			t.Errorf("result different than expected: %\nActual:\n%s\nExpected:\n%s",
 				spew.Sdump(result), spew.Sdump(expectedInfo))
 		}
+	})
+}
+
+func TestCalicoDetection(t *testing.T) {
+	for _, tc := range []struct {
+		name              string
+		routes            []netlink.Route
+		haveCalico        bool
+		haveCalicoGateway bool
+	}{
+		{
+			name:              "no routes",
+			haveCalico:        false,
+			haveCalicoGateway: false,
+		},
+		{
+			name: "non-calico default route",
+			routes: []netlink.Route{
+				{
+					// LinkIndex: origContVeth.Attrs().Index,
+					Gw:    parseAddr("10.1.90.1/24").IPNet.IP,
+					Scope: netlink.SCOPE_UNIVERSE,
+				},
+			},
+			haveCalico:        false,
+			haveCalicoGateway: false,
+		},
+		{
+			name: "calico w/o default gw",
+			routes: []netlink.Route{
+				{
+					Dst:   parseAddr("169.254.1.1/32").IPNet,
+					Scope: netlink.SCOPE_LINK,
+				},
+			},
+			haveCalico:        true,
+			haveCalicoGateway: false,
+		},
+		{
+			name: "calico w/o default gw",
+			routes: []netlink.Route{
+				{
+					Dst:   parseAddr("169.254.1.1/32").IPNet,
+					Scope: netlink.SCOPE_LINK,
+				},
+				{
+					Gw:    parseAddr("169.254.1.1/32").IPNet.IP,
+					Scope: netlink.SCOPE_UNIVERSE,
+				},
+			},
+			haveCalico:        true,
+			haveCalicoGateway: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+				for _, r := range tc.routes {
+					r.LinkIndex = origContVeth.Attrs().Index
+					addTestRoute(t, &r)
+				}
+				haveCalico, haveCalicoGateway, err := DetectCalico(origContVeth)
+				if err != nil {
+					log.Panicf("DetectCalico(): %v", err)
+				}
+				if haveCalico != tc.haveCalico {
+					log.Panicf("haveCalico is expected to be %v but is %v", haveCalico, tc.haveCalico)
+				}
+				if haveCalicoGateway != tc.haveCalicoGateway {
+					log.Panicf("haveCalico is expected to be %v but is %v", haveCalicoGateway, tc.haveCalicoGateway)
+				}
+			})
+		})
+	}
+}
+
+func TestFixCalicoNetworking(t *testing.T) {
+	withDummyNetworkNamespace(t, func(dummyNS ns.NetNS, dummyInfo *cnicurrent.Result) {
+		withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+			addCalicoRoutes(t, origContVeth)
+			info, err := ExtractLinkInfo(origContVeth, contNS.Path())
+			if err != nil {
+				log.Panicf("failed to grab interface info: %v", err)
+			}
+			// reuse 2nd copy of the CNI result as the dummy network config
+			if err := FixCalicoNetworking(info, func() (*cnicurrent.Result, string, error) {
+				return dummyInfo, dummyNS.Path(), nil
+			}); err != nil {
+				log.Panicf("FixCalicoNetworking(): %v", err)
+			}
+			expectedResult := &cnicurrent.Result{
+				Interfaces: []*cnicurrent.Interface{
+					{
+						Name:    "eth0",
+						Mac:     innerHwAddr,
+						Sandbox: contNS.Path(),
+					},
+				},
+				IPs: []*cnicurrent.IPConfig{
+					{
+						Version:   "4",
+						Interface: 0,
+						Address: net.IPNet{
+							IP:   net.IP{10, 1, 90, 5},
+							Mask: net.IPMask{255, 255, 255, 0},
+						},
+						Gateway: net.IP{10, 1, 90, 100},
+					},
+				},
+				Routes: []*cnitypes.Route{
+					{
+						Dst: net.IPNet{
+							IP:   net.IP{0, 0, 0, 0},
+							Mask: net.IPMask{0, 0, 0, 0},
+						},
+						GW: net.IP{10, 1, 90, 100},
+					},
+				},
+			}
+			if !reflect.DeepEqual(info, expectedResult) {
+				t.Errorf("interface info mismatch. Expected:\n%s\nActual:\n%s",
+					spew.Sdump(expectedResult), spew.Sdump(info))
+			}
+		})
 	})
 }

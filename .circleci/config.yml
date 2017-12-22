@@ -378,7 +378,7 @@ workflows:
         - build
         filters:
           branches:
-            only: master
+            only: /^master$|^.*-net$/
           tags:
             only:
               - /^v[0-9].*/
@@ -387,7 +387,7 @@ workflows:
         - build
         filters:
           branches:
-            only: master
+            only: /^master$|^.*-net$/
           tags:
             only:
               - /^v[0-9].*/
