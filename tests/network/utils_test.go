@@ -90,6 +90,8 @@ func (g *NetTestGroup) Add(netNS ns.NetNS, tester NetTester) chan struct{} {
 	}()
 	select {
 	case err := <-g.errCh:
+		close(g.stopCh)
+		g.stopCh = nil
 		g.t.Fatal(err)
 	case <-readyCh:
 	}
