@@ -45,7 +45,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"syscall"
-	"unsafe"
 
 	"github.com/containernetworking/cni/pkg/ns"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
@@ -99,29 +98,6 @@ type InterfaceInfo struct {
 type ContainerNetwork struct {
 	Info   *cnicurrent.Result
 	DhcpNS ns.NetNS
-}
-
-func OpenTAP(devName string) (*os.File, error) {
-	tapFile, err := os.OpenFile("/dev/net/tun", os.O_RDWR, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	var req ifReq
-
-	// set IFF_NO_PI to not provide packet information
-	// If flag IFF_NO_PI is not set each frame format is:
-	// Flags [2 bytes]
-	// Proto [2 bytes]
-	// Raw protocol ethernet frame.
-	// This extra 4-byte header breaks connectivity as in this case kernel truncates initial package
-	req.Flags = uint16(syscall.IFF_TAP | syscall.IFF_NO_PI | syscall.IFF_ONE_QUEUE)
-	copy(req.Name[:15], devName)
-	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, tapFile.Fd(), uintptr(syscall.TUNSETIFF), uintptr(unsafe.Pointer(&req)))
-	if errno != 0 {
-		return nil, fmt.Errorf("tuntap IOCTL TUNSETIFF failed, errno %v", errno)
-	}
-	return tapFile, nil
 }
 
 func makeVethPair(name, peer string, mtu int) (netlink.Link, error) {
@@ -754,20 +730,9 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 		}
 
 		tapInterfaceName := fmt.Sprintf(tapInterfaceNameTemplate, i)
-		tap := &netlink.Tuntap{
-			LinkAttrs: netlink.LinkAttrs{
-				Name:  tapInterfaceName,
-				Flags: net.FlagUp,
-				MTU:   link.Attrs().MTU,
-			},
-			Mode: netlink.TUNTAP_MODE_TAP,
-		}
-		if err := netlink.LinkAdd(tap); err != nil {
-			return nil, fmt.Errorf("failed to create tap interface: %v", err)
-		}
-
-		if err := netlink.LinkSetUp(tap); err != nil {
-			return nil, fmt.Errorf("failed to set %q up: %v", tapInterfaceName, err)
+		tap, err := CreateTAP(tapInterfaceName, link.Attrs().MTU)
+		if err != nil {
+			return nil, err
 		}
 
 		containerBridgeName := fmt.Sprintf(containerBridgeNameTemplate, i)

@@ -51,6 +51,44 @@ const (
 	clientMacAddress          = "42:a4:a6:22:80:2e"
 )
 
+// copyFrames copies a packets between tap devices. Unlike
+// io.Copy(), it doesn't use buffering and thus keeps frame boundaries
+func copyFrames(from, to *os.File) {
+	buf := make([]byte, 1600)
+	for {
+		nRead, err := from.Read(buf)
+		if err != nil {
+			glog.Infof("copyFrames(): Read(): %v", err)
+			break
+		}
+		nWritten, err := to.Write(buf[:nRead])
+		if err != nil {
+			glog.Infof("copyFrames(): Write(): %v", err)
+			break
+		}
+		if nWritten < nRead {
+			glog.Warning("copyFrames(): short Write(): %d bytes instead of %d", nWritten, nRead)
+		}
+	}
+}
+
+// connectTaps copies frames between tap interfaces. It returns
+// a channel that should be closed to stop copying and close
+// the tap devices
+func connectTaps(tapA, tapB *os.File) chan struct{} {
+	stopCh := make(chan struct{})
+	go copyFrames(tapA, tapB)
+	go copyFrames(tapB, tapA)
+	go func() {
+		// TODO: use SetDeadline() when it's available for os.File
+		// (perhaps in Go 1.10): https://github.com/golang/go/issues/22114
+		<-stopCh
+		tapA.Close()
+		tapB.Close()
+	}()
+	return stopCh
+}
+
 func TestVmNetwork(t *testing.T) {
 	hostNS, err := ns.NewNS()
 	if err != nil {
@@ -106,7 +144,7 @@ func TestVmNetwork(t *testing.T) {
 		},
 	}
 
-	var dhcpClientVeth, hostVeth netlink.Link
+	var hostVeth, clientTapLink netlink.Link
 	if err := hostNS.Do(func(ns.NetNS) (err error) {
 		hostVeth, _, err = nettools.CreateEscapeVethPair(contNS, "eth0", 1500)
 		return
@@ -114,48 +152,35 @@ func TestVmNetwork(t *testing.T) {
 		t.Fatalf("failed to create escape veth pair: %v", err)
 	}
 
+	var csn *nettools.ContainerSideNetwork
+	var dhcpClientTap *os.File
 	if err := contNS.Do(func(ns.NetNS) error {
 		allLinks, err := netlink.LinkList()
 		if err != nil {
 			return fmt.Errorf("LinkList() failed: %v", err)
 		}
-		_, err = nettools.SetupContainerSideNetwork(info, contNS.Path(), allLinks)
+		csn, err = nettools.SetupContainerSideNetwork(info, contNS.Path(), allLinks)
 		if err != nil {
 			return fmt.Errorf("failed to set up container side network: %v", err)
 		}
-
-		// Here we setup extra veth for dhcp client.
-		// That's temporary solution, what we really should
-		// use is another tap interface + forwarding.
-		// See https://nsl.cz/using-tun-tap-in-go-or-how-to-write-vpn/
-		// Also https://ldpreload.com/p/vpn-with-socat.txt
-		var vethToBridge netlink.Link
-		vethToBridge, dhcpClientVeth, err = nettools.CreateEscapeVethPair(clientNS, "veth0", 1500)
-		if err != nil {
-			return fmt.Errorf("failed to create veth pair for the client: %v", err)
+		if len(csn.Fds) != 1 {
+			return fmt.Errorf("single tap fd is expected")
 		}
-
-		brLink, err := netlink.LinkByName("br0")
-		if err != nil {
-			return fmt.Errorf("failed to locate container-side bridge: %v", err)
-		}
-
-		br, ok := brLink.(*netlink.Bridge)
-		if !ok {
-			return fmt.Errorf("br0 is not a bridge: %#v", brLink)
-		}
-
-		if err := netlink.LinkSetMaster(vethToBridge, br); err != nil {
-			return fmt.Errorf("failed to set master for dhcp client veth: %v", err)
-		}
-
 		return nil
 	}); err != nil {
 		t.Fatalf("failed to set up container-side network: %v", err)
 	}
 	if err := clientNS.Do(func(ns.NetNS) error {
+		clientTapLink, err = nettools.CreateTAP("tap0", 1500)
+		if err != nil {
+			return fmt.Errorf("CreateTAP() in the client netns: %v", err)
+		}
+		dhcpClientTap, err = nettools.OpenTAP("tap0")
+		if err != nil {
+			return fmt.Errorf("OpenTAP() in the client netns: %v", err)
+		}
 		mac, _ := net.ParseMAC(clientMacAddress)
-		if err = nettools.SetHardwareAddr(dhcpClientVeth, mac); err != nil {
+		if err = nettools.SetHardwareAddr(clientTapLink, mac); err != nil {
 			return fmt.Errorf("can't set test MAC address on client interface: %v", err)
 		}
 		return nil
@@ -163,6 +188,8 @@ func TestVmNetwork(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	stopCh := connectTaps(csn.Fds[0], dhcpClientTap)
+	defer close(stopCh)
 	outerIP := addAddress(t, hostNS, hostVeth, outerAddr)
 
 	g := NewNetTestGroup(t, 15*time.Second)
@@ -182,11 +209,11 @@ func TestVmNetwork(t *testing.T) {
 		"new_network_number='10.1.90.0'",
 		"new_routers='10.1.90.1'",
 		"new_subnet_mask='255.255.255.0'",
-		"veth0: offered 10.1.90.5 from 169.254.254.2",
+		"tap0: offered 10.1.90.5 from 169.254.254.2",
 	}))
 
 	// dhcpcd -T doesn't add address to the link
-	clientIP := addAddress(t, clientNS, dhcpClientVeth, clientAddr)
+	clientIP := addAddress(t, clientNS, clientTapLink, clientAddr)
 	g.Add(hostNS, newPinger(outerIP, clientIP))
 	g.Add(clientNS, newPinger(clientIP, outerIP))
 	g.Add(clientNS, newPingReceiver(clientIP))
