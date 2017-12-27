@@ -414,7 +414,8 @@ func ValidateAndFixCNIResult(netConfig *cnicurrent.Result, nsPath string, allLin
 func GetContainerLinks(interfaces []*cnicurrent.Interface) ([]netlink.Link, error) {
 	var links []netlink.Link
 	for _, iface := range interfaces {
-		// if Sandbox is empty interface is on host, not in container netns
+		// empty Sandbox means this interface belongs to the host
+		// network namespace, so we skip it
 		if iface.Sandbox == "" {
 			continue
 		}
@@ -654,28 +655,18 @@ func getDevNameByPCIAddress(address string) (string, error) {
 	return "", fmt.Errorf("can't find network device with pci address %q", address)
 }
 
-func writeStringToFile(s, path string, mode os.FileMode) error {
-	f, err := os.OpenFile(path, os.O_WRONLY, mode)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	_, err = f.WriteString(s)
-	return err
-}
-
 func unbindDriverFromDevice(devName string) error {
-	return writeStringToFile(
+	return ioutil.WriteFile(
 		devName,
-		filepath.Join("/sys/bus/pci/devices", devName, "driver/unbind"),
+		[]byte(filepath.Join("/sys/bus/pci/devices", devName, "driver/unbind")),
 		0200,
 	)
 }
 
 func rebindDriverToDevice(devName string) error {
-	return writeStringToFile(
+	return ioutil.WriteFile(
 		devName,
-		"/sys/bus/pci/drivers_probe",
+		[]byte("/sys/bus/pci/drivers_probe"),
 		0200,
 	)
 }
@@ -688,7 +679,7 @@ func rebindDriverToDevice(devName string) error {
 // with X denoting an link index in info.Interfaces list.
 // Each bridge gets assigned a link-local address to be used
 // for dhcp server.
-// For SR-IOV VFs this function only prepares device to pass it to VM.
+// In case of SR-IOV VFs this function only sets up a device to be passed to VM.
 // The function should be called from within container namespace.
 // Returns container network struct and an error, if any.
 func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks []netlink.Link) (*ContainerSideNetwork, error) {
@@ -1020,14 +1011,16 @@ func (csn *ContainerSideNetwork) ReconstructVFs(netns ns.NetNS) error {
 		if err := netlink.LinkSetNsFd(link, int(netns.Fd())); err != nil {
 			return fmt.Errorf("can't move link %q to netns %q: %v", csn.InterfaceNames[i], netns.Path(), err)
 		}
-		netns.Do(func(ns.NetNS) error {
+		if err := netns.Do(func(ns.NetNS) error {
 			if link.Attrs().Name != csn.InterfaceNames[i] {
 				if err := netlink.LinkSetName(link, csn.InterfaceNames[i]); err != nil {
 					return fmt.Errorf("can't rename device %q to %q: %v", devName, csn.InterfaceNames[i], err)
 				}
 			}
 			return nil
-		})
+		}); err != nil {
+			return err
+		}
 	}
 
 	return nil
