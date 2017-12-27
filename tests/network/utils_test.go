@@ -76,9 +76,14 @@ func (g *NetTestGroup) Add(netNS ns.NetNS, tester NetTester) chan struct{} {
 		g.fg.Add(1)
 	}
 	go func() {
-		err := netNS.Do(func(ns.NetNS) (err error) {
-			return tester.Run(readyCh, g.stopCh)
-		})
+		var err error
+		if netNS != nil {
+			err = netNS.Do(func(ns.NetNS) (err error) {
+				return tester.Run(readyCh, g.stopCh)
+			})
+		} else {
+			err = tester.Run(readyCh, g.stopCh)
+		}
 		if err != nil {
 			g.errCh <- fmt.Errorf("%s: %v", tester.Name(), err)
 		}

@@ -49,70 +49,136 @@ const (
 	outerAddr                 = "10.1.90.1/24"
 	clientAddr                = "10.1.90.5/24"
 	clientMacAddress          = "42:a4:a6:22:80:2e"
+	netTestWaitTime           = 15 * time.Second
 )
 
-// copyFrames copies a packets between tap devices. Unlike
-// io.Copy(), it doesn't use buffering and thus keeps frame boundaries
-func copyFrames(from, to *os.File) {
-	buf := make([]byte, 1600)
-	for {
-		nRead, err := from.Read(buf)
-		if err != nil {
-			glog.Infof("copyFrames(): Read(): %v", err)
-			break
-		}
-		nWritten, err := to.Write(buf[:nRead])
-		if err != nil {
-			glog.Infof("copyFrames(): Write(): %v", err)
-			break
-		}
-		if nWritten < nRead {
-			glog.Warning("copyFrames(): short Write(): %d bytes instead of %d", nWritten, nRead)
-		}
-	}
+type vmNetworkTester struct {
+	t                        *testing.T
+	hostNS, contNS, clientNS ns.NetNS
+	dhcpClientTap            *os.File
+	clientTapLink            netlink.Link
+	g                        *NetTestGroup
 }
 
-// connectTaps copies frames between tap interfaces. It returns
-// a channel that should be closed to stop copying and close
-// the tap devices
-func connectTaps(tapA, tapB *os.File) chan struct{} {
-	stopCh := make(chan struct{})
-	go copyFrames(tapA, tapB)
-	go copyFrames(tapB, tapA)
-	go func() {
-		// TODO: use SetDeadline() when it's available for os.File
-		// (perhaps in Go 1.10): https://github.com/golang/go/issues/22114
-		<-stopCh
-		tapA.Close()
-		tapB.Close()
-	}()
-	return stopCh
-}
-
-func TestVmNetwork(t *testing.T) {
+func newVMNetworkTester(t *testing.T) *vmNetworkTester {
 	hostNS, err := ns.NewNS()
 	if err != nil {
 		t.Fatalf("Failed to create host ns: %v", err)
 	}
-	defer hostNS.Close()
 
 	contNS, err := ns.NewNS()
 	if err != nil {
+		hostNS.Close()
 		t.Fatalf("Failed to create container ns: %v", err)
 	}
-	defer contNS.Close()
 
 	clientNS, err := ns.NewNS()
 	if err != nil {
+		hostNS.Close()
+		contNS.Close()
 		t.Fatalf("Failed to create ns for dhcp client: %v", err)
 	}
+
+	vnt := &vmNetworkTester{
+		t:        t,
+		hostNS:   hostNS,
+		contNS:   contNS,
+		clientNS: clientNS,
+		g:        NewNetTestGroup(t, netTestWaitTime),
+	}
+	if err := vnt.setupClientTap(); err != nil {
+		vnt.teardown()
+		t.Fatal(err)
+	}
+	return vnt
+}
+
+func (vnt *vmNetworkTester) connectTaps(vmTap *os.File) {
+	vnt.g.Add(nil, newTapConnector(vmTap, vnt.dhcpClientTap))
+}
+
+func (vnt *vmNetworkTester) addTcpdump(link netlink.Link, stopOn, failOn string) {
+	tcpdump := newTcpdump(link, stopOn, failOn)
+	vnt.g.Add(vnt.hostNS, tcpdump)
+}
+
+func (vnt *vmNetworkTester) verifyDhcp(info *cnicurrent.Result, expectedSubstrings ...string) {
+	vnt.g.Add(vnt.contNS, NewDhcpServerTester(info))
+	// wait for dhcp client to complete so we don't interfere
+	// with the network link too early
+	<-vnt.g.Add(vnt.clientNS, NewDhcpClient(expectedSubstrings))
+}
+
+func (vnt *vmNetworkTester) verifyPing(outerIP net.IP) {
+	// dhcpcd -T doesn't add address to the link
+	clientIP := addAddress(vnt.t, vnt.clientNS, vnt.clientTapLink, clientAddr)
+	vnt.g.Add(vnt.hostNS, newPinger(outerIP, clientIP))
+	vnt.g.Add(vnt.clientNS, newPinger(clientIP, outerIP))
+	vnt.g.Add(vnt.clientNS, newPingReceiver(clientIP))
+	vnt.g.Add(vnt.hostNS, newPingReceiver(outerIP))
+}
+
+func (vnt *vmNetworkTester) wait() {
+	vnt.g.Wait()
+}
+
+func (vnt *vmNetworkTester) teardown() {
+	vnt.g.Stop()
+	if vnt.dhcpClientTap != nil {
+		// this Close() call may likely cause an error because
+		// tap is probably already closed by tapConnector
+		vnt.dhcpClientTap.Close()
+	}
+	if vnt.clientTapLink != nil {
+		if err := vnt.clientNS.Do(func(ns.NetNS) error {
+			if err := netlink.LinkSetDown(vnt.clientTapLink); err != nil {
+				return err
+			}
+			if err := netlink.LinkDel(vnt.clientTapLink); err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
+			vnt.t.Logf("WARNING: error tearing down client tap: %v", err)
+		}
+	}
+	vnt.clientNS.Close()
+	vnt.contNS.Close()
+	vnt.hostNS.Close()
+}
+
+func (vnt *vmNetworkTester) setupClientTap() error {
+	return vnt.clientNS.Do(func(ns.NetNS) error {
+		var err error
+		vnt.clientTapLink, err = nettools.CreateTAP("tap0", 1500)
+		if err != nil {
+			return fmt.Errorf("CreateTAP() in the client netns: %v", err)
+		}
+		vnt.dhcpClientTap, err = nettools.OpenTAP("tap0")
+		if err != nil {
+			return fmt.Errorf("OpenTAP() in the client netns: %v", err)
+		}
+		mac, _ := net.ParseMAC(clientMacAddress)
+		if err = nettools.SetHardwareAddr(vnt.clientTapLink, mac); err != nil {
+			return fmt.Errorf("can't set test MAC address on client interface: %v", err)
+		}
+		return nil
+	})
+}
+
+// TestVmNetwork verifies the network setup by directly calling
+// SetupContainerSideNetwork() to rule out some possible
+// TapFDSource-only errors
+func TestVmNetwork(t *testing.T) {
+	vnt := newVMNetworkTester(t)
+	defer vnt.teardown()
 
 	info := &cnicurrent.Result{
 		Interfaces: []*cnicurrent.Interface{
 			{
 				Name:    "eth0",
 				Mac:     clientMacAddress,
-				Sandbox: contNS.Path(),
+				Sandbox: vnt.contNS.Path(),
 			},
 		},
 		IPs: []*cnicurrent.IPConfig{
@@ -144,22 +210,21 @@ func TestVmNetwork(t *testing.T) {
 		},
 	}
 
-	var hostVeth, clientTapLink netlink.Link
-	if err := hostNS.Do(func(ns.NetNS) (err error) {
-		hostVeth, _, err = nettools.CreateEscapeVethPair(contNS, "eth0", 1500)
+	var hostVeth netlink.Link
+	if err := vnt.hostNS.Do(func(ns.NetNS) (err error) {
+		hostVeth, _, err = nettools.CreateEscapeVethPair(vnt.contNS, "eth0", 1500)
 		return
 	}); err != nil {
 		t.Fatalf("failed to create escape veth pair: %v", err)
 	}
 
 	var csn *nettools.ContainerSideNetwork
-	var dhcpClientTap *os.File
-	if err := contNS.Do(func(ns.NetNS) error {
+	if err := vnt.contNS.Do(func(ns.NetNS) error {
 		allLinks, err := netlink.LinkList()
 		if err != nil {
 			return fmt.Errorf("LinkList() failed: %v", err)
 		}
-		csn, err = nettools.SetupContainerSideNetwork(info, contNS.Path(), allLinks)
+		csn, err = nettools.SetupContainerSideNetwork(info, vnt.contNS.Path(), allLinks)
 		if err != nil {
 			return fmt.Errorf("failed to set up container side network: %v", err)
 		}
@@ -170,62 +235,29 @@ func TestVmNetwork(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("failed to set up container-side network: %v", err)
 	}
-	if err := clientNS.Do(func(ns.NetNS) error {
-		clientTapLink, err = nettools.CreateTAP("tap0", 1500)
-		if err != nil {
-			return fmt.Errorf("CreateTAP() in the client netns: %v", err)
-		}
-		dhcpClientTap, err = nettools.OpenTAP("tap0")
-		if err != nil {
-			return fmt.Errorf("OpenTAP() in the client netns: %v", err)
-		}
-		mac, _ := net.ParseMAC(clientMacAddress)
-		if err = nettools.SetHardwareAddr(clientTapLink, mac); err != nil {
-			return fmt.Errorf("can't set test MAC address on client interface: %v", err)
-		}
-		return nil
-	}); err != nil {
-		t.Fatal(err)
-	}
 
-	stopCh := connectTaps(csn.Fds[0], dhcpClientTap)
-	defer close(stopCh)
-	outerIP := addAddress(t, hostNS, hostVeth, outerAddr)
-
-	g := NewNetTestGroup(t, 15*time.Second)
-	defer g.Stop()
-
+	outerIP := addAddress(t, vnt.hostNS, hostVeth, outerAddr)
+	vnt.connectTaps(csn.Fds[0])
 	// tcpdump should catch udp 'ping' but should not
 	// see BOOTP/DHCP on the 'outer' link
-	tcpdump := newTcpdump(hostVeth, "10.1.90.1.4243 > 10.1.90.5.4242: UDP", "BOOTP/DHCP")
-	g.Add(hostNS, tcpdump)
-
-	g.Add(contNS, NewDhcpServerTester(info))
-	// wait for dhcp client to complete so we don't interfere
-	// with the network link too early
-	<-g.Add(clientNS, NewDhcpClient([]string{
+	vnt.addTcpdump(hostVeth, "10.1.90.1.4243 > 10.1.90.5.4242: UDP", "BOOTP/DHCP")
+	vnt.verifyDhcp(info,
 		"new_classless_static_routes='10.10.42.0/24 10.1.90.90'",
 		"new_ip_address='10.1.90.5'",
 		"new_network_number='10.1.90.0'",
 		"new_routers='10.1.90.1'",
 		"new_subnet_mask='255.255.255.0'",
-		"tap0: offered 10.1.90.5 from 169.254.254.2",
-	}))
-
-	// dhcpcd -T doesn't add address to the link
-	clientIP := addAddress(t, clientNS, clientTapLink, clientAddr)
-	g.Add(hostNS, newPinger(outerIP, clientIP))
-	g.Add(clientNS, newPinger(clientIP, outerIP))
-	g.Add(clientNS, newPingReceiver(clientIP))
-	g.Add(hostNS, newPingReceiver(outerIP))
-
-	g.Wait()
+		"tap0: offered 10.1.90.5 from 169.254.254.2")
+	vnt.verifyPing(outerIP)
+	vnt.wait()
 }
 
 type pinger struct {
 	localIP, destIP net.IP
 	conn            *net.UDPConn
 }
+
+var _ NetTester = &pinger{}
 
 func newPinger(localIP net.IP, destIP net.IP) *pinger {
 	return &pinger{localIP: localIP, destIP: destIP}
@@ -281,6 +313,8 @@ type pingReceiver struct {
 	localIP net.IP
 	conn    *net.UDPConn
 }
+
+var _ NetTester = &pingReceiver{}
 
 func newPingReceiver(localIP net.IP) *pingReceiver {
 	return &pingReceiver{localIP: localIP}
@@ -365,6 +399,8 @@ type tcpdump struct {
 	cmd            *exec.Cmd
 	out            string
 }
+
+var _ NetTester = &tcpdump{}
 
 func newTcpdump(link netlink.Link, stopOn, failOn string) *tcpdump {
 	return &tcpdump{
@@ -473,5 +509,65 @@ func addAddress(t *testing.T, netNS ns.NetNS, link netlink.Link, addr string) ne
 	return parsedAddr.IP
 }
 
+// tapConnector copies frames between tap interfaces. It returns
+// a channel that should be closed to stop copying and close
+// the tap devices
+type tapConnector struct {
+	tapA, tapB *os.File
+	wg         sync.WaitGroup
+}
+
+var _ NetTester = &tapConnector{}
+
+func newTapConnector(tapA, tapB *os.File) *tapConnector {
+	return &tapConnector{tapA: tapA, tapB: tapB}
+}
+
+func (tc *tapConnector) Name() string { return "tapConnector" }
+func (tc *tapConnector) Fg() bool     { return false }
+
+// copyFrames copies a packets between tap devices. Unlike
+// io.Copy(), it doesn't use buffering and thus keeps frame boundaries
+func (tc *tapConnector) copyFrames(from, to *os.File) {
+	buf := make([]byte, 1600)
+	for {
+		nRead, err := from.Read(buf)
+		if err != nil {
+			glog.Infof("copyFrames(): Read(): %v", err)
+			break
+		}
+		nWritten, err := to.Write(buf[:nRead])
+		if err != nil {
+			glog.Infof("copyFrames(): Write(): %v", err)
+			break
+		}
+		if nWritten < nRead {
+			glog.Warning("copyFrames(): short Write(): %d bytes instead of %d", nWritten, nRead)
+		}
+	}
+	tc.wg.Done()
+}
+
+func (tc *tapConnector) Run(readyCh, stopCh chan struct{}) error {
+	tc.wg.Add(1)
+	go tc.copyFrames(tc.tapA, tc.tapB)
+	tc.wg.Add(1)
+	go tc.copyFrames(tc.tapB, tc.tapA)
+	close(readyCh)
+	<-stopCh
+	// TODO: use SetDeadline() when it's available for os.File
+	// (perhaps in Go 1.10): https://github.com/golang/go/issues/22114
+	tc.tapA.Close()
+	tc.tapB.Close()
+	tc.wg.Wait()
+	return nil
+}
+
 // TODO: document NetTester / NetTestGroup
 // TODO: block ip trafic from br0 ip
+
+// TODO: apply CNI result using ConfigureLink()
+// TODO: use https://github.com/d4l3k/messagediff to diff cni results
+// TODO: test network teardown
+// TODO: test multiple CNIs
+// TODO: test Calico
