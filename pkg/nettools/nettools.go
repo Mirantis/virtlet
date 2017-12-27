@@ -845,7 +845,7 @@ func TeardownBridge(bridge netlink.Link, links []netlink.Link) error {
 	return netlink.LinkSetDown(bridge)
 }
 
-// ConfigureLink adds to link ip address and routes based on info.
+// ConfigureLink configures a link according to the CNI result
 func ConfigureLink(link netlink.Link, info *cnicurrent.Result) error {
 	linkNo := -1
 	linkMAC := link.Attrs().HardwareAddr.String()
