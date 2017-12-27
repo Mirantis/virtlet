@@ -407,11 +407,11 @@ func TestTapFDSource(t *testing.T) {
 					}
 				}()
 
-				var result *cnicurrent.Result
+				var result, expectedResult *cnicurrent.Result
 				if err := json.Unmarshal(netConfigBytes, &result); err != nil {
 					t.Errorf("error unmarshalling CNI result: %v", err)
 				} else {
-					expectedResult := copyCNIResult(tc.info)
+					expectedResult = copyCNIResult(tc.info)
 					replaceSandboxPlaceholders(expectedResult, podId)
 					verifyNoDiff(t, "cni result", expectedResult, result)
 				}
@@ -453,12 +453,15 @@ func TestTapFDSource(t *testing.T) {
 				}
 				released = true
 				cniClient.VerifyRemoved()
+
+				infoAfterTeardown := cniClient.NetworkInfoAfterTeardown()
+				verifyNoDiff(t, "network info after teardown", expectedResult, infoAfterTeardown)
 			})
 		})
 	}
 }
 
-// TODO: test network teardown
 // TODO: test multiple CNIs
 // TODO: test Calico
 // TODO: test recovering netns
+// TODO: test SR-IOV

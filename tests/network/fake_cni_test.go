@@ -40,12 +40,12 @@ type FakeCNIVethPair struct {
 // FakeCNIClient fakes a CNI client. It's only good for one-time
 // network setup for a single pod network namespace
 type FakeCNIClient struct {
-	info                  *cnicurrent.Result
-	hostNS, contNS        ns.NetNS
-	podId, podName, podNS string
-	added                 bool
-	removed               bool
-	veths                 []FakeCNIVethPair
+	info, infoAfterTeardown *cnicurrent.Result
+	hostNS, contNS          ns.NetNS
+	podId, podName, podNS   string
+	added                   bool
+	removed                 bool
+	veths                   []FakeCNIVethPair
 }
 
 var _ cni.CNIClient = &FakeCNIClient{}
@@ -141,8 +141,34 @@ func (c *FakeCNIClient) RemoveSandboxFromNetwork(podId, podName, podNS string) e
 		panic("RemoveSandboxFromNetwork() was already called")
 	}
 
+	c.captureNetworkConfigAfterTeardown(podId)
 	c.removed = true
 	return nil
+}
+
+func (c *FakeCNIClient) captureNetworkConfigAfterTeardown(podId string) {
+	if len(c.info.IPs) != 1 {
+		// TODO: check this for multiple interfaces, too
+		return
+	}
+	if err := c.contNS.Do(func(ns.NetNS) error {
+		ifaceIndex := c.info.IPs[0].Interface
+		if ifaceIndex > len(c.info.Interfaces) {
+			return fmt.Errorf("bad interface index %d", ifaceIndex)
+		}
+		iface := c.info.Interfaces[ifaceIndex]
+		link, err := netlink.LinkByName(iface.Name)
+		if err != nil {
+			return fmt.Errorf("can't find link %q: %v", iface.Name, err)
+		}
+		c.infoAfterTeardown, err = nettools.ExtractLinkInfo(link, cni.PodNetNSPath(podId))
+		if err != nil {
+			return fmt.Errorf("error extracting link info: %v", err)
+		}
+		return nil
+	}); err != nil {
+		panic(err)
+	}
 }
 
 func (c *FakeCNIClient) VerifyAdded() {
@@ -169,6 +195,10 @@ func (c *FakeCNIClient) Cleanup() {
 func (c *FakeCNIClient) Veths() []FakeCNIVethPair {
 	c.VerifyAdded()
 	return c.veths
+}
+
+func (c *FakeCNIClient) NetworkInfoAfterTeardown() *cnicurrent.Result {
+	return c.infoAfterTeardown
 }
 
 func copyCNIResult(result *cnicurrent.Result) *cnicurrent.Result {
