@@ -46,6 +46,7 @@ type FakeCNIClient struct {
 	added                   bool
 	removed                 bool
 	veths                   []FakeCNIVethPair
+	useBadResult            bool
 }
 
 var _ cni.CNIClient = &FakeCNIClient{}
@@ -129,7 +130,11 @@ func (c *FakeCNIClient) AddSandboxToNetwork(podId, podName, podNS string) (*cnic
 	}
 
 	c.added = true
-	return copyCNIResult(c.info), nil
+	r := copyCNIResult(c.info)
+	if c.useBadResult {
+		r.Routes = nil
+	}
+	return r, nil
 }
 
 func (c *FakeCNIClient) RemoveSandboxFromNetwork(podId, podName, podNS string) error {
@@ -199,6 +204,10 @@ func (c *FakeCNIClient) Veths() []FakeCNIVethPair {
 
 func (c *FakeCNIClient) NetworkInfoAfterTeardown() *cnicurrent.Result {
 	return c.infoAfterTeardown
+}
+
+func (c *FakeCNIClient) UseBadResult(useBadResult bool) {
+	c.useBadResult = useBadResult
 }
 
 func copyCNIResult(result *cnicurrent.Result) *cnicurrent.Result {

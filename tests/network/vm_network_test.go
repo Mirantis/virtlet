@@ -49,6 +49,45 @@ const (
 	fdKey            = "fdkey"
 )
 
+func sampleCNIResult() *cnicurrent.Result {
+	return &cnicurrent.Result{
+		Interfaces: []*cnicurrent.Interface{
+			{
+				Name:    "eth0",
+				Mac:     clientMacAddress,
+				Sandbox: "placeholder",
+			},
+		},
+		IPs: []*cnicurrent.IPConfig{
+			{
+				Version:   "4",
+				Interface: 0,
+				Address: net.IPNet{
+					IP:   net.IP{10, 1, 90, 5},
+					Mask: net.IPMask{255, 255, 255, 0},
+				},
+				Gateway: net.IP{10, 1, 90, 1},
+			},
+		},
+		Routes: []*cnitypes.Route{
+			{
+				Dst: net.IPNet{
+					IP:   net.IP{0, 0, 0, 0},
+					Mask: net.IPMask{0, 0, 0, 0},
+				},
+				GW: net.IP{10, 1, 90, 1},
+			},
+			{
+				Dst: net.IPNet{
+					IP:   net.IP{10, 10, 42, 0},
+					Mask: net.IPMask{255, 255, 255, 0},
+				},
+				GW: net.IP{10, 1, 90, 90},
+			},
+		},
+	}
+}
+
 type vmNetworkTester struct {
 	t                        *testing.T
 	hostNS, contNS, clientNS ns.NetNS
@@ -166,42 +205,7 @@ func TestVmNetwork(t *testing.T) {
 	}
 	defer contNS.Close()
 
-	info := &cnicurrent.Result{
-		Interfaces: []*cnicurrent.Interface{
-			{
-				Name:    "eth0",
-				Mac:     clientMacAddress,
-				Sandbox: contNS.Path(),
-			},
-		},
-		IPs: []*cnicurrent.IPConfig{
-			{
-				Version:   "4",
-				Interface: 0,
-				Address: net.IPNet{
-					IP:   net.IP{10, 1, 90, 5},
-					Mask: net.IPMask{255, 255, 255, 0},
-				},
-				Gateway: net.IP{10, 1, 90, 1},
-			},
-		},
-		Routes: []*cnitypes.Route{
-			{
-				Dst: net.IPNet{
-					IP:   net.IP{0, 0, 0, 0},
-					Mask: net.IPMask{0, 0, 0, 0},
-				},
-				GW: net.IP{10, 1, 90, 1},
-			},
-			{
-				Dst: net.IPNet{
-					IP:   net.IP{10, 10, 42, 0},
-					Mask: net.IPMask{255, 255, 255, 0},
-				},
-				GW: net.IP{10, 1, 90, 90},
-			},
-		},
-	}
+	info := sampleCNIResult()
 
 	var hostVeth netlink.Link
 	if err := vnt.hostNS.Do(func(ns.NetNS) (err error) {
@@ -325,48 +329,14 @@ func TestTapFDSource(t *testing.T) {
 		tcpdumpStopOn          string
 		dhcpExpectedSubstrings []string
 		interfaceDesc          []tapmanager.InterfaceDescription
+		useBadResult           bool
 	}{
 		{
 			name:           "single cni",
 			interfaceCount: 1,
 			outerAddr:      sampleOuterAddr,
-			info: &cnicurrent.Result{
-				Interfaces: []*cnicurrent.Interface{
-					{
-						Name:    "eth0",
-						Mac:     clientMacAddress,
-						Sandbox: "placeholder",
-					},
-				},
-				IPs: []*cnicurrent.IPConfig{
-					{
-						Version:   "4",
-						Interface: 0,
-						Address: net.IPNet{
-							IP:   net.IP{10, 1, 90, 5},
-							Mask: net.IPMask{255, 255, 255, 0},
-						},
-						Gateway: net.IP{10, 1, 90, 1},
-					},
-				},
-				Routes: []*cnitypes.Route{
-					{
-						Dst: net.IPNet{
-							IP:   net.IP{0, 0, 0, 0},
-							Mask: net.IPMask{0, 0, 0, 0},
-						},
-						GW: net.IP{10, 1, 90, 1},
-					},
-					{
-						Dst: net.IPNet{
-							IP:   net.IP{10, 10, 42, 0},
-							Mask: net.IPMask{255, 255, 255, 0},
-						},
-						GW: net.IP{10, 1, 90, 90},
-					},
-				},
-			},
-			tcpdumpStopOn: "10.1.90.1.4243 > 10.1.90.5.4242: UDP",
+			info:           sampleCNIResult(),
+			tcpdumpStopOn:  "10.1.90.1.4243 > 10.1.90.5.4242: UDP",
 			dhcpExpectedSubstrings: []string{
 				"new_classless_static_routes='10.10.42.0/24 10.1.90.90'",
 				"new_ip_address='10.1.90.5'",
@@ -384,12 +354,37 @@ func TestTapFDSource(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:           "single cni with bad result",
+			interfaceCount: 1,
+			outerAddr:      sampleOuterAddr,
+			info:           sampleCNIResult(),
+			tcpdumpStopOn:  "10.1.90.1.4243 > 10.1.90.5.4242: UDP",
+			dhcpExpectedSubstrings: []string{
+				"new_classless_static_routes='10.10.42.0/24 10.1.90.90'",
+				"new_ip_address='10.1.90.5'",
+				"new_network_number='10.1.90.0'",
+				"new_routers='10.1.90.1'",
+				"new_subnet_mask='255.255.255.0'",
+				"tap0: offered 10.1.90.5 from 169.254.254.2",
+			},
+			interfaceDesc: []tapmanager.InterfaceDescription{
+				{
+					Type:         nettools.InterfaceTypeTap,
+					HardwareAddr: mustParseMAC(clientMacAddress),
+					FdIndex:      0,
+					PCIAddress:   "",
+				},
+			},
+			useBadResult: true,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			vnt := newVMNetworkTester(t)
 			defer vnt.teardown()
 
 			withTapFDSource(t, tc.info, vnt.hostNS, func(podId string, cniClient *FakeCNIClient, c *tapmanager.FDClient) {
+				cniClient.UseBadResult(tc.useBadResult)
 				netConfigBytes, err := c.AddFDs(fdKey, &tapmanager.GetFDPayload{
 					Description: &tapmanager.PodNetworkDesc{
 						PodId:   podId,
@@ -464,4 +459,4 @@ func TestTapFDSource(t *testing.T) {
 // TODO: test multiple CNIs
 // TODO: test Calico
 // TODO: test recovering netns
-// TODO: test SR-IOV
+// TODO: test SR-IOV (by making a fake sysfs dir)
