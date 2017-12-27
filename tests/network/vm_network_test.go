@@ -32,6 +32,7 @@ import (
 
 	"github.com/Mirantis/virtlet/pkg/nettools"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 const (
@@ -39,7 +40,6 @@ const (
 	clientAddr       = "10.1.90.5/24"
 	clientMacAddress = "42:a4:a6:22:80:2e"
 	netTestWaitTime  = 15 * time.Second
-	samplePodId      = "8da3af4b-ff84-48dd-994a-47b166d40819"
 	samplePodName    = "foobar"
 	samplePodNS      = "default"
 	fdKey            = "fdkey"
@@ -307,7 +307,8 @@ func TestTapFDSource(t *testing.T) {
 			vnt := newVMNetworkTester(t)
 			defer vnt.teardown()
 
-			cniClient := NewFakeCNIClient(tc.info, vnt.hostNS, samplePodId, samplePodName, samplePodNS)
+			podId := utils.NewUuid()
+			cniClient := NewFakeCNIClient(tc.info, vnt.hostNS, podId, samplePodName, samplePodNS)
 			defer cniClient.Cleanup()
 
 			src, err := tapmanager.NewTapFDSource(cniClient)
@@ -341,7 +342,7 @@ func TestTapFDSource(t *testing.T) {
 			// TODO: check the returned data
 			if _, err := c.AddFDs(fdKey, &tapmanager.GetFDPayload{
 				Description: &tapmanager.PodNetworkDesc{
-					PodId:   samplePodId,
+					PodId:   podId,
 					PodNs:   samplePodNS,
 					PodName: samplePodName,
 				},
@@ -390,7 +391,6 @@ func TestTapFDSource(t *testing.T) {
 	}
 }
 
-// TODO: in TestTapFDSource, use random pod id
 // TODO: use https://github.com/d4l3k/messagediff to diff cni results
 // TODO: check data returned by AddFDs() / GetFDs()
 // TODO: use table-driven test
