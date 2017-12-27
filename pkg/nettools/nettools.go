@@ -847,23 +847,23 @@ func TeardownBridge(bridge netlink.Link, links []netlink.Link) error {
 
 // ConfigureLink configures a link according to the CNI result
 func ConfigureLink(link netlink.Link, info *cnicurrent.Result) error {
-	linkNo := -1
+	ifaceNo := -1
 	linkMAC := link.Attrs().HardwareAddr.String()
 	for i, iface := range info.Interfaces {
 		if iface.Mac == linkMAC {
-			linkNo = i
+			ifaceNo = i
 			break
 		}
 	}
-	if linkNo == -1 {
+	if ifaceNo == -1 {
 		return fmt.Errorf("can't find link with MAC %q in saved cni result: %s", linkMAC, spew.Sdump(info))
 	}
 
 	for _, addr := range info.IPs {
-		if addr.Interface == linkNo {
-			addr := &netlink.Addr{IPNet: &addr.Address}
-			if err := netlink.AddrAdd(link, addr); err != nil {
-				return err
+		if addr.Interface == ifaceNo {
+			linkAddr := &netlink.Addr{IPNet: &addr.Address}
+			if err := netlink.AddrAdd(link, linkAddr); err != nil {
+				return fmt.Errorf("error adding address %v to link %q: %v", addr.Address, link.Attrs().Name, err)
 			}
 
 			for _, route := range info.Routes {
@@ -871,7 +871,7 @@ func ConfigureLink(link netlink.Link, info *cnicurrent.Result) error {
 				// in their subnet - same gw will be added on both of them
 				// in theory this should be ok, but there is can lead to configuration other than prepared
 				// by cni plugins
-				if addr.Contains(route.GW) {
+				if linkAddr.Contains(route.GW) {
 					err := netlink.RouteAdd(&netlink.Route{
 						LinkIndex: link.Attrs().Index,
 						Scope:     netlink.SCOPE_UNIVERSE,
@@ -879,7 +879,7 @@ func ConfigureLink(link netlink.Link, info *cnicurrent.Result) error {
 						Gw:        route.GW,
 					})
 					if err != nil {
-						return err
+						return fmt.Errorf("error adding route (dst %v gw %v): %v", route.Dst, route.GW, err)
 					}
 				}
 			}

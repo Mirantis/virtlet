@@ -27,10 +27,23 @@ import (
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
+// CNIClient provides an interface to CNI
+type CNIClient interface {
+	// AddSandboxToNetwork adds a pod sandbox to the CNI network
+	AddSandboxToNetwork(podId, podName, podNs string) (*cnicurrent.Result, error)
+	// RemoveSandboxFromNetwork removes a pod sandbox from the CNI network
+	RemoveSandboxFromNetwork(podId, podName, podNs string) error
+	// GetDummyNetwork creates a dummy network using CNI plugin.
+	// It's used for making a dummy gateway for Calico CNI plugin
+	GetDummyNetwork() (*cnicurrent.Result, string, error)
+}
+
 type Client struct {
 	cniConfig     *libcni.CNIConfig
 	netConfigList *libcni.NetworkConfigList
 }
+
+var _ CNIClient = &Client{}
 
 func NewClient(pluginsDir, configsDir string) (*Client, error) {
 	netConfigList, err := ReadConfiguration(configsDir)
@@ -44,8 +57,6 @@ func NewClient(pluginsDir, configsDir string) (*Client, error) {
 		netConfigList: netConfigList,
 	}, nil
 }
-
-func (c *Client) Type() string { return c.netConfigList.Plugins[0].Network.Type }
 
 func (c *Client) cniRuntimeConf(podId, podName, podNs string) *libcni.RuntimeConf {
 	r := &libcni.RuntimeConf{
@@ -64,8 +75,7 @@ func (c *Client) cniRuntimeConf(podId, podName, podNs string) *libcni.RuntimeCon
 	return r
 }
 
-// GetDummyNetwork creates a dummy network using CNI plugin.
-// It's used for making a dummy gateway for Calico CNI plugin.
+// GetDummyNetwork implements GetDummyNetwork method of CNIClient interface
 func (c *Client) GetDummyNetwork() (*cnicurrent.Result, string, error) {
 	// TODO: virtlet pod restarts should not grab another address for
 	// the gateway. That's not a big problem usually though
@@ -82,6 +92,7 @@ func (c *Client) GetDummyNetwork() (*cnicurrent.Result, string, error) {
 	return r, PodNetNSPath(podId), nil
 }
 
+// AddSandboxToNetwork implements AddSandboxToNetwork method of CNIClient interface
 func (c *Client) AddSandboxToNetwork(podId, podName, podNs string) (*cnicurrent.Result, error) {
 	rtConf := c.cniRuntimeConf(podId, podName, podNs)
 	// NOTE: this annotation is only need by CNI Genie
@@ -106,6 +117,7 @@ func (c *Client) AddSandboxToNetwork(podId, podName, podNs string) (*cnicurrent.
 	return r, err
 }
 
+// RemoveSandboxFromNetwork implements RemoveSandboxFromNetwork method of CNIClient interface
 func (c *Client) RemoveSandboxFromNetwork(podId, podName, podNs string) error {
 	glog.V(3).Infof("RemoveSandboxFromNetwork: podId %q, podName %q, podNs %q", podId, podName, podNs)
 	err := c.cniConfig.DelNetworkList(c.netConfigList, c.cniRuntimeConf(podId, podName, podNs))

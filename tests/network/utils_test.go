@@ -18,7 +18,10 @@ package network
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"net"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -28,13 +31,23 @@ import (
 
 	"github.com/containernetworking/cni/pkg/ns"
 	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
+	"github.com/golang/glog"
+	"github.com/vishvananda/netlink"
 
 	"github.com/Mirantis/virtlet/pkg/dhcp"
 )
 
 const (
-	maxNetTestMembers = 32
-	dhcpcdTimeout     = 2
+	maxNetTestMembers         = 32
+	dhcpcdTimeout             = 2
+	pingPort                  = 4242
+	pingSrcPort               = 4243
+	pingInterval              = 100 * time.Millisecond
+	pingDeadline              = 55 * time.Millisecond
+	pingReceiverCycles        = 100
+	tcpdumpPollPeriod         = 50 * time.Millisecond
+	tcpdumpStartupPollCount   = 100
+	tcpdumpSubstringWaitCount = 100
 )
 
 type NetTester interface {
@@ -227,3 +240,317 @@ func (d *DhcpClient) Run(readyCh, stopCh chan struct{}) error {
 	}
 	return nil
 }
+
+type pinger struct {
+	localIP, destIP net.IP
+	conn            *net.UDPConn
+}
+
+var _ NetTester = &pinger{}
+
+func newPinger(localIP net.IP, destIP net.IP) *pinger {
+	return &pinger{localIP: localIP, destIP: destIP}
+}
+
+func (p *pinger) Name() string {
+	return fmt.Sprintf("pinger for %v", p.destIP)
+}
+
+func (p *pinger) Fg() bool { return false }
+
+func (p *pinger) dial() error {
+	var laddr *net.UDPAddr
+	if p.localIP != nil {
+		laddr = &net.UDPAddr{IP: p.localIP, Port: pingSrcPort}
+	}
+	raddr := &net.UDPAddr{IP: p.destIP, Port: pingPort}
+	var err error
+	p.conn, err = net.DialUDP("udp4", laddr, raddr)
+	if err != nil {
+		return fmt.Errorf("net.DialUDP(): %v", err)
+	}
+	return nil
+}
+
+func (p *pinger) ping() error {
+	if _, err := p.conn.Write([]byte("hello")); err != nil {
+		return fmt.Errorf("Write(): %v", err)
+	}
+	return nil
+}
+
+func (p *pinger) Run(readyCh, stopCh chan struct{}) error {
+	if err := p.dial(); err != nil {
+		return err
+	}
+	close(readyCh)
+	for {
+		select {
+		case <-stopCh:
+			p.conn.Close()
+			return nil
+		case <-time.After(pingInterval):
+			if err := p.ping(); err != nil {
+				// receiver may not be ready yet, don't fail here
+				glog.V(3).Infof("ping error: %v", err)
+			}
+		}
+	}
+}
+
+type pingReceiver struct {
+	localIP net.IP
+	conn    *net.UDPConn
+}
+
+var _ NetTester = &pingReceiver{}
+
+func newPingReceiver(localIP net.IP) *pingReceiver {
+	return &pingReceiver{localIP: localIP}
+}
+
+func (p *pingReceiver) Name() string {
+	return fmt.Sprintf("pingReceiver for %v", p.localIP)
+}
+
+func (p *pingReceiver) Fg() bool { return true }
+
+func (p *pingReceiver) listen() error {
+	var err error
+	p.conn, err = net.ListenUDP("udp4", &net.UDPAddr{IP: p.localIP, Port: pingPort})
+	if err != nil {
+		return fmt.Errorf("net.ListenUDP(): %v", err)
+	}
+	return nil
+}
+
+func (p *pingReceiver) cycle() (bool, error) {
+	if err := p.conn.SetDeadline(time.Now().Add(pingDeadline)); err != nil {
+		return false, err
+	}
+	buf := make([]byte, 16)
+	n, addr, err := p.conn.ReadFromUDP(buf)
+	if err != nil {
+		if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
+			return false, nil
+		}
+		return false, err
+	}
+	glog.V(3).Infof("received udp ping from %v: %q", addr, string(buf[:n]))
+	return true, nil
+}
+
+func (p *pingReceiver) Run(readyCh, stopCh chan struct{}) error {
+	if err := p.listen(); err != nil {
+		return err
+	}
+	close(readyCh)
+	defer p.conn.Close()
+	for n := 0; n < pingReceiverCycles; n++ {
+		select {
+		case <-stopCh:
+			return errors.New("ping receiver stopped before receiving any pings")
+		default:
+		}
+		received, err := p.cycle()
+		if err != nil {
+			return err
+		}
+		if received {
+			return nil
+		}
+	}
+	return errors.New("no pings received")
+}
+
+type safeBuf struct {
+	m sync.Mutex
+	b bytes.Buffer
+}
+
+func (sb *safeBuf) Write(p []byte) (n int, err error) {
+	sb.m.Lock()
+	defer sb.m.Unlock()
+	return sb.b.Write(p)
+}
+
+func (sb *safeBuf) String() string {
+	sb.m.Lock()
+	defer sb.m.Unlock()
+	return sb.b.String()
+}
+
+type tcpdump struct {
+	link           netlink.Link
+	stopOn, failOn string
+	readyCh        chan struct{}
+	bOut, bErr     safeBuf
+	cmd            *exec.Cmd
+	out            string
+}
+
+var _ NetTester = &tcpdump{}
+
+func newTcpdump(link netlink.Link, stopOn, failOn string) *tcpdump {
+	return &tcpdump{
+		link:    link,
+		stopOn:  stopOn,
+		failOn:  failOn,
+		readyCh: make(chan struct{}),
+	}
+}
+
+func (t *tcpdump) Name() string {
+	return fmt.Sprintf("tcpdump on %s", t.link.Attrs().Name)
+}
+
+func (t *tcpdump) Fg() bool { return true }
+
+func (t *tcpdump) gotListeningMsg() bool {
+	idx := strings.Index(t.bErr.String(), "\nlistening on")
+	if idx < 0 {
+		return false
+	}
+	return strings.LastIndex(t.bErr.String(), "\n") > idx
+}
+
+func (t *tcpdump) waitForReady() bool {
+	for n := 0; n < tcpdumpStartupPollCount; n++ {
+		time.Sleep(tcpdumpPollPeriod)
+		if t.gotListeningMsg() {
+			// XXX: the correct way would be to wait for
+			// some traffic here
+			time.Sleep(100 * time.Millisecond)
+			return true
+		}
+	}
+	return false
+}
+
+func (t *tcpdump) waitForSubstring(stopCh chan struct{}) error {
+	for n := 0; n < tcpdumpSubstringWaitCount; n++ {
+		select {
+		case <-stopCh:
+			return fmt.Errorf("tcpdump stopped before producing expected output %q, out:\n", t.stopOn, t.bOut.String())
+		case <-time.After(tcpdumpPollPeriod):
+			s := t.bOut.String()
+			if strings.Contains(s, t.failOn) {
+				return fmt.Errorf("found unexpected %q in tcpdump output:\n%s", t.failOn, s)
+			}
+			if strings.Contains(s, t.stopOn) {
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("timed out waiting for tcpdump output %q, out:\n%s", t.stopOn, t.bOut.String())
+}
+
+func (t *tcpdump) stop() error {
+	// tcpdump exits with status 0 on SIGINT
+	// (if it hasn't exited already)
+	t.cmd.Process.Signal(os.Interrupt)
+	err := t.cmd.Wait()
+	if err != nil {
+		glog.Errorf("tcpdump failed: %v", err)
+	}
+	return err
+}
+
+func (t *tcpdump) Run(readyCh, stopCh chan struct{}) error {
+	// -l stands for 'line buffered'. We want to receive tcpdump
+	// output as soon as it's generated
+	t.cmd = exec.Command("tcpdump", "-l", "-n", "-i", t.link.Attrs().Name, "udp")
+	t.cmd.Stdout = &t.bOut
+	t.cmd.Stderr = &t.bErr
+
+	// make sure we start the process in current network namespace
+	if err := t.cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start tcpdump: %v", err)
+	}
+
+	if t.waitForReady() {
+		close(readyCh)
+	} else {
+		t.stop()
+		return fmt.Errorf("timed out waiting for tcpdump, error output:\n%s", t.bErr.String())
+	}
+
+	if err := t.waitForSubstring(stopCh); err != nil {
+		t.stop()
+		return err
+	}
+
+	err := t.stop()
+	t.out = t.bOut.String()
+	return err
+}
+
+func addAddress(t *testing.T, netNS ns.NetNS, link netlink.Link, addr string) net.IP {
+	parsedAddr, err := netlink.ParseAddr(addr)
+	if err != nil {
+		t.Fatalf("failed to parse snooping address: %v", err)
+	}
+	if err := netNS.Do(func(ns.NetNS) (err error) {
+		return netlink.AddrAdd(link, parsedAddr)
+	}); err != nil {
+		t.Fatalf("failed to add address to snooping veth: %v", err)
+	}
+	return parsedAddr.IP
+}
+
+// tapConnector copies frames between tap interfaces. It returns
+// a channel that should be closed to stop copying and close
+// the tap devices
+type tapConnector struct {
+	tapA, tapB *os.File
+	wg         sync.WaitGroup
+}
+
+var _ NetTester = &tapConnector{}
+
+func newTapConnector(tapA, tapB *os.File) *tapConnector {
+	return &tapConnector{tapA: tapA, tapB: tapB}
+}
+
+func (tc *tapConnector) Name() string { return "tapConnector" }
+func (tc *tapConnector) Fg() bool     { return false }
+
+// copyFrames copies a packets between tap devices. Unlike
+// io.Copy(), it doesn't use buffering and thus keeps frame boundaries
+func (tc *tapConnector) copyFrames(from, to *os.File) {
+	buf := make([]byte, 1600)
+	for {
+		nRead, err := from.Read(buf)
+		if err != nil {
+			glog.Infof("copyFrames(): Read(): %v", err)
+			break
+		}
+		nWritten, err := to.Write(buf[:nRead])
+		if err != nil {
+			glog.Infof("copyFrames(): Write(): %v", err)
+			break
+		}
+		if nWritten < nRead {
+			glog.Warning("copyFrames(): short Write(): %d bytes instead of %d", nWritten, nRead)
+		}
+	}
+	tc.wg.Done()
+}
+
+func (tc *tapConnector) Run(readyCh, stopCh chan struct{}) error {
+	tc.wg.Add(1)
+	go tc.copyFrames(tc.tapA, tc.tapB)
+	tc.wg.Add(1)
+	go tc.copyFrames(tc.tapB, tc.tapA)
+	close(readyCh)
+	<-stopCh
+	// TODO: use SetDeadline() when it's available for os.File
+	// (perhaps in Go 1.10): https://github.com/golang/go/issues/22114
+	tc.tapA.Close()
+	tc.tapB.Close()
+	tc.wg.Wait()
+	return nil
+}
+
+// TODO: document NetTester / NetTestGroup
+// TODO: block ip trafic from br0 ip

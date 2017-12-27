@@ -26,6 +26,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
 	"github.com/Mirantis/virtlet/pkg/manager"
 	"github.com/Mirantis/virtlet/pkg/metadata"
@@ -115,7 +116,12 @@ func runVirtlet() {
 }
 
 func runTapManager() {
-	src, err := tapmanager.NewTapFDSource(*cniPluginsDir, *cniConfigsDir)
+	cniClient, err := cni.NewClient(*cniPluginsDir, *cniConfigsDir)
+	if err != nil {
+		glog.Errorf("Error initializing CNI client: %v", err)
+		os.Exit(1)
+	}
+	src, err := tapmanager.NewTapFDSource(cniClient)
 	if err != nil {
 		glog.Errorf("Error creating tap fd source: %v", err)
 		os.Exit(1)
