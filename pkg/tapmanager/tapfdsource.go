@@ -36,14 +36,10 @@ import (
 	"github.com/Mirantis/virtlet/pkg/nettools"
 )
 
-// InterfaceType presents type of network interface instance
-type InterfaceType int
-
 const (
-	InterfaceTypeTap    InterfaceType = iota
-	calicoNetType                     = "calico"
-	calicoDefaultSubnet               = 24
-	calicoSubnetVar                   = "VIRTLET_CALICO_SUBNET"
+	calicoNetType       = "calico"
+	calicoDefaultSubnet = 24
+	calicoSubnetVar     = "VIRTLET_CALICO_SUBNET"
 )
 
 // InterfaceDescription contains interface type with additional data

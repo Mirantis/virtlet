@@ -17,8 +17,11 @@ limitations under the License.
 package network
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -28,6 +31,7 @@ import (
 	"github.com/containernetworking/cni/pkg/ns"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
+	"github.com/pmezard/go-difflib/difflib"
 	"github.com/vishvananda/netlink"
 
 	"github.com/Mirantis/virtlet/pkg/nettools"
@@ -243,6 +247,75 @@ func TestVmNetwork(t *testing.T) {
 	vnt.wait()
 }
 
+func withTapFDSource(t *testing.T, info *cnicurrent.Result, hostNS ns.NetNS, toCall func(string, *FakeCNIClient, *tapmanager.FDClient)) {
+	podId := utils.NewUuid()
+	cniClient := NewFakeCNIClient(info, hostNS, podId, samplePodName, samplePodNS)
+	defer cniClient.Cleanup()
+
+	src, err := tapmanager.NewTapFDSource(cniClient)
+	if err != nil {
+		t.Fatalf("Error creating tap fd source: %v", err)
+	}
+
+	tmpDir, err := ioutil.TempDir("", "pass-fd-test")
+	if err != nil {
+		t.Fatalf("ioutil.TempDir(): %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	socketPath := filepath.Join(tmpDir, "tapfdserver.sock")
+
+	s := tapmanager.NewFDServer(socketPath, src)
+	if err := s.Serve(); err != nil {
+		t.Fatalf("Serve(): %v", err)
+	}
+	defer s.Stop()
+
+	c := tapmanager.NewFDClient(socketPath)
+	if err := c.Connect(); err != nil {
+		t.Fatalf("Connect(): %v", err)
+	}
+	defer func() {
+		if err := c.Close(); err != nil {
+			t.Errorf("Close(): %v", err)
+		}
+	}()
+	toCall(podId, cniClient, c)
+}
+
+func verifyNoDiff(t *testing.T, what string, expected, actual interface{}) {
+	expectedJson, err := json.MarshalIndent(expected, "", "  ")
+	if err != nil {
+		expectedJson = []byte(fmt.Sprintf("<error marshalling expected: %v>", err))
+	}
+	actualJson, err := json.MarshalIndent(actual, "", "  ")
+	if err != nil {
+		actualJson = []byte(fmt.Sprintf("<error marshalling actual: %v>", err))
+	}
+	if bytes.Equal(expectedJson, actualJson) {
+		return
+	}
+	diff, err := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
+		A:        difflib.SplitLines(string(expectedJson)),
+		B:        difflib.SplitLines(string(actualJson)),
+		FromFile: "Expected",
+		ToFile:   "Actual",
+		Context:  5,
+	})
+	if err != nil {
+		diff = fmt.Sprintf("<diff error: %v>", err)
+	}
+	t.Errorf("mismatch: %s: expected:\n%s\n\nactual:\n%s\ndiff:\n%s", what, expectedJson, actualJson, diff)
+}
+
+func mustParseMAC(mac string) net.HardwareAddr {
+	hwAddr, err := net.ParseMAC(mac)
+	if err != nil {
+		log.Panicf("Error parsing hwaddr %q: %v", mac, err)
+	}
+	return hwAddr
+}
+
+// TestVmNetwork verifies the network setup using TapFDSource
 func TestTapFDSource(t *testing.T) {
 	for _, tc := range []struct {
 		name                   string
@@ -251,6 +324,7 @@ func TestTapFDSource(t *testing.T) {
 		info                   *cnicurrent.Result
 		tcpdumpStopOn          string
 		dhcpExpectedSubstrings []string
+		interfaceDesc          []tapmanager.InterfaceDescription
 	}{
 		{
 			name:           "single cni",
@@ -301,99 +375,89 @@ func TestTapFDSource(t *testing.T) {
 				"new_subnet_mask='255.255.255.0'",
 				"tap0: offered 10.1.90.5 from 169.254.254.2",
 			},
+			interfaceDesc: []tapmanager.InterfaceDescription{
+				{
+					Type:         nettools.InterfaceTypeTap,
+					HardwareAddr: mustParseMAC(clientMacAddress),
+					FdIndex:      0,
+					PCIAddress:   "",
+				},
+			},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			vnt := newVMNetworkTester(t)
 			defer vnt.teardown()
 
-			podId := utils.NewUuid()
-			cniClient := NewFakeCNIClient(tc.info, vnt.hostNS, podId, samplePodName, samplePodNS)
-			defer cniClient.Cleanup()
-
-			src, err := tapmanager.NewTapFDSource(cniClient)
-			if err != nil {
-				t.Fatalf("Error creating tap fd source: %v", err)
-			}
-
-			tmpDir, err := ioutil.TempDir("", "pass-fd-test")
-			if err != nil {
-				t.Fatalf("ioutil.TempDir(): %v", err)
-			}
-			defer os.RemoveAll(tmpDir)
-			socketPath := filepath.Join(tmpDir, "tapfdserver.sock")
-
-			s := tapmanager.NewFDServer(socketPath, src)
-			if err := s.Serve(); err != nil {
-				t.Fatalf("Serve(): %v", err)
-			}
-			defer s.Stop()
-
-			c := tapmanager.NewFDClient(socketPath)
-			if err := c.Connect(); err != nil {
-				t.Fatalf("Connect(): %v", err)
-			}
-			defer func() {
-				if err := c.Close(); err != nil {
-					t.Errorf("Close(): %v", err)
+			withTapFDSource(t, tc.info, vnt.hostNS, func(podId string, cniClient *FakeCNIClient, c *tapmanager.FDClient) {
+				netConfigBytes, err := c.AddFDs(fdKey, &tapmanager.GetFDPayload{
+					Description: &tapmanager.PodNetworkDesc{
+						PodId:   podId,
+						PodNs:   samplePodNS,
+						PodName: samplePodName,
+					},
+				})
+				if err != nil {
+					t.Fatalf("AddFDs(): %v", err)
 				}
-			}()
+				released := false
+				defer func() {
+					if !released {
+						c.ReleaseFDs(fdKey)
+					}
+				}()
 
-			// TODO: check the returned data
-			if _, err := c.AddFDs(fdKey, &tapmanager.GetFDPayload{
-				Description: &tapmanager.PodNetworkDesc{
-					PodId:   podId,
-					PodNs:   samplePodNS,
-					PodName: samplePodName,
-				},
-			}); err != nil {
-				t.Fatalf("AddFDs(): %v", err)
-			}
-			released := false
-			defer func() {
-				if !released {
-					c.ReleaseFDs(fdKey)
+				var result *cnicurrent.Result
+				if err := json.Unmarshal(netConfigBytes, &result); err != nil {
+					t.Errorf("error unmarshalling CNI result: %v", err)
+				} else {
+					expectedResult := copyCNIResult(tc.info)
+					replaceSandboxPlaceholders(expectedResult, podId)
+					verifyNoDiff(t, "cni result", expectedResult, result)
 				}
-			}()
-			cniClient.VerifyAdded()
-			veths := cniClient.Veths()
-			// TODO: support multiple interfaces
-			if len(veths) != 1 {
-				t.Fatalf("veth count mismatch: %d instead of %d", len(veths), 1)
-			}
 
-			fds, _, err := c.GetFDs(fdKey)
-			if err != nil {
-				t.Fatalf("GetFDs(): %v", err)
-			}
-			// TODO: support multiple interfaces
-			if len(fds) != 1 {
-				t.Fatalf("fd count mismatch: %d instead of %d", len(fds), 1)
-			}
-			vmTap := os.NewFile(uintptr(fds[0]), "tap-fd")
-			defer vmTap.Close()
+				cniClient.VerifyAdded()
+				veths := cniClient.Veths()
+				if len(veths) != 1 {
+					t.Fatalf("veth count mismatch: %d instead of %d", len(veths), tc.interfaceCount)
+				}
 
-			outerIP := addAddress(t, vnt.hostNS, veths[0].HostSide, tc.outerAddr)
-			vnt.connectTaps(vmTap)
-			// tcpdump should catch udp 'ping' but should not
-			// see BOOTP/DHCP on the 'outer' link
-			vnt.addTcpdump(veths[0].HostSide, tc.tcpdumpStopOn, "BOOTP/DHCP")
-			vnt.verifyDhcp(tc.dhcpExpectedSubstrings)
-			vnt.verifyPing(outerIP)
-			vnt.wait()
+				fds, descBytes, err := c.GetFDs(fdKey)
+				if err != nil {
+					t.Fatalf("GetFDs(): %v", err)
+				}
+				if len(fds) != tc.interfaceCount {
+					t.Fatalf("fd count mismatch: %d instead of %d", len(fds), tc.interfaceCount)
+				}
 
-			if err := c.ReleaseFDs(fdKey); err != nil {
-				t.Errorf("ReleaseFDs(): %v", err)
-			}
-			released = true
-			cniClient.VerifyRemoved()
+				var interfaceDesc []tapmanager.InterfaceDescription
+				if err := json.Unmarshal(descBytes, &interfaceDesc); err != nil {
+					t.Errorf("error unmarshalling interface desc: %v", err)
+				} else {
+					verifyNoDiff(t, "interfaceDesc", tc.interfaceDesc, interfaceDesc)
+				}
+
+				vmTap := os.NewFile(uintptr(fds[0]), "tap-fd")
+				defer vmTap.Close()
+				outerIP := addAddress(t, vnt.hostNS, veths[0].HostSide, tc.outerAddr)
+				vnt.connectTaps(vmTap)
+				// tcpdump should catch udp 'ping' but should not
+				// see BOOTP/DHCP on the 'outer' link
+				vnt.addTcpdump(veths[0].HostSide, tc.tcpdumpStopOn, "BOOTP/DHCP")
+				vnt.verifyDhcp(tc.dhcpExpectedSubstrings)
+				vnt.verifyPing(outerIP)
+				vnt.wait()
+
+				if err := c.ReleaseFDs(fdKey); err != nil {
+					t.Errorf("ReleaseFDs(): %v", err)
+				}
+				released = true
+				cniClient.VerifyRemoved()
+			})
 		})
 	}
 }
 
-// TODO: use https://github.com/d4l3k/messagediff to diff cni results
-// TODO: check data returned by AddFDs() / GetFDs()
-// TODO: use table-driven test
 // TODO: test network teardown
 // TODO: test multiple CNIs
 // TODO: test Calico

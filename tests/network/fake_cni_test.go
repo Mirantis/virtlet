@@ -17,6 +17,7 @@ limitations under the License.
 package network
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -51,7 +52,7 @@ var _ cni.CNIClient = &FakeCNIClient{}
 
 func NewFakeCNIClient(info *cnicurrent.Result, hostNS ns.NetNS, podId, podName, podNS string) *FakeCNIClient {
 	return &FakeCNIClient{
-		info:    info,
+		info:    copyCNIResult(info),
 		hostNS:  hostNS,
 		podId:   podId,
 		podName: podName,
@@ -83,19 +84,17 @@ func (c *FakeCNIClient) AddSandboxToNetwork(podId, podName, podNS string) (*cnic
 		panic("AddSandboxToNetwork() was already called")
 	}
 
+	replaceSandboxPlaceholders(c.info, podId)
 	for _, iface := range c.info.Interfaces {
 		if iface.Sandbox == "" {
 			continue
 		}
-		if iface.Sandbox != "placeholder" {
-			log.Panicf("bad sandbox %q: expected empty string or \"placeholder\"", iface.Sandbox)
-		}
 
-		nsPath := cni.PodNetNSPath(podId)
+		iface.Sandbox = cni.PodNetNSPath(podId)
 		var err error
-		c.contNS, err = ns.GetNS(nsPath)
+		c.contNS, err = ns.GetNS(iface.Sandbox)
 		if err != nil {
-			return nil, fmt.Errorf("can't get pod netns (path %q): %v", nsPath, err)
+			return nil, fmt.Errorf("can't get pod netns (path %q): %v", iface.Sandbox, err)
 		}
 		var vp FakeCNIVethPair
 		if err := c.hostNS.Do(func(ns.NetNS) error {
@@ -130,7 +129,7 @@ func (c *FakeCNIClient) AddSandboxToNetwork(podId, podName, podNS string) (*cnic
 	}
 
 	c.added = true
-	return c.info, nil
+	return copyCNIResult(c.info), nil
 }
 
 func (c *FakeCNIClient) RemoveSandboxFromNetwork(podId, podName, podNS string) error {
@@ -170,4 +169,24 @@ func (c *FakeCNIClient) Cleanup() {
 func (c *FakeCNIClient) Veths() []FakeCNIVethPair {
 	c.VerifyAdded()
 	return c.veths
+}
+
+func copyCNIResult(result *cnicurrent.Result) *cnicurrent.Result {
+	bs, err := json.Marshal(result)
+	if err != nil {
+		log.Panicf("error marshalling CNI result: %v", err)
+	}
+	var newResult *cnicurrent.Result
+	if err := json.Unmarshal(bs, &newResult); err != nil {
+		log.Panicf("error unmarshalling CNI result: %v", err)
+	}
+	return newResult
+}
+
+func replaceSandboxPlaceholders(result *cnicurrent.Result, podId string) {
+	for _, iface := range result.Interfaces {
+		if iface.Sandbox == "placeholder" {
+			iface.Sandbox = cni.PodNetNSPath(podId)
+		}
+	}
 }
