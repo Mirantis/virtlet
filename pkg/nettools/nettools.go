@@ -45,7 +45,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"syscall"
-	"unsafe"
 
 	"github.com/containernetworking/cni/pkg/ns"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
@@ -99,29 +98,6 @@ type InterfaceInfo struct {
 type ContainerNetwork struct {
 	Info   *cnicurrent.Result
 	DhcpNS ns.NetNS
-}
-
-func OpenTAP(devName string) (*os.File, error) {
-	tapFile, err := os.OpenFile("/dev/net/tun", os.O_RDWR, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	var req ifReq
-
-	// set IFF_NO_PI to not provide packet information
-	// If flag IFF_NO_PI is not set each frame format is:
-	// Flags [2 bytes]
-	// Proto [2 bytes]
-	// Raw protocol ethernet frame.
-	// This extra 4-byte header breaks connectivity as in this case kernel truncates initial package
-	req.Flags = uint16(syscall.IFF_TAP | syscall.IFF_NO_PI | syscall.IFF_ONE_QUEUE)
-	copy(req.Name[:15], devName)
-	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, tapFile.Fd(), uintptr(syscall.TUNSETIFF), uintptr(unsafe.Pointer(&req)))
-	if errno != 0 {
-		return nil, fmt.Errorf("tuntap IOCTL TUNSETIFF failed, errno %v", errno)
-	}
-	return tapFile, nil
 }
 
 func makeVethPair(name, peer string, mtu int) (netlink.Link, error) {
@@ -745,20 +721,9 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 		}
 
 		tapInterfaceName := fmt.Sprintf(tapInterfaceNameTemplate, i)
-		tap := &netlink.Tuntap{
-			LinkAttrs: netlink.LinkAttrs{
-				Name:  tapInterfaceName,
-				Flags: net.FlagUp,
-				MTU:   link.Attrs().MTU,
-			},
-			Mode: netlink.TUNTAP_MODE_TAP,
-		}
-		if err := netlink.LinkAdd(tap); err != nil {
-			return nil, fmt.Errorf("failed to create tap interface: %v", err)
-		}
-
-		if err := netlink.LinkSetUp(tap); err != nil {
-			return nil, fmt.Errorf("failed to set %q up: %v", tapInterfaceName, err)
+		tap, err := CreateTAP(tapInterfaceName, link.Attrs().MTU)
+		if err != nil {
+			return nil, err
 		}
 
 		containerBridgeName := fmt.Sprintf(containerBridgeNameTemplate, i)
@@ -871,25 +836,25 @@ func TeardownBridge(bridge netlink.Link, links []netlink.Link) error {
 	return netlink.LinkSetDown(bridge)
 }
 
-// ConfigureLink adds to link ip address and routes based on info.
+// ConfigureLink configures a link according to the CNI result
 func ConfigureLink(link netlink.Link, info *cnicurrent.Result) error {
-	linkNo := -1
+	ifaceNo := -1
 	linkMAC := link.Attrs().HardwareAddr.String()
 	for i, iface := range info.Interfaces {
 		if iface.Mac == linkMAC {
-			linkNo = i
+			ifaceNo = i
 			break
 		}
 	}
-	if linkNo == -1 {
+	if ifaceNo == -1 {
 		return fmt.Errorf("can't find link with MAC %q in saved cni result: %s", linkMAC, spew.Sdump(info))
 	}
 
 	for _, addr := range info.IPs {
-		if addr.Interface == linkNo {
-			addr := &netlink.Addr{IPNet: &addr.Address}
-			if err := netlink.AddrAdd(link, addr); err != nil {
-				return err
+		if addr.Interface == ifaceNo {
+			linkAddr := &netlink.Addr{IPNet: &addr.Address}
+			if err := netlink.AddrAdd(link, linkAddr); err != nil {
+				return fmt.Errorf("error adding address %v to link %q: %v", addr.Address, link.Attrs().Name, err)
 			}
 
 			for _, route := range info.Routes {
@@ -897,7 +862,7 @@ func ConfigureLink(link netlink.Link, info *cnicurrent.Result) error {
 				// in their subnet - same gw will be added on both of them
 				// in theory this should be ok, but there is can lead to configuration other than prepared
 				// by cni plugins
-				if addr.Contains(route.GW) {
+				if linkAddr.Contains(route.GW) {
 					err := netlink.RouteAdd(&netlink.Route{
 						LinkIndex: link.Attrs().Index,
 						Scope:     netlink.SCOPE_UNIVERSE,
@@ -905,7 +870,7 @@ func ConfigureLink(link netlink.Link, info *cnicurrent.Result) error {
 						Gw:        route.GW,
 					})
 					if err != nil {
-						return err
+						return fmt.Errorf("error adding route (dst %v gw %v): %v", route.Dst, route.GW, err)
 					}
 				}
 			}

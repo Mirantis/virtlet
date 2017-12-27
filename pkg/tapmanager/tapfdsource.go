@@ -36,14 +36,10 @@ import (
 	"github.com/Mirantis/virtlet/pkg/nettools"
 )
 
-// InterfaceType presents type of network interface instance
-type InterfaceType int
-
 const (
-	InterfaceTypeTap    InterfaceType = iota
-	calicoNetType                     = "calico"
-	calicoDefaultSubnet               = 24
-	calicoSubnetVar                   = "VIRTLET_CALICO_SUBNET"
+	calicoNetType       = "calico"
+	calicoDefaultSubnet = 24
+	calicoSubnetVar     = "VIRTLET_CALICO_SUBNET"
 )
 
 // InterfaceDescription contains interface type with additional data
@@ -92,7 +88,7 @@ type podNetwork struct {
 type TapFDSource struct {
 	sync.Mutex
 
-	cniClient          *cni.Client
+	cniClient          cni.CNIClient
 	dummyNetwork       *cnicurrent.Result
 	dummyNetworkNsPath string
 	fdMap              map[string]*podNetwork
@@ -102,12 +98,7 @@ var _ FDSource = &TapFDSource{}
 
 // NewTapFDSource returns a TapFDSource for the specified CNI plugin &
 // config dir
-func NewTapFDSource(cniPluginsDir, cniConfigsDir string) (*TapFDSource, error) {
-	cniClient, err := cni.NewClient(cniPluginsDir, cniConfigsDir)
-	if err != nil {
-		return nil, err
-	}
-
+func NewTapFDSource(cniClient cni.CNIClient) (*TapFDSource, error) {
 	s := &TapFDSource{
 		cniClient: cniClient,
 		fdMap:     make(map[string]*podNetwork),

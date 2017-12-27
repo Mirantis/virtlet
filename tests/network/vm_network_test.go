@@ -18,63 +18,44 @@ package network
 
 import (
 	"bytes"
-	"errors"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"net"
 	"os"
-	"os/exec"
-	"strings"
-	"sync"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/containernetworking/cni/pkg/ns"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
-	"github.com/golang/glog"
+	"github.com/pmezard/go-difflib/difflib"
 	"github.com/vishvananda/netlink"
 
 	"github.com/Mirantis/virtlet/pkg/nettools"
+	"github.com/Mirantis/virtlet/pkg/tapmanager"
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 const (
-	pingPort                  = 4242
-	pingSrcPort               = 4243
-	pingInterval              = 100 * time.Millisecond
-	pingDeadline              = 55 * time.Millisecond
-	pingReceiverCycles        = 100
-	tcpdumpPollPeriod         = 50 * time.Millisecond
-	tcpdumpStartupPollCount   = 100
-	tcpdumpSubstringWaitCount = 100
-	outerAddr                 = "10.1.90.1/24"
-	clientAddr                = "10.1.90.5/24"
-	clientMacAddress          = "42:a4:a6:22:80:2e"
+	sampleOuterAddr  = "10.1.90.1/24"
+	clientAddr       = "10.1.90.5/24"
+	clientMacAddress = "42:a4:a6:22:80:2e"
+	netTestWaitTime  = 15 * time.Second
+	samplePodName    = "foobar"
+	samplePodNS      = "default"
+	fdKey            = "fdkey"
 )
 
-func TestVmNetwork(t *testing.T) {
-	hostNS, err := ns.NewNS()
-	if err != nil {
-		t.Fatalf("Failed to create host ns: %v", err)
-	}
-	defer hostNS.Close()
-
-	contNS, err := ns.NewNS()
-	if err != nil {
-		t.Fatalf("Failed to create container ns: %v", err)
-	}
-	defer contNS.Close()
-
-	clientNS, err := ns.NewNS()
-	if err != nil {
-		t.Fatalf("Failed to create ns for dhcp client: %v", err)
-	}
-
-	info := &cnicurrent.Result{
+func sampleCNIResult() *cnicurrent.Result {
+	return &cnicurrent.Result{
 		Interfaces: []*cnicurrent.Interface{
 			{
 				Name:    "eth0",
 				Mac:     clientMacAddress,
-				Sandbox: contNS.Path(),
+				Sandbox: "placeholder",
 			},
 		},
 		IPs: []*cnicurrent.IPConfig{
@@ -105,346 +86,377 @@ func TestVmNetwork(t *testing.T) {
 			},
 		},
 	}
+}
 
-	var dhcpClientVeth, hostVeth netlink.Link
-	if err := hostNS.Do(func(ns.NetNS) (err error) {
+type vmNetworkTester struct {
+	t                        *testing.T
+	hostNS, contNS, clientNS ns.NetNS
+	dhcpClientTap            *os.File
+	clientTapLink            netlink.Link
+	g                        *NetTestGroup
+}
+
+func newVMNetworkTester(t *testing.T) *vmNetworkTester {
+	hostNS, err := ns.NewNS()
+	if err != nil {
+		t.Fatalf("Failed to create host ns: %v", err)
+	}
+
+	clientNS, err := ns.NewNS()
+	if err != nil {
+		hostNS.Close()
+		t.Fatalf("Failed to create ns for dhcp client: %v", err)
+	}
+
+	vnt := &vmNetworkTester{
+		t:        t,
+		hostNS:   hostNS,
+		clientNS: clientNS,
+		g:        NewNetTestGroup(t, netTestWaitTime),
+	}
+	if err := vnt.setupClientTap(); err != nil {
+		vnt.teardown()
+		t.Fatal(err)
+	}
+	return vnt
+}
+
+func (vnt *vmNetworkTester) connectTaps(vmTap *os.File) {
+	vnt.g.Add(nil, newTapConnector(vmTap, vnt.dhcpClientTap))
+}
+
+func (vnt *vmNetworkTester) addTcpdump(link netlink.Link, stopOn, failOn string) {
+	tcpdump := newTcpdump(link, stopOn, failOn)
+	vnt.g.Add(vnt.hostNS, tcpdump)
+}
+
+func (vnt *vmNetworkTester) verifyDhcp(expectedSubstrings []string) {
+	// wait for dhcp client to complete so we don't interfere
+	// with the network link too early
+	<-vnt.g.Add(vnt.clientNS, NewDhcpClient(expectedSubstrings))
+}
+
+func (vnt *vmNetworkTester) verifyPing(outerIP net.IP) {
+	// dhcpcd -T doesn't add address to the link
+	clientIP := addAddress(vnt.t, vnt.clientNS, vnt.clientTapLink, clientAddr)
+	vnt.g.Add(vnt.hostNS, newPinger(outerIP, clientIP))
+	vnt.g.Add(vnt.clientNS, newPinger(clientIP, outerIP))
+	vnt.g.Add(vnt.clientNS, newPingReceiver(clientIP))
+	vnt.g.Add(vnt.hostNS, newPingReceiver(outerIP))
+}
+
+func (vnt *vmNetworkTester) wait() {
+	vnt.g.Wait()
+}
+
+func (vnt *vmNetworkTester) teardown() {
+	vnt.g.Stop()
+	if vnt.dhcpClientTap != nil {
+		// this Close() call may likely cause an error because
+		// tap is probably already closed by tapConnector
+		vnt.dhcpClientTap.Close()
+	}
+	if vnt.clientTapLink != nil {
+		if err := vnt.clientNS.Do(func(ns.NetNS) error {
+			if err := netlink.LinkSetDown(vnt.clientTapLink); err != nil {
+				return err
+			}
+			if err := netlink.LinkDel(vnt.clientTapLink); err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
+			vnt.t.Logf("WARNING: error tearing down client tap: %v", err)
+		}
+	}
+	vnt.clientNS.Close()
+	vnt.hostNS.Close()
+}
+
+func (vnt *vmNetworkTester) setupClientTap() error {
+	return vnt.clientNS.Do(func(ns.NetNS) error {
+		var err error
+		vnt.clientTapLink, err = nettools.CreateTAP("tap0", 1500)
+		if err != nil {
+			return fmt.Errorf("CreateTAP() in the client netns: %v", err)
+		}
+		vnt.dhcpClientTap, err = nettools.OpenTAP("tap0")
+		if err != nil {
+			return fmt.Errorf("OpenTAP() in the client netns: %v", err)
+		}
+		mac, _ := net.ParseMAC(clientMacAddress)
+		if err = nettools.SetHardwareAddr(vnt.clientTapLink, mac); err != nil {
+			return fmt.Errorf("can't set test MAC address on client interface: %v", err)
+		}
+		return nil
+	})
+}
+
+// TestVmNetwork verifies the network setup by directly calling
+// SetupContainerSideNetwork() to rule out some possible
+// TapFDSource-only errors
+func TestVmNetwork(t *testing.T) {
+	vnt := newVMNetworkTester(t)
+	defer vnt.teardown()
+
+	contNS, err := ns.NewNS()
+	if err != nil {
+		t.Fatalf("Failed to create container ns: %v", err)
+	}
+	defer contNS.Close()
+
+	info := sampleCNIResult()
+
+	var hostVeth netlink.Link
+	if err := vnt.hostNS.Do(func(ns.NetNS) (err error) {
 		hostVeth, _, err = nettools.CreateEscapeVethPair(contNS, "eth0", 1500)
 		return
 	}); err != nil {
 		t.Fatalf("failed to create escape veth pair: %v", err)
 	}
 
+	var csn *nettools.ContainerSideNetwork
 	if err := contNS.Do(func(ns.NetNS) error {
 		allLinks, err := netlink.LinkList()
 		if err != nil {
 			return fmt.Errorf("LinkList() failed: %v", err)
 		}
-		_, err = nettools.SetupContainerSideNetwork(info, contNS.Path(), allLinks)
+		csn, err = nettools.SetupContainerSideNetwork(info, contNS.Path(), allLinks)
 		if err != nil {
 			return fmt.Errorf("failed to set up container side network: %v", err)
 		}
-
-		// Here we setup extra veth for dhcp client.
-		// That's temporary solution, what we really should
-		// use is another tap interface + forwarding.
-		// See https://nsl.cz/using-tun-tap-in-go-or-how-to-write-vpn/
-		// Also https://ldpreload.com/p/vpn-with-socat.txt
-		var vethToBridge netlink.Link
-		vethToBridge, dhcpClientVeth, err = nettools.CreateEscapeVethPair(clientNS, "veth0", 1500)
-		if err != nil {
-			return fmt.Errorf("failed to create veth pair for the client: %v", err)
+		if len(csn.Fds) != 1 {
+			return fmt.Errorf("single tap fd is expected")
 		}
-
-		brLink, err := netlink.LinkByName("br0")
-		if err != nil {
-			return fmt.Errorf("failed to locate container-side bridge: %v", err)
-		}
-
-		br, ok := brLink.(*netlink.Bridge)
-		if !ok {
-			return fmt.Errorf("br0 is not a bridge: %#v", brLink)
-		}
-
-		if err := netlink.LinkSetMaster(vethToBridge, br); err != nil {
-			return fmt.Errorf("failed to set master for dhcp client veth: %v", err)
-		}
-
 		return nil
 	}); err != nil {
 		t.Fatalf("failed to set up container-side network: %v", err)
 	}
-	if err := clientNS.Do(func(ns.NetNS) error {
-		mac, _ := net.ParseMAC(clientMacAddress)
-		if err = nettools.SetHardwareAddr(dhcpClientVeth, mac); err != nil {
-			return fmt.Errorf("can't set test MAC address on client interface: %v", err)
-		}
-		return nil
-	}); err != nil {
-		t.Fatal(err)
-	}
 
-	outerIP := addAddress(t, hostNS, hostVeth, outerAddr)
-
-	g := NewNetTestGroup(t, 15*time.Second)
-	defer g.Stop()
-
+	outerIP := addAddress(t, vnt.hostNS, hostVeth, sampleOuterAddr)
+	vnt.connectTaps(csn.Fds[0])
 	// tcpdump should catch udp 'ping' but should not
 	// see BOOTP/DHCP on the 'outer' link
-	tcpdump := newTcpdump(hostVeth, "10.1.90.1.4243 > 10.1.90.5.4242: UDP", "BOOTP/DHCP")
-	g.Add(hostNS, tcpdump)
-
-	g.Add(contNS, NewDhcpServerTester(info))
-	// wait for dhcp client to complete so we don't interfere
-	// with the network link too early
-	<-g.Add(clientNS, NewDhcpClient([]string{
+	vnt.addTcpdump(hostVeth, "10.1.90.1.4243 > 10.1.90.5.4242: UDP", "BOOTP/DHCP")
+	vnt.g.Add(contNS, NewDhcpServerTester(info))
+	vnt.verifyDhcp([]string{
 		"new_classless_static_routes='10.10.42.0/24 10.1.90.90'",
 		"new_ip_address='10.1.90.5'",
 		"new_network_number='10.1.90.0'",
 		"new_routers='10.1.90.1'",
 		"new_subnet_mask='255.255.255.0'",
-		"veth0: offered 10.1.90.5 from 169.254.254.2",
-	}))
-
-	// dhcpcd -T doesn't add address to the link
-	clientIP := addAddress(t, clientNS, dhcpClientVeth, clientAddr)
-	g.Add(hostNS, newPinger(outerIP, clientIP))
-	g.Add(clientNS, newPinger(clientIP, outerIP))
-	g.Add(clientNS, newPingReceiver(clientIP))
-	g.Add(hostNS, newPingReceiver(outerIP))
-
-	g.Wait()
+		"tap0: offered 10.1.90.5 from 169.254.254.2",
+	})
+	vnt.verifyPing(outerIP)
+	vnt.wait()
 }
 
-type pinger struct {
-	localIP, destIP net.IP
-	conn            *net.UDPConn
-}
+func withTapFDSource(t *testing.T, info *cnicurrent.Result, hostNS ns.NetNS, toCall func(string, *FakeCNIClient, *tapmanager.FDClient)) {
+	podId := utils.NewUuid()
+	cniClient := NewFakeCNIClient(info, hostNS, podId, samplePodName, samplePodNS)
+	defer cniClient.Cleanup()
 
-func newPinger(localIP net.IP, destIP net.IP) *pinger {
-	return &pinger{localIP: localIP, destIP: destIP}
-}
-
-func (p *pinger) Name() string {
-	return fmt.Sprintf("pinger for %v", p.destIP)
-}
-
-func (p *pinger) Fg() bool { return false }
-
-func (p *pinger) dial() error {
-	var laddr *net.UDPAddr
-	if p.localIP != nil {
-		laddr = &net.UDPAddr{IP: p.localIP, Port: pingSrcPort}
-	}
-	raddr := &net.UDPAddr{IP: p.destIP, Port: pingPort}
-	var err error
-	p.conn, err = net.DialUDP("udp4", laddr, raddr)
+	src, err := tapmanager.NewTapFDSource(cniClient)
 	if err != nil {
-		return fmt.Errorf("net.DialUDP(): %v", err)
+		t.Fatalf("Error creating tap fd source: %v", err)
 	}
-	return nil
-}
 
-func (p *pinger) ping() error {
-	if _, err := p.conn.Write([]byte("hello")); err != nil {
-		return fmt.Errorf("Write(): %v", err)
-	}
-	return nil
-}
-
-func (p *pinger) Run(readyCh, stopCh chan struct{}) error {
-	if err := p.dial(); err != nil {
-		return err
-	}
-	close(readyCh)
-	for {
-		select {
-		case <-stopCh:
-			p.conn.Close()
-			return nil
-		case <-time.After(pingInterval):
-			if err := p.ping(); err != nil {
-				// receiver may not be ready yet, don't fail here
-				glog.V(3).Infof("ping error: %v", err)
-			}
-		}
-	}
-}
-
-type pingReceiver struct {
-	localIP net.IP
-	conn    *net.UDPConn
-}
-
-func newPingReceiver(localIP net.IP) *pingReceiver {
-	return &pingReceiver{localIP: localIP}
-}
-
-func (p *pingReceiver) Name() string {
-	return fmt.Sprintf("pingReceiver for %v", p.localIP)
-}
-
-func (p *pingReceiver) Fg() bool { return true }
-
-func (p *pingReceiver) listen() error {
-	var err error
-	p.conn, err = net.ListenUDP("udp4", &net.UDPAddr{IP: p.localIP, Port: pingPort})
+	tmpDir, err := ioutil.TempDir("", "pass-fd-test")
 	if err != nil {
-		return fmt.Errorf("net.ListenUDP(): %v", err)
+		t.Fatalf("ioutil.TempDir(): %v", err)
 	}
-	return nil
+	defer os.RemoveAll(tmpDir)
+	socketPath := filepath.Join(tmpDir, "tapfdserver.sock")
+
+	s := tapmanager.NewFDServer(socketPath, src)
+	if err := s.Serve(); err != nil {
+		t.Fatalf("Serve(): %v", err)
+	}
+	defer s.Stop()
+
+	c := tapmanager.NewFDClient(socketPath)
+	if err := c.Connect(); err != nil {
+		t.Fatalf("Connect(): %v", err)
+	}
+	defer func() {
+		if err := c.Close(); err != nil {
+			t.Errorf("Close(): %v", err)
+		}
+	}()
+	toCall(podId, cniClient, c)
 }
 
-func (p *pingReceiver) cycle() (bool, error) {
-	if err := p.conn.SetDeadline(time.Now().Add(pingDeadline)); err != nil {
-		return false, err
-	}
-	buf := make([]byte, 16)
-	n, addr, err := p.conn.ReadFromUDP(buf)
+func verifyNoDiff(t *testing.T, what string, expected, actual interface{}) {
+	expectedJson, err := json.MarshalIndent(expected, "", "  ")
 	if err != nil {
-		if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
-			return false, nil
-		}
-		return false, err
+		expectedJson = []byte(fmt.Sprintf("<error marshalling expected: %v>", err))
 	}
-	glog.V(3).Infof("received udp ping from %v: %q", addr, string(buf[:n]))
-	return true, nil
-}
-
-func (p *pingReceiver) Run(readyCh, stopCh chan struct{}) error {
-	if err := p.listen(); err != nil {
-		return err
-	}
-	close(readyCh)
-	defer p.conn.Close()
-	for n := 0; n < pingReceiverCycles; n++ {
-		select {
-		case <-stopCh:
-			return errors.New("ping receiver stopped before receiving any pings")
-		default:
-		}
-		received, err := p.cycle()
-		if err != nil {
-			return err
-		}
-		if received {
-			return nil
-		}
-	}
-	return errors.New("no pings received")
-}
-
-type safeBuf struct {
-	m sync.Mutex
-	b bytes.Buffer
-}
-
-func (sb *safeBuf) Write(p []byte) (n int, err error) {
-	sb.m.Lock()
-	defer sb.m.Unlock()
-	return sb.b.Write(p)
-}
-
-func (sb *safeBuf) String() string {
-	sb.m.Lock()
-	defer sb.m.Unlock()
-	return sb.b.String()
-}
-
-type tcpdump struct {
-	link           netlink.Link
-	stopOn, failOn string
-	readyCh        chan struct{}
-	bOut, bErr     safeBuf
-	cmd            *exec.Cmd
-	out            string
-}
-
-func newTcpdump(link netlink.Link, stopOn, failOn string) *tcpdump {
-	return &tcpdump{
-		link:    link,
-		stopOn:  stopOn,
-		failOn:  failOn,
-		readyCh: make(chan struct{}),
-	}
-}
-
-func (t *tcpdump) Name() string {
-	return fmt.Sprintf("tcpdump on %s", t.link.Attrs().Name)
-}
-
-func (t *tcpdump) Fg() bool { return true }
-
-func (t *tcpdump) gotListeningMsg() bool {
-	idx := strings.Index(t.bErr.String(), "\nlistening on")
-	if idx < 0 {
-		return false
-	}
-	return strings.LastIndex(t.bErr.String(), "\n") > idx
-}
-
-func (t *tcpdump) waitForReady() bool {
-	for n := 0; n < tcpdumpStartupPollCount; n++ {
-		time.Sleep(tcpdumpPollPeriod)
-		if t.gotListeningMsg() {
-			// XXX: the correct way would be to wait for
-			// some traffic here
-			time.Sleep(100 * time.Millisecond)
-			return true
-		}
-	}
-	return false
-}
-
-func (t *tcpdump) waitForSubstring(stopCh chan struct{}) error {
-	for n := 0; n < tcpdumpSubstringWaitCount; n++ {
-		select {
-		case <-stopCh:
-			return fmt.Errorf("tcpdump stopped before producing expected output %q, out:\n", t.stopOn, t.bOut.String())
-		case <-time.After(tcpdumpPollPeriod):
-			s := t.bOut.String()
-			if strings.Contains(s, t.failOn) {
-				return fmt.Errorf("found unexpected %q in tcpdump output:\n%s", t.failOn, s)
-			}
-			if strings.Contains(s, t.stopOn) {
-				return nil
-			}
-		}
-	}
-	return fmt.Errorf("timed out waiting for tcpdump output %q, out:\n%s", t.stopOn, t.bOut.String())
-}
-
-func (t *tcpdump) stop() error {
-	// tcpdump exits with status 0 on SIGINT
-	// (if it hasn't exited already)
-	t.cmd.Process.Signal(os.Interrupt)
-	err := t.cmd.Wait()
+	actualJson, err := json.MarshalIndent(actual, "", "  ")
 	if err != nil {
-		glog.Errorf("tcpdump failed: %v", err)
+		actualJson = []byte(fmt.Sprintf("<error marshalling actual: %v>", err))
 	}
-	return err
-}
-
-func (t *tcpdump) Run(readyCh, stopCh chan struct{}) error {
-	// -l stands for 'line buffered'. We want to receive tcpdump
-	// output as soon as it's generated
-	t.cmd = exec.Command("tcpdump", "-l", "-n", "-i", t.link.Attrs().Name, "udp")
-	t.cmd.Stdout = &t.bOut
-	t.cmd.Stderr = &t.bErr
-
-	// make sure we start the process in current network namespace
-	if err := t.cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start tcpdump: %v", err)
+	if bytes.Equal(expectedJson, actualJson) {
+		return
 	}
-
-	if t.waitForReady() {
-		close(readyCh)
-	} else {
-		t.stop()
-		return fmt.Errorf("timed out waiting for tcpdump, error output:\n%s", t.bErr.String())
-	}
-
-	if err := t.waitForSubstring(stopCh); err != nil {
-		t.stop()
-		return err
-	}
-
-	err := t.stop()
-	t.out = t.bOut.String()
-	return err
-}
-
-func addAddress(t *testing.T, netNS ns.NetNS, link netlink.Link, addr string) net.IP {
-	parsedAddr, err := netlink.ParseAddr(addr)
+	diff, err := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
+		A:        difflib.SplitLines(string(expectedJson)),
+		B:        difflib.SplitLines(string(actualJson)),
+		FromFile: "Expected",
+		ToFile:   "Actual",
+		Context:  5,
+	})
 	if err != nil {
-		t.Fatalf("failed to parse snooping address: %v", err)
+		diff = fmt.Sprintf("<diff error: %v>", err)
 	}
-	if err := netNS.Do(func(ns.NetNS) (err error) {
-		return netlink.AddrAdd(link, parsedAddr)
-	}); err != nil {
-		t.Fatalf("failed to add address to snooping veth: %v", err)
-	}
-	return parsedAddr.IP
+	t.Errorf("mismatch: %s: expected:\n%s\n\nactual:\n%s\ndiff:\n%s", what, expectedJson, actualJson, diff)
 }
 
-// TODO: document NetTester / NetTestGroup
-// TODO: block ip trafic from br0 ip
+func mustParseMAC(mac string) net.HardwareAddr {
+	hwAddr, err := net.ParseMAC(mac)
+	if err != nil {
+		log.Panicf("Error parsing hwaddr %q: %v", mac, err)
+	}
+	return hwAddr
+}
+
+// TestVmNetwork verifies the network setup using TapFDSource
+func TestTapFDSource(t *testing.T) {
+	for _, tc := range []struct {
+		name                   string
+		interfaceCount         int
+		outerAddr              string
+		info                   *cnicurrent.Result
+		tcpdumpStopOn          string
+		dhcpExpectedSubstrings []string
+		interfaceDesc          []tapmanager.InterfaceDescription
+		useBadResult           bool
+	}{
+		{
+			name:           "single cni",
+			interfaceCount: 1,
+			outerAddr:      sampleOuterAddr,
+			info:           sampleCNIResult(),
+			tcpdumpStopOn:  "10.1.90.1.4243 > 10.1.90.5.4242: UDP",
+			dhcpExpectedSubstrings: []string{
+				"new_classless_static_routes='10.10.42.0/24 10.1.90.90'",
+				"new_ip_address='10.1.90.5'",
+				"new_network_number='10.1.90.0'",
+				"new_routers='10.1.90.1'",
+				"new_subnet_mask='255.255.255.0'",
+				"tap0: offered 10.1.90.5 from 169.254.254.2",
+			},
+			interfaceDesc: []tapmanager.InterfaceDescription{
+				{
+					Type:         nettools.InterfaceTypeTap,
+					HardwareAddr: mustParseMAC(clientMacAddress),
+					FdIndex:      0,
+					PCIAddress:   "",
+				},
+			},
+		},
+		{
+			name:           "single cni with bad result",
+			interfaceCount: 1,
+			outerAddr:      sampleOuterAddr,
+			info:           sampleCNIResult(),
+			tcpdumpStopOn:  "10.1.90.1.4243 > 10.1.90.5.4242: UDP",
+			dhcpExpectedSubstrings: []string{
+				"new_classless_static_routes='10.10.42.0/24 10.1.90.90'",
+				"new_ip_address='10.1.90.5'",
+				"new_network_number='10.1.90.0'",
+				"new_routers='10.1.90.1'",
+				"new_subnet_mask='255.255.255.0'",
+				"tap0: offered 10.1.90.5 from 169.254.254.2",
+			},
+			interfaceDesc: []tapmanager.InterfaceDescription{
+				{
+					Type:         nettools.InterfaceTypeTap,
+					HardwareAddr: mustParseMAC(clientMacAddress),
+					FdIndex:      0,
+					PCIAddress:   "",
+				},
+			},
+			useBadResult: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vnt := newVMNetworkTester(t)
+			defer vnt.teardown()
+
+			withTapFDSource(t, tc.info, vnt.hostNS, func(podId string, cniClient *FakeCNIClient, c *tapmanager.FDClient) {
+				cniClient.UseBadResult(tc.useBadResult)
+				netConfigBytes, err := c.AddFDs(fdKey, &tapmanager.GetFDPayload{
+					Description: &tapmanager.PodNetworkDesc{
+						PodId:   podId,
+						PodNs:   samplePodNS,
+						PodName: samplePodName,
+					},
+				})
+				if err != nil {
+					t.Fatalf("AddFDs(): %v", err)
+				}
+				released := false
+				defer func() {
+					if !released {
+						c.ReleaseFDs(fdKey)
+					}
+				}()
+
+				var result, expectedResult *cnicurrent.Result
+				if err := json.Unmarshal(netConfigBytes, &result); err != nil {
+					t.Errorf("error unmarshalling CNI result: %v", err)
+				} else {
+					expectedResult = copyCNIResult(tc.info)
+					replaceSandboxPlaceholders(expectedResult, podId)
+					verifyNoDiff(t, "cni result", expectedResult, result)
+				}
+
+				cniClient.VerifyAdded()
+				veths := cniClient.Veths()
+				if len(veths) != 1 {
+					t.Fatalf("veth count mismatch: %d instead of %d", len(veths), tc.interfaceCount)
+				}
+
+				fds, descBytes, err := c.GetFDs(fdKey)
+				if err != nil {
+					t.Fatalf("GetFDs(): %v", err)
+				}
+				if len(fds) != tc.interfaceCount {
+					t.Fatalf("fd count mismatch: %d instead of %d", len(fds), tc.interfaceCount)
+				}
+
+				var interfaceDesc []tapmanager.InterfaceDescription
+				if err := json.Unmarshal(descBytes, &interfaceDesc); err != nil {
+					t.Errorf("error unmarshalling interface desc: %v", err)
+				} else {
+					verifyNoDiff(t, "interfaceDesc", tc.interfaceDesc, interfaceDesc)
+				}
+
+				vmTap := os.NewFile(uintptr(fds[0]), "tap-fd")
+				defer vmTap.Close()
+				outerIP := addAddress(t, vnt.hostNS, veths[0].HostSide, tc.outerAddr)
+				vnt.connectTaps(vmTap)
+				// tcpdump should catch udp 'ping' but should not
+				// see BOOTP/DHCP on the 'outer' link
+				vnt.addTcpdump(veths[0].HostSide, tc.tcpdumpStopOn, "BOOTP/DHCP")
+				vnt.verifyDhcp(tc.dhcpExpectedSubstrings)
+				vnt.verifyPing(outerIP)
+				vnt.wait()
+
+				if err := c.ReleaseFDs(fdKey); err != nil {
+					t.Errorf("ReleaseFDs(): %v", err)
+				}
+				released = true
+				cniClient.VerifyRemoved()
+
+				infoAfterTeardown := cniClient.NetworkInfoAfterTeardown()
+				verifyNoDiff(t, "network info after teardown", expectedResult, infoAfterTeardown)
+			})
+		})
+	}
+}
+
+// TODO: test multiple CNIs
+// TODO: test Calico
+// TODO: test recovering netns
+// TODO: test SR-IOV (by making a fake sysfs dir)

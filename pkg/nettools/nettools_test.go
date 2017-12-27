@@ -244,7 +244,7 @@ func addTestRoute(t *testing.T, route *netlink.Route) {
 func setupLink(hwAddrAsText string, link netlink.Link) netlink.Link {
 	hwAddr, err := net.ParseMAC(hwAddrAsText)
 	if err != nil {
-		log.Panicf("Error parsing hwaddr %q: %v", hwAddr, err)
+		log.Panicf("Error parsing hwaddr %q: %v", hwAddrAsText, err)
 	}
 	if err := SetHardwareAddr(link, hwAddr); err != nil {
 		log.Panicf("Error setting hardware address: %v", err)
