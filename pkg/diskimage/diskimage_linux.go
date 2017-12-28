@@ -1,3 +1,5 @@
+// +build linux
+
 /*
 Copyright 2016 Mirantis
 
@@ -22,7 +24,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/diskimage/guestfs"
 )
 
-func InitLibForImage(path string) (*guestfs.Guestfs, error) {
+func initLibForImage(path string) (*guestfs.Guestfs, error) {
 	g, err := guestfs.Create()
 	if err != nil {
 		return nil, err
@@ -35,7 +37,7 @@ func InitLibForImage(path string) (*guestfs.Guestfs, error) {
 }
 
 func FormatDisk(path string) error {
-	g, err := InitLibForImage(path)
+	g, err := initLibForImage(path)
 	if err != nil {
 		return err
 	}
