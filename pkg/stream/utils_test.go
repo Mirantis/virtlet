@@ -21,11 +21,15 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"runtime"
 	"testing"
 	"time"
 )
 
 func TestGetPidFromConnection(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("getPidFromConnection only works on Linux")
+	}
 	socket, err := ioutil.TempFile(os.TempDir(), "utilTest")
 	defer os.Remove(socket.Name())
 	socketPath := socket.Name()
@@ -54,6 +58,9 @@ func TestGetPidFromConnection(t *testing.T) {
 }
 
 func TestGetProcessEnvironment(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("getProcessEnvironment only works on Linux")
+	}
 	cmd := exec.Command("sleep", "10")
 	cmd.Env = append(os.Environ(),
 		"FOO=1",
