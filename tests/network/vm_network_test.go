@@ -225,8 +225,8 @@ func TestVmNetwork(t *testing.T) {
 		if err != nil {
 			return fmt.Errorf("failed to set up container side network: %v", err)
 		}
-		if len(csn.Fds) != 1 {
-			return fmt.Errorf("single tap fd is expected")
+		if len(csn.Interfaces) != 1 {
+			return fmt.Errorf("single interface is expected")
 		}
 		return nil
 	}); err != nil {
@@ -234,7 +234,7 @@ func TestVmNetwork(t *testing.T) {
 	}
 
 	outerIP := addAddress(t, vnt.hostNS, hostVeth, sampleOuterAddr)
-	vnt.connectTaps(csn.Fds[0])
+	vnt.connectTaps(csn.Interfaces[0].Fo)
 	// tcpdump should catch udp 'ping' but should not
 	// see BOOTP/DHCP on the 'outer' link
 	vnt.addTcpdump(hostVeth, "10.1.90.1.4243 > 10.1.90.5.4242: UDP", "BOOTP/DHCP")

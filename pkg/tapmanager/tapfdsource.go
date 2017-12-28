@@ -233,8 +233,8 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 		doneCh:     doneCh,
 	}
 	var fds []int
-	for _, f := range csn.Fds {
-		fds = append(fds, int(f.Fd()))
+	for _, i := range csn.Interfaces {
+		fds = append(fds, int(i.Fo.Fd()))
 	}
 	return fds, respData, nil
 }
@@ -293,12 +293,12 @@ func (s *TapFDSource) GetInfo(key string) ([]byte, error) {
 		return nil, fmt.Errorf("bad fd key: %q", key)
 	}
 	var descriptions []InterfaceDescription
-	for i, hwAddr := range pn.csn.HardwareAddrs {
+	for i, iface := range pn.csn.Interfaces {
 		descriptions = append(descriptions, InterfaceDescription{
 			FdIndex:      i,
-			HardwareAddr: hwAddr,
-			Type:         pn.csn.InterfaceTypes[i],
-			PCIAddress:   pn.csn.PCIAddresses[i],
+			HardwareAddr: iface.HardwareAddr,
+			Type:         iface.Type,
+			PCIAddress:   iface.PCIAddress,
 		})
 	}
 	data, err := json.Marshal(descriptions)
