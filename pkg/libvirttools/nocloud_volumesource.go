@@ -23,10 +23,7 @@ import (
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 )
 
-const (
-	// FIXME: make this configurable
-	nocloudIsoDir = "/var/lib/virtlet/nocloud"
-)
+var nocloudIsoDir = "/var/lib/virtlet/nocloud"
 
 // nocloudVolume denotes an ISO image using nocloud format
 // that contains cloud-init meta-data nad user-data
@@ -64,6 +61,12 @@ func (v *nocloudVolume) Teardown() error {
 		glog.Warningf("Cannot remove temporary nocloud file %q: %v", isoPath, err)
 	}
 	return nil
+}
+
+// SetNocloudIsoDir sets a directory for nocloud iso dir.
+// It can be useful in tests
+func SetNocloudIsoDir(dir string) {
+	nocloudIsoDir = dir
 }
 
 // TODO: this file needs a test
