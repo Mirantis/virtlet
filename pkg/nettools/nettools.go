@@ -677,6 +677,9 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 		hwAddrs = append(hwAddrs, hwAddr)
 
 		if isSriovVf(link) {
+			if os.Getenv("VIRTLET_SRIOV_SUPPORT") == "" {
+				return nil, fmt.Errorf("SR-IOV device configured in container network namespace while Virtlet is configured with disabled SR-IOV support")
+			}
 			if err := StripLink(link); err != nil {
 				return nil, err
 			}
