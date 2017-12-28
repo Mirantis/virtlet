@@ -29,6 +29,11 @@ import (
 	"github.com/Mirantis/virtlet/pkg/virt"
 )
 
+const (
+	nocloudPathHint        = "/__nocloud__/"
+	nocloudPathReplacement = "/var/lib/virtlet/nocloud/"
+)
+
 type FakeDomainConnection struct {
 	rec                Recorder
 	domains            map[string]*FakeDomain
@@ -75,7 +80,6 @@ func (dc *FakeDomainConnection) removeSecret(s *FakeSecret) {
 
 func (dc *FakeDomainConnection) DefineDomain(def *libvirtxml.Domain) (virt.VirtDomain, error) {
 	def = copyDomain(def)
-	dc.rec.Rec("DefineDomain", def)
 	addPciRoot(def)
 	assignFakePCIAddressesToControllers(def)
 	// TODO: dump any ISOs mentioned in disks (Type=file) as json
@@ -92,6 +96,21 @@ func (dc *FakeDomainConnection) DefineDomain(def *libvirtxml.Domain) (virt.VirtD
 	d := newFakeDomain(dc, def)
 	dc.domains[def.Name] = d
 	dc.domainsByUuid[def.UUID] = d
+
+	updatedDef := copyDomain(def)
+	if updatedDef.Devices != nil {
+		for _, disk := range updatedDef.Devices.Disks {
+			if disk.Type != "file" || disk.Source == nil {
+				continue
+			}
+			p := strings.Index(disk.Source.File, nocloudPathHint)
+			if p >= 0 {
+				disk.Source.File = nocloudPathReplacement + disk.Source.File[p+len(nocloudPathHint):]
+			}
+		}
+	}
+
+	dc.rec.Rec("DefineDomain", updatedDef)
 	return d, nil
 }
 

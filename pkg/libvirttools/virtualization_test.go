@@ -72,6 +72,9 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 		t.Fatalf("TempDir(): %v", err)
 	}
 
+	// __nocloud__ is a hint for fake libvirt domain to fix the path
+	SetNocloudIsoDir(filepath.Join(ct.tmpDir, "__nocloud__"))
+
 	downloader := utils.NewFakeDownloader(ct.tmpDir)
 	ct.rec = rec
 	ct.domainConn = fake.NewFakeDomainConnection(ct.rec.Child("domain conn"))

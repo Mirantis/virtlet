@@ -211,7 +211,7 @@
           {
             "XMLName": {
               "Space": "",
-              "Local": ""
+              "Local": "controller"
             },
             "Type": "pci",
             "Index": null,
