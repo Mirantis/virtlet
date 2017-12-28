@@ -62,14 +62,12 @@ func newRawDeviceVolume(volumeName, configPath string, config *VMConfig, owner V
 
 func (v *rawDeviceVolume) verifyRawDeviceWhitelisted(path string) error {
 	for _, deviceTemplate := range v.owner.RawDevices() {
-		devicePaths, err := filepath.Glob("/dev/" + deviceTemplate)
+		matches, err := filepath.Match("/dev/"+deviceTemplate, path)
 		if err != nil {
-			return fmt.Errorf("error in raw device whitelist glob pattern '%s': %v", deviceTemplate, err)
+			return fmt.Errorf("bad raw device whitelist glob pattern '%s': %v", deviceTemplate, err)
 		}
-		for _, devicePath := range devicePaths {
-			if path == devicePath {
-				return nil
-			}
+		if matches {
+			return nil
 		}
 	}
 	return fmt.Errorf("device '%s' not whitelisted on this virtlet node", path)
