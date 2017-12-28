@@ -69,5 +69,5 @@ Some of the tests such as integration/e2e and network related tests
 only run on Linux. That being said, some of the tests do run on
 Mac OS X:
 ```
-$ go test -v ./pkg/{flexvolume,imagetranslation,libvirttools,metadata,stream,utils}
+$ go test -v ./pkg/{flexvolume,imagetranslation,libvirttools,metadata,stream,utils,tapmanager}
 ```
