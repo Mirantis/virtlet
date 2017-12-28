@@ -13,16 +13,15 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package stream
 
 import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
 	"path/filepath"
 	"strings"
-	"syscall"
 )
 
 // DetachError is special error which returned in case of container detach.
@@ -30,19 +29,6 @@ type DetachError struct{}
 
 func (DetachError) Error() string {
 	return "detached from container"
-}
-
-func getPidFromConnection(conn *net.UnixConn) (int32, error) {
-	f, err := conn.File()
-	if err != nil {
-		return -1, err
-	}
-	defer f.Close()
-	cred, err := syscall.GetsockoptUcred(int(f.Fd()), syscall.SOL_SOCKET, syscall.SO_PEERCRED)
-	if err != nil {
-		return -1, err
-	}
-	return cred.Pid, nil
 }
 
 func getProcessEnvironment(pid int32) (map[string]string, error) {
