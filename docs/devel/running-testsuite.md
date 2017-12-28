@@ -56,3 +56,18 @@ $ ../../build/cmd.sh gotest
 PASS
 ok      github.com/Mirantis/virtlet/pkg/libvirttools    0.456s
 ```
+
+To run tests on Mac OS X, you need to install `cdrtools` package and
+then make a symbolic link for `mkisofs` named `genisoimage`:
+
+```
+$ brew install cdrtools
+$ sudo ln -s `which mkisofs` /usr/local/bin/genisoimage
+```
+
+Some of the tests such as integration/e2e and network related tests
+only run on Linux. That being said, some of the tests do run on
+Mac OS X:
+```
+$ go test -v ./pkg/{flexvolume,imagetranslation,libvirttools,metadata,stream,utils}
+```
