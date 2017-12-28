@@ -251,22 +251,22 @@ func (g *CloudInitGenerator) GenerateImage(volumeMap diskPathMap) error {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	var metaData, userData, networkConfiguration []byte
+	var metaData, userData []byte //, networkConfiguration []byte
 	metaData, err = g.generateMetaData()
 	if err == nil {
 		userData, err = g.generateUserData(volumeMap)
 	}
-	if err == nil {
-		networkConfiguration, err = g.generateNetworkConfiguration()
-	}
+	// if err == nil {
+	// 	networkConfiguration, err = g.generateNetworkConfiguration()
+	// }
 	if err != nil {
 		return err
 	}
 
 	if err := utils.WriteFiles(tmpDir, map[string][]byte{
-		"user-data":      userData,
-		"meta-data":      metaData,
-		"network-config": networkConfiguration,
+		"latest/user_data":      userData,
+		"latest/meta_data.json": metaData,
+		// "network-config": networkConfiguration,
 	}); err != nil {
 		return fmt.Errorf("can't write user-data: %v", err)
 	}
@@ -275,7 +275,7 @@ func (g *CloudInitGenerator) GenerateImage(volumeMap diskPathMap) error {
 		return fmt.Errorf("error making iso directory %q: %v", g.isoDir, err)
 	}
 
-	if err := utils.GenIsoImage(g.IsoPath(), "cidata", tmpDir); err != nil {
+	if err := utils.GenIsoImage(g.IsoPath(), "config-2", tmpDir); err != nil { // cidata
 		if rmErr := os.Remove(g.IsoPath()); rmErr != nil {
 			glog.Warningf("Error removing iso file %s: %v", g.IsoPath(), rmErr)
 		}
