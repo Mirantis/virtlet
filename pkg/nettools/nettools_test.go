@@ -407,8 +407,8 @@ func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, contNsP
 		t.Errorf("interface info mismatch. Expected:\n%s\nActual:\n%s",
 			spew.Sdump(expectedInfo), spew.Sdump(*csn.Result))
 	}
-	if !reflect.DeepEqual(origHwAddr, csn.HardwareAddrs[0]) {
-		t.Errorf("bad hwaddr returned from SetupContainerSideNetwork: %v instead of %v", csn.HardwareAddrs[0], origHwAddr)
+	if !reflect.DeepEqual(origHwAddr, csn.Interfaces[0].HardwareAddr) {
+		t.Errorf("bad hwaddr returned from SetupContainerSideNetwork: %v instead of %v", csn.Interfaces[0].HardwareAddr, origHwAddr)
 	}
 	// re-query origContVeth attrs
 	origContVeth, err = netlink.LinkByName(origContVeth.Attrs().Name)
@@ -552,7 +552,7 @@ func TestTeardownContainerSideNetwork(t *testing.T) {
 		if err != nil {
 			log.Panicf("the original cni veth is gone")
 		}
-		if !reflect.DeepEqual(origContVeth.Attrs().HardwareAddr, csn.HardwareAddrs[0]) {
+		if !reflect.DeepEqual(origContVeth.Attrs().HardwareAddr, csn.Interfaces[0].HardwareAddr) {
 			t.Errorf("cni veth hardware address wasn't restored")
 		}
 	})
