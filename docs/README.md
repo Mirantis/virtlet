@@ -7,7 +7,7 @@ This directory holds files containing documentation.
     * [Description of networking](networking.md)
     * [Description of SyncPod workflow](sync-pod-workflow.md)
     * [Volume handling](volumes.md)
-    * [CRI proxy](criproxy.md) overview
+    * [CRI proxy](https://github.com/Mirantis/criproxy/blob/master/README.md) overview
     * [Environment variables](environment-variables.md) support
     * [Image Handling](images.md)
     * [Image Name Translation](image-name-translation.md)
