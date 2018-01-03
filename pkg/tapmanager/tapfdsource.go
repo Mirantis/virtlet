@@ -195,7 +195,7 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 			return err
 		}
 
-		dhcpServer = dhcp.NewServer(csn.Result)
+		dhcpServer = dhcp.NewServer(csn)
 		if err := dhcpServer.SetupListener("0.0.0.0"); err != nil {
 			return fmt.Errorf("Failed to set up dhcp listener: %v", err)
 		}

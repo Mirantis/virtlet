@@ -232,16 +232,19 @@ func TestVmNetwork(t *testing.T) {
 
 	info := sampleCNIResult()
 
-	var hostVeth netlink.Link
+	var hostVeth, clientVeth netlink.Link
 	if err := vnt.hostNS.Do(func(ns.NetNS) (err error) {
-		hostVeth, _, err = nettools.CreateEscapeVethPair(contNS, "eth0", 1500)
+		hostVeth, clientVeth, err = nettools.CreateEscapeVethPair(contNS, "eth0", 1500)
 		return
 	}); err != nil {
 		t.Fatalf("failed to create escape veth pair: %v", err)
 	}
 
+	clientMac, _ := net.ParseMAC(clientMacAddress)
+
 	var csn *nettools.ContainerSideNetwork
 	if err := contNS.Do(func(ns.NetNS) error {
+		netlink.LinkSetHardwareAddr(clientVeth, clientMac)
 		allLinks, err := netlink.LinkList()
 		if err != nil {
 			return fmt.Errorf("LinkList() failed: %v", err)
@@ -263,7 +266,7 @@ func TestVmNetwork(t *testing.T) {
 	// tcpdump should catch udp 'ping' but should not
 	// see BOOTP/DHCP on the 'outer' link
 	vnt.addTcpdump(hostVeth, "10.1.90.1.4243 > 10.1.90.5.4242: UDP", "BOOTP/DHCP")
-	vnt.g.Add(contNS, NewDhcpServerTester(info))
+	vnt.g.Add(contNS, NewDhcpServerTester(csn))
 	vnt.verifyDhcp("tap0", []string{
 		"new_classless_static_routes='10.10.42.0/24 10.1.90.90'",
 		"new_ip_address='10.1.90.5'",
