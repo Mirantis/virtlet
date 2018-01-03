@@ -30,11 +30,11 @@ import (
 	"time"
 
 	"github.com/containernetworking/cni/pkg/ns"
-	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
 
 	"github.com/Mirantis/virtlet/pkg/dhcp"
+	"github.com/Mirantis/virtlet/pkg/nettools"
 )
 
 const (
@@ -158,10 +158,10 @@ func (g *NetTestGroup) Wait() {
 }
 
 type DhcpServerTester struct {
-	config *cnicurrent.Result
+	config *nettools.ContainerSideNetwork
 }
 
-func NewDhcpServerTester(config *cnicurrent.Result) *DhcpServerTester {
+func NewDhcpServerTester(config *nettools.ContainerSideNetwork) *DhcpServerTester {
 	return &DhcpServerTester{config}
 }
 

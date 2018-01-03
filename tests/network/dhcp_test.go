@@ -31,47 +31,56 @@ import (
 )
 
 type dhcpTestCase struct {
-	info               cnicurrent.Result
+	csn                nettools.ContainerSideNetwork
 	expectedSubstrings []string
 }
 
 func TestDhcpServer(t *testing.T) {
+	clientMac, _ := net.ParseMAC(clientMacAddress)
 	testCases := []*dhcpTestCase{
 		{
-			info: cnicurrent.Result{
-				Interfaces: []*cnicurrent.Interface{
-					{
-						Name: "eth0",
-						Mac:  clientMacAddress,
-						// Sandbox is clientNS dependent
-						// so it must be set in runtime
+			csn: nettools.ContainerSideNetwork{
+				Result: &cnicurrent.Result{
+					Interfaces: []*cnicurrent.Interface{
+						{
+							Name: "eth0",
+							Mac:  clientMacAddress,
+							// Sandbox is clientNS dependent
+							// so it must be set in runtime
+						},
+					},
+					IPs: []*cnicurrent.IPConfig{
+						{
+							Version:   "4",
+							Interface: 0,
+							Address: net.IPNet{
+								IP:   net.IP{10, 1, 90, 5},
+								Mask: net.IPMask{255, 255, 255, 0},
+							},
+							Gateway: net.IP{10, 1, 90, 1},
+						},
+					},
+					Routes: []*cnitypes.Route{
+						{
+							Dst: net.IPNet{
+								IP:   net.IP{0, 0, 0, 0},
+								Mask: net.IPMask{0, 0, 0, 0},
+							},
+							GW: net.IP{10, 1, 90, 1},
+						},
+						{
+							Dst: net.IPNet{
+								IP:   net.IP{10, 10, 42, 0},
+								Mask: net.IPMask{255, 255, 255, 0},
+							},
+							GW: net.IP{10, 1, 90, 90},
+						},
 					},
 				},
-				IPs: []*cnicurrent.IPConfig{
+				Interfaces: []nettools.InterfaceDescription{
 					{
-						Version:   "4",
-						Interface: 0,
-						Address: net.IPNet{
-							IP:   net.IP{10, 1, 90, 5},
-							Mask: net.IPMask{255, 255, 255, 0},
-						},
-						Gateway: net.IP{10, 1, 90, 1},
-					},
-				},
-				Routes: []*cnitypes.Route{
-					{
-						Dst: net.IPNet{
-							IP:   net.IP{0, 0, 0, 0},
-							Mask: net.IPMask{0, 0, 0, 0},
-						},
-						GW: net.IP{10, 1, 90, 1},
-					},
-					{
-						Dst: net.IPNet{
-							IP:   net.IP{10, 10, 42, 0},
-							Mask: net.IPMask{255, 255, 255, 0},
-						},
-						GW: net.IP{10, 1, 90, 90},
+						HardwareAddr: clientMac,
+						MTU:          9000,
 					},
 				},
 			},
@@ -84,6 +93,7 @@ func TestDhcpServer(t *testing.T) {
 				"new_dhcp_server_identifier='169.254.254.2'",
 				"new_domain_name_servers='8.8.8.8'",
 				"new_ip_address='10.1.90.5'",
+				"new_interface_mtu='9000'",
 				"new_network_number='10.1.90.0'",
 				"new_routers='10.1.90.1'",
 				"new_subnet_cidr='24'",
@@ -114,7 +124,7 @@ func runDhcpTestCase(t *testing.T, testCase *dhcpTestCase) {
 	defer clientNS.Close()
 
 	// Sandbox is clientNS dependent so it needs to be set there on all interfaces
-	for _, iface := range testCase.info.Interfaces {
+	for _, iface := range testCase.csn.Result.Interfaces {
 		iface.Sandbox = clientNS.Path()
 	}
 
@@ -150,7 +160,7 @@ func runDhcpTestCase(t *testing.T, testCase *dhcpTestCase) {
 
 	g := NewNetTestGroup(t, 15*time.Second)
 	defer g.Stop()
-	g.Add(serverNS, NewDhcpServerTester(&testCase.info))
+	g.Add(serverNS, NewDhcpServerTester(&testCase.csn))
 
 	g.Add(clientNS, NewDhcpClient(testCase.expectedSubstrings))
 	g.Wait()

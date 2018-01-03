@@ -578,6 +578,8 @@ type InterfaceDescription struct {
 	HardwareAddr net.HardwareAddr
 	// PCIAddress contains a pci address for sr-iov vf interface
 	PCIAddress string
+	// MTU contains max transfer unit value for interface
+	MTU uint16
 }
 
 // ContainerSideNetwork struct describes the container (VM) network
@@ -677,6 +679,8 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 		var ifaceType InterfaceType
 		var fo *os.File
 
+		mtu := link.Attrs().MTU
+
 		if err := StripLink(link); err != nil {
 			return nil, err
 		}
@@ -715,7 +719,7 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 			ifaceType = InterfaceTypeTap
 
 			tapInterfaceName := fmt.Sprintf(tapInterfaceNameTemplate, i)
-			tap, err := CreateTAP(tapInterfaceName, link.Attrs().MTU)
+			tap, err := CreateTAP(tapInterfaceName, mtu)
 			if err != nil {
 				return nil, err
 			}
@@ -755,11 +759,12 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 		}
 
 		interfaces = append(interfaces, InterfaceDescription{
-			Type: ifaceType,
-			Name: ifaceName,
-			Fo: fo,
+			Type:         ifaceType,
+			Name:         ifaceName,
+			Fo:           fo,
 			HardwareAddr: hwAddr,
-			PCIAddress: pciAddress,
+			PCIAddress:   pciAddress,
+			MTU:          uint16(mtu),
 		})
 	}
 
@@ -811,11 +816,11 @@ func RecreateContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLin
 			}
 		}
 		interfaces = append(interfaces, InterfaceDescription{
-			Type: ifaceType,
-			Name: ifaceName,
-			Fo: fo,
+			Type:         ifaceType,
+			Name:         ifaceName,
+			Fo:           fo,
 			HardwareAddr: hwAddr,
-			PCIAddress: pciAddress,
+			PCIAddress:   pciAddress,
 		})
 	}
 
