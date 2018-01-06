@@ -12,12 +12,13 @@ The steps described here are performed automatically by
 1. Start [kubeadm-dind-cluster](https://github.com/Mirants/kubeadm-dind-cluster)
    with Kubernetes version 1.8 (you're not required to download it to your home directory):
 ```
-$ wget -O ~/dind-cluster-v1.8.sh https://cdn.rawgit.com/Mirantis/kubeadm-dind-cluster/master/fixed/dind-cluster-v1.7.sh
+$ wget -O ~/dind-cluster-v1.8.sh https://cdn.rawgit.com/Mirantis/kubeadm-dind-cluster/master/fixed/dind-cluster-v1.8.sh
 $ chmod +x ~/dind-cluster-v1.8.sh
 $ ~/dind-cluster-v1.8.sh up
 $ export PATH="$HOME/.kubeadm-dind-cluster:$PATH"
 ```
    The cluster script stores appropriate kubectl version in `~/.kubeadm-dind-cluster`.
+
 2. Label a node to accept Virtlet pod:
 ```
 kubectl label node kube-node-1 extraRuntime=virtlet
