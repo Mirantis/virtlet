@@ -36,7 +36,7 @@ type dhcpTestCase struct {
 }
 
 func TestDhcpServer(t *testing.T) {
-	clientMac, _ := net.ParseMAC(clientMacAddress)
+	clientMac, _ := net.ParseMAC(clientMacAddrs[0])
 	testCases := []*dhcpTestCase{
 		{
 			csn: nettools.ContainerSideNetwork{

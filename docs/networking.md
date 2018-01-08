@@ -104,3 +104,6 @@ In case if standard deploy/virtlet-ds.yaml is used, this can be done by settings
 
 **NOTE:** Virtlet doesn't support `hostNetwork` pod setting because it
 cannot be implemented for VM in a meaningful way.
+
+**NOTE:** At the moment Virtlet can only pass `MTU` values configured for
+the network interfaces by CNI plugins to VMs via its built-in `DHCP` server.

@@ -240,7 +240,7 @@ func TestVmNetwork(t *testing.T) {
 		t.Fatalf("failed to create escape veth pair: %v", err)
 	}
 
-	clientMac, _ := net.ParseMAC(clientMacAddress)
+	clientMac, _ := net.ParseMAC(clientMacAddrs[0])
 
 	var csn *nettools.ContainerSideNetwork
 	if err := contNS.Do(func(ns.NetNS) error {
