@@ -1,4 +1,4 @@
-// +build linux
+// +build !linux
 
 /*
 Copyright 2018 Mirantis
@@ -18,7 +18,7 @@ limitations under the License.
 
 package flexvolume
 
-import "syscall"
+import "errors"
 
 type LinuxMounter struct{}
 
@@ -29,9 +29,9 @@ func NewLinuxMounter() *LinuxMounter {
 }
 
 func (mounter *LinuxMounter) Mount(source string, target string, fstype string) error {
-	return syscall.Mount(source, target, fstype, 0, "")
+	return errors.New("not implemented")
 }
 
 func (mounter *LinuxMounter) Unmount(target string) error {
-	return syscall.Unmount(target, 0)
+	return errors.New("not implemented")
 }
