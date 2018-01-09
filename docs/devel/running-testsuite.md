@@ -1,19 +1,15 @@
 # Running tests
 
-To run integration & e2e tests, please install [docker-compose](https://pypi.python.org/pypi/docker-compose)
-at least in 1.8.0 version. If your Linux distribution is providing an older version, we suggest to
-use [virtualenvwrapper](https://virtualenvwrapper.readthedocs.io):
+In order to run unit tests, use:
 
-```sh
-apt-get install virtualenvwrapper
-mkvirtualenv docker-compose
-pip install docker-compose
+```
+$ build/cmd.sh test
 ```
 
-In order to run the tests, use:
+In order to run integration, use:
 
-```sh
-./test.sh
+```
+$ build/cmd.sh integration
 ```
 
 There's a number of 'golden master' tests in Virtlet. These tests work
@@ -57,8 +53,14 @@ PASS
 ok      github.com/Mirantis/virtlet/pkg/libvirttools    0.456s
 ```
 
-To run tests on Mac OS X, you need to install `cdrtools` package and
-then make a symbolic link for `mkisofs` named `genisoimage`:
+For information on how to run e2e tests, refer to [Runn9ng local environment](running-local-environment.md)
+
+# Running tests on Mac OS X
+
+To run tests on Mac OS X you need a working Go 1.8 installation and
+[Glide](https://glide.sh/). You also need to install `cdrtools`
+package and then make a symbolic link for `mkisofs` named
+`genisoimage`:
 
 ```
 $ brew install cdrtools
@@ -67,7 +69,12 @@ $ sudo ln -s `which mkisofs` /usr/local/bin/genisoimage
 
 Some of the tests such as integration/e2e and network related tests
 only run on Linux. That being said, some of the tests do run on
-Mac OS X:
+Mac OS X. First you need to install glide deps:
+
+```
+$ glide i --strip-vendor
+```
+
 ```
 $ go test -v ./pkg/{flexvolume,imagetranslation,libvirttools,metadata,stream,utils,tapmanager}
 ```
