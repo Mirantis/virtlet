@@ -1,5 +1,5 @@
-hash: 325763650c30cc7dd38d4b6f0b25da37e1f96a6393003025f4aa897407d621d9
-updated: 2017-11-15T16:37:54.179735355+03:00
+hash: 22be7f3d99045e1a22d1216d0599627db9f35a5b0d036faacade6b6e30030fa9
+updated: 2018-01-09T16:31:38.664524836+03:00
 imports:
 - name: github.com/boltdb/bolt
   version: 583e8937c61f1af6513608ccc75c97b6abdf4ff9
@@ -209,7 +209,7 @@ imports:
   subpackages:
   - codec
 - name: github.com/vishvananda/netlink
-  version: 9dee363ad4abbc3c9a4a24a9f1e33363e224b111
+  version: 1882fa99fc5adc217f354c6f37a172876877f77d
   subpackages:
   - nl
 - name: github.com/vishvananda/netns
