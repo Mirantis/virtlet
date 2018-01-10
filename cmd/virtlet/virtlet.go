@@ -21,7 +21,6 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
-	"syscall"
 	"time"
 
 	"github.com/golang/glog"
@@ -148,9 +147,7 @@ func startTapManagerProcess() {
 	// Here we make this process die with the main Virtlet process.
 	// Note that this is Linux-specific, and also it may fail if virtlet is PID 1:
 	// https://github.com/golang/go/issues/9263
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Pdeathsig: syscall.SIGTERM,
-	}
+	setPdeathsig(cmd)
 	if err := cmd.Start(); err != nil {
 		glog.Errorf("error starting tapmanager process: %v", err)
 		os.Exit(1)

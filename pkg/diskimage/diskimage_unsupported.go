@@ -1,7 +1,7 @@
-// +build linux
+// +build !linux
 
 /*
-Copyright 2018 Mirantis
+Copyright 2016 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,22 +16,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package flexvolume
+package diskimage
 
-import "syscall"
+import (
+	"errors"
+)
 
-type LinuxMounter struct{}
-
-var _ Mounter = &LinuxMounter{}
-
-func NewLinuxMounter() *LinuxMounter {
-	return &LinuxMounter{}
-}
-
-func (mounter *LinuxMounter) Mount(source string, target string, fstype string) error {
-	return syscall.Mount(source, target, fstype, 0, "")
-}
-
-func (mounter *LinuxMounter) Unmount(target string) error {
-	return syscall.Unmount(target, 0)
+func FormatDisk(path string) error {
+	return errors.New("not implemented")
 }

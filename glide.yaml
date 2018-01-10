@@ -15,7 +15,7 @@ import:
 - package: github.com/containernetworking/cni
   version: v0.5.2
 - package: github.com/vishvananda/netlink
-  version: 9dee363ad4abbc3c9a4a24a9f1e33363e224b111
+  version: 1882fa99fc5adc217f354c6f37a172876877f77d
 - package: github.com/pmezard/go-difflib
   version: ~1.0.0
   subpackages:
@@ -41,3 +41,8 @@ import:
 - package: golang.org/x/sync
   subpackages:
   - syncmap
+- package: golang.org/x/sys
+  version: b9cf5f96b68d9eaa53d5db5fef235718767f416a
+  subpackages:
+  - unix
+  - windows

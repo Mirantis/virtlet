@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/containernetworking/cni/pkg/ns"
@@ -162,12 +161,11 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 	doneCh := make(chan error)
 	if err := vmNS.Do(func(ns.NetNS) error {
 		// switch /sys to corresponding one in netns
-		if err := syscall.Mount("none", "/sys", "sysfs", 0, ""); err != nil {
+		if err := mountSysfs(); err != nil {
 			return err
 		}
 		defer func() {
-			err := syscall.Unmount("/sys", syscall.MNT_DETACH)
-			if err != nil {
+			if err := unmountSysfs(); err != nil {
 				glog.V(3).Infof("Warning, error during umount of /sys: %v", err)
 			}
 		}()

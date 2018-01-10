@@ -1,4 +1,4 @@
-// +build linux
+// +build !linux
 
 /*
 Copyright 2018 Mirantis
@@ -16,22 +16,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package flexvolume
+package tapmanager
 
-import "syscall"
+import (
+	"errors"
+)
 
-type LinuxMounter struct{}
-
-var _ Mounter = &LinuxMounter{}
-
-func NewLinuxMounter() *LinuxMounter {
-	return &LinuxMounter{}
+func mountSysfs() error {
+	return errors.New("not implemented")
 }
 
-func (mounter *LinuxMounter) Mount(source string, target string, fstype string) error {
-	return syscall.Mount(source, target, fstype, 0, "")
-}
-
-func (mounter *LinuxMounter) Unmount(target string) error {
-	return syscall.Unmount(target, 0)
+func unmountSysfs() error {
+	return errors.New("not implemented")
 }

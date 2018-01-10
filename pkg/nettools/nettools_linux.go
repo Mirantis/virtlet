@@ -16,22 +16,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package flexvolume
+package nettools
 
-import "syscall"
+import (
+	"github.com/vishvananda/netlink"
+	"syscall"
+)
 
-type LinuxMounter struct{}
-
-var _ Mounter = &LinuxMounter{}
-
-func NewLinuxMounter() *LinuxMounter {
-	return &LinuxMounter{}
-}
-
-func (mounter *LinuxMounter) Mount(source string, target string, fstype string) error {
-	return syscall.Mount(source, target, fstype, 0, "")
-}
-
-func (mounter *LinuxMounter) Unmount(target string) error {
-	return syscall.Unmount(target, 0)
-}
+// these constants are only available on Linux
+const (
+	FAMILY_ALL     = netlink.FAMILY_ALL
+	FAMILY_V4      = netlink.FAMILY_V4
+	RTPROT_KERNEL  = syscall.RTPROT_KERNEL
+	SCOPE_LINK     = netlink.SCOPE_LINK
+	SCOPE_UNIVERSE = netlink.SCOPE_UNIVERSE
+)

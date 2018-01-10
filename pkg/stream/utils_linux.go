@@ -1,7 +1,6 @@
 // +build linux
-
 /*
-Copyright 2018 Mirantis
+Copyright 2017 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,22 +15,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package flexvolume
+package stream
 
-import "syscall"
+import (
+	"net"
+	"syscall"
+)
 
-type LinuxMounter struct{}
-
-var _ Mounter = &LinuxMounter{}
-
-func NewLinuxMounter() *LinuxMounter {
-	return &LinuxMounter{}
-}
-
-func (mounter *LinuxMounter) Mount(source string, target string, fstype string) error {
-	return syscall.Mount(source, target, fstype, 0, "")
-}
-
-func (mounter *LinuxMounter) Unmount(target string) error {
-	return syscall.Unmount(target, 0)
+func getPidFromConnection(conn *net.UnixConn) (int32, error) {
+	f, err := conn.File()
+	if err != nil {
+		return -1, err
+	}
+	defer f.Close()
+	cred, err := syscall.GetsockoptUcred(int(f.Fd()), syscall.SOL_SOCKET, syscall.SO_PEERCRED)
+	if err != nil {
+		return -1, err
+	}
+	return cred.Pid, nil
 }

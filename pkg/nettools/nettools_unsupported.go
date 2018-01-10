@@ -1,4 +1,4 @@
-// +build linux
+// +build !linux
 
 /*
 Copyright 2018 Mirantis
@@ -16,22 +16,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package flexvolume
+package nettools
 
-import "syscall"
-
-type LinuxMounter struct{}
-
-var _ Mounter = &LinuxMounter{}
-
-func NewLinuxMounter() *LinuxMounter {
-	return &LinuxMounter{}
-}
-
-func (mounter *LinuxMounter) Mount(source string, target string, fstype string) error {
-	return syscall.Mount(source, target, fstype, 0, "")
-}
-
-func (mounter *LinuxMounter) Unmount(target string) error {
-	return syscall.Unmount(target, 0)
-}
+// Some missing constants that break syntax check
+// on non-Linux systems
+const (
+	FAMILY_ALL     = 0
+	FAMILY_V4      = 0
+	RTPROT_KERNEL  = 0
+	SCOPE_LINK     = 0
+	SCOPE_UNIVERSE = 0
+)

@@ -44,7 +44,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"syscall"
 
 	"github.com/containernetworking/cni/pkg/ns"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
@@ -311,7 +310,7 @@ func FindVeth(links []netlink.Link) (netlink.Link, error) {
 
 func findLinkByAddress(links []netlink.Link, address net.IPNet) (netlink.Link, error) {
 	for _, link := range links {
-		addresses, err := netlink.AddrList(link, netlink.FAMILY_ALL)
+		addresses, err := netlink.AddrList(link, FAMILY_ALL)
 		if err != nil {
 			return nil, err
 		}
@@ -408,18 +407,18 @@ func GetContainerLinks(interfaces []*cnicurrent.Interface) ([]netlink.Link, erro
 // along with any routes related to the link, except
 // those created by the kernel
 func StripLink(link netlink.Link) error {
-	routes, err := netlink.RouteList(link, netlink.FAMILY_V4)
+	routes, err := netlink.RouteList(link, FAMILY_V4)
 	if err != nil {
 		return fmt.Errorf("failed to list routes: %v", err)
 	}
 
-	addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
+	addrs, err := netlink.AddrList(link, FAMILY_V4)
 	if err != nil {
 		return fmt.Errorf("failed to get addresses for link: %v", err)
 	}
 
 	for _, route := range routes {
-		if route.Protocol == syscall.RTPROT_KERNEL {
+		if route.Protocol == RTPROT_KERNEL {
 			// route created by the kernel
 			continue
 		}
@@ -444,7 +443,7 @@ func StripLink(link netlink.Link) error {
 // and exactly one address associated with veth.
 // Returns interface info struct and error, if any.
 func ExtractLinkInfo(link netlink.Link, nsPath string) (*cnicurrent.Result, error) {
-	addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
+	addrs, err := netlink.AddrList(link, FAMILY_V4)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get addresses for link: %v", err)
 	}
@@ -469,13 +468,13 @@ func ExtractLinkInfo(link netlink.Link, nsPath string) (*cnicurrent.Result, erro
 		},
 	}
 
-	routes, err := netlink.RouteList(link, netlink.FAMILY_V4)
+	routes, err := netlink.RouteList(link, FAMILY_V4)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list routes: %v", err)
 	}
 	for _, route := range routes {
 		switch {
-		case route.Protocol == syscall.RTPROT_KERNEL:
+		case route.Protocol == RTPROT_KERNEL:
 			// route created by kernel
 		case route.Gw == nil:
 			// these routes can't be represented properly
@@ -755,11 +754,11 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 		}
 
 		interfaces = append(interfaces, InterfaceDescription{
-			Type: ifaceType,
-			Name: ifaceName,
-			Fo: fo,
+			Type:         ifaceType,
+			Name:         ifaceName,
+			Fo:           fo,
 			HardwareAddr: hwAddr,
-			PCIAddress: pciAddress,
+			PCIAddress:   pciAddress,
 		})
 	}
 
@@ -811,11 +810,11 @@ func RecreateContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLin
 			}
 		}
 		interfaces = append(interfaces, InterfaceDescription{
-			Type: ifaceType,
-			Name: ifaceName,
-			Fo: fo,
+			Type:         ifaceType,
+			Name:         ifaceName,
+			Fo:           fo,
 			HardwareAddr: hwAddr,
-			PCIAddress: pciAddress,
+			PCIAddress:   pciAddress,
 		})
 	}
 
@@ -862,7 +861,7 @@ func ConfigureLink(link netlink.Link, info *cnicurrent.Result) error {
 				if linkAddr.Contains(route.GW) {
 					err := netlink.RouteAdd(&netlink.Route{
 						LinkIndex: link.Attrs().Index,
-						Scope:     netlink.SCOPE_UNIVERSE,
+						Scope:     SCOPE_UNIVERSE,
 						Dst:       &route.Dst,
 						Gw:        route.GW,
 					})
@@ -1015,13 +1014,13 @@ var calicoGatewayIP = net.IP{169, 254, 1, 1}
 // when the types of individual CNI plugins are not available.
 func DetectCalico(link netlink.Link) (bool, bool, error) {
 	haveCalico, haveCalicoGateway := false, false
-	routes, err := netlink.RouteList(link, netlink.FAMILY_V4)
+	routes, err := netlink.RouteList(link, FAMILY_V4)
 	if err != nil {
 		return false, false, fmt.Errorf("failed to list routes: %v", err)
 	}
 	for _, route := range routes {
 		switch {
-		case route.Protocol == syscall.RTPROT_KERNEL:
+		case route.Protocol == RTPROT_KERNEL:
 			// route created by kernel
 		case route.LinkIndex == link.Attrs().Index && route.Gw == nil && route.Dst.IP.Equal(calicoGatewayIP):
 			haveCalico = true

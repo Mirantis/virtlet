@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -48,6 +49,9 @@ func verifyWaitProc(t *testing.T, tmpDir string) {
 }
 
 func TestWaitProc(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("WaitForProcess only works on Linux")
+	}
 	tmpDir, err := ioutil.TempDir("", "waitproc-test")
 	if err != nil {
 		t.Fatalf("ioutil.TempDir(): %v", err)

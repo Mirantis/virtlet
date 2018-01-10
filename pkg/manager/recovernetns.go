@@ -14,20 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package libvirttools
+package manager
 
 import (
 	"fmt"
 
 	"github.com/Mirantis/virtlet/pkg/cni"
+	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
 )
 
-// RecoverNetworkNamespaces recovers all the active VM network namespaces
+// recoverNetworkNamespaces recovers all the active VM network namespaces
 // from previous Virtlet run by scanning the metadata store and starting
 // dhcp server for each namespace that's still active
-func (v *VirtualizationTool) RecoverNetworkNamespaces(fdManager tapmanager.FDManager) (allErrors []error) {
-	sandboxes, err := v.metadataStore.ListPodSandboxes(nil)
+func recoverNetworkNamespaces(metadataStore metadata.MetadataStore, fdManager tapmanager.FDManager) (allErrors []error) {
+	sandboxes, err := metadataStore.ListPodSandboxes(nil)
 	if err != nil {
 		allErrors = append(allErrors, err)
 		return

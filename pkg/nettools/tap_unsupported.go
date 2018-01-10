@@ -1,4 +1,4 @@
-// +build linux
+// +build !linux
 
 /*
 Copyright 2018 Mirantis
@@ -16,22 +16,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package flexvolume
+package nettools
 
-import "syscall"
+import (
+	"errors"
+	"os"
 
-type LinuxMounter struct{}
+	"github.com/vishvananda/netlink"
+)
 
-var _ Mounter = &LinuxMounter{}
-
-func NewLinuxMounter() *LinuxMounter {
-	return &LinuxMounter{}
+// OpenTAP opens a tap device and returns an os.File for it
+func OpenTAP(devName string) (*os.File, error) {
+	return nil, errors.New("not implemented")
 }
 
-func (mounter *LinuxMounter) Mount(source string, target string, fstype string) error {
-	return syscall.Mount(source, target, fstype, 0, "")
-}
-
-func (mounter *LinuxMounter) Unmount(target string) error {
-	return syscall.Unmount(target, 0)
+// CreateTAP sets up a tap link and brings it up
+func CreateTAP(devName string, mtu int) (netlink.Link, error) {
+	return nil, errors.New("not implemented")
 }

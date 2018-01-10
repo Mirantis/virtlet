@@ -285,12 +285,12 @@ func withFakeCNIVeth(t *testing.T, toRun func(hostNS, contNS ns.NetNS, origHostV
 func addCalicoRoutes(t *testing.T, origContVeth netlink.Link) {
 	addTestRoute(t, &netlink.Route{
 		Dst:       parseAddr("169.254.1.1/32").IPNet,
-		Scope:     netlink.SCOPE_LINK,
+		Scope:     SCOPE_LINK,
 		LinkIndex: origContVeth.Attrs().Index,
 	})
 	addTestRoute(t, &netlink.Route{
 		Gw:    parseAddr("169.254.1.1/32").IPNet.IP,
-		Scope: netlink.SCOPE_UNIVERSE,
+		Scope: SCOPE_UNIVERSE,
 	})
 }
 
@@ -329,7 +329,7 @@ func withFakeCNIVethAndGateway(t *testing.T, toRun func(hostNS, contNS ns.NetNS,
 	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
 		addTestRoute(t, &netlink.Route{
 			Gw:    parseAddr("10.1.90.1/24").IPNet.IP,
-			Scope: netlink.SCOPE_UNIVERSE,
+			Scope: SCOPE_UNIVERSE,
 		})
 
 		toRun(hostNS, contNS, origHostVeth, origContVeth)
@@ -337,13 +337,13 @@ func withFakeCNIVethAndGateway(t *testing.T, toRun func(hostNS, contNS ns.NetNS,
 }
 
 func verifyNoAddressAndRoutes(t *testing.T, link netlink.Link) {
-	if routes, err := netlink.RouteList(link, netlink.FAMILY_V4); err != nil {
+	if routes, err := netlink.RouteList(link, FAMILY_V4); err != nil {
 		t.Errorf("failed to get route list: %v", err)
 	} else if len(routes) != 0 {
 		t.Errorf("unexpected routes remain on the interface: %s", spew.Sdump(routes))
 	}
 
-	if addrs, err := netlink.AddrList(link, netlink.FAMILY_V4); err != nil {
+	if addrs, err := netlink.AddrList(link, FAMILY_V4); err != nil {
 		t.Errorf("failed to get addresses for veth: %v", err)
 	} else if len(addrs) != 0 {
 		t.Errorf("unexpected addresses remain on the interface: %s", spew.Sdump(addrs))
@@ -428,7 +428,7 @@ func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, contNsP
 		t.Errorf("tap0 interface must have type tun, but has %q instead", tap.Type())
 	}
 
-	addrs, err := netlink.AddrList(bridge, netlink.FAMILY_V4)
+	addrs, err := netlink.AddrList(bridge, FAMILY_V4)
 	if err != nil {
 		t.Errorf("failed to get addresses for dhcp-side veth: %v", err)
 	}
@@ -492,7 +492,7 @@ func verifyVethHaveConfiguration(t *testing.T, info *cnicurrent.Result) {
 		log.Panicf("FindVeth() failed: %v", err)
 	}
 
-	addrList, err := netlink.AddrList(contVeth, netlink.FAMILY_V4)
+	addrList, err := netlink.AddrList(contVeth, FAMILY_V4)
 	if err != nil {
 		log.Panicf("AddrList() failed: %v", err)
 	}
@@ -509,7 +509,7 @@ func verifyVethHaveConfiguration(t *testing.T, info *cnicurrent.Result) {
 		t.Errorf("veth has ipmask %s wherever expected is %s", addrMaskSize, desiredMaskSize)
 	}
 
-	routeList, err := netlink.RouteList(contVeth, netlink.FAMILY_V4)
+	routeList, err := netlink.RouteList(contVeth, FAMILY_V4)
 	if err != nil {
 		log.Panicf("RouteList() failed: %v", err)
 	}
@@ -612,7 +612,7 @@ func withMultipleInterfacesConfigured(t *testing.T, toRun func(contNS ns.NetNS, 
 			gwAddr := parseAddr("10.1.90.1/24")
 			addTestRoute(t, &netlink.Route{
 				Gw:    gwAddr.IPNet.IP,
-				Scope: netlink.SCOPE_UNIVERSE,
+				Scope: SCOPE_UNIVERSE,
 			})
 
 			toRun(contNS, origContVeths[:])
@@ -698,7 +698,7 @@ func TestCalicoDetection(t *testing.T) {
 				{
 					// LinkIndex: origContVeth.Attrs().Index,
 					Gw:    parseAddr("10.1.90.1/24").IPNet.IP,
-					Scope: netlink.SCOPE_UNIVERSE,
+					Scope: SCOPE_UNIVERSE,
 				},
 			},
 			haveCalico:        false,
@@ -709,7 +709,7 @@ func TestCalicoDetection(t *testing.T) {
 			routes: []netlink.Route{
 				{
 					Dst:   parseAddr("169.254.1.1/32").IPNet,
-					Scope: netlink.SCOPE_LINK,
+					Scope: SCOPE_LINK,
 				},
 			},
 			haveCalico:        true,
@@ -720,11 +720,11 @@ func TestCalicoDetection(t *testing.T) {
 			routes: []netlink.Route{
 				{
 					Dst:   parseAddr("169.254.1.1/32").IPNet,
-					Scope: netlink.SCOPE_LINK,
+					Scope: SCOPE_LINK,
 				},
 				{
 					Gw:    parseAddr("169.254.1.1/32").IPNet.IP,
-					Scope: netlink.SCOPE_UNIVERSE,
+					Scope: SCOPE_UNIVERSE,
 				},
 			},
 			haveCalico:        true,
