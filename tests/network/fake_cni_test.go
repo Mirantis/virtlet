@@ -152,23 +152,34 @@ func (c *FakeCNIClient) RemoveSandboxFromNetwork(podId, podName, podNS string) e
 }
 
 func (c *FakeCNIClient) captureNetworkConfigAfterTeardown(podId string) {
-	if len(c.info.IPs) != 1 {
-		// TODO: check this for multiple interfaces, too
-		return
-	}
 	if err := c.contNS.Do(func(ns.NetNS) error {
-		ifaceIndex := c.info.IPs[0].Interface
-		if ifaceIndex > len(c.info.Interfaces) {
-			return fmt.Errorf("bad interface index %d", ifaceIndex)
-		}
-		iface := c.info.Interfaces[ifaceIndex]
-		link, err := netlink.LinkByName(iface.Name)
-		if err != nil {
-			return fmt.Errorf("can't find link %q: %v", iface.Name, err)
-		}
-		c.infoAfterTeardown, err = nettools.ExtractLinkInfo(link, cni.PodNetNSPath(podId))
-		if err != nil {
-			return fmt.Errorf("error extracting link info: %v", err)
+		for _, ipConfig := range c.info.IPs {
+			ifaceIndex := ipConfig.Interface
+			if ifaceIndex > len(c.info.Interfaces) {
+				return fmt.Errorf("bad interface index %d", ifaceIndex)
+			}
+			iface := c.info.Interfaces[ifaceIndex]
+			link, err := netlink.LinkByName(iface.Name)
+			if err != nil {
+				return fmt.Errorf("can't find link %q: %v", iface.Name, err)
+			}
+			linkInfo, err := nettools.ExtractLinkInfo(link, cni.PodNetNSPath(podId))
+			if err != nil {
+				return fmt.Errorf("error extracting link info: %v", err)
+			}
+			if c.infoAfterTeardown == nil {
+				c.infoAfterTeardown = linkInfo
+			} else {
+				if len(linkInfo.Interfaces) != 1 {
+					return fmt.Errorf("more than one interface extracted")
+				}
+				if len(linkInfo.IPs) != 1 {
+					return fmt.Errorf("more than one ip config extracted")
+				}
+				linkInfo.IPs[0].Interface = len(c.infoAfterTeardown.Interfaces)
+				c.infoAfterTeardown.IPs = append(c.infoAfterTeardown.IPs, linkInfo.IPs[0])
+				c.infoAfterTeardown.Interfaces = append(c.infoAfterTeardown.Interfaces, linkInfo.Interfaces[0])
+			}
 		}
 		return nil
 	}); err != nil {
