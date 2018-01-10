@@ -40,21 +40,33 @@ import (
 )
 
 const (
-	sampleOuterAddr  = "10.1.90.1/24"
-	clientAddr       = "10.1.90.5/24"
-	clientMacAddress = "42:a4:a6:22:80:2e"
-	netTestWaitTime  = 15 * time.Second
-	samplePodName    = "foobar"
-	samplePodNS      = "default"
-	fdKey            = "fdkey"
+	netTestWaitTime = 15 * time.Second
+	samplePodName   = "foobar"
+	samplePodNS     = "default"
+	fdKey           = "fdkey"
 )
+
+var outerAddrs = []string{
+	"10.1.90.1/24",
+	"10.2.90.1/24",
+}
+
+var clientAddrs = []string{
+	"10.1.90.5/24",
+	"10.2.90.5/24",
+}
+
+var clientMacAddrs = []string{
+	"42:a4:a6:22:80:2e",
+	"42:a4:a6:22:80:2f",
+}
 
 func sampleCNIResult() *cnicurrent.Result {
 	return &cnicurrent.Result{
 		Interfaces: []*cnicurrent.Interface{
 			{
 				Name:    "eth0",
-				Mac:     clientMacAddress,
+				Mac:     clientMacAddrs[0],
 				Sandbox: "placeholder",
 			},
 		},
@@ -90,13 +102,14 @@ func sampleCNIResult() *cnicurrent.Result {
 
 type vmNetworkTester struct {
 	t                        *testing.T
+	linkCount                int
 	hostNS, contNS, clientNS ns.NetNS
-	dhcpClientTap            *os.File
-	clientTapLink            netlink.Link
+	clientTapLinks           []netlink.Link
+	dhcpClientTaps           []*os.File
 	g                        *NetTestGroup
 }
 
-func newVMNetworkTester(t *testing.T) *vmNetworkTester {
+func newVMNetworkTester(t *testing.T, linkCount int) *vmNetworkTester {
 	hostNS, err := ns.NewNS()
 	if err != nil {
 		t.Fatalf("Failed to create host ns: %v", err)
@@ -109,10 +122,11 @@ func newVMNetworkTester(t *testing.T) *vmNetworkTester {
 	}
 
 	vnt := &vmNetworkTester{
-		t:        t,
-		hostNS:   hostNS,
-		clientNS: clientNS,
-		g:        NewNetTestGroup(t, netTestWaitTime),
+		t:         t,
+		linkCount: linkCount,
+		hostNS:    hostNS,
+		clientNS:  clientNS,
+		g:         NewNetTestGroup(t, netTestWaitTime),
 	}
 	if err := vnt.setupClientTap(); err != nil {
 		vnt.teardown()
@@ -121,8 +135,13 @@ func newVMNetworkTester(t *testing.T) *vmNetworkTester {
 	return vnt
 }
 
-func (vnt *vmNetworkTester) connectTaps(vmTap *os.File) {
-	vnt.g.Add(nil, newTapConnector(vmTap, vnt.dhcpClientTap))
+func (vnt *vmNetworkTester) connectTaps(vmTaps []*os.File) {
+	if len(vmTaps) != len(vnt.dhcpClientTaps) {
+		vnt.t.Fatalf("bad number of vmTaps: %d instead of %d", len(vmTaps), len(vnt.dhcpClientTaps))
+	}
+	for n, vmTap := range vmTaps {
+		vnt.g.Add(nil, newTapConnector(vmTap, vnt.dhcpClientTaps[n]))
+	}
 }
 
 func (vnt *vmNetworkTester) addTcpdump(link netlink.Link, stopOn, failOn string) {
@@ -130,15 +149,17 @@ func (vnt *vmNetworkTester) addTcpdump(link netlink.Link, stopOn, failOn string)
 	vnt.g.Add(vnt.hostNS, tcpdump)
 }
 
-func (vnt *vmNetworkTester) verifyDhcp(expectedSubstrings []string) {
+func (vnt *vmNetworkTester) verifyDhcp(iface string, expectedSubstrings []string) {
 	// wait for dhcp client to complete so we don't interfere
 	// with the network link too early
-	<-vnt.g.Add(vnt.clientNS, NewDhcpClient(expectedSubstrings))
+	<-vnt.g.Add(vnt.clientNS, NewDhcpClient(iface, expectedSubstrings))
 }
 
-func (vnt *vmNetworkTester) verifyPing(outerIP net.IP) {
+func (vnt *vmNetworkTester) verifyPing(linkIndex int, outerAddr, clientAddr string) {
 	// dhcpcd -T doesn't add address to the link
-	clientIP := addAddress(vnt.t, vnt.clientNS, vnt.clientTapLink, clientAddr)
+	outerIP := parseAddr(vnt.t, outerAddr).IP
+	clientIP := parseAddr(vnt.t, clientAddr).IP
+	addAddress(vnt.t, vnt.clientNS, vnt.clientTapLinks[linkIndex], clientAddr)
 	vnt.g.Add(vnt.hostNS, newPinger(outerIP, clientIP))
 	vnt.g.Add(vnt.clientNS, newPinger(clientIP, outerIP))
 	vnt.g.Add(vnt.clientNS, newPingReceiver(clientIP))
@@ -151,17 +172,17 @@ func (vnt *vmNetworkTester) wait() {
 
 func (vnt *vmNetworkTester) teardown() {
 	vnt.g.Stop()
-	if vnt.dhcpClientTap != nil {
+	for _, tap := range vnt.dhcpClientTaps {
 		// this Close() call may likely cause an error because
 		// tap is probably already closed by tapConnector
-		vnt.dhcpClientTap.Close()
+		tap.Close()
 	}
-	if vnt.clientTapLink != nil {
+	for _, link := range vnt.clientTapLinks {
 		if err := vnt.clientNS.Do(func(ns.NetNS) error {
-			if err := netlink.LinkSetDown(vnt.clientTapLink); err != nil {
+			if err := netlink.LinkSetDown(link); err != nil {
 				return err
 			}
-			if err := netlink.LinkDel(vnt.clientTapLink); err != nil {
+			if err := netlink.LinkDel(link); err != nil {
 				return err
 			}
 			return nil
@@ -175,18 +196,22 @@ func (vnt *vmNetworkTester) teardown() {
 
 func (vnt *vmNetworkTester) setupClientTap() error {
 	return vnt.clientNS.Do(func(ns.NetNS) error {
-		var err error
-		vnt.clientTapLink, err = nettools.CreateTAP("tap0", 1500)
-		if err != nil {
-			return fmt.Errorf("CreateTAP() in the client netns: %v", err)
-		}
-		vnt.dhcpClientTap, err = nettools.OpenTAP("tap0")
-		if err != nil {
-			return fmt.Errorf("OpenTAP() in the client netns: %v", err)
-		}
-		mac, _ := net.ParseMAC(clientMacAddress)
-		if err = nettools.SetHardwareAddr(vnt.clientTapLink, mac); err != nil {
-			return fmt.Errorf("can't set test MAC address on client interface: %v", err)
+		for n := 0; n < vnt.linkCount; n++ {
+			linkName := fmt.Sprintf("tap%d", n)
+			clientTapLink, err := nettools.CreateTAP(linkName, 1500)
+			if err != nil {
+				return fmt.Errorf("CreateTAP() in the client netns: %v", err)
+			}
+			dhcpClientTap, err := nettools.OpenTAP(linkName)
+			if err != nil {
+				return fmt.Errorf("OpenTAP() in the client netns: %v", err)
+			}
+			mac, _ := net.ParseMAC(clientMacAddrs[n])
+			if err = nettools.SetHardwareAddr(clientTapLink, mac); err != nil {
+				return fmt.Errorf("can't set test MAC address on client interface: %v", err)
+			}
+			vnt.clientTapLinks = append(vnt.clientTapLinks, clientTapLink)
+			vnt.dhcpClientTaps = append(vnt.dhcpClientTaps, dhcpClientTap)
 		}
 		return nil
 	})
@@ -196,7 +221,7 @@ func (vnt *vmNetworkTester) setupClientTap() error {
 // SetupContainerSideNetwork() to rule out some possible
 // TapFDSource-only errors
 func TestVmNetwork(t *testing.T) {
-	vnt := newVMNetworkTester(t)
+	vnt := newVMNetworkTester(t, 1)
 	defer vnt.teardown()
 
 	contNS, err := ns.NewNS()
@@ -233,13 +258,13 @@ func TestVmNetwork(t *testing.T) {
 		t.Fatalf("failed to set up container-side network: %v", err)
 	}
 
-	outerIP := addAddress(t, vnt.hostNS, hostVeth, sampleOuterAddr)
-	vnt.connectTaps(csn.Interfaces[0].Fo)
+	addAddress(t, vnt.hostNS, hostVeth, outerAddrs[0])
+	vnt.connectTaps([]*os.File{csn.Interfaces[0].Fo})
 	// tcpdump should catch udp 'ping' but should not
 	// see BOOTP/DHCP on the 'outer' link
 	vnt.addTcpdump(hostVeth, "10.1.90.1.4243 > 10.1.90.5.4242: UDP", "BOOTP/DHCP")
 	vnt.g.Add(contNS, NewDhcpServerTester(info))
-	vnt.verifyDhcp([]string{
+	vnt.verifyDhcp("tap0", []string{
 		"new_classless_static_routes='10.10.42.0/24 10.1.90.90'",
 		"new_ip_address='10.1.90.5'",
 		"new_network_number='10.1.90.0'",
@@ -247,7 +272,7 @@ func TestVmNetwork(t *testing.T) {
 		"new_subnet_mask='255.255.255.0'",
 		"tap0: offered 10.1.90.5 from 169.254.254.2",
 	})
-	vnt.verifyPing(outerIP)
+	vnt.verifyPing(0, outerAddrs[0], clientAddrs[0])
 	vnt.wait()
 }
 
@@ -324,54 +349,145 @@ func TestTapFDSource(t *testing.T) {
 	for _, tc := range []struct {
 		name                   string
 		interfaceCount         int
-		outerAddr              string
 		info                   *cnicurrent.Result
 		tcpdumpStopOn          string
-		dhcpExpectedSubstrings []string
+		dhcpExpectedSubstrings [][]string
 		interfaceDesc          []tapmanager.InterfaceDescription
 		useBadResult           bool
 	}{
 		{
 			name:           "single cni",
 			interfaceCount: 1,
-			outerAddr:      sampleOuterAddr,
 			info:           sampleCNIResult(),
 			tcpdumpStopOn:  "10.1.90.1.4243 > 10.1.90.5.4242: UDP",
-			dhcpExpectedSubstrings: []string{
-				"new_classless_static_routes='10.10.42.0/24 10.1.90.90'",
-				"new_ip_address='10.1.90.5'",
-				"new_network_number='10.1.90.0'",
-				"new_routers='10.1.90.1'",
-				"new_subnet_mask='255.255.255.0'",
-				"tap0: offered 10.1.90.5 from 169.254.254.2",
+			dhcpExpectedSubstrings: [][]string{
+				{
+					"new_classless_static_routes='10.10.42.0/24 10.1.90.90'",
+					"new_ip_address='10.1.90.5'",
+					"new_network_number='10.1.90.0'",
+					"new_routers='10.1.90.1'",
+					"new_subnet_mask='255.255.255.0'",
+					"tap0: offered 10.1.90.5 from 169.254.254.2",
+				},
 			},
 			interfaceDesc: []tapmanager.InterfaceDescription{
 				{
 					Type:         nettools.InterfaceTypeTap,
-					HardwareAddr: mustParseMAC(clientMacAddress),
+					HardwareAddr: mustParseMAC(clientMacAddrs[0]),
 					FdIndex:      0,
 					PCIAddress:   "",
 				},
 			},
 		},
 		{
-			name:           "single cni with bad result",
-			interfaceCount: 1,
-			outerAddr:      sampleOuterAddr,
-			info:           sampleCNIResult(),
-			tcpdumpStopOn:  "10.1.90.1.4243 > 10.1.90.5.4242: UDP",
-			dhcpExpectedSubstrings: []string{
-				"new_classless_static_routes='10.10.42.0/24 10.1.90.90'",
-				"new_ip_address='10.1.90.5'",
-				"new_network_number='10.1.90.0'",
-				"new_routers='10.1.90.1'",
-				"new_subnet_mask='255.255.255.0'",
-				"tap0: offered 10.1.90.5 from 169.254.254.2",
+			name:           "multiple cnis",
+			interfaceCount: 2,
+			info: &cnicurrent.Result{
+				Interfaces: []*cnicurrent.Interface{
+					{
+						Name:    "eth0",
+						Mac:     clientMacAddrs[0],
+						Sandbox: "placeholder",
+					},
+					{
+						Name:    "eth1",
+						Mac:     clientMacAddrs[1],
+						Sandbox: "placeholder",
+					},
+				},
+				IPs: []*cnicurrent.IPConfig{
+					{
+						Version:   "4",
+						Interface: 0,
+						Address: net.IPNet{
+							IP:   net.IP{10, 1, 90, 5},
+							Mask: net.IPMask{255, 255, 255, 0},
+						},
+						Gateway: net.IP{10, 1, 90, 1},
+					},
+					{
+						Version:   "4",
+						Interface: 1,
+						Address: net.IPNet{
+							IP:   net.IP{10, 2, 90, 5},
+							Mask: net.IPMask{255, 255, 255, 0},
+						},
+					},
+				},
+				Routes: []*cnitypes.Route{
+					{
+						Dst: net.IPNet{
+							IP:   net.IP{0, 0, 0, 0},
+							Mask: net.IPMask{0, 0, 0, 0},
+						},
+						GW: net.IP{10, 1, 90, 1},
+					},
+					{
+						Dst: net.IPNet{
+							IP:   net.IP{10, 10, 42, 0},
+							Mask: net.IPMask{255, 255, 255, 0},
+						},
+						GW: net.IP{10, 1, 90, 90},
+					},
+				},
+			},
+			tcpdumpStopOn: "10.1.90.1.4243 > 10.1.90.5.4242: UDP",
+			dhcpExpectedSubstrings: [][]string{
+				{
+					"new_classless_static_routes='10.10.42.0/24 10.1.90.90'",
+					"new_ip_address='10.1.90.5'",
+					"new_network_number='10.1.90.0'",
+					"new_routers='10.1.90.1'",
+					"new_subnet_mask='255.255.255.0'",
+					"tap0: offered 10.1.90.5 from 169.254.254.2",
+				},
+				{
+					// FIXME: this is a bug, we should not pass
+					// static routes for non-matching network
+					"new_classless_static_routes='10.10.42.0/24 10.1.90.90'",
+					"new_ip_address='10.2.90.5'",
+					"new_network_number='10.2.90.0'",
+					// FIXME: this is a bug, we should not pass
+					// the gateway for non-matching network
+					"new_routers='10.1.90.1'",
+					"new_subnet_mask='255.255.255.0'",
+					"tap1: offered 10.2.90.5 from 169.254.254.2",
+				},
 			},
 			interfaceDesc: []tapmanager.InterfaceDescription{
 				{
 					Type:         nettools.InterfaceTypeTap,
-					HardwareAddr: mustParseMAC(clientMacAddress),
+					HardwareAddr: mustParseMAC(clientMacAddrs[0]),
+					FdIndex:      0,
+					PCIAddress:   "",
+				},
+				{
+					Type:         nettools.InterfaceTypeTap,
+					HardwareAddr: mustParseMAC(clientMacAddrs[1]),
+					FdIndex:      1,
+					PCIAddress:   "",
+				},
+			},
+		},
+		{
+			name:           "single cni with bad result correction",
+			interfaceCount: 1,
+			info:           sampleCNIResult(),
+			tcpdumpStopOn:  "10.1.90.1.4243 > 10.1.90.5.4242: UDP",
+			dhcpExpectedSubstrings: [][]string{
+				{
+					"new_classless_static_routes='10.10.42.0/24 10.1.90.90'",
+					"new_ip_address='10.1.90.5'",
+					"new_network_number='10.1.90.0'",
+					"new_routers='10.1.90.1'",
+					"new_subnet_mask='255.255.255.0'",
+					"tap0: offered 10.1.90.5 from 169.254.254.2",
+				},
+			},
+			interfaceDesc: []tapmanager.InterfaceDescription{
+				{
+					Type:         nettools.InterfaceTypeTap,
+					HardwareAddr: mustParseMAC(clientMacAddrs[0]),
 					FdIndex:      0,
 					PCIAddress:   "",
 				},
@@ -380,7 +496,7 @@ func TestTapFDSource(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			vnt := newVMNetworkTester(t)
+			vnt := newVMNetworkTester(t, tc.interfaceCount)
 			defer vnt.teardown()
 
 			withTapFDSource(t, tc.info, vnt.hostNS, func(podId string, cniClient *FakeCNIClient, c *tapmanager.FDClient) {
@@ -413,7 +529,7 @@ func TestTapFDSource(t *testing.T) {
 
 				cniClient.VerifyAdded()
 				veths := cniClient.Veths()
-				if len(veths) != 1 {
+				if len(veths) != tc.interfaceCount {
 					t.Fatalf("veth count mismatch: %d instead of %d", len(veths), tc.interfaceCount)
 				}
 
@@ -432,15 +548,27 @@ func TestTapFDSource(t *testing.T) {
 					verifyNoDiff(t, "interfaceDesc", tc.interfaceDesc, interfaceDesc)
 				}
 
-				vmTap := os.NewFile(uintptr(fds[0]), "tap-fd")
-				defer vmTap.Close()
-				outerIP := addAddress(t, vnt.hostNS, veths[0].HostSide, tc.outerAddr)
-				vnt.connectTaps(vmTap)
+				vmTaps := []*os.File{}
+				for _, fd := range fds {
+					vmTap := os.NewFile(uintptr(fd), "tap-fd")
+					defer vmTap.Close()
+					vmTaps = append(vmTaps, vmTap)
+				}
+
+				for n, veth := range veths {
+					addAddress(t, vnt.hostNS, veth.HostSide, outerAddrs[n])
+				}
+
+				vnt.connectTaps(vmTaps)
 				// tcpdump should catch udp 'ping' but should not
 				// see BOOTP/DHCP on the 'outer' link
 				vnt.addTcpdump(veths[0].HostSide, tc.tcpdumpStopOn, "BOOTP/DHCP")
-				vnt.verifyDhcp(tc.dhcpExpectedSubstrings)
-				vnt.verifyPing(outerIP)
+				for n, substrings := range tc.dhcpExpectedSubstrings {
+					vnt.verifyDhcp(fmt.Sprintf("tap%d", n), substrings)
+				}
+				for n := range veths {
+					vnt.verifyPing(n, outerAddrs[n], clientAddrs[n])
+				}
 				vnt.wait()
 
 				if err := c.ReleaseFDs(fdKey); err != nil {
@@ -456,7 +584,6 @@ func TestTapFDSource(t *testing.T) {
 	}
 }
 
-// TODO: test multiple CNIs
 // TODO: test Calico
 // TODO: test recovering netns
 // TODO: test SR-IOV (by making a fake sysfs dir)

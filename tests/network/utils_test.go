@@ -193,18 +193,19 @@ func (d *DhcpServerTester) Run(readyCh, stopCh chan struct{}) error {
 }
 
 type DhcpClient struct {
+	iface              string
 	expectedSubstrings []string
 }
 
-func NewDhcpClient(expectedSubstrings []string) *DhcpClient {
-	return &DhcpClient{expectedSubstrings}
+func NewDhcpClient(iface string, expectedSubstrings []string) *DhcpClient {
+	return &DhcpClient{iface, expectedSubstrings}
 }
 
 func (d *DhcpClient) Name() string { return "dhcp client" }
 func (d *DhcpClient) Fg() bool     { return true }
 
 func (d *DhcpClient) Run(readyCh, stopCh chan struct{}) error {
-	args := []string{"-T", "-t", strconv.Itoa(dhcpcdTimeout)}
+	args := []string{"-T", "-t", strconv.Itoa(dhcpcdTimeout), d.iface}
 	cmd := exec.Command("dhcpcd", args...)
 	var b bytes.Buffer
 	cmd.Stdout = &b
@@ -485,17 +486,21 @@ func (t *tcpdump) Run(readyCh, stopCh chan struct{}) error {
 	return err
 }
 
-func addAddress(t *testing.T, netNS ns.NetNS, link netlink.Link, addr string) net.IP {
-	parsedAddr, err := netlink.ParseAddr(addr)
+func parseAddr(t *testing.T, addr string) *netlink.Addr {
+	netAddr, err := netlink.ParseAddr(addr)
 	if err != nil {
 		t.Fatalf("failed to parse snooping address: %v", err)
 	}
+	return netAddr
+}
+
+func addAddress(t *testing.T, netNS ns.NetNS, link netlink.Link, addr string) {
+	netAddr := parseAddr(t, addr)
 	if err := netNS.Do(func(ns.NetNS) (err error) {
-		return netlink.AddrAdd(link, parsedAddr)
+		return netlink.AddrAdd(link, netAddr)
 	}); err != nil {
 		t.Fatalf("failed to add address to snooping veth: %v", err)
 	}
-	return parsedAddr.IP
 }
 
 // tapConnector copies frames between tap interfaces. It returns
