@@ -61,6 +61,8 @@ func (g *CloudInitGenerator) generateMetaData() ([]byte, error) {
 	m := map[string]interface{}{
 		"instance-id":    fmt.Sprintf("%s.%s", g.config.PodName, g.config.PodNamespace),
 		"local-hostname": g.config.PodName,
+		"uuid":           fmt.Sprintf("%s.%s", g.config.PodName, g.config.PodNamespace),
+		"hostname":       g.config.PodName,
 	}
 	if len(g.config.ParsedAnnotations.SSHKeys) != 0 {
 		var keys []string
@@ -117,6 +119,61 @@ func (g *CloudInitGenerator) generateUserData(volumeMap diskPathMap) ([]byte, er
 		}
 	}
 	return []byte("#cloud-config\n" + string(r)), nil
+}
+
+func (g *CloudInitGenerator) generateNetworkConfigurationAsOpenstack() ([]byte, error) {
+	cniResult, err := cni.BytesToResult([]byte(g.config.CNIConfig))
+	if err != nil {
+		return nil, err
+	}
+	if cniResult == nil {
+		// This can only happen during integration tests
+		// where a dummy sandbox is used
+		return []byte("{}"), nil
+	}
+
+	config := make(map[string]interface{})
+
+	// links
+	var links []map[string]interface{}
+	for _, iface := range cniResult.Interfaces {
+		if iface.Sandbox == "" {
+			// skip host interfaces
+			continue
+		}
+		linkConf := map[string]interface{}{
+			"type": "phy",
+			"id":   iface.Name,
+			"ethernet_mac_address": iface.Mac,
+		}
+		links = append(links, linkConf)
+	}
+	config["links"] = links
+
+	var networks []map[string]interface{}
+	for i, ipConfig := range cniResult.IPs {
+		netConf := map[string]interface{}{
+			"id": fmt.Sprintf("net-%d", i),
+			// config from openstack have as network_id network uuid
+			"network_id": fmt.Sprintf("net-%d", i),
+			"type":       fmt.Sprintf("ipv%s", ipConfig.Version),
+			"link":       cniResult.Interfaces[ipConfig.Interface].Name,
+			"ip_address": ipConfig.Address.IP.String(),
+			"netmask":    net.IP(ipConfig.Address.Mask).String(),
+			// TODO: fill all routes there, including default route
+			// using as example data from https://specs.openstack.org/openstack/nova-specs/specs/liberty/implemented/metadata-service-network-info.html
+		}
+		networks = append(networks, netConf)
+	}
+	config["networks"] = networks
+
+	// TODO: add "services" section with dns addresses
+
+	r, err := json.Marshal(config)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling network configuration: %v", err)
+	}
+	return r, nil
 }
 
 func (g *CloudInitGenerator) generateNetworkConfiguration() ([]byte, error) {
@@ -257,16 +314,17 @@ func (g *CloudInitGenerator) GenerateImage(volumeMap diskPathMap) error {
 		userData, err = g.generateUserData(volumeMap)
 	}
 	if err == nil {
-		networkConfiguration, err = g.generateNetworkConfiguration()
+		// networkConfiguration, err = g.generateNetworkConfiguration()
+		networkConfiguration, err = g.generateNetworkConfigurationAsOpenstack()
 	}
 	if err != nil {
 		return err
 	}
 
 	if err := utils.WriteFiles(tmpDir, map[string][]byte{
-		"user-data":      userData,
-		"meta-data":      metaData,
-		"network-config": networkConfiguration,
+		"openstack/latest/user_data":         userData,
+		"openstack/latest/meta_data.json":    metaData,
+		"openstack/latest/network_data.json": networkConfiguration,
 	}); err != nil {
 		return fmt.Errorf("can't write user-data: %v", err)
 	}
@@ -275,7 +333,7 @@ func (g *CloudInitGenerator) GenerateImage(volumeMap diskPathMap) error {
 		return fmt.Errorf("error making iso directory %q: %v", g.isoDir, err)
 	}
 
-	if err := utils.GenIsoImage(g.IsoPath(), "cidata", tmpDir); err != nil {
+	if err := utils.GenIsoImage(g.IsoPath(), "config-2", tmpDir); err != nil { // cidata
 		if rmErr := os.Remove(g.IsoPath()); rmErr != nil {
 			glog.Warningf("Error removing iso file %s: %v", g.IsoPath(), rmErr)
 		}
