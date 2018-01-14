@@ -1,5 +1,5 @@
 /*
-Copyright 2017 Mirantis
+Copyright 2018 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,16 +27,17 @@ import (
 )
 
 const (
-	noCloudMetaData      = "{\"instance-id\":\"testName_0.default\",\"local-hostname\":\"testName_0\"}"
-	noCloudUserData      = "#cloud-config\n"
-	noCloudNetworkConfig = "version: 1\n"
+	configDriveMetaData      = "{\"hostname\":\"testName_0\",\"instance-id\":\"testName_0.default\",\"local-hostname\":\"testName_0\",\"uuid\":\"testName_0.default\"}"
+	configDriveUserData      = "#cloud-config\n"
+	configDriveNetworkConfig = "{}"
 )
 
-func TestCloudInitNoCloud(t *testing.T) {
+func TestCloudInitConfigDrive(t *testing.T) {
 	ct := newContainerTester(t)
 	defer ct.teardown()
 	imageSpec := ct.imageSpecs[0]
 	sandbox := ct.sandboxes[0]
+	sandbox.Annotations["VirtletCloudInitImageType"] = "configdrive"
 	container := ct.containers[0]
 
 	ct.pullImage(imageSpec)
@@ -52,12 +53,16 @@ func TestCloudInitNoCloud(t *testing.T) {
 		t.Fatalf("isoToMap() on %q: %v", isoPath, err)
 	}
 	expectedFiles := map[string]interface{}{
-		"meta-data":      noCloudMetaData,
-		"network-config": noCloudNetworkConfig,
-		"user-data":      noCloudUserData,
+		"openstack": map[string]interface{}{
+			"latest": map[string]interface{}{
+				"meta_data.json":    configDriveMetaData,
+				"network_data.json": configDriveNetworkConfig,
+				"user_data":         configDriveUserData,
+			},
+		},
 	}
 	if !reflect.DeepEqual(files, expectedFiles) {
-		t.Errorf("bad nocloud metadata iso:\n%s\n-- instead of --\n%s", utils.MapToJson(files), utils.MapToJson(expectedFiles))
+		t.Errorf("bad config drive iso:\n%s\n-- instead of --\n%s", utils.MapToJson(files), utils.MapToJson(expectedFiles))
 	}
 
 	ct.stopContainer(container.ContainerId)

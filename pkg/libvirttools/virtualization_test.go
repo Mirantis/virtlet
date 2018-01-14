@@ -72,8 +72,8 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 		t.Fatalf("TempDir(): %v", err)
 	}
 
-	// __nocloud__ is a hint for fake libvirt domain to fix the path
-	SetNocloudIsoDir(filepath.Join(ct.tmpDir, "__nocloud__"))
+	// __config__  is a hint for fake libvirt domain to fix the path
+	SetConfigIsoDir(filepath.Join(ct.tmpDir, "__config__"))
 
 	downloader := utils.NewFakeDownloader(ct.tmpDir)
 	ct.rec = rec
@@ -93,9 +93,9 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 	volSrc := CombineVMVolumeSources(
 		GetRootVolume,
 		ScanFlexvolumes,
-		// XXX: GetNocloudVolume must go last because it
+		// XXX: GetConfigVolume must go last because it
 		// doesn't produce correct name for cdrom devices
-		GetNocloudVolume)
+		GetConfigVolume)
 	ct.virtTool, err = NewVirtualizationTool(ct.domainConn, ct.storageConn, imageTool, ct.metadataStore, "volumes", "loop*", volSrc)
 	if err != nil {
 		t.Fatalf("failed to create VirtualizationTool: %v", err)

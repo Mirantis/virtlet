@@ -71,7 +71,7 @@ func buildNetworkedPodConfig(cniResult *cnicurrent.Result) *VMConfig {
 	return &VMConfig{
 		PodName:           "foo",
 		PodNamespace:      "default",
-		ParsedAnnotations: &VirtletAnnotations{},
+		ParsedAnnotations: &VirtletAnnotations{ImageType: "nocloud"},
 		CNIConfig:         string(r),
 	}
 }
@@ -102,7 +102,7 @@ func TestCloudInitGenerator(t *testing.T) {
 			config: &VMConfig{
 				PodName:           "foo",
 				PodNamespace:      "default",
-				ParsedAnnotations: &VirtletAnnotations{},
+				ParsedAnnotations: &VirtletAnnotations{ImageType: "nocloud"},
 			},
 			expectedMetaData: map[string]interface{}{
 				"instance-id":    "foo.default",
@@ -120,7 +120,8 @@ func TestCloudInitGenerator(t *testing.T) {
 				PodName:      "foo",
 				PodNamespace: "default",
 				ParsedAnnotations: &VirtletAnnotations{
-					SSHKeys: []string{"key1", "key2"},
+					SSHKeys:   []string{"key1", "key2"},
+					ImageType: "nocloud",
 				},
 			},
 			expectedMetaData: map[string]interface{}{
@@ -140,6 +141,7 @@ func TestCloudInitGenerator(t *testing.T) {
 					MetaData: map[string]interface{}{
 						"instance-id": "foobar",
 					},
+					ImageType: "nocloud",
 				},
 			},
 			expectedMetaData: map[string]interface{}{
@@ -162,7 +164,8 @@ func TestCloudInitGenerator(t *testing.T) {
 							},
 						},
 					},
-					SSHKeys: []string{"key1", "key2"},
+					SSHKeys:   []string{"key1", "key2"},
+					ImageType: "nocloud",
 				},
 			},
 			expectedMetaData: map[string]interface{}{
@@ -183,7 +186,7 @@ func TestCloudInitGenerator(t *testing.T) {
 			config: &VMConfig{
 				PodName:           "foo",
 				PodNamespace:      "default",
-				ParsedAnnotations: &VirtletAnnotations{},
+				ParsedAnnotations: &VirtletAnnotations{ImageType: "nocloud"},
 				Environment: []*VMKeyValue{
 					{"foo", "bar"},
 					{"baz", "abc"},
@@ -222,6 +225,7 @@ func TestCloudInitGenerator(t *testing.T) {
 							},
 						},
 					},
+					ImageType: "nocloud",
 				},
 				Environment: []*VMKeyValue{
 					{"foo", "bar"},
@@ -259,6 +263,7 @@ func TestCloudInitGenerator(t *testing.T) {
 				ParsedAnnotations: &VirtletAnnotations{
 					UserDataScript: "#!/bin/sh\necho hi\n",
 					SSHKeys:        []string{"key1", "key2"},
+					ImageType:      "nocloud",
 				},
 			},
 			expectedMetaData: map[string]interface{}{
@@ -273,7 +278,7 @@ func TestCloudInitGenerator(t *testing.T) {
 			config: &VMConfig{
 				PodName:           "foo",
 				PodNamespace:      "default",
-				ParsedAnnotations: &VirtletAnnotations{},
+				ParsedAnnotations: &VirtletAnnotations{ImageType: "nocloud"},
 				Mounts: []*VMMount{
 					{
 						ContainerPath: "/opt",
@@ -332,6 +337,7 @@ func TestCloudInitGenerator(t *testing.T) {
 				PodNamespace: "default",
 				ParsedAnnotations: &VirtletAnnotations{
 					UserDataScript: "#!/bin/sh\necho hi\n@virtlet-mount-script@",
+					ImageType:      "nocloud",
 				},
 				Mounts: []*VMMount{
 					{
@@ -402,10 +408,8 @@ func TestCloudInitGenerator(t *testing.T) {
 						"name":        "cni0",
 						"subnets": []interface{}{
 							map[string]interface{}{
-								"address":         "1.1.1.1/8",
-								"dns_nameservers": []interface{}{"1.2.3.4"},
-								"dns_search":      []interface{}{"some", "search"},
-								"type":            "static",
+								"address": "1.1.1.1/8",
+								"type":    "static",
 							},
 						},
 						"type": "physical",
@@ -414,6 +418,11 @@ func TestCloudInitGenerator(t *testing.T) {
 						"destination": "0.0.0.0/0",
 						"gateway":     "1.2.3.4",
 						"type":        "route",
+					},
+					map[string]interface{}{
+						"address": []interface{}{"1.2.3.4"},
+						"search":  []interface{}{"some", "search"},
+						"type":    "nameserver",
 					},
 				},
 			},
@@ -482,10 +491,8 @@ func TestCloudInitGenerator(t *testing.T) {
 						"name":        "cni0",
 						"subnets": []interface{}{
 							map[string]interface{}{
-								"address":         "1.1.1.1/8",
-								"dns_nameservers": []interface{}{"1.2.3.4"},
-								"dns_search":      []interface{}{"some", "search"},
-								"type":            "static",
+								"address": "1.1.1.1/8",
+								"type":    "static",
 							},
 						},
 						"type": "physical",
@@ -495,10 +502,8 @@ func TestCloudInitGenerator(t *testing.T) {
 						"name":        "cni1",
 						"subnets": []interface{}{
 							map[string]interface{}{
-								"address":         "192.168.100.42/24",
-								"dns_nameservers": []interface{}{"1.2.3.4"},
-								"dns_search":      []interface{}{"some", "search"},
-								"type":            "static",
+								"address": "192.168.100.42/24",
+								"type":    "static",
 							},
 						},
 						"type": "physical",
@@ -507,6 +512,11 @@ func TestCloudInitGenerator(t *testing.T) {
 						"destination": "0.0.0.0/0",
 						"gateway":     "1.2.3.4",
 						"type":        "route",
+					},
+					map[string]interface{}{
+						"address": []interface{}{"1.2.3.4"},
+						"search":  []interface{}{"some", "search"},
+						"type":    "nameserver",
 					},
 				},
 			},
@@ -575,7 +585,7 @@ func TestCloudInitDiskDef(t *testing.T) {
 	g := NewCloudInitGenerator(&VMConfig{
 		PodName:           "foo",
 		PodNamespace:      "default",
-		ParsedAnnotations: &VirtletAnnotations{},
+		ParsedAnnotations: &VirtletAnnotations{ImageType: "nocloud"},
 	}, "")
 	diskDef := g.DiskDef()
 	if !reflect.DeepEqual(diskDef, &libvirtxml.DomainDisk{
@@ -590,7 +600,7 @@ func TestCloudInitDiskDef(t *testing.T) {
 }
 
 func TestCloudInitGenerateImage(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "nocloud-")
+	tmpDir, err := ioutil.TempDir("", "config-")
 	if err != nil {
 		t.Fatalf("Can't create temp dir: %v", err)
 	}
@@ -599,7 +609,7 @@ func TestCloudInitGenerateImage(t *testing.T) {
 	g := NewCloudInitGenerator(&VMConfig{
 		PodName:           "foo",
 		PodNamespace:      "default",
-		ParsedAnnotations: &VirtletAnnotations{},
+		ParsedAnnotations: &VirtletAnnotations{ImageType: "nocloud"},
 	}, tmpDir)
 
 	if err := g.GenerateImage(nil); err != nil {
