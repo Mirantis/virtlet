@@ -29,6 +29,7 @@ import (
 	"strconv"
 	"strings"
 
+	cnitypes "github.com/containernetworking/cni/pkg/types"
 	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
@@ -62,6 +63,12 @@ func (g *CloudInitGenerator) generateMetaData() ([]byte, error) {
 		"instance-id":    fmt.Sprintf("%s.%s", g.config.PodName, g.config.PodNamespace),
 		"local-hostname": g.config.PodName,
 	}
+
+	if g.config.ParsedAnnotations.ImageType == ImageTypeConfigDrive {
+		m["uuid"] = m["instance-id"]
+		m["hostname"] = m["local-hostname"]
+	}
+
 	if len(g.config.ParsedAnnotations.SSHKeys) != 0 {
 		var keys []string
 		for _, key := range g.config.ParsedAnnotations.SSHKeys {
@@ -69,13 +76,16 @@ func (g *CloudInitGenerator) generateMetaData() ([]byte, error) {
 		}
 		m["public-keys"] = keys
 	}
+
 	for k, v := range g.config.ParsedAnnotations.MetaData {
 		m[k] = v
 	}
+
 	r, err := json.Marshal(m)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling meta-data: %v", err)
 	}
+
 	return r, nil
 }
 
@@ -120,6 +130,17 @@ func (g *CloudInitGenerator) generateUserData(volumeMap diskPathMap) ([]byte, er
 }
 
 func (g *CloudInitGenerator) generateNetworkConfiguration() ([]byte, error) {
+	switch g.config.ParsedAnnotations.ImageType {
+	case ImageTypeNoCloud:
+		return g.generateNetworkConfigurationNoCloud()
+	case ImageTypeConfigDrive:
+		return g.generateNetworkConfigurationConfigDrive()
+	}
+
+	return nil, fmt.Errorf("unknown cloud-init config image type: %q", g.config.ParsedAnnotations.ImageType)
+}
+
+func (g *CloudInitGenerator) generateNetworkConfigurationNoCloud() ([]byte, error) {
 	cniResult, err := cni.BytesToResult([]byte(g.config.CNIConfig))
 	if err != nil {
 		return nil, err
@@ -181,6 +202,12 @@ func (g *CloudInitGenerator) generateNetworkConfiguration() ([]byte, error) {
 		config = append(config, route)
 	}
 
+	// dns
+	dnsData := getDnsData(cniResult.DNS)
+	if dnsData != nil {
+		config = append(config, dnsData...)
+	}
+
 	r, err := yaml.Marshal(map[string]interface{}{
 		"config": config,
 	})
@@ -208,15 +235,6 @@ func (g *CloudInitGenerator) getSubnetsAndGatewaysForNthInterface(interfaceNo in
 				// The routes must be specified in Routes field
 				// of the CNI result.
 			}
-			// Cloud Init requires dns settings on the subnet level (yeah, I know...)
-			// while we get just one setting for all the IP configurations from CNI,
-			// so as a workaround we're adding it to all subnets configurations
-			if cniResult.DNS.Nameservers != nil {
-				subnet["dns_nameservers"] = cniResult.DNS.Nameservers
-			}
-			if cniResult.DNS.Search != nil {
-				subnet["dns_search"] = cniResult.DNS.Search
-			}
 			subnets = append(subnets, subnet)
 		}
 	}
@@ -231,8 +249,104 @@ func (g *CloudInitGenerator) getSubnetsAndGatewaysForNthInterface(interfaceNo in
 	return subnets, gateways
 }
 
+func getDnsData(cniDns cnitypes.DNS) []map[string]interface{} {
+	var dnsData []map[string]interface{}
+	if cniDns.Nameservers != nil {
+		dnsData = append(dnsData, map[string]interface{}{
+			"type":    "nameserver",
+			"address": cniDns.Nameservers,
+		})
+		if cniDns.Search != nil {
+			dnsData[0]["search"] = cniDns.Search
+		}
+	}
+	return dnsData
+}
+
+func (g *CloudInitGenerator) generateNetworkConfigurationConfigDrive() ([]byte, error) {
+	cniResult, err := cni.BytesToResult([]byte(g.config.CNIConfig))
+	if err != nil {
+		return nil, err
+	}
+	if cniResult == nil {
+		// This can only happen during integration tests
+		// where a dummy sandbox is used
+		return []byte("{}"), nil
+	}
+
+	config := make(map[string]interface{})
+
+	// links
+	var links []map[string]interface{}
+	for _, iface := range cniResult.Interfaces {
+		if iface.Sandbox == "" {
+			// skip host interfaces
+			continue
+		}
+		linkConf := map[string]interface{}{
+			"type": "phy",
+			"id":   iface.Name,
+			"ethernet_mac_address": iface.Mac,
+		}
+		links = append(links, linkConf)
+	}
+	config["links"] = links
+
+	var networks []map[string]interface{}
+	for i, ipConfig := range cniResult.IPs {
+		netConf := map[string]interface{}{
+			"id": fmt.Sprintf("net-%d", i),
+			// config from openstack have as network_id network uuid
+			"network_id": fmt.Sprintf("net-%d", i),
+			"type":       fmt.Sprintf("ipv%s", ipConfig.Version),
+			"link":       cniResult.Interfaces[ipConfig.Interface].Name,
+			"ip_address": ipConfig.Address.IP.String(),
+			"netmask":    net.IP(ipConfig.Address.Mask).String(),
+		}
+
+		routes := routesForIP(ipConfig.Address, cniResult.Routes)
+		if routes != nil {
+			netConf["routes"] = routes
+		}
+
+		networks = append(networks, netConf)
+	}
+	config["networks"] = networks
+
+	dnsData := getDnsData(cniResult.DNS)
+	if dnsData != nil {
+		config["services"] = dnsData
+	}
+
+	r, err := json.Marshal(config)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling network configuration: %v", err)
+	}
+	return r, nil
+}
+
+func routesForIP(sourceIP net.IPNet, allRoutes []*cnitypes.Route) []map[string]interface{} {
+	var routes []map[string]interface{}
+
+	// NOTE: at the moment on cni result level there is no distinction
+	// for which interface particular route should be set,
+	// so we are returning there all routes with gateway accessible
+	// by particular source ip address.
+	for _, route := range allRoutes {
+		if sourceIP.Contains(route.GW) {
+			routes = append(routes, map[string]interface{}{
+				"network": route.Dst.IP.String(),
+				"netmask": net.IP(route.Dst.Mask).String(),
+				"gateway": route.GW.String(),
+			})
+		}
+	}
+
+	return routes
+}
+
 func (g *CloudInitGenerator) IsoPath() string {
-	return filepath.Join(g.isoDir, fmt.Sprintf("nocloud-%s.iso", g.config.DomainUUID))
+	return filepath.Join(g.isoDir, fmt.Sprintf("config-%s.iso", g.config.DomainUUID))
 }
 
 func (g *CloudInitGenerator) DiskDef() *libvirtxml.DomainDisk {
@@ -246,9 +360,9 @@ func (g *CloudInitGenerator) DiskDef() *libvirtxml.DomainDisk {
 }
 
 func (g *CloudInitGenerator) GenerateImage(volumeMap diskPathMap) error {
-	tmpDir, err := ioutil.TempDir("", "nocloud-")
+	tmpDir, err := ioutil.TempDir("", "config-")
 	if err != nil {
-		return fmt.Errorf("can't create temp dir for nocloud: %v", err)
+		return fmt.Errorf("can't create temp dir for config image: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
@@ -264,10 +378,30 @@ func (g *CloudInitGenerator) GenerateImage(volumeMap diskPathMap) error {
 		return err
 	}
 
+	var userDataLocation, metaDataLocation, networkConfigLocation string
+	var volumeName string
+
+	switch g.config.ParsedAnnotations.ImageType {
+	case ImageTypeNoCloud:
+		userDataLocation = "user-data"
+		metaDataLocation = "meta-data"
+		networkConfigLocation = "network-config"
+		volumeName = "cidata"
+	case ImageTypeConfigDrive:
+		userDataLocation = "openstack/latest/user_data"
+		metaDataLocation = "openstack/latest/meta_data.json"
+		networkConfigLocation = "openstack/latest/network_data.json"
+		volumeName = "config-2"
+	default:
+		// that should newer happen, as ImageType should be validated
+		// already earlier
+		return fmt.Errorf("unknown cloud-init config image type: %q", g.config.ParsedAnnotations.ImageType)
+	}
+
 	if err := utils.WriteFiles(tmpDir, map[string][]byte{
-		"user-data":      userData,
-		"meta-data":      metaData,
-		"network-config": networkConfiguration,
+		userDataLocation:      userData,
+		metaDataLocation:      metaData,
+		networkConfigLocation: networkConfiguration,
 	}); err != nil {
 		return fmt.Errorf("can't write user-data: %v", err)
 	}
@@ -276,7 +410,7 @@ func (g *CloudInitGenerator) GenerateImage(volumeMap diskPathMap) error {
 		return fmt.Errorf("error making iso directory %q: %v", g.isoDir, err)
 	}
 
-	if err := utils.GenIsoImage(g.IsoPath(), "cidata", tmpDir); err != nil {
+	if err := utils.GenIsoImage(g.IsoPath(), volumeName, tmpDir); err != nil {
 		if rmErr := os.Remove(g.IsoPath()); rmErr != nil {
 			glog.Warningf("Error removing iso file %s: %v", g.IsoPath(), rmErr)
 		}

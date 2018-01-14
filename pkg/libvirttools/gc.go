@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	nocloudFilenameTemplate = "nocloud-*.iso"
+	configFilenameTemplate = "config-*.iso"
 )
 
 // GarbageCollect retrieves from metadata store list of container ids,
@@ -42,7 +42,7 @@ func (v *VirtualizationTool) GarbageCollect() (allErrors []error) {
 	allErrors = append(allErrors, v.removeOrphanDomains(ids)...)
 	allErrors = append(allErrors, v.removeOrphanRootVolumes(ids)...)
 	allErrors = append(allErrors, v.removeOrphanQcow2Volumes(ids)...)
-	allErrors = append(allErrors, v.removeOrphanNoCloudImages(ids, nocloudIsoDir)...)
+	allErrors = append(allErrors, v.removeOrphanConfigImages(ids, configIsoDir)...)
 
 	return
 }
@@ -218,14 +218,14 @@ func (v *VirtualizationTool) removeOrphanQcow2Volumes(ids []string) []error {
 	return allErrors
 }
 
-func (v *VirtualizationTool) removeOrphanNoCloudImages(ids []string, directory string) []error {
-	files, err := filepath.Glob(filepath.Join(directory, nocloudFilenameTemplate))
+func (v *VirtualizationTool) removeOrphanConfigImages(ids []string, directory string) []error {
+	files, err := filepath.Glob(filepath.Join(directory, configFilenameTemplate))
 	if err != nil {
 		return []error{
 			fmt.Errorf(
 				"error while globbing '%s' files in '%s' directory: %v",
-				nocloudFilenameTemplate,
-				nocloudIsoDir,
+				configFilenameTemplate,
+				configIsoDir,
 				err,
 			),
 		}
@@ -236,10 +236,10 @@ func (v *VirtualizationTool) removeOrphanNoCloudImages(ids []string, directory s
 		filename := filepath.Base(path)
 
 		filter := func(id string) bool {
-			return filename == "nocloud-"+id+".iso"
+			return filename == "config-"+id+".iso"
 		}
 
-		if strings.HasPrefix(filename, "nocloud-") && strings.HasSuffix(filename, ".iso") && !inList(ids, filter) {
+		if strings.HasPrefix(filename, "config-") && strings.HasSuffix(filename, ".iso") && !inList(ids, filter) {
 			if err := os.Remove(path); err != nil {
 				allErrors = append(
 					allErrors,

@@ -157,7 +157,7 @@ func TestQcow2VolumesCleanup(t *testing.T) {
 	gm.Verify(t, ct.rec.Content())
 }
 
-func TestNocloudISOsCleanup(t *testing.T) {
+func TestConfigISOsCleanup(t *testing.T) {
 	ct := newContainerTester(t, fake.NewToplevelRecorder())
 	defer ct.teardown()
 
@@ -168,7 +168,7 @@ func TestNocloudISOsCleanup(t *testing.T) {
 	defer os.RemoveAll(directory)
 
 	for _, uuid := range randomUUIDs {
-		fname := filepath.Join(directory, "nocloud-"+uuid+".iso")
+		fname := filepath.Join(directory, "config-"+uuid+".iso")
 		if file, err := os.Create(fname); err != nil {
 			t.Fatalf("Cannot create fake iso with name %q: %v", fname, err)
 		} else {
@@ -190,11 +190,11 @@ func TestNocloudISOsCleanup(t *testing.T) {
 		t.Fatalf("Expected 4 files in temporary directory, found: %d", len(preCallFileNames))
 	}
 
-	// this should remove only nocloud iso file corresponding to the first
+	// this should remove only config iso file corresponding to the first
 	// element of randomUUIDs slice, keeping other files
-	errors := ct.virtTool.removeOrphanNoCloudImages(randomUUIDs[1:], directory)
+	errors := ct.virtTool.removeOrphanConfigImages(randomUUIDs[1:], directory)
 	if errors != nil {
-		t.Errorf("removeOrphanNoCloudImages returned errors: %v", errors)
+		t.Errorf("removeOrphanConfigImages returned errors: %v", errors)
 	}
 
 	postCallFileNames, err := filepath.Glob(filepath.Join(directory, "*"))
@@ -204,12 +204,12 @@ func TestNocloudISOsCleanup(t *testing.T) {
 
 	diff := difference(preCallFileNames, postCallFileNames)
 	if len(diff) != 1 {
-		t.Fatalf("Expected removeOrphanNoCloudImages to remove single file, but it removed %d files", len(diff))
+		t.Fatalf("Expected removeOrphanConfigImages to remove single file, but it removed %d files", len(diff))
 	}
 
-	expectedPath := filepath.Join(directory, "nocloud-"+randomUUIDs[0]+".iso")
+	expectedPath := filepath.Join(directory, "config-"+randomUUIDs[0]+".iso")
 	if diff[0] != expectedPath {
-		t.Fatalf("Expected removeOrphanNoCloudImages to remove only %q file, but it also removed: %q", expectedPath, diff[0])
+		t.Fatalf("Expected removeOrphanConfigImages to remove only %q file, but it also removed: %q", expectedPath, diff[0])
 	}
 
 	// no gm validation, because we are testing only file operations in this test

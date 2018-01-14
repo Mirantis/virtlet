@@ -30,8 +30,8 @@ import (
 )
 
 const (
-	nocloudPathHint        = "/__nocloud__/"
-	nocloudPathReplacement = "/var/lib/virtlet/nocloud/"
+	configPathHint        = "/__config__/"
+	configPathReplacement = "/var/lib/virtlet/config/"
 )
 
 type FakeDomainConnection struct {
@@ -103,9 +103,9 @@ func (dc *FakeDomainConnection) DefineDomain(def *libvirtxml.Domain) (virt.VirtD
 			if disk.Type != "file" || disk.Source == nil {
 				continue
 			}
-			p := strings.Index(disk.Source.File, nocloudPathHint)
+			p := strings.Index(disk.Source.File, configPathHint)
 			if p >= 0 {
-				disk.Source.File = nocloudPathReplacement + disk.Source.File[p+len(nocloudPathHint):]
+				disk.Source.File = configPathReplacement + disk.Source.File[p+len(configPathHint):]
 			}
 		}
 	}
@@ -195,7 +195,7 @@ func (d *FakeDomain) Create() error {
 				continue
 			}
 			origPath := disk.Source.File
-			if filepath.Ext(origPath) == ".iso" || strings.HasPrefix(filepath.Base(origPath), "nocloud-iso") {
+			if filepath.Ext(origPath) == ".iso" || strings.HasPrefix(filepath.Base(origPath), "config-iso") {
 				m, err := testutils.IsoToMap(origPath)
 				if err != nil {
 					return fmt.Errorf("bad iso image: %q", origPath)

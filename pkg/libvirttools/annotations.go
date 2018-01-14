@@ -31,6 +31,7 @@ import (
 )
 
 type DiskDriver string
+type ImageType string
 
 const (
 	maxVCPUCount                                 = 255
@@ -40,15 +41,19 @@ const (
 	CloudInitUserDataSourceKeyName               = "VirtletCloudInitUserDataSource"
 	CloudInitUserDataOverwriteKeyName            = "VirtletCloudInitUserDataOverwrite"
 	CloudInitUserDataScriptKeyName               = "VirtletCloudInitUserDataScript"
+	CloudInitImageType                           = "VirtletCloudInitImageType"
 	SSHKeysKeyName                               = "VirtletSSHKeys"
 	SSHKeySourceKeyName                          = "VirtletSSHKeySource"
 	DiskDriverKeyName                            = "VirtletDiskDriver"
 	DiskDriverVirtio                  DiskDriver = "virtio"
 	DiskDriverScsi                    DiskDriver = "scsi"
+	ImageTypeNoCloud                  ImageType  = "nocloud"
+	ImageTypeConfigDrive              ImageType  = "configdrive"
 )
 
 type VirtletAnnotations struct {
 	VCPUCount         int
+	ImageType         ImageType
 	MetaData          map[string]interface{}
 	UserData          map[string]interface{}
 	UserDataOverwrite bool
@@ -119,7 +124,9 @@ func (va *VirtletAnnotations) parsePodAnnotations(ns string, podAnnotations map[
 		}
 	}
 
+	va.ImageType = ImageType(strings.ToLower(podAnnotations[CloudInitImageType]))
 	va.DiskDriver = DiskDriver(podAnnotations[DiskDriverKeyName])
+
 	return nil
 }
 
@@ -127,8 +134,13 @@ func (va *VirtletAnnotations) applyDefaults() {
 	if va.VCPUCount <= 0 {
 		va.VCPUCount = 1
 	}
+
 	if va.DiskDriver == "" {
 		va.DiskDriver = DiskDriverScsi
+	}
+
+	if va.ImageType == "" {
+		va.ImageType = ImageTypeNoCloud
 	}
 }
 
@@ -139,7 +151,11 @@ func (va *VirtletAnnotations) validate() error {
 	}
 
 	if va.DiskDriver != DiskDriverVirtio && va.DiskDriver != DiskDriverScsi {
-		errs = append(errs, fmt.Sprintf("bad disk driver %q. Must be either %q or %q", DiskDriverVirtio, DiskDriverScsi))
+		errs = append(errs, fmt.Sprintf("bad disk driver %q. Must be either %q or %q", va.DiskDriver, DiskDriverVirtio, DiskDriverScsi))
+	}
+
+	if va.ImageType != ImageTypeNoCloud && va.ImageType != ImageTypeConfigDrive {
+		errs = append(errs, fmt.Sprintf("unknown config image type %q. Must be either %q or %q", va.ImageType, ImageTypeNoCloud, ImageTypeConfigDrive))
 	}
 
 	if errs != nil {

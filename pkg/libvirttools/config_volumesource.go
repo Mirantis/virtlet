@@ -23,50 +23,50 @@ import (
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 )
 
-var nocloudIsoDir = "/var/lib/virtlet/nocloud"
+var configIsoDir = "/var/lib/virtlet/config"
 
-// nocloudVolume denotes an ISO image using nocloud format
+// configVolume denotes an ISO image using config format
 // that contains cloud-init meta-data nad user-data
-type nocloudVolume struct {
+type configVolume struct {
 	volumeBase
 }
 
-var _ VMVolume = &nocloudVolume{}
+var _ VMVolume = &configVolume{}
 
-func GetNocloudVolume(config *VMConfig, owner VolumeOwner) ([]VMVolume, error) {
+func GetConfigVolume(config *VMConfig, owner VolumeOwner) ([]VMVolume, error) {
 	return []VMVolume{
-		&nocloudVolume{
+		&configVolume{
 			volumeBase{config, owner},
 		},
 	}, nil
 }
 
-func (v *nocloudVolume) Uuid() string { return "" }
+func (v *configVolume) Uuid() string { return "" }
 
-func (v *nocloudVolume) cloudInitGenerator() *CloudInitGenerator {
-	return NewCloudInitGenerator(v.config, nocloudIsoDir)
+func (v *configVolume) cloudInitGenerator() *CloudInitGenerator {
+	return NewCloudInitGenerator(v.config, configIsoDir)
 }
 
-func (v *nocloudVolume) Setup() (*libvirtxml.DomainDisk, error) {
+func (v *configVolume) Setup() (*libvirtxml.DomainDisk, error) {
 	return v.cloudInitGenerator().DiskDef(), nil
 }
 
-func (v *nocloudVolume) WriteImage(volumeMap diskPathMap) error {
+func (v *configVolume) WriteImage(volumeMap diskPathMap) error {
 	return v.cloudInitGenerator().GenerateImage(volumeMap)
 }
 
-func (v *nocloudVolume) Teardown() error {
+func (v *configVolume) Teardown() error {
 	isoPath := v.cloudInitGenerator().IsoPath()
 	if err := os.Remove(isoPath); err != nil && !os.IsNotExist(err) {
-		glog.Warningf("Cannot remove temporary nocloud file %q: %v", isoPath, err)
+		glog.Warningf("Cannot remove temporary config file %q: %v", isoPath, err)
 	}
 	return nil
 }
 
-// SetNocloudIsoDir sets a directory for nocloud iso dir.
+// SetConfigIsoDir sets a directory for config iso dir.
 // It can be useful in tests
-func SetNocloudIsoDir(dir string) {
-	nocloudIsoDir = dir
+func SetConfigIsoDir(dir string) {
+	configIsoDir = dir
 }
 
 // TODO: this file needs a test
