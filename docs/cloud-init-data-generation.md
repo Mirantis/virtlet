@@ -14,10 +14,11 @@ datasource can be added later.
 
 ## Output ISO image format
 
-Virtlet supports two types of Cloud-init ISO datasources - NoCloud and
-ConfigDrive. Which one should be used is controlled by annotation
-`VirtletCloudInitImageType`. It accepts as values `nocloud`, `configdrive` and
-defaults to `nocloud` when annotation is not set.
+Virtlet supports two types of Cloud-init ISO9660-based datasources, NoCloud and
+ConfigDrive. The user may choose an appropriate one using
+`VirtletCloudInitImageType` annotation, which can have either `nocloud` or
+`configdrive` as its value. When there's no `VirtletCloudInitImageType`
+annotation, Virtlet defaults to `nocloud`.
 
 ## Basic idea with an example
 
@@ -156,8 +157,8 @@ The `meta-data` part is a piece of JSON that looks like this:
 }
 ```
 
-In case of Config Drive this JSON has duplicated `instance-id` as `uuid` and
-`local-hostname` as `hostname`.
+In case of ConfigDrive, this JSON has `instance-id` repeated as `uuid` and 
+`local-hostname` repeated as `hostname`.
 
 We're using JSON format here so as to be compatible with older
 cloud-init implementations such as one used in
