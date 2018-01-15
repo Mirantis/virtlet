@@ -108,10 +108,23 @@ func TestCloudInitGenerator(t *testing.T) {
 				"instance-id":    "foo.default",
 				"local-hostname": "foo",
 			},
-			expectedUserData: nil,
 			expectedNetworkConfig: map[string]interface{}{
 				// that's how yaml parses the number
 				"version": float64(1),
+			},
+		},
+		{
+			name: "metadata for configdrive",
+			config: &VMConfig{
+				PodName:           "foo",
+				PodNamespace:      "default",
+				ParsedAnnotations: &VirtletAnnotations{ImageType: "configdrive"},
+			},
+			expectedMetaData: map[string]interface{}{
+				"instance-id":    "foo.default",
+				"local-hostname": "foo",
+				"uuid":           "foo.default",
+				"hostname":       "foo",
 			},
 		},
 		{
@@ -129,7 +142,6 @@ func TestCloudInitGenerator(t *testing.T) {
 				"local-hostname": "foo",
 				"public-keys":    []interface{}{"key1", "key2"},
 			},
-			expectedUserData: nil,
 		},
 		{
 			name: "pod with ssh keys and meta-data override",
@@ -149,7 +161,6 @@ func TestCloudInitGenerator(t *testing.T) {
 				"local-hostname": "foo",
 				"public-keys":    []interface{}{"key1", "key2"},
 			},
-			expectedUserData: nil,
 		},
 		{
 			name: "pod with user data",
