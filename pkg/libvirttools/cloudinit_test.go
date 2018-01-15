@@ -63,7 +63,7 @@ func newFakeFlexvolume(t *testing.T, parentDir string, uuid string, part int) *f
 	}
 }
 
-func buildNetworkedPodConfig(cniResult *cnicurrent.Result) *VMConfig {
+func buildNetworkedPodConfig(cniResult *cnicurrent.Result, imageType string) *VMConfig {
 	r, err := json.Marshal(cniResult)
 	if err != nil {
 		panic("failed to marshal CNI result")
@@ -71,7 +71,7 @@ func buildNetworkedPodConfig(cniResult *cnicurrent.Result) *VMConfig {
 	return &VMConfig{
 		PodName:           "foo",
 		PodNamespace:      "default",
-		ParsedAnnotations: &VirtletAnnotations{ImageType: "nocloud"},
+		ParsedAnnotations: &VirtletAnnotations{ImageType: ImageType(imageType)},
 		CNIConfig:         string(r),
 	}
 }
@@ -410,7 +410,7 @@ func TestCloudInitGenerator(t *testing.T) {
 					Nameservers: []string{"1.2.3.4"},
 					Search:      []string{"some", "search"},
 				},
-			}),
+			}, "nocloud"),
 			expectedNetworkConfig: map[string]interface{}{
 				"version": float64(1),
 				"config": []interface{}{
@@ -494,7 +494,7 @@ func TestCloudInitGenerator(t *testing.T) {
 					Nameservers: []string{"1.2.3.4"},
 					Search:      []string{"some", "search"},
 				},
-			}),
+			}, "nocloud"),
 			expectedNetworkConfig: map[string]interface{}{
 				"version": float64(1),
 				"config": []interface{}{
@@ -531,6 +531,186 @@ func TestCloudInitGenerator(t *testing.T) {
 						"address": []interface{}{"1.2.3.4"},
 						"search":  []interface{}{"some", "search"},
 						"type":    "nameserver",
+					},
+				},
+			},
+		},
+		{
+			name: "pod with network config - configdrive",
+			config: buildNetworkedPodConfig(&cnicurrent.Result{
+				Interfaces: []*cnicurrent.Interface{
+					{
+						Name:    "cni0",
+						Mac:     "00:11:22:33:44:55",
+						Sandbox: "/var/run/netns/bae464f1-6ee7-4ee2-826e-33293a9de95e",
+					},
+					{
+						Name:    "ignoreme0",
+						Mac:     "00:12:34:56:78:9a",
+						Sandbox: "", // host interface
+					},
+				},
+				IPs: []*cnicurrent.IPConfig{
+					{
+						Version: "4",
+						Address: net.IPNet{
+							IP:   net.IPv4(1, 1, 1, 1),
+							Mask: net.CIDRMask(8, 32),
+						},
+						Gateway:   net.IPv4(1, 2, 3, 4),
+						Interface: 0,
+					},
+				},
+				Routes: []*cnitypes.Route{
+					{
+						Dst: net.IPNet{
+							IP:   net.IPv4zero,
+							Mask: net.CIDRMask(0, 32),
+						},
+						GW: nil,
+					},
+				},
+				DNS: cnitypes.DNS{
+					Nameservers: []string{"1.2.3.4"},
+					Search:      []string{"some", "search"},
+				},
+			}, "configdrive"),
+			expectedNetworkConfig: map[string]interface{}{
+				"links": []interface{}{
+					map[string]interface{}{
+						"ethernet_mac_address": "00:11:22:33:44:55",
+						"id":   "cni0",
+						"type": "phy",
+					},
+				},
+				"networks": []interface{}{
+					map[string]interface{}{
+						"id":         "net-0",
+						"ip_address": "1.1.1.1",
+						"link":       "cni0",
+						"netmask":    "255.0.0.0",
+						"network_id": "net-0",
+						"type":       "ipv4",
+					},
+				},
+				"services": []interface{}{
+					map[string]interface{}{
+						"address": []interface{}{
+							"1.2.3.4",
+						},
+						"search": []interface{}{
+							"some",
+							"search",
+						},
+						"type": "nameserver",
+					},
+				},
+			},
+		},
+		{
+			name: "pod with multiple network interfaces - configdrive",
+			config: buildNetworkedPodConfig(&cnicurrent.Result{
+				Interfaces: []*cnicurrent.Interface{
+					{
+						Name:    "cni0",
+						Mac:     "00:11:22:33:44:55",
+						Sandbox: "/var/run/netns/bae464f1-6ee7-4ee2-826e-33293a9de95e",
+					},
+					{
+						Name:    "cni1",
+						Mac:     "00:11:22:33:ab:cd",
+						Sandbox: "/var/run/netns/d920d2e2-5849-4c70-b9a6-5e3cb4f831cb",
+					},
+					{
+						Name:    "ignoreme0",
+						Mac:     "00:12:34:56:78:9a",
+						Sandbox: "", // host interface
+					},
+				},
+				IPs: []*cnicurrent.IPConfig{
+					// Note that Gateway addresses are not used because
+					// there's no routes with nil gateway
+					{
+						Version: "4",
+						Address: net.IPNet{
+							IP:   net.IPv4(1, 1, 1, 1),
+							Mask: net.CIDRMask(8, 32),
+						},
+						Gateway:   net.IPv4(1, 2, 3, 4),
+						Interface: 0,
+					},
+					{
+						Version: "4",
+						Address: net.IPNet{
+							IP:   net.IPv4(192, 168, 100, 42),
+							Mask: net.CIDRMask(24, 32),
+						},
+						Gateway:   net.IPv4(192, 168, 100, 1),
+						Interface: 1,
+					},
+				},
+				Routes: []*cnitypes.Route{
+					{
+						Dst: net.IPNet{
+							IP:   net.IPv4zero,
+							Mask: net.CIDRMask(0, 32),
+						},
+						GW: net.IPv4(1, 2, 3, 4),
+					},
+				},
+				DNS: cnitypes.DNS{
+					Nameservers: []string{"1.2.3.4"},
+					Search:      []string{"some", "search"},
+				},
+			}, "configdrive"),
+			expectedNetworkConfig: map[string]interface{}{
+				"services": []interface{}{
+					map[string]interface{}{
+						"address": []interface{}{
+							"1.2.3.4",
+						},
+						"search": []interface{}{
+							"some",
+							"search",
+						},
+						"type": "nameserver",
+					},
+				},
+				"links": []interface{}{
+					map[string]interface{}{
+						"id":                   "cni0",
+						"type":                 "phy",
+						"ethernet_mac_address": "00:11:22:33:44:55",
+					},
+					map[string]interface{}{
+						"type":                 "phy",
+						"ethernet_mac_address": "00:11:22:33:ab:cd",
+						"id": "cni1",
+					},
+				},
+				"networks": []interface{}{
+					map[string]interface{}{
+						"netmask":    "255.0.0.0",
+						"network_id": "net-0",
+						"routes": []interface{}{
+							map[string]interface{}{
+								"netmask": "0.0.0.0",
+								"network": "0.0.0.0",
+								"gateway": "1.2.3.4",
+							},
+						},
+						"type":       "ipv4",
+						"id":         "net-0",
+						"ip_address": "1.1.1.1",
+						"link":       "cni0",
+					},
+					map[string]interface{}{
+						"type":       "ipv4",
+						"id":         "net-1",
+						"ip_address": "192.168.100.42",
+						"link":       "cni1",
+						"netmask":    "255.255.255.0",
+						"network_id": "net-1",
 					},
 				},
 			},
