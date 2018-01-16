@@ -1,7 +1,9 @@
+# This example is ubuntu-vm.yaml one extended with example volume for docker
+# which makes it more usable as a test environment
 apiVersion: v1
 kind: Pod
 metadata:
-  name: ubuntu-vm
+  name: ubuntu-vm-with-volume
   annotations:
     kubernetes.io/target-runtime: virtlet.cloud
     VirtletSSHKeys: |
@@ -27,3 +29,13 @@ spec:
     # tty and stdin required for `kubectl attach -t` to work
     tty: true
     stdin: true
+    volumeMounts:
+    - name: docker
+      mountPath: /var/lib/docker
+  volumes:
+  - name: docker
+    flexVolume:
+      driver: "virtlet/flexvolume_driver"
+      options:
+        type: qcow2
+        capacity: 2048MB
