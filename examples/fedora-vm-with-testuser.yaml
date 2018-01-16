@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fedora-vm-with-testuser
+  annotations:
+    kubernetes.io/target-runtime: virtlet.cloud
+    VirtletCloudInitUserData: |
+      ssh_pwauth: True
+      users:
+      - name: testuser
+        gecos: User
+        primary-group: testuser
+        groups: users
+        lock_passwd: false
+        passwd: "$6$rounds=4096$wPs4Hz4tfs$a8ssMnlvH.3GX88yxXKF2cKMlVULsnydoOKgkuStTErTq2dzKZiIx9R/pPWWh5JLxzoZEx7lsSX5T2jW5WISi1"
+        sudo: ALL=(ALL) NOPASSWD:ALL
+    VirtletSSHKeys: |
+      ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCaJEcFDXEK2ZbX0ZLS1EIYFZRbDAcRfuVjpstSc0De8+sV1aiu+dePxdkuDRwqFtCyk6dEZkssjOkBXtri00MECLkir6FcH3kKOJtbJ6vy3uaJc9w1ERo+wyl6SkAh/+JTJkp7QRXj8oylW5E20LsbnA/dIwWzAF51PPwF7A7FtNg9DnwPqMkxFo1Th/buOMKbP5ZA1mmNNtmzbMpMfJATvVyiv3ccsSJKOiyQr6UG+j7sc/7jMVz5Xk34Vd0l8GwcB0334MchHckmqDB142h/NCWTr8oLakDNvkfC1YneAfAO41hDkUbxPtVBG5M/o7P4fxoqiHEX+ZLfRxDtHB53 me@localhost
+spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: extraRuntime
+            operator: In
+            values:
+            - virtlet
+  # This is the number of seconds Virtlet gives the VM to shut down cleanly.
+  # The default value of 30 seconds is ok for containers but probably too
+  # low for VM, so overriding it here is strongly advised.
+  terminationGracePeriodSeconds: 120
+  containers:
+  - name: fedora-vm
+    image: virtlet.cloud/fedora
+    imagePullPolicy: IfNotPresent
+    # tty and stdin required for `kubectl attach -t` to work
+    tty: true
+    stdin: true
+    resources:
+      limits:
+        # This memory limit is applied to the libvirt domain definition
+        memory: 256Mi
