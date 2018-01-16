@@ -1,15 +1,26 @@
+# This example is the same as a basic one but it's extended with
+# example values for VirtletCloudInitUserData and VirtletVCPUCount annotations
 apiVersion: v1
 kind: Pod
 metadata:
-  name: cirros-vm
+  name: cirros-vm-with-additional-annotations
   annotations:
     # This tells CRI Proxy that this pod belongs to Virtlet runtime
     kubernetes.io/target-runtime: virtlet.cloud
+    # An optional annotation specifying the count of virtual CPUs.
+    # Note that annotation values must always be strings,
+    # thus numeric values need to be quoted.
+    # Defaults to "1".
+    VirtletVCPUCount: "1"
     # CirrOS doesn't load nocloud data from SCSI CD-ROM for some reason
     VirtletDiskDriver: virtio
     # inject ssh keys via cloud-init
     VirtletSSHKeys: |
       ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCaJEcFDXEK2ZbX0ZLS1EIYFZRbDAcRfuVjpstSc0De8+sV1aiu+dePxdkuDRwqFtCyk6dEZkssjOkBXtri00MECLkir6FcH3kKOJtbJ6vy3uaJc9w1ERo+wyl6SkAh/+JTJkp7QRXj8oylW5E20LsbnA/dIwWzAF51PPwF7A7FtNg9DnwPqMkxFo1Th/buOMKbP5ZA1mmNNtmzbMpMfJATvVyiv3ccsSJKOiyQr6UG+j7sc/7jMVz5Xk34Vd0l8GwcB0334MchHckmqDB142h/NCWTr8oLakDNvkfC1YneAfAO41hDkUbxPtVBG5M/o7P4fxoqiHEX+ZLfRxDtHB53 me@localhost
+    # cloud-init user data
+    VirtletCloudInitUserDataScript: |
+      #!/bin/sh
+      echo "Hi there"
 spec:
   # This nodeAffinity specification tells Kubernetes to run this
   # pod only on the nodes that have extraRuntime=virtlet label.

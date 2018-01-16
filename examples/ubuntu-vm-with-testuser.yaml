@@ -1,9 +1,21 @@
+# This example shows how to add by cloud-init a user with sudo passwordless
+# access to root acount. User added that way will have as password "testuser".
 apiVersion: v1
 kind: Pod
 metadata:
-  name: ubuntu-vm
+  name: ubuntu-vm-with-test-user
   annotations:
     kubernetes.io/target-runtime: virtlet.cloud
+    VirtletCloudInitUserData: |
+      ssh_pwauth: True
+      users:
+      - name: testuser
+        gecos: User
+        primary-group: testuser
+        groups: users
+        lock_passwd: false
+        passwd: "$6$rounds=4096$wPs4Hz4tfs$a8ssMnlvH.3GX88yxXKF2cKMlVULsnydoOKgkuStTErTq2dzKZiIx9R/pPWWh5JLxzoZEx7lsSX5T2jW5WISi1"
+        sudo: ALL=(ALL) NOPASSWD:ALL
     VirtletSSHKeys: |
       ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCaJEcFDXEK2ZbX0ZLS1EIYFZRbDAcRfuVjpstSc0De8+sV1aiu+dePxdkuDRwqFtCyk6dEZkssjOkBXtri00MECLkir6FcH3kKOJtbJ6vy3uaJc9w1ERo+wyl6SkAh/+JTJkp7QRXj8oylW5E20LsbnA/dIwWzAF51PPwF7A7FtNg9DnwPqMkxFo1Th/buOMKbP5ZA1mmNNtmzbMpMfJATvVyiv3ccsSJKOiyQr6UG+j7sc/7jMVz5Xk34Vd0l8GwcB0334MchHckmqDB142h/NCWTr8oLakDNvkfC1YneAfAO41hDkUbxPtVBG5M/o7P4fxoqiHEX+ZLfRxDtHB53 me@localhost
 spec:
