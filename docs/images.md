@@ -11,7 +11,7 @@ Virtlet supports QCOW2 format for VM images.
 ```yaml
   containers:
     - name: test-vm
-      image: download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img
+      image: download.cirros-cloud.net/0.3.5/cirros-0.3.5-x86_64-disk.img
 ```
 
 **Note:** You need to specify url without `scheme://`. In case you are using [instructions](../deploy/README.md) in `deploy/` directory to deploy Virtlet, you need to add `virtlet.cloud/` prefix to the url.
@@ -29,6 +29,16 @@ Original images are stored in libvirt `default` pool (`/var/lib/libvirt/images` 
 Clones used as boot images are stored in "**volumes**" libvirt pool under `/var/lib/virtlet/volumes`
 during the VM execution time and are automatically garbage collected by Virtlet
 after stopping VM pod environment (sandbox).
+
+**Note:**
+Virtlet currently ignores image tags, but their meaning may change
+in future, so it’s better not to set them for VM pods. If there’s no tag
+provided in the image specification kubelet defaults to
+`imagePullPolicy: Always`, which means that the image is always
+redownloaded when the pod is created. In order to make pod creation
+faster and more reliable, we set in examples `imagePullPolicy` to `IfNotPresent`
+so a previously downloaded image is reused if there is one in Virtlet’s
+image store.
 
 ## Restrictions and pitfalls
 
