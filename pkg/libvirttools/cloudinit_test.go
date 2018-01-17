@@ -402,7 +402,8 @@ func TestCloudInitGenerator(t *testing.T) {
 						"name":        "cni0",
 						"subnets": []interface{}{
 							map[string]interface{}{
-								"address":         "1.1.1.1/8",
+								"address":         "1.1.1.1",
+								"netmask":         "255.0.0.0",
 								"dns_nameservers": []interface{}{"1.2.3.4"},
 								"dns_search":      []interface{}{"some", "search"},
 								"type":            "static",
@@ -482,7 +483,8 @@ func TestCloudInitGenerator(t *testing.T) {
 						"name":        "cni0",
 						"subnets": []interface{}{
 							map[string]interface{}{
-								"address":         "1.1.1.1/8",
+								"address":         "1.1.1.1",
+								"netmask":         "255.0.0.0",
 								"dns_nameservers": []interface{}{"1.2.3.4"},
 								"dns_search":      []interface{}{"some", "search"},
 								"type":            "static",
@@ -495,7 +497,8 @@ func TestCloudInitGenerator(t *testing.T) {
 						"name":        "cni1",
 						"subnets": []interface{}{
 							map[string]interface{}{
-								"address":         "192.168.100.42/24",
+								"address":         "192.168.100.42",
+								"netmask":         "255.255.255.0",
 								"dns_nameservers": []interface{}{"1.2.3.4"},
 								"dns_search":      []interface{}{"some", "search"},
 								"type":            "static",

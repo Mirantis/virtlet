@@ -197,7 +197,8 @@ func (g *CloudInitGenerator) getSubnetsAndGatewaysForNthInterface(interfaceNo in
 		if ipConfig.Interface == interfaceNo {
 			subnet := map[string]interface{}{
 				"type":    "static",
-				"address": ipConfig.Address.String(),
+				"address": ipConfig.Address.IP.String(),
+				"netmask": net.IP(ipConfig.Address.Mask).String(),
 			}
 			if !ipConfig.Gateway.IsUnspecified() {
 				gateways = append(gateways, ipConfig.Gateway)
