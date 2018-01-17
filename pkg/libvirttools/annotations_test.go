@@ -34,6 +34,7 @@ func TestVirtletAnnotations(t *testing.T) {
 			va: &VirtletAnnotations{
 				VCPUCount:  1,
 				DiskDriver: "scsi",
+				ImageType:  "nocloud",
 			},
 		},
 		{
@@ -42,6 +43,16 @@ func TestVirtletAnnotations(t *testing.T) {
 			va: &VirtletAnnotations{
 				VCPUCount:  1,
 				DiskDriver: "scsi",
+				ImageType:  "nocloud",
+			},
+		},
+		{
+			name:        "non empty cloud init type annotation",
+			annotations: map[string]string{"VirtletCloudInitImageType": "configdrive"},
+			va: &VirtletAnnotations{
+				VCPUCount:  1,
+				DiskDriver: "scsi",
+				ImageType:  "configdrive",
 			},
 		},
 		{
@@ -50,6 +61,7 @@ func TestVirtletAnnotations(t *testing.T) {
 			va: &VirtletAnnotations{
 				VCPUCount:  1,
 				DiskDriver: "scsi",
+				ImageType:  "nocloud",
 			},
 		},
 		{
@@ -58,6 +70,7 @@ func TestVirtletAnnotations(t *testing.T) {
 			va: &VirtletAnnotations{
 				VCPUCount:  1,
 				DiskDriver: "scsi",
+				ImageType:  "nocloud",
 			},
 		},
 		{
@@ -66,6 +79,7 @@ func TestVirtletAnnotations(t *testing.T) {
 			va: &VirtletAnnotations{
 				VCPUCount:  4,
 				DiskDriver: "scsi",
+				ImageType:  "nocloud",
 			},
 		},
 		{
@@ -93,6 +107,7 @@ func TestVirtletAnnotations(t *testing.T) {
 				},
 				SSHKeys:    []string{"key1", "key2"},
 				DiskDriver: "scsi",
+				ImageType:  "nocloud",
 			},
 		},
 		{
@@ -104,6 +119,7 @@ func TestVirtletAnnotations(t *testing.T) {
 				VCPUCount:         1,
 				UserDataOverwrite: true,
 				DiskDriver:        "scsi",
+				ImageType:         "nocloud",
 			},
 		},
 		{
@@ -115,6 +131,7 @@ func TestVirtletAnnotations(t *testing.T) {
 				VCPUCount:      1,
 				UserDataScript: "#!/bin/sh\necho hi\n",
 				DiskDriver:     "scsi",
+				ImageType:      "nocloud",
 			},
 		},
 		// bad metadata items follow
@@ -130,6 +147,12 @@ func TestVirtletAnnotations(t *testing.T) {
 			name: "bad cloud-init meta-data",
 			annotations: map[string]string{
 				"VirtletCloudInitMetaData": "{",
+			},
+		},
+		{
+			name: "bad cloud-init image type",
+			annotations: map[string]string{
+				"VirtletCloudInitImageType": "ducttape",
 			},
 		},
 		{

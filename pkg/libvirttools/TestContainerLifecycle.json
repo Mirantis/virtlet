@@ -291,7 +291,7 @@
             },
             "Auth": null,
             "Source": {
-              "File": "/var/lib/virtlet/nocloud/nocloud-231700d5-c9a6-5a49-738d-99a954c51550.iso",
+              "File": "/var/lib/virtlet/config/config-231700d5-c9a6-5a49-738d-99a954c51550.iso",
               "Device": "",
               "Protocol": "",
               "Name": "",
