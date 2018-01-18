@@ -1,37 +1,46 @@
 [
   {
-    "name": "image: GetImageVolume",
+    "name": "image: GetImagePathAndVirtualSize",
     "data": "rootfs image name"
   },
   {
-    "name": "volumes: CreateStorageVolClone",
+    "name": "volumes: CreateStorageVol",
     "data": {
-      "def": {
-        "XMLName": {
-          "Space": "",
-          "Local": ""
-        },
-        "Type": "file",
-        "Name": "virtlet_root_77f29a0e-46af-4188-a6af-9ff8b8a65224",
-        "Key": "",
-        "Allocation": null,
-        "Capacity": null,
-        "Physical": null,
-        "Target": {
-          "Path": "",
-          "Format": {
-            "Type": "qcow2"
-          },
-          "Permissions": null,
-          "Timestamps": null,
-          "Compat": "",
-          "NoCOW": null,
-          "Features": null,
-          "Encryption": null
-        },
-        "BackingStore": null
+      "XMLName": {
+        "Space": "",
+        "Local": ""
       },
-      "from": "images.fake volume name"
+      "Type": "file",
+      "Name": "virtlet_root_77f29a0e-46af-4188-a6af-9ff8b8a65224",
+      "Key": "",
+      "Allocation": {
+        "Unit": "b",
+        "Value": 0
+      },
+      "Capacity": {
+        "Unit": "b",
+        "Value": 424242
+      },
+      "Physical": null,
+      "Target": {
+        "Path": "",
+        "Format": {
+          "Type": "qcow2"
+        },
+        "Permissions": null,
+        "Timestamps": null,
+        "Compat": "",
+        "NoCOW": null,
+        "Features": null,
+        "Encryption": null
+      },
+      "BackingStore": {
+        "Path": "/fake/volume/path",
+        "Format": {
+          "Type": "qcow2"
+        },
+        "Permissions": null
+      }
     }
   },
   {

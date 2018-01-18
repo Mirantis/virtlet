@@ -46,19 +46,12 @@ type VirtStorageConnection interface {
 type VirtStoragePool interface {
 	// CreateStorageVol creates a new storage volume based on the specified definition
 	CreateStorageVol(def *libvirtxml.StorageVolume) (VirtStorageVolume, error)
-	// CreateStorageVolClone creates a new storage volume clone
-	// based on the specified definition and an existing volume
-	// passed as 'from'
-	CreateStorageVolClone(def *libvirtxml.StorageVolume, from VirtStorageVolume) (VirtStorageVolume, error)
 	// ListAllVolumes lists all storage volumes available in the pool
 	ListAllVolumes() ([]VirtStorageVolume, error)
 	// LookupVolumeByName tries to locate the storage volume by its
 	// UUID. In case if the domain cannot be found but no other
 	// error occurred, it returns ErrStorageVolumeNotFound
 	LookupVolumeByName(name string) (VirtStorageVolume, error)
-	// ImageToVolume converts an image at sourcePath to a storage
-	// volume using the specified definition
-	ImageToVolume(def *libvirtxml.StorageVolume, sourcePath string) (VirtStorageVolume, error)
 	// RemoveVolumeByName removes the storage volume with the
 	// specified name
 	RemoveVolumeByName(name string) error

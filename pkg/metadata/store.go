@@ -130,23 +130,10 @@ type ContainerMetadataStore interface {
 	ListPodContainers(podID string) ([]ContainerMetadata, error)
 }
 
-// ImageMetadataStore contains methods to operate on VM images
-type ImageMetadataStore interface {
-	// SetImageName associates image name with the volume
-	SetImageName(volumeName, imageName string) error
-
-	// GetImageName returns image name associated with the volume
-	GetImageName(volumeName string) (string, error)
-
-	// RemoveImage removes volume name association from the volume name
-	RemoveImage(volumeName string) error
-}
-
 // MetadataStore provides single interface for metadata storage implementation
 type MetadataStore interface {
 	SandboxMetadataStore
 	ContainerMetadataStore
-	ImageMetadataStore
 	io.Closer
 }
 

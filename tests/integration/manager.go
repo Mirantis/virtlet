@@ -17,12 +17,18 @@ limitations under the License.
 package integration
 
 import (
+	"fmt"
+	"io/ioutil"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"google.golang.org/grpc"
 
-	"os"
-
+	"github.com/Mirantis/virtlet/pkg/image"
 	"github.com/Mirantis/virtlet/pkg/manager"
 	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
@@ -45,8 +51,27 @@ func (m *fakeFDManager) ReleaseFDs(key string) error {
 	return nil
 }
 
+type fakeImageFileSystem struct {
+	t     *testing.T
+	inner http.FileSystem
+}
+
+func newFakeImageFileSystem(t *testing.T) http.FileSystem {
+	return &fakeImageFileSystem{t: t, inner: http.Dir("/images")}
+}
+
+func (fs *fakeImageFileSystem) Open(name string) (http.File, error) {
+	if name != "/cirros.img" && name != "/copy/cirros.img" {
+		fs.t.Errorf("bad file name %q", name)
+		return nil, fmt.Errorf("bad file name %q", name)
+	}
+	return fs.inner.Open("/cirros.img")
+}
+
 type VirtletManager struct {
 	t       *testing.T
+	ts      *httptest.Server
+	tempDir string
 	manager *manager.VirtletManager
 	conn    *grpc.ClientConn
 	doneCh  chan struct{}
@@ -56,24 +81,40 @@ func NewVirtletManager(t *testing.T) *VirtletManager {
 	return &VirtletManager{t: t}
 }
 
+func (v *VirtletManager) startImageServer() {
+	l, err := net.Listen("tcp", "127.0.0.1:80")
+	if err != nil {
+		v.t.Fatalf("can't listen on port 80: %v", err)
+	}
+	v.ts = httptest.NewUnstartedServer(http.FileServer(newFakeImageFileSystem(v.t)))
+	v.ts.Listener = l
+	v.ts.Start()
+}
+
 func (v *VirtletManager) Run() {
 	if v.manager != nil {
 		v.t.Fatalf("virtlet manager already started")
 	}
 
-	dbFilename, err := utils.Tempfile()
+	v.startImageServer()
+
+	var err error
+	v.tempDir, err = ioutil.TempDir("", "virtlet-manager")
 	if err != nil {
-		v.t.Fatalf("Can't create temp file: %v", err)
+		v.t.Fatalf("Can't create temp directory: %v", err)
 	}
 
-	metadataStore, err := metadata.NewMetadataStore(dbFilename)
+	metadataStore, err := metadata.NewMetadataStore(filepath.Join(v.tempDir, "virtlet.db"))
 	if err != nil {
 		v.t.Fatalf("Failed to create metadata store: %v", err)
 	}
 
+	downloader := image.NewDownloader("http")
+	imageStore := image.NewImageFileStore(filepath.Join(v.tempDir, "images"), downloader, nil)
+
 	os.Setenv("KUBERNETES_CLUSTER_URL", "")
 	os.Setenv("VIRTLET_DISABLE_LOGGING", "true")
-	v.manager, err = manager.NewVirtletManager(libvirtUri, "default", "http", "dir", "loop*", "", metadataStore, &fakeFDManager{})
+	v.manager, err = manager.NewVirtletManager(libvirtUri, "loop*", "", imageStore, metadataStore, &fakeFDManager{})
 	if err != nil {
 		v.t.Fatalf("Failed to create VirtletManager: %v", err)
 	}
@@ -101,5 +142,7 @@ func (v *VirtletManager) Close() {
 		v.t.Fatalf("virtlet manager not started")
 	}
 	v.manager.Stop()
+	os.RemoveAll(v.tempDir)
+	v.ts.Close()
 	<-v.doneCh
 }

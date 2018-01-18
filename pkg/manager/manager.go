@@ -33,13 +33,12 @@ import (
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	"github.com/Mirantis/virtlet/pkg/cni"
+	"github.com/Mirantis/virtlet/pkg/image"
 	"github.com/Mirantis/virtlet/pkg/imagetranslation"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
 	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/stream"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
-	"github.com/Mirantis/virtlet/pkg/utils"
-	"github.com/Mirantis/virtlet/pkg/virt"
 )
 
 const (
@@ -52,7 +51,7 @@ const (
 type VirtletManager struct {
 	server *grpc.Server
 	// libvirt
-	libvirtImageTool          *libvirttools.ImageTool
+	imageStore                image.ImageStore
 	libvirtVirtualizationTool *libvirttools.VirtualizationTool
 	// metadata
 	metadataStore              metadata.MetadataStore
@@ -61,23 +60,13 @@ type VirtletManager struct {
 	StreamServer               *stream.Server
 }
 
-func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, rawDevices, imageTranslationConfigsDir string, metadataStore metadata.MetadataStore, fdManager tapmanager.FDManager) (*VirtletManager, error) {
+func NewVirtletManager(libvirtUri, rawDevices, imageTranslationConfigsDir string, imageStore image.ImageStore, metadataStore metadata.MetadataStore, fdManager tapmanager.FDManager) (*VirtletManager, error) {
 	err := imagetranslation.RegisterCustomResourceType()
 	if err != nil {
 		return nil, err
 	}
 
-	if downloadProtocol == "" {
-		downloadProtocol = defaultDownloadProtocol
-	}
-	downloader := utils.NewDownloader(downloadProtocol)
-
 	conn, err := libvirttools.NewConnection(libvirtUri)
-	if err != nil {
-		return nil, err
-	}
-
-	libvirtImageTool, err := libvirttools.NewImageTool(conn, downloader, poolName)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +79,7 @@ func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, r
 		// doesn't produce correct name for cdrom devices
 		libvirttools.GetNocloudVolume)
 	// TODO: pool name should be passed like for imageTool
-	libvirtVirtualizationTool, err := libvirttools.NewVirtualizationTool(conn, conn, libvirtImageTool, metadataStore, "volumes", rawDevices, volSrc)
+	libvirtVirtualizationTool, err := libvirttools.NewVirtualizationTool(conn, conn, imageStore, metadataStore, "volumes", rawDevices, volSrc)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +100,7 @@ func NewVirtletManager(libvirtUri, poolName, downloadProtocol, storageBackend, r
 
 	virtletManager := &VirtletManager{
 		server:                     grpc.NewServer(),
-		libvirtImageTool:           libvirtImageTool,
+		imageStore:                 imageStore,
 		libvirtVirtualizationTool:  libvirtVirtualizationTool,
 		metadataStore:              metadataStore,
 		fdManager:                  fdManager,
@@ -532,127 +521,46 @@ func (v *VirtletManager) ListContainerStats(ctx context.Context, in *kubeapi.Lis
 // Images
 //
 
-func (v *VirtletManager) imageFromVolume(virtVolume virt.VirtStorageVolume) (*kubeapi.Image, error) {
-	imageName, err := v.metadataStore.GetImageName(virtVolume.Name())
-	if err != nil {
-		glog.Errorf("Error when checking for existing image with volume %q: %v", virtVolume.Name(), err)
-		return nil, err
-	}
-
-	if imageName == "" {
-		// the image doesn't exist
-		return nil, nil
-	}
-
-	size, err := virtVolume.Size()
-	if err != nil {
-		return nil, err
-	}
-
-	return &kubeapi.Image{
-		Id:       imageName,
-		RepoTags: []string{imageName},
-		Size_:    size,
-	}, nil
-}
-
 func (v *VirtletManager) ListImages(ctx context.Context, in *kubeapi.ListImagesRequest) (*kubeapi.ListImagesResponse, error) {
-	virtVolumes, err := v.libvirtImageTool.ListVolumes()
+	images, err := v.imageStore.ListImages(in.GetFilter().GetImage().GetImage())
 	if err != nil {
-		glog.Errorf("Error when listing images: %v", err)
+		glog.Errorf("ListImages: ERROR: %v", err)
 		return nil, err
 	}
 
-	images := make([]*kubeapi.Image, 0, len(virtVolumes))
-	for _, virtVolume := range virtVolumes {
-		image, err := v.imageFromVolume(virtVolume)
-		if err != nil {
-			glog.Errorf("ListImages: error when getting image info for volume %q: %v", virtVolume.Name(), err)
-			return nil, err
-		}
-		// skip images that aren't in virtlet db
-		if image == nil {
-			continue
-		}
-		if filter := in.GetFilter(); filter != nil {
-			if filter.GetImage() != nil && filter.GetImage().Image != image.RepoTags[0] {
-				continue
-			}
-		}
-		images = append(images, image)
+	response := &kubeapi.ListImagesResponse{Images: make([]*kubeapi.Image, len(images))}
+	for n, image := range images {
+		response.Images[n] = imageToKubeapi(image)
 	}
 
-	response := &kubeapi.ListImagesResponse{Images: images}
 	glog.V(4).Infof("ListImages response: %s", spew.Sdump(response))
 	return response, err
 }
 
 func (v *VirtletManager) ImageStatus(ctx context.Context, in *kubeapi.ImageStatusRequest) (*kubeapi.ImageStatusResponse, error) {
-	imageName := in.GetImage().Image
-	volumeName, err := libvirttools.ImageNameToVolumeName(imageName)
+	img, err := v.imageStore.ImageStatus(in.GetImage().GetImage())
 	if err != nil {
-		glog.Errorf("ImageStatus: error getting volume name for image %q: %v", imageName, err)
+		glog.Errorf("ImageStatus: ERROR: %v", err)
 		return nil, err
 	}
-
-	// FIXME: avoid this check by verifying ImageAsVolumeInfo() result instead
-	// (need to be able to distinguish between different libvirt errors for this)
-	// This query is also done in imageFromVolumeInfo() so images
-	// that have volumes but aren't in virtlet db will not be retuned
-	// anyway.
-	existingImageName, err := v.metadataStore.GetImageName(volumeName)
-	if err != nil {
-		glog.Errorf("Error when checking for existing image with volume %q: %v", volumeName, err)
-		return nil, err
-	}
-
-	if existingImageName == "" {
-		glog.V(3).Infof("ImageStatus: image %q not found in db, returning empty response", imageName)
-		return &kubeapi.ImageStatusResponse{}, nil
-	}
-
-	volume, err := v.libvirtImageTool.ImageAsVolume(volumeName)
-	if err != nil {
-		glog.Errorf("Error when getting info for image %q (volume %q): %v", imageName, volumeName, err)
-		return nil, err
-	}
-
-	image, err := v.imageFromVolume(volume)
-	if err != nil {
-		glog.Errorf("ImageStatus: error getting image info for %q (volume %q): %v", imageName, volumeName, err)
-		return nil, err
-	}
-
-	// Note that after the change described in FIXME comment above
-	// the image can be nil here if it's not in virtlet db, but that's ok
-	response := &kubeapi.ImageStatusResponse{Image: image}
+	response := &kubeapi.ImageStatusResponse{Image: imageToKubeapi(img)}
 	glog.V(3).Infof("ImageStatus response: %s", spew.Sdump(response))
 	return response, err
 }
 
 func (v *VirtletManager) PullImage(ctx context.Context, in *kubeapi.PullImageRequest) (*kubeapi.PullImageResponse, error) {
-	imageName := in.GetImage().Image
+	imageName := in.GetImage().GetImage()
 	glog.V(2).Infof("PullImage called for: %s", imageName)
 
-	volumeName, err := libvirttools.ImageNameToVolumeName(imageName)
-	if err != nil {
-		glog.Errorf("PullImage: error getting volume name for image %q: %v", imageName, err)
-		return nil, err
-	}
-
 	imageNameTranslator := v.getImageNameTranslator(ctx)
-	if _, err = v.libvirtImageTool.PullRemoteImageToVolume(imageName, volumeName, imageNameTranslator); err != nil {
-		glog.Errorf("Error when pulling image %q: %v", imageName, err)
-		return nil, err
-	}
-
-	err = v.metadataStore.SetImageName(volumeName, imageName)
+	ref, err := v.imageStore.PullImage(imageName, imageNameTranslator.Translate)
 	if err != nil {
-		glog.Errorf("Error when setting image name %q for volume %q: %v", imageName, volumeName, err)
+		glog.Errorf("PullImage: ERROR: %v", err)
 		return nil, err
 	}
 
-	response := &kubeapi.PullImageResponse{ImageRef: imageName}
+	response := &kubeapi.PullImageResponse{ImageRef: ref}
+	glog.V(3).Infof("PullImage response: %s", spew.Sdump(response))
 	return response, nil
 }
 
@@ -668,30 +576,27 @@ func (v *VirtletManager) getImageNameTranslator(ctx context.Context) imagetransl
 }
 
 func (v *VirtletManager) RemoveImage(ctx context.Context, in *kubeapi.RemoveImageRequest) (*kubeapi.RemoveImageResponse, error) {
-	imageName := in.GetImage().Image
+	imageName := in.GetImage().GetImage()
 	glog.V(2).Infof("RemoveImage called for: %s", imageName)
-
-	volumeName, err := libvirttools.ImageNameToVolumeName(imageName)
-	if err != nil {
-		glog.Errorf("RemoveImage: error getting volume name for image %q: %v", imageName, err)
+	if err := v.imageStore.RemoveImage(imageName); err != nil {
+		glog.Errorf("RemoveImage: ERROR: %v", err)
 		return nil, err
 	}
-
-	if err = v.libvirtImageTool.RemoveImage(volumeName); err != nil {
-		glog.Errorf("Error when removing image %q with path %q: %v", imageName, volumeName, err)
-		return nil, err
-	}
-
-	if err = v.metadataStore.RemoveImage(volumeName); err != nil {
-		glog.Errorf("Error removing image %q from bolt: %v", imageName, volumeName, err)
-		return nil, err
-	}
-
-	response := &kubeapi.RemoveImageResponse{}
-	return response, nil
+	return &kubeapi.RemoveImageResponse{}, nil
 }
 
 func (v *VirtletManager) ImageFsInfo(ctx context.Context, in *kubeapi.ImageFsInfoRequest) (*kubeapi.ImageFsInfoResponse, error) {
 	glog.V(2).Infof("ImageFsInfo: %s", spew.Sdump(in))
 	return nil, errors.New("ImageFsInfo() not implemented")
+}
+
+func imageToKubeapi(img *image.Image) *kubeapi.Image {
+	if img == nil {
+		return nil
+	}
+	return &kubeapi.Image{
+		Id:       img.Digest,
+		RepoTags: []string{img.Name},
+		Size_:    img.Size,
+	}
 }

@@ -31,7 +31,6 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 
 	"github.com/Mirantis/virtlet/pkg/flexvolume"
-	"github.com/Mirantis/virtlet/pkg/imagetranslation"
 	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/Mirantis/virtlet/pkg/virt/fake"
@@ -75,7 +74,6 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 	// __nocloud__ is a hint for fake libvirt domain to fix the path
 	SetNocloudIsoDir(filepath.Join(ct.tmpDir, "__nocloud__"))
 
-	downloader := utils.NewFakeDownloader(ct.tmpDir)
 	ct.rec = rec
 	ct.domainConn = fake.NewFakeDomainConnection(ct.rec.Child("domain conn"))
 	ct.storageConn = fake.NewFakeStorageConnection(ct.rec.Child("storage"))
@@ -85,18 +83,14 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 		t.Fatalf("Failed to create fake bolt client: %v", err)
 	}
 
-	imageTool, err := NewImageTool(ct.storageConn, downloader, "default")
-	if err != nil {
-		t.Fatalf("Failed to create ImageTool: %v", err)
-	}
-
+	imageManager := NewFakeImageManager(ct.rec)
 	volSrc := CombineVMVolumeSources(
 		GetRootVolume,
 		ScanFlexvolumes,
 		// XXX: GetNocloudVolume must go last because it
 		// doesn't produce correct name for cdrom devices
 		GetNocloudVolume)
-	ct.virtTool, err = NewVirtualizationTool(ct.domainConn, ct.storageConn, imageTool, ct.metadataStore, "volumes", "loop*", volSrc)
+	ct.virtTool, err = NewVirtualizationTool(ct.domainConn, ct.storageConn, imageManager, ct.metadataStore, "volumes", "loop*", volSrc)
 	if err != nil {
 		t.Fatalf("failed to create VirtualizationTool: %v", err)
 	}
@@ -105,17 +99,6 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 	ct.virtTool.SetForceKVM(true)
 	ct.kubeletRootDir = filepath.Join(ct.tmpDir, "kubelet-root")
 	ct.virtTool.SetKubeletRootDir(ct.kubeletRootDir)
-
-	// TODO: move image metadata store & name conversion to ImageTool
-	// (i.e. methods like RemoveImage should accept image name)
-	imageVolumeName, err := ImageNameToVolumeName(fakeImageName)
-	if err != nil {
-		t.Fatalf("Error getting volume name for image %q: %v", fakeImageName, err)
-	}
-
-	if _, err := imageTool.PullRemoteImageToVolume(fakeImageName, imageVolumeName, imagetranslation.NewImageNameTranslator()); err != nil {
-		t.Fatalf("Error pulling image %q to volume %q: %v", fakeImageName, imageVolumeName, err)
-	}
 
 	return ct
 }

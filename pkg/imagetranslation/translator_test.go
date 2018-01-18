@@ -74,7 +74,7 @@ func TestTranslations(t *testing.T) {
 			name:        "negative strict translation",
 			allowRegexp: false,
 			imageName:   "image2",
-			expectedUrl: "",
+			expectedUrl: "image2",
 		},
 		{
 			name:        "strict translation precedes regexps",
@@ -92,7 +92,7 @@ func TestTranslations(t *testing.T) {
 			name:        "negative regexp translation",
 			allowRegexp: true,
 			imageName:   "image",
-			expectedUrl: "",
+			expectedUrl: "image",
 		},
 		{
 			name:        "translation with prefix",
@@ -110,7 +110,7 @@ func TestTranslations(t *testing.T) {
 			name:        "negative translation with prefix",
 			allowRegexp: false,
 			imageName:   "prod/image1",
-			expectedUrl: "",
+			expectedUrl: "prod/image1",
 		},
 		{
 			name:        "empty string translation",

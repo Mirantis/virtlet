@@ -27,7 +27,7 @@ const (
 )
 
 type ImageManager interface {
-	GetImageVolume(imageName string) (virt.VirtStorageVolume, error)
+	GetImagePathAndVirtualSize(ref string) (string, uint64, error)
 }
 
 type VolumeOwner interface {

@@ -18,8 +18,6 @@ package libvirttools
 
 import (
 	"fmt"
-	"io"
-	"os"
 
 	"github.com/golang/glog"
 	libvirt "github.com/libvirt/libvirt-go"
@@ -91,19 +89,6 @@ func (pool *LibvirtStoragePool) CreateStorageVol(def *libvirtxml.StorageVolume) 
 	return &LibvirtStorageVolume{name: def.Name, v: v}, nil
 }
 
-func (pool *LibvirtStoragePool) CreateStorageVolClone(def *libvirtxml.StorageVolume, from virt.VirtStorageVolume) (virt.VirtStorageVolume, error) {
-	xml, err := def.Marshal()
-	if err != nil {
-		return nil, err
-	}
-	glog.V(2).Infof("Creating storage volume clone:\n%s", xml)
-	v, err := pool.p.StorageVolCreateXMLFrom(xml, from.(*LibvirtStorageVolume).v, 0)
-	if err != nil {
-		return nil, err
-	}
-	return &LibvirtStorageVolume{name: def.Name, v: v}, nil
-}
-
 func (pool *LibvirtStoragePool) ListAllVolumes() ([]virt.VirtStorageVolume, error) {
 	volumes, err := pool.p.ListAllStorageVolumes(0)
 	if err != nil {
@@ -132,61 +117,6 @@ func (pool *LibvirtStoragePool) LookupVolumeByName(name string) (virt.VirtStorag
 		return nil, err
 	}
 	return &LibvirtStorageVolume{name: name, v: v}, nil
-}
-
-func (pool *LibvirtStoragePool) ImageToVolume(def *libvirtxml.StorageVolume, sourcePath string) (virt.VirtStorageVolume, error) {
-	// if we have such image already in store - remove it
-	existingVol, _ := pool.LookupVolumeByName(def.Name)
-	if existingVol != nil {
-		if err := existingVol.Remove(); err != nil {
-			return nil, err
-		}
-	}
-
-	f, err := os.Open(sourcePath)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	vol, err := pool.CreateStorageVol(def)
-	if err != nil {
-		return nil, err
-	}
-
-	stream, err := pool.conn.NewStream(0)
-	if err != nil {
-		return nil, err
-	}
-
-	err = vol.(*LibvirtStorageVolume).v.Upload(stream, 0, 0, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	err = stream.SendAll(func(s *libvirt.Stream, n int) ([]byte, error) {
-		buffer := make([]byte, n)
-
-		nread, err := f.Read(buffer)
-		if err != nil {
-			if err != io.EOF {
-				return nil, err
-			}
-			return nil, nil
-		}
-
-		return buffer[:nread], nil
-	})
-
-	if err == nil {
-		err = stream.Finish()
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	return vol, nil
 }
 
 func (pool *LibvirtStoragePool) RemoveVolumeByName(name string) error {
