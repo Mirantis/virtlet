@@ -33,7 +33,7 @@ import (
 )
 
 const (
-	copyBufferSize = 1024 * 1024 * 1024
+	copyBufferSize = 1024 * 1024
 )
 
 // Endpoint contains all the endpoint parameters needed to download a file
