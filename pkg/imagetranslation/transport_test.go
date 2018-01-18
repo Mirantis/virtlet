@@ -25,6 +25,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"net"
 	"net/http"
@@ -34,10 +35,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Mirantis/virtlet/pkg/utils"
+	"github.com/Mirantis/virtlet/pkg/image"
 )
 
-func translate(config ImageTranslation, name string, server *httptest.Server) utils.Endpoint {
+func translate(config ImageTranslation, name string, server *httptest.Server) image.Endpoint {
 	for i, rule := range config.Rules {
 		config.Rules[i].Url = strings.Replace(rule.Url, "%", server.Listener.Addr().String(), 1)
 	}
@@ -53,9 +54,8 @@ func intptr(v int) *int {
 }
 
 func download(t *testing.T, proto string, config ImageTranslation, name string, server *httptest.Server) {
-	downloader := utils.NewDownloader(proto)
-	_, err := downloader.DownloadFile(translate(config, name, server))
-	if err != nil {
+	downloader := image.NewDownloader(proto)
+	if err := downloader.DownloadFile(translate(config, name, server), ioutil.Discard); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -140,7 +140,7 @@ func TestImageDownloadRedirects(t *testing.T) {
 		},
 	}
 
-	downloader := utils.NewDownloader("http")
+	downloader := image.NewDownloader("http")
 	for _, tst := range []struct {
 		name         string
 		image        string
@@ -218,7 +218,7 @@ func TestImageDownloadRedirects(t *testing.T) {
 			urls = nil
 			handledCount = 0
 			maxRedirects = tst.mr
-			_, err := downloader.DownloadFile(translate(config, tst.image, ts))
+			err := downloader.DownloadFile(translate(config, tst.image, ts), ioutil.Discard)
 			if handledCount == 0 {
 				t.Error("http handler wasn't called")
 			} else if (err != nil) != tst.mustFail {
@@ -289,7 +289,7 @@ func TestImageDownloadWithTimeout(t *testing.T) {
 		},
 	}
 
-	downloader := utils.NewDownloader("http")
+	downloader := image.NewDownloader("http")
 	for _, tst := range []struct {
 		name     string
 		timeout  time.Duration
@@ -309,7 +309,7 @@ func TestImageDownloadWithTimeout(t *testing.T) {
 		t.Run(tst.name, func(t *testing.T) {
 			handled = false
 			timeout = tst.timeout
-			_, err := downloader.DownloadFile(translate(config, "image", ts))
+			err := downloader.DownloadFile(translate(config, "image", ts), ioutil.Discard)
 			if err == nil && tst.mustFail {
 				t.Error("no error happened when timeout was expected")
 			} else if err != nil && !tst.mustFail {

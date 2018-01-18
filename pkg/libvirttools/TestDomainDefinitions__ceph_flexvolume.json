@@ -7,28 +7,6 @@
         "Local": ""
       },
       "Type": "dir",
-      "Name": "default",
-      "UUID": "",
-      "Allocation": null,
-      "Capacity": null,
-      "Available": null,
-      "Target": {
-        "Path": "/var/lib/libvirt/images",
-        "Permissions": null,
-        "Timestamps": null,
-        "Encryption": null
-      },
-      "Source": null
-    }
-  },
-  {
-    "name": "storage: CreateStoragePool",
-    "data": {
-      "XMLName": {
-        "Space": "",
-        "Local": ""
-      },
-      "Type": "dir",
       "Name": "volumes",
       "UUID": "",
       "Allocation": null,
@@ -44,27 +22,33 @@
     }
   },
   {
-    "name": "storage: default: CreateStorageVol",
+    "name": "GetImagePathAndVirtualSize",
+    "data": "fake/image1"
+  },
+  {
+    "name": "storage: volumes: CreateStorageVol",
     "data": {
       "XMLName": {
         "Space": "",
         "Local": ""
       },
-      "Type": "",
-      "Name": "0d24dac87b6d48c5c3de11956f1774ef9a57a004_image1",
+      "Type": "file",
+      "Name": "virtlet_root_231700d5-c9a6-5a49-738d-99a954c51550",
       "Key": "",
       "Allocation": {
-        "Unit": "",
+        "Unit": "b",
         "Value": 0
       },
       "Capacity": {
         "Unit": "b",
-        "Value": 11
+        "Value": 424242
       },
       "Physical": null,
       "Target": {
-        "Path": "/var/lib/libvirt/images/0d24dac87b6d48c5c3de11956f1774ef9a57a004_image1",
-        "Format": null,
+        "Path": "",
+        "Format": {
+          "Type": "qcow2"
+        },
         "Permissions": null,
         "Timestamps": null,
         "Compat": "",
@@ -72,38 +56,13 @@
         "Features": null,
         "Encryption": null
       },
-      "BackingStore": null
-    }
-  },
-  {
-    "name": "storage: volumes: CreateStorageVolClone",
-    "data": {
-      "def": {
-        "XMLName": {
-          "Space": "",
-          "Local": ""
+      "BackingStore": {
+        "Path": "/fake/volume/path",
+        "Format": {
+          "Type": "qcow2"
         },
-        "Type": "file",
-        "Name": "virtlet_root_231700d5-c9a6-5a49-738d-99a954c51550",
-        "Key": "",
-        "Allocation": null,
-        "Capacity": null,
-        "Physical": null,
-        "Target": {
-          "Path": "",
-          "Format": {
-            "Type": "qcow2"
-          },
-          "Permissions": null,
-          "Timestamps": null,
-          "Compat": "",
-          "NoCOW": null,
-          "Features": null,
-          "Encryption": null
-        },
-        "BackingStore": null
-      },
-      "from": "default.0d24dac87b6d48c5c3de11956f1774ef9a57a004_image1"
+        "Permissions": null
+      }
     }
   },
   {

@@ -18,7 +18,7 @@ package integration
 
 import (
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -44,7 +44,7 @@ func (it *imageTester) stop() {
 	it.manager.Close()
 }
 
-func (it *imageTester) pullImage(url string) {
+func (it *imageTester) pullImage(url, expectedRef string) {
 	imageSpec := &kubeapi.ImageSpec{Image: url}
 	in := &kubeapi.PullImageRequest{
 		Image:         imageSpec,
@@ -54,13 +54,13 @@ func (it *imageTester) pullImage(url string) {
 
 	if resp, err := it.imageServiceClient.PullImage(context.Background(), in); err != nil {
 		it.t.Fatalf("PullImage() failed: %v", err)
-	} else if resp.ImageRef != imageSpec.Image {
-		it.t.Fatalf("PullImage(): bad ImageRef in the response: %q instead of %q", resp.ImageRef, imageSpec)
+	} else if resp.ImageRef != expectedRef {
+		it.t.Fatalf("PullImage(): bad ImageRef in the response: %q instead of %q", resp.ImageRef, expectedRef)
 	}
 }
 
 func (it *imageTester) pullSampleImage() {
-	it.pullImage(imageCirrosUrl)
+	it.pullImage(imageCirrosUrl, imageCirrosRef)
 }
 
 func (it *imageTester) queryImage() *kubeapi.Image {
@@ -100,8 +100,8 @@ func (it *imageTester) verifyImage(image *kubeapi.Image) {
 		it.t.Fatalf("bad image repo tag: %q instead of %q", repoTags[0], imageCirrosUrl)
 	}
 
-	if image.Size_ != uint64(cirrosVolumeSize) {
-		it.t.Fatalf("bad image size in bytes: %d instead of %d", image.Size_, cirrosVolumeSize)
+	if image.Size_ != uint64(cirrosImageSize) {
+		it.t.Fatalf("bad image size in bytes: %d instead of %d", image.Size_, cirrosImageSize)
 	}
 
 	if image.Uid != nil {
@@ -129,6 +129,15 @@ func (it *imageTester) verifyNoImagesListed(filter *kubeapi.ImageFilter) {
 	if len(images) != 0 {
 		it.t.Fatalf("No images expected from ListImages(), but got %s", spew.Sdump(images))
 	}
+}
+
+func (it *imageTester) getImageFileModificationTime() (time.Time, error) {
+	fi, err := os.Stat(filepath.Join(it.manager.tempDir, "images/data/"+imageCirrosSha256))
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return fi.ModTime(), nil
 }
 
 func TestImagePull(t *testing.T) {
@@ -181,38 +190,27 @@ func TestListImagesWithFilter(t *testing.T) {
 	it.verifySingleImageListed(&kubeapi.ImageFilter{Image: &kubeapi.ImageSpec{Image: imageCirrosUrl}})
 }
 
-func getImageFileModificationTime() (time.Time, error) {
-	// Hardcoded file name for image:
-	// "localhost/cirros.img"
-	// used by it.pullImage
-	imageFileName := "d25f5d42e5feaeea79ffd749e56a7d74772147e5_cirros.img"
-	fileInfo, err := os.Stat(path.Join("/var/lib/libvirt/images", imageFileName))
-	if err != nil {
-		return time.Time{}, err
-	}
-
-	return fileInfo.ModTime(), nil
-}
-
 func TestImageRedownload(t *testing.T) {
 	it := newImageTester(t)
 	defer it.stop()
 
 	it.pullSampleImage()
-	firstTime, err := getImageFileModificationTime()
+	firstTime, err := it.getImageFileModificationTime()
 	if err != nil {
 		t.Fatal("Can't stat cirros image in libvirt store:", err)
 	}
 
 	it.pullSampleImage()
 
-	secondTime, err := getImageFileModificationTime()
+	secondTime, err := it.getImageFileModificationTime()
 	if err != nil {
 		t.Fatal("Can't stat cirros image in libvirt store:", err)
 	}
 
-	if firstTime.Equal(secondTime) {
-		t.Fatal("Image in libvirt store was not modified by second call to PullImage")
+	// the file is the same so no modifications happen
+	// TODO: test downloading modified image
+	if !firstTime.Equal(secondTime) {
+		t.Fatal("Image in libvirt store was modified by second call to PullImage")
 	}
 }
 
@@ -221,7 +219,7 @@ func TestImagesWithSameName(t *testing.T) {
 	defer it.stop()
 
 	it.pullSampleImage()
-	it.pullImage(imageCopyCirrosUrl)
+	it.pullImage(imageCopyCirrosUrl, imageCopyCirrosRef)
 
 	imagesCount := len(it.listImages(nil))
 	if imagesCount != 2 {

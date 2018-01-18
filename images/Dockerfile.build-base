@@ -18,6 +18,8 @@ ENV GOLANG_VERSION 1.8.3
 ENV GOLANG_DOWNLOAD_URL https://golang.org/dl/go$GOLANG_VERSION.linux-amd64.tar.gz
 ENV GOLANG_DOWNLOAD_SHA256 1862f4c3d3907e59b04a757cfda0ea7aa9ef39274af99a784f5be843c80c6772
 
+ENV CIRROS_SHA256 fcd9e9a622835de8dba6b546481d13599b1e592bba1275219e1b31cae33b1365
+
 # build container should be able to run libvirt because it's used for integration tests
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
@@ -55,7 +57,7 @@ WORKDIR $GOPATH
 
 # Install kubectl
 RUN curl -L https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl -o /usr/local/bin/kubectl
-RUN echo ${KUBECTL_SHA1} /usr/local/bin/kubectl |sha1sum -c
+RUN echo "${KUBECTL_SHA1}  /usr/local/bin/kubectl" |sha1sum -c
 RUN mkdir -p /usr/local/bin
 RUN chmod +x /usr/local/bin/kubectl
 
@@ -66,3 +68,8 @@ RUN mkdir -p ~/.ssh && \
     curl -L https://github.com/containernetworking/cni/releases/download/v0.3.0/cni-v0.3.0.tgz | \
       tar zxC /opt/cni/bin && \
     ln -s /go/src/github.com/Mirantis/virtlet/_output/vmwrapper /vmwrapper
+
+# Download cirros image
+RUN mkdir -p /images && \
+    curl -L https://github.com/Mirantis/virtlet/releases/download/v0.8.2/cirros.img -o /images/cirros.img && \
+    echo "${CIRROS_SHA256}  /images/cirros.img" | sha256sum -c -

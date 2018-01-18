@@ -19,7 +19,7 @@ package imagetranslation
 import (
 	"context"
 
-	"github.com/Mirantis/virtlet/pkg/utils"
+	"github.com/Mirantis/virtlet/pkg/image"
 )
 
 // TranslationRule represents a single translation rule from either name or regexp to Endpoint
@@ -110,5 +110,5 @@ type ImageNameTranslator interface {
 	LoadConfigs(ctx context.Context, sources ...ConfigSource)
 
 	// Translate translates image name to ins Endpoint. If no suitable mapping was found, the default Endpoint is returned
-	Translate(name string) utils.Endpoint
+	Translate(name string) image.Endpoint
 }

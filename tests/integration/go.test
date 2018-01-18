@@ -4,28 +4,11 @@ set -o nounset
 set -o pipefail
 set -o errtrace
 
-cleanup() {
-  if [[ ${HTTP_SERVER_PID:-} ]] ; then
-    kill ${HTTP_SERVER_PID}
-  fi
-}
-
-trap cleanup EXIT
-
 export VIRTLET_DISABLE_KVM=1
 
 if [[ ! -f /var/run/libvirtd.pid ]]; then
     /libvirt.sh -novirtlet
 fi
-
-mkdir -p /tmp/image_store
-pushd /tmp/image_store
-curl -L https://github.com/Mirantis/virtlet/releases/download/v0.8.2/cirros.img -o cirros.img
-rm -rf copy
-ln -s . copy
-python -m SimpleHTTPServer 80 >/tmp/http_server.log &
-HTTP_SERVER_PID=$!
-popd
 
 success=1
 if [ $# -ne 0 ] ; then
