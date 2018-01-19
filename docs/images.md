@@ -4,7 +4,10 @@ Virtlet supports QCOW2 format for VM images.
 
 ## Options:
 - `ImagePullSecrets` - not supported currently
-- Protocol to use to download the image. By default `https` is used. In order to use `http` set `VIRTLET_DOWNLOAD_PROTOCOL` env var to `http` for virtlet container.
+- protocol to use to download the image. By default `https` is
+  used. In order to use `http` set `VIRTLET_DOWNLOAD_PROTOCOL` env var
+  to `http` for virtlet container. `<scheme>://` below denotes
+  the selected protocol
 
 ## An example of container definition:
 
@@ -14,19 +17,43 @@ Virtlet supports QCOW2 format for VM images.
       image: download.cirros-cloud.net/0.3.5/cirros-0.3.5-x86_64-disk.img
 ```
 
-**Note:** You need to specify url without `scheme://`. In case you are using [instructions](../deploy/README.md) in `deploy/` directory to deploy Virtlet, you need to add `virtlet.cloud/` prefix to the url.
+**Note:** You need to specify url without `<scheme>://`. In case you are using [instructions](../deploy/README.md) in `deploy/` directory to deploy Virtlet, you need to add `virtlet.cloud/` prefix to the url.
 
 Also see [Image Name Translation](image-name-translation.md) for another way of providing image URL.
 
-## Image handling Workflow:
-1. Kubelet sends `PullImage` gRPC request to Virtlet.
-(Note, that `PullImage` request can be skipped by kubelet unless the pod has `imagePullPolicy: PullAlways` or `imagePullPolicy: PullIfNotPreset` and the image is not pulled yet.)
-1. Virtlet uses image url fragment after last slash as internal image name that it looks up in the list of existent images on the host.
-1. The image will be downloaded using specified url prepended with `scheme://`. After that Virtlet creates libvirt volume in "**default**" libvirt pool under `/var/lib/libvirt/images` and copies the image content to it. As there is no versioning of QCOW2 images Virtlet downloads the image each time, using the image name with `scheme://` prefix added.
+Virtlet uses filesystem-based image store for the VM images.
+The images are stored like this:
 
-**Note:** Virtual machines are started from volumes which are clones of boot images.
-Original images are stored in libvirt `default` pool (`/var/lib/libvirt/images` on filesystem).
-Clones used as boot images are stored in "**volumes**" libvirt pool under `/var/lib/virtlet/volumes`
+```
+/var/lib/virtlet/images
+  links/
+    example.com%whatever%etc -> ../data/2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881
+    example.com%same%image   -> ../data/2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881
+    anotherimg               -> ../data/a1fce4363854ff888cff4b8e7875d600c2682390412a8cf79b37d0b11148b0fa
+  data/
+    2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881
+    a1fce4363854ff888cff4b8e7875d600c2682390412a8cf79b37d0b11148b0fa
+```
+
+The files are downloaded to `data/`. File names correspond to SHA256
+hashes of their content.
+
+The images are pulled upon `PullImage` gRPC request made by kubelet.
+Files are named `part_SOME_RANDOM_STRING` while being downloaded.
+After the download finishes, SHA256 hash is calculated to be used as
+the data file name, and if the file with that name already exists, the
+newly downloaded file is removed, otherwise it's renamed to that
+SHA256 digest string. In both cases a symbolic link is created with
+the name equal to docker image name but with `/` replaced by `%`, with
+the link target being the matching data file.
+
+The image store performs GC upon Virtlet startup, which consists of
+removing any part_* files and those files in data/ which have no
+symlinks leading to them.
+
+The VMs are started from QCOW2 volumes which use the boot images
+as backing store files. The images are stored under `/var/lib/libvirt/images/data`.
+VM volumes are stored in "**volumes**" libvirt pool under `/var/lib/virtlet/volumes`
 during the VM execution time and are automatically garbage collected by Virtlet
 after stopping VM pod environment (sandbox).
 
