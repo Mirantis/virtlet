@@ -98,6 +98,10 @@ func NewVirtletManager(libvirtUri, rawDevices, imageTranslationConfigsDir string
 		}
 	}
 
+	if err := imageStore.GC(); err != nil {
+		glog.Warningf("error during the image GC: %v", err)
+	}
+
 	virtletManager := &VirtletManager{
 		server:                     grpc.NewServer(),
 		imageStore:                 imageStore,

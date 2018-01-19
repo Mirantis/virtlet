@@ -36,6 +36,14 @@ type Image struct {
 	Size   uint64
 }
 
+func (img *Image) hexDigest() (string, error) {
+	if d, err := digest.ParseDigest(img.Digest); err != nil {
+		return "", err
+	} else {
+		return d.Hex(), nil
+	}
+}
+
 // ImageTranslator translates image name to a Endpoint
 type ImageTranslator func(string) Endpoint
 
@@ -154,7 +162,7 @@ func (s *ImageFileStore) placeImage(tempPath string, dataName string, imageName 
 	if err := os.Symlink(filepath.Join("../data/", dataName), linkFileName); err != nil {
 		if isNew {
 			if err := os.Remove(dataPath); err != nil {
-				glog.Warning("error removing %q: %v", dataPath, err)
+				glog.Warningf("error removing %q: %v", dataPath, err)
 			}
 		}
 		return fmt.Errorf("error creating symbolic link %q for image %q: %v", linkFileName, imageName, err)
@@ -205,9 +213,7 @@ func (s *ImageFileStore) imageInfo(fi os.FileInfo) (*Image, error) {
 	}, nil
 }
 
-func (s *ImageFileStore) ListImages(filter string) ([]*Image, error) {
-	s.Lock()
-	defer s.Unlock()
+func (s *ImageFileStore) listImagesUnlocked(filter string) ([]*Image, error) {
 	if linkDirExists, err := s.linkDirExists(); err != nil {
 		return nil, err
 	} else if !linkDirExists {
@@ -235,6 +241,12 @@ func (s *ImageFileStore) ListImages(filter string) ([]*Image, error) {
 	}
 
 	return r, nil
+}
+
+func (s *ImageFileStore) ListImages(filter string) ([]*Image, error) {
+	s.Lock()
+	defer s.Unlock()
+	return s.listImagesUnlocked(filter)
 }
 
 func (s *ImageFileStore) imageStatusUnlocked(name string) (*Image, error) {
@@ -341,7 +353,34 @@ func (s *ImageFileStore) RemoveImage(name string) error {
 }
 
 func (s *ImageFileStore) GC() error {
-	glog.Warning("Image GC not implemented yet")
+	s.Lock()
+	defer s.Unlock()
+	images, err := s.listImagesUnlocked("")
+	if err != nil {
+		return err
+	}
+	imagesInUse := make(map[string]bool)
+	for _, img := range images {
+		if hexDigest, err := img.hexDigest(); err != nil {
+			glog.Warningf("GC: error calculating digest for image %q: %v", img.Name, err)
+		} else {
+			imagesInUse[hexDigest] = true
+		}
+	}
+	globExpr := filepath.Join(s.dataDir(), "*")
+	matches, err := filepath.Glob(globExpr)
+	if err != nil {
+		return fmt.Errorf("Glob(): %q: %v", globExpr, err)
+	}
+	for _, m := range matches {
+		if imagesInUse[filepath.Base(m)] {
+			continue
+		}
+		glog.V(1).Infof("GC: removing unreferenced image file %q", m)
+		if err := os.Remove(m); err != nil {
+			glog.Warningf("GC: removing %q: %v", m, err)
+		}
+	}
 	return nil
 }
 

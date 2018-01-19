@@ -25,6 +25,8 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
+	"strings"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -207,6 +209,32 @@ func (tst *ifsTester) pullAllImages() {
 	tst.verifyListImages("", tst.images[1], tst.images[0], tst.images[2]) // alphabetically sorted by name
 }
 
+func (tst *ifsTester) removeFile(relPath string) {
+	p := filepath.Join(tst.tmpDir, relPath)
+	if err := os.Remove(p); err != nil {
+		tst.t.Errorf("failed to remove %q: %v", p, err)
+	}
+}
+
+func (tst *ifsTester) verifyDataFiles(expectedNames ...string) {
+	dataPath := filepath.Join(tst.tmpDir, "data")
+	infos, err := ioutil.ReadDir(dataPath)
+	if err != nil {
+		tst.t.Errorf("readdir %q: %v", dataPath, err)
+		return
+	}
+	var names []string
+	for _, fi := range infos {
+		names = append(names, fi.Name())
+	}
+	nameStr := strings.Join(names, "\n")
+	sort.Strings(names)
+	expectedNameStr := strings.Join(expectedNames, "\n")
+	if nameStr != expectedNameStr {
+		tst.t.Errorf("bad file list:\n%s\n-- instead of --\n%s", nameStr, expectedNameStr)
+	}
+}
+
 func TestImagePullListStatus(t *testing.T) {
 	tst := newIfsTester(t)
 	defer tst.teardown()
@@ -293,6 +321,36 @@ func TestRemoveImage(t *testing.T) {
 	tst.verifyDataDirIsEmpty()
 }
 
-// TODO: image gc (rm unrefd images, rm part_* files)
-//       needs to take a list of image refs that are in use
-//       (name, digest or full ref)
+func TestImageGC(t *testing.T) {
+	tst := newIfsTester(t)
+	defer tst.teardown()
+	tst.pullAllImages()
+	if err := ioutil.WriteFile(
+		filepath.Join(tst.tmpDir, "data/part_73475cb40a568e8da8a045ced110137e159f890ac4da883b6b17dc651b3a8049"),
+		[]byte("4"), 0666); err != nil {
+		t.Errorf("WriteFile(): %v", err)
+	}
+	tst.store.GC()
+	// GC on the correct fs only removes part_* files (because they're never referenced by anything)
+	tst.verifyListImages("", tst.images[1], tst.images[0], tst.images[2])
+	tst.verifyDataFiles(sha256str("###example.com:1234/foo/bar"), sha256str("###baz"))
+
+	tst.removeFile("links/baz")
+	tst.store.GC()
+	// GC on the correct fs doesn't change anything
+	tst.verifyListImages("", tst.images[0], tst.images[2])
+	tst.verifyImage(tst.refs[0], "###example.com:1234/foo/bar")
+	tst.verifyImage(tst.refs[2], "###baz")
+	tst.verifyDataFiles(sha256str("###example.com:1234/foo/bar"), sha256str("###baz"))
+
+	tst.removeFile("links/example.com:1234%foo%bar")
+	tst.store.GC()
+	tst.verifyListImages("", tst.images[2])
+	tst.verifyImage(tst.refs[2], "###baz")
+	tst.verifyDataFiles(sha256str("###baz"))
+
+	tst.removeFile("links/foobar")
+	tst.store.GC()
+	tst.verifyListImages("")
+	tst.verifyDataFiles()
+}
