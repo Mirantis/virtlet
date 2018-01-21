@@ -84,21 +84,6 @@ type ifReq struct {
 	pad   [SizeOfIfReq - IFNAMSIZ - 2]byte
 }
 
-type Route struct {
-	Destination *net.IPNet
-	Via         net.IP
-}
-
-type InterfaceInfo struct {
-	IPNet  *net.IPNet
-	Routes []Route
-}
-
-type ContainerNetwork struct {
-	Info   *cnicurrent.Result
-	DhcpNS ns.NetNS
-}
-
 func makeVethPair(name, peer string, mtu int) (netlink.Link, error) {
 	veth := &netlink.Veth{
 		LinkAttrs: netlink.LinkAttrs{
