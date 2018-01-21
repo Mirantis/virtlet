@@ -25,6 +25,7 @@ import (
 	"time"
 
 	cnitypes "github.com/containernetworking/cni/pkg/types"
+	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 	"github.com/jonboulle/clockwork"
@@ -202,7 +203,7 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 		}
 	}
 	fdPayload := &tapmanager.GetFDPayload{Description: pnd}
-	netConfigBytes, err := v.fdManager.AddFDs(podId, fdPayload)
+	csnBytes, err := v.fdManager.AddFDs(podId, fdPayload)
 	if err != nil {
 		// this will cause kubelet to delete the pod sandbox and then retry
 		// its creation
@@ -210,7 +211,7 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 		glog.Errorf("Error when adding pod %s (%s) to CNI network: %v", podName, podId, err)
 	}
 
-	psi, err := metadata.NewPodSandboxInfo(config, netConfigBytes, state, clockwork.NewRealClock())
+	psi, err := metadata.NewPodSandboxInfo(config, csnBytes, state, clockwork.NewRealClock())
 	if err != nil {
 		glog.Errorf("Error serializing bod %q (%q) sandbox configuration: %v", podName, podId, err)
 		return nil, err
@@ -312,13 +313,12 @@ func (v *VirtletManager) PodSandboxStatus(ctx context.Context, in *kubeapi.PodSa
 	}
 	status := sandboxInfo.AsPodSandboxStatus()
 
-	netResult, err := cni.BytesToResult([]byte(sandboxInfo.CNIConfig))
-	if err != nil {
-		glog.Errorf("Error when unmarshaling pod network configuration for sandbox '%s': %v", podSandboxId, err)
-		return nil, err
+	var cniResult *cnicurrent.Result
+	if sandboxInfo.ContainerSideNetwork != nil {
+		cniResult = sandboxInfo.ContainerSideNetwork.Result
 	}
 
-	ip := cni.GetPodIP(netResult)
+	ip := cni.GetPodIP(cniResult)
 	if ip != "" {
 		status.Network = &kubeapi.PodSandboxNetworkStatus{Ip: ip}
 	}
@@ -388,12 +388,12 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 	}
 
 	fdKey := podSandboxId
-	vmConfig, err := libvirttools.GetVMConfig(in, sandboxInfo.CNIConfig)
+	vmConfig, err := libvirttools.GetVMConfig(in, sandboxInfo.ContainerSideNetwork)
 	if err != nil {
 		glog.Errorf("Error getting vm config for container %s: %v", name, err)
 		return nil, err
 	}
-	if len(sandboxInfo.CNIConfig) == 0 {
+	if sandboxInfo.ContainerSideNetwork == nil || sandboxInfo.ContainerSideNetwork.Result == nil {
 		fdKey = ""
 	}
 

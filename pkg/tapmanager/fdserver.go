@@ -432,7 +432,7 @@ func (c *FDClient) request(hdr *fdHeader, data []byte) (*fdHeader, []byte, []byt
 }
 
 // AddFDs requests the FDServer to add a new file descriptor
-// using its FDSource. It returns the info which is returned
+// using its FDSource. It returns the CSN which is returned
 // by FDSource's GetFDs() call
 func (c *FDClient) AddFDs(key string, data interface{}) ([]byte, error) {
 	bs, ok := data.([]byte)

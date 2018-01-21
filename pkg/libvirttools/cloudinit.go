@@ -35,7 +35,6 @@ import (
 	"github.com/golang/glog"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
-	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/flexvolume"
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
@@ -141,15 +140,12 @@ func (g *CloudInitGenerator) generateNetworkConfiguration() ([]byte, error) {
 }
 
 func (g *CloudInitGenerator) generateNetworkConfigurationNoCloud() ([]byte, error) {
-	cniResult, err := cni.BytesToResult([]byte(g.config.CNIConfig))
-	if err != nil {
-		return nil, err
-	}
-	if cniResult == nil {
+	if g.config.ContainerSideNetwork == nil {
 		// This can only happen during integration tests
 		// where a dummy sandbox is used
 		return []byte("version: 1\n"), nil
 	}
+	cniResult := g.config.ContainerSideNetwork.Result
 
 	var config []map[string]interface{}
 	var gateways []net.IP
@@ -264,10 +260,7 @@ func getDnsData(cniDns cnitypes.DNS) []map[string]interface{} {
 }
 
 func (g *CloudInitGenerator) generateNetworkConfigurationConfigDrive() ([]byte, error) {
-	cniResult, err := cni.BytesToResult([]byte(g.config.CNIConfig))
-	if err != nil {
-		return nil, err
-	}
+	cniResult := g.config.ContainerSideNetwork.Result
 	if cniResult == nil {
 		// This can only happen during integration tests
 		// where a dummy sandbox is used

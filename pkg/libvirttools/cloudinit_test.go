@@ -32,6 +32,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ghodss/yaml"
 
+	"github.com/Mirantis/virtlet/pkg/network"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
@@ -64,15 +65,13 @@ func newFakeFlexvolume(t *testing.T, parentDir string, uuid string, part int) *f
 }
 
 func buildNetworkedPodConfig(cniResult *cnicurrent.Result, imageType string) *VMConfig {
-	r, err := json.Marshal(cniResult)
-	if err != nil {
-		panic("failed to marshal CNI result")
-	}
 	return &VMConfig{
 		PodName:           "foo",
 		PodNamespace:      "default",
 		ParsedAnnotations: &VirtletAnnotations{ImageType: ImageType(imageType)},
-		CNIConfig:         string(r),
+		ContainerSideNetwork: &network.ContainerSideNetwork{
+			Result: cniResult,
+		},
 	}
 }
 

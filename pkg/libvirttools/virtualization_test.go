@@ -121,7 +121,7 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 }
 
 func (ct *containerTester) setPodSandbox(config *kubeapi.PodSandboxConfig) {
-	psi, _ := metadata.NewPodSandboxInfo(config, fakeCNIConfig, kubeapi.PodSandboxState_SANDBOX_READY, ct.clock)
+	psi, _ := metadata.NewPodSandboxInfo(config, nil, kubeapi.PodSandboxState_SANDBOX_READY, ct.clock)
 	sandbox := ct.metadataStore.PodSandbox(config.Metadata.Uid)
 	err := sandbox.Save(
 		func(c *metadata.PodSandboxInfo) (*metadata.PodSandboxInfo, error) {
@@ -156,7 +156,7 @@ func (ct *containerTester) createContainer(sandbox *kubeapi.PodSandboxConfig, mo
 	// Here we pass "" as cniConfig argument of GetVMConfig because we
 	// don't test CNI aspect here. It's taken care of in pkg/manager
 	// and cloud-init part of this package.
-	vmConfig, err := GetVMConfig(req, "")
+	vmConfig, err := GetVMConfig(req, nil)
 	if err != nil {
 		ct.t.Fatalf("GetVMConfig(): %v", err)
 	}
@@ -514,7 +514,7 @@ func TestDomainResourceConstraints(t *testing.T) {
 		},
 		SandboxConfig: sandbox,
 	}
-	vmConfig, err := GetVMConfig(req, "")
+	vmConfig, err := GetVMConfig(req, nil)
 	if err != nil {
 		t.Fatalf("GetVMConfig(): %v", err)
 	}

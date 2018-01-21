@@ -18,26 +18,29 @@ package metadata
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 
 	"github.com/jonboulle/clockwork"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+
+	"github.com/Mirantis/virtlet/pkg/network"
 )
 
 // PodSandboxInfo contains metadata information about pod sandbox instance
 type PodSandboxInfo struct {
 	podID string
 
-	Metadata        *kubeapi.PodSandboxMetadata
-	CreatedAt       int64
-	Labels          map[string]string
-	Hostname        string
-	LogDirectory    string
-	Annotations     map[string]string
-	State           kubeapi.PodSandboxState
-	CgroupParent    string
-	NamespaceOption *kubeapi.NamespaceOption
-	CNIConfig       string
+	Metadata             *kubeapi.PodSandboxMetadata
+	CreatedAt            int64
+	Labels               map[string]string
+	Hostname             string
+	LogDirectory         string
+	Annotations          map[string]string
+	State                kubeapi.PodSandboxState
+	CgroupParent         string
+	NamespaceOption      *kubeapi.NamespaceOption
+	ContainerSideNetwork *network.ContainerSideNetwork
 }
 
 // AsPodSandboxStatus converts PodSandboxInfo to an instance of PodSandboxStatus
@@ -151,7 +154,7 @@ type MetadataStore interface {
 }
 
 // NewPodSandboxInfo is a factory function for PodSandboxInfo instances
-func NewPodSandboxInfo(config *kubeapi.PodSandboxConfig, netConfig interface{}, state kubeapi.PodSandboxState, clock clockwork.Clock) (*PodSandboxInfo, error) {
+func NewPodSandboxInfo(config *kubeapi.PodSandboxConfig, csnData interface{}, state kubeapi.PodSandboxState, clock clockwork.Clock) (*PodSandboxInfo, error) {
 	linuxSandbox := config.Linux
 	if linuxSandbox == nil {
 		linuxSandbox = &kubeapi.LinuxPodSandboxConfig{}
@@ -161,30 +164,40 @@ func NewPodSandboxInfo(config *kubeapi.PodSandboxConfig, netConfig interface{}, 
 		namespaceOptions = linuxSandbox.SecurityContext.NamespaceOptions
 	}
 
-	var netConfigStr string
-	switch netConfig.(type) {
-	case []byte:
-		netConfigStr = string(netConfig.([]byte))
+	var csn *network.ContainerSideNetwork
+	switch csnData.(type) {
 	case string:
-		netConfigStr = netConfig.(string)
-	default:
-		data, err := json.Marshal(netConfig)
-		if err != nil {
-			return nil, err
+		data := csnData.(string)
+		if len(data) > 0 {
+			if err := json.Unmarshal([]byte(data), csn); err != nil {
+				return nil, err
+			}
 		}
-		netConfigStr = string(data)
+	case []byte:
+		data := csnData.([]byte)
+		if len(data) > 0 {
+			if err := json.Unmarshal((data), csn); err != nil {
+				return nil, err
+			}
+		}
+	case *network.ContainerSideNetwork:
+		csn = csnData.(*network.ContainerSideNetwork)
+	case nil:
+		break
+	default:
+		return nil, fmt.Errorf("CSN data in unknown format: %v", csnData)
 	}
 
 	return &PodSandboxInfo{
-		Metadata:        config.Metadata,
-		CreatedAt:       clock.Now().UnixNano(),
-		Labels:          config.Labels,
-		Hostname:        config.Hostname,
-		LogDirectory:    config.LogDirectory,
-		Annotations:     config.Annotations,
-		State:           state,
-		CgroupParent:    linuxSandbox.CgroupParent,
-		NamespaceOption: namespaceOptions,
-		CNIConfig:       netConfigStr,
+		Metadata:             config.Metadata,
+		CreatedAt:            clock.Now().UnixNano(),
+		Labels:               config.Labels,
+		Hostname:             config.Hostname,
+		LogDirectory:         config.LogDirectory,
+		Annotations:          config.Annotations,
+		State:                state,
+		CgroupParent:         linuxSandbox.CgroupParent,
+		NamespaceOption:      namespaceOptions,
+		ContainerSideNetwork: csn,
 	}, nil
 }

@@ -20,13 +20,15 @@ import (
 	"errors"
 
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+
+	"github.com/Mirantis/virtlet/pkg/network"
 )
 
 // TODO: this file should be moved to 'pkg/manager' at some point
 // under a different name
 
 // GetVMConfig translates CRI's CreateContainerRequest and CNI info to a VMConfig
-func GetVMConfig(in *kubeapi.CreateContainerRequest, cniConfig string) (*VMConfig, error) {
+func GetVMConfig(in *kubeapi.CreateContainerRequest, csn *network.ContainerSideNetwork) (*VMConfig, error) {
 	if in.Config == nil || in.Config.Metadata == nil || in.Config.Metadata.Name == "" || in.Config.Image == nil || in.SandboxConfig == nil || in.SandboxConfig.Metadata == nil {
 		return nil, errors.New("invalid input data")
 	}
@@ -41,7 +43,7 @@ func GetVMConfig(in *kubeapi.CreateContainerRequest, cniConfig string) (*VMConfi
 		PodAnnotations:       in.SandboxConfig.Annotations,
 		ContainerAnnotations: in.Config.Annotations,
 		ContainerLabels:      in.Config.Labels,
-		CNIConfig:            cniConfig,
+		ContainerSideNetwork: csn,
 	}
 
 	if linuxCfg := in.Config.Linux; linuxCfg != nil && linuxCfg.Resources != nil {

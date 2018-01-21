@@ -146,13 +146,10 @@ func (s *Server) getPodSandboxIP(sandboxID string) (string, error) {
 		return "", err
 	}
 
-	netResult, err := cni.BytesToResult([]byte(sandboxInfo.CNIConfig))
-	if err != nil {
-		glog.Errorf("Error when unmarshaling pod network configuration for sandbox '%s': %v", sandboxID, err)
-		return "", err
+	if sandboxInfo.ContainerSideNetwork == nil {
+		return "", fmt.Errorf("ContainerSideNetwork missing in PodSandboxInfo returned from medatada store")
 	}
-
-	ip := cni.GetPodIP(netResult)
+	ip := cni.GetPodIP(sandboxInfo.ContainerSideNetwork.Result)
 	if ip != "" {
 		return ip, nil
 	}

@@ -505,7 +505,7 @@ func TestTapFDSource(t *testing.T) {
 
 			withTapFDSource(t, tc.info, vnt.hostNS, func(podId string, cniClient *FakeCNIClient, c *tapmanager.FDClient) {
 				cniClient.UseBadResult(tc.useBadResult)
-				netConfigBytes, err := c.AddFDs(fdKey, &tapmanager.GetFDPayload{
+				csnBytes, err := c.AddFDs(fdKey, &tapmanager.GetFDPayload{
 					Description: &tapmanager.PodNetworkDesc{
 						PodId:   podId,
 						PodNs:   samplePodNS,
@@ -522,13 +522,14 @@ func TestTapFDSource(t *testing.T) {
 					}
 				}()
 
-				var result, expectedResult *cnicurrent.Result
-				if err := json.Unmarshal(netConfigBytes, &result); err != nil {
-					t.Errorf("error unmarshalling CNI result: %v", err)
+				var expectedResult *cnicurrent.Result
+				var csn *network.ContainerSideNetwork
+				if err := json.Unmarshal(csnBytes, &csn); err != nil {
+					t.Errorf("error unmarshalling containser side network: %v", err)
 				} else {
 					expectedResult = copyCNIResult(tc.info)
 					replaceSandboxPlaceholders(expectedResult, podId)
-					verifyNoDiff(t, "cni result", expectedResult, result)
+					verifyNoDiff(t, "cni result", expectedResult, csn.Result)
 				}
 
 				cniClient.VerifyAdded()
