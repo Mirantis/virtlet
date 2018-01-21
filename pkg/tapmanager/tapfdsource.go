@@ -33,6 +33,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/dhcp"
 	"github.com/Mirantis/virtlet/pkg/nettools"
+	"github.com/Mirantis/virtlet/pkg/network"
 )
 
 const (
@@ -44,10 +45,10 @@ const (
 // InterfaceDescription contains interface type with additional data
 // needed to identify it
 type InterfaceDescription struct {
-	Type         nettools.InterfaceType `json:"type"`
-	HardwareAddr net.HardwareAddr       `json:"mac"`
-	FdIndex      int                    `json:"fdIndex"`
-	PCIAddress   string                 `json:"pciAddress"`
+	Type         network.InterfaceType `json:"type"`
+	HardwareAddr net.HardwareAddr      `json:"mac"`
+	FdIndex      int                   `json:"fdIndex"`
+	PCIAddress   string                `json:"pciAddress"`
 }
 
 // PodNetworkDesc contains the data that are required by TapFDSource
@@ -77,7 +78,7 @@ type GetFDPayload struct {
 
 type podNetwork struct {
 	pnd        PodNetworkDesc
-	csn        *nettools.ContainerSideNetwork
+	csn        *network.ContainerSideNetwork
 	dhcpServer *dhcp.Server
 	doneCh     chan error
 }
@@ -156,7 +157,7 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 		return nil, nil, fmt.Errorf("failed to open network namespace at %q: %v", netNSPath, err)
 	}
 
-	var csn *nettools.ContainerSideNetwork
+	var csn *network.ContainerSideNetwork
 	var dhcpServer *dhcp.Server
 	doneCh := make(chan error)
 	if err := vmNS.Do(func(ns.NetNS) error {
@@ -253,7 +254,7 @@ func (s *TapFDSource) Release(key string) error {
 		return fmt.Errorf("failed to open network namespace at %q: %v", netNSPath, err)
 	}
 
-	if err := pn.csn.ReconstructVFs(vmNS); err != nil {
+	if err := nettools.ReconstructVFs(pn.csn, vmNS); err != nil {
 		return fmt.Errorf("failed to reconstruct SR-IOV devices: %v", err)
 	}
 
@@ -262,7 +263,7 @@ func (s *TapFDSource) Release(key string) error {
 			return fmt.Errorf("failed to stop dhcp server: %v", err)
 		}
 		<-pn.doneCh
-		if err := pn.csn.Teardown(); err != nil {
+		if err := nettools.Teardown(pn.csn); err != nil {
 			return err
 		}
 		return nil

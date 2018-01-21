@@ -28,10 +28,11 @@ import (
 	"github.com/vishvananda/netlink"
 
 	"github.com/Mirantis/virtlet/pkg/nettools"
+	"github.com/Mirantis/virtlet/pkg/network"
 )
 
 type dhcpTestCase struct {
-	csn                nettools.ContainerSideNetwork
+	csn                network.ContainerSideNetwork
 	expectedSubstrings []string
 }
 
@@ -39,7 +40,7 @@ func TestDhcpServer(t *testing.T) {
 	clientMac, _ := net.ParseMAC(clientMacAddrs[0])
 	testCases := []*dhcpTestCase{
 		{
-			csn: nettools.ContainerSideNetwork{
+			csn: network.ContainerSideNetwork{
 				Result: &cnicurrent.Result{
 					Interfaces: []*cnicurrent.Interface{
 						{
@@ -77,7 +78,7 @@ func TestDhcpServer(t *testing.T) {
 						},
 					},
 				},
-				Interfaces: []nettools.InterfaceDescription{
+				Interfaces: []network.InterfaceDescription{
 					{
 						HardwareAddr: clientMac,
 						MTU:          9000,

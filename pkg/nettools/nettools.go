@@ -53,6 +53,7 @@ import (
 	"github.com/vishvananda/netlink"
 
 	"github.com/Mirantis/virtlet/pkg/cni"
+	"github.com/Mirantis/virtlet/pkg/network"
 )
 
 const (
@@ -67,14 +68,6 @@ const (
 
 	calicoDefaultSubnet = 24
 	calicoSubnetVar     = "VIRTLET_CALICO_SUBNET"
-)
-
-// InterfaceType presents type of network interface instance
-type InterfaceType int
-
-const (
-	InterfaceTypeTap InterfaceType = iota
-	InterfaceTypeVF
 )
 
 // Had to duplicate ifReq here as it's not exported
@@ -549,35 +542,6 @@ func SetHardwareAddr(link netlink.Link, hwAddr net.HardwareAddr) error {
 	return nil
 }
 
-type InterfaceDescription struct {
-	// Type contains interface type designator
-	Type InterfaceType
-	// Fo contains open File object pointing to tap device inside network
-	// namespace or to control file in sysfs for sr-iov VF
-	Fo *os.File
-	// Name containes original interface name for sr-iov interface
-	Name string
-	// HardwareAddr contains original hardware address for CNI-created
-	// veth link
-	HardwareAddr net.HardwareAddr
-	// PCIAddress contains a pci address for sr-iov vf interface
-	PCIAddress string
-	// MTU contains max transfer unit value for interface
-	MTU uint16
-}
-
-// ContainerSideNetwork struct describes the container (VM) network
-// namespace properties
-type ContainerSideNetwork struct {
-	// Result contains CNI result object describing the network settings
-	Result *cnicurrent.Result
-	// NsPath specifies the path to the container network namespace
-	NsPath string
-	// Interfaces contains a list of interfaces with data needed
-	// to configure them
-	Interfaces []InterfaceDescription
-}
-
 // verify if device is pci virtual function (in the same way as does
 // that libvirt (src/util/virpci.c:virPCIIsVirtualFunction)
 func isSriovVf(link netlink.Link) bool {
@@ -648,19 +612,19 @@ func rebindDriverToDevice(devName string) error {
 // In case of SR-IOV VFs this function only sets up a device to be passed to VM.
 // The function should be called from within container namespace.
 // Returns container network struct and an error, if any.
-func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks []netlink.Link) (*ContainerSideNetwork, error) {
+func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks []netlink.Link) (*network.ContainerSideNetwork, error) {
 	contLinks, err := GetContainerLinks(info.Interfaces)
 	if err != nil {
 		return nil, err
 	}
 
-	var interfaces []InterfaceDescription
+	var interfaces []network.InterfaceDescription
 
 	for i, link := range contLinks {
 		hwAddr := link.Attrs().HardwareAddr
 		ifaceName := link.Attrs().Name
 		pciAddress := ""
-		var ifaceType InterfaceType
+		var ifaceType network.InterfaceType
 		var fo *os.File
 
 		mtu := link.Attrs().MTU
@@ -674,7 +638,7 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 				return nil, fmt.Errorf("SR-IOV device configured in container network namespace while Virtlet is configured with disabled SR-IOV support")
 			}
 
-			ifaceType = InterfaceTypeVF
+			ifaceType = network.InterfaceTypeVF
 
 			pciAddress, err = getPCIAddressOfVF(ifaceName)
 			if err != nil {
@@ -700,7 +664,7 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 				return nil, err
 			}
 
-			ifaceType = InterfaceTypeTap
+			ifaceType = network.InterfaceTypeTap
 
 			tapInterfaceName := fmt.Sprintf(tapInterfaceNameTemplate, i)
 			tap, err := CreateTAP(tapInterfaceName, mtu)
@@ -742,7 +706,7 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 			glog.V(3).Infof("Adding interface %q as %q", ifaceName, tapInterfaceName)
 		}
 
-		interfaces = append(interfaces, InterfaceDescription{
+		interfaces = append(interfaces, network.InterfaceDescription{
 			Type:         ifaceType,
 			Name:         ifaceName,
 			Fo:           fo,
@@ -752,12 +716,12 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 		})
 	}
 
-	return &ContainerSideNetwork{info, nsPath, interfaces}, nil
+	return &network.ContainerSideNetwork{info, nsPath, interfaces}, nil
 }
 
 // RecreateContainerSideNetwork tries to populate ContainerSideNetwork
 // structure based on a network namespace that was already adjusted for Virtlet
-func RecreateContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks []netlink.Link) (*ContainerSideNetwork, error) {
+func RecreateContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks []netlink.Link) (*network.ContainerSideNetwork, error) {
 	if len(info.Interfaces) == 0 {
 		return nil, fmt.Errorf("wrong cni configuration - missing interfaces list: %v", spew.Sdump(info))
 	}
@@ -768,17 +732,17 @@ func RecreateContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLin
 		return nil, err
 	}
 
-	var interfaces []InterfaceDescription
+	var interfaces []network.InterfaceDescription
 
 	for i, link := range contLinks {
 		hwAddr := link.Attrs().HardwareAddr
 		ifaceName := link.Attrs().Name
 		pciAddress := ""
-		var ifaceType InterfaceType
+		var ifaceType network.InterfaceType
 		var fo *os.File
 
 		if isSriovVf(link) {
-			ifaceType = InterfaceTypeVF
+			ifaceType = network.InterfaceTypeVF
 			pciAddress, err = getPCIAddressOfVF(ifaceName)
 			if err != nil {
 				return nil, err
@@ -792,14 +756,14 @@ func RecreateContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLin
 			// device should be already unbound, but after machine reboot that can be necessary
 			_ = unbindDriverFromDevice(pciAddress)
 		} else {
-			ifaceType = InterfaceTypeTap
+			ifaceType = network.InterfaceTypeTap
 			tapInterfaceName := fmt.Sprintf(tapInterfaceNameTemplate, i)
 			fo, err = OpenTAP(tapInterfaceName)
 			if err != nil {
 				return nil, fmt.Errorf("failed to open tap: %v", err)
 			}
 		}
-		interfaces = append(interfaces, InterfaceDescription{
+		interfaces = append(interfaces, network.InterfaceDescription{
 			Type:         ifaceType,
 			Name:         ifaceName,
 			Fo:           fo,
@@ -808,7 +772,7 @@ func RecreateContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLin
 		})
 	}
 
-	return &ContainerSideNetwork{info, nsPath, interfaces}, nil
+	return &network.ContainerSideNetwork{info, nsPath, interfaces}, nil
 }
 
 // TeardownBridge removes links from bridge and sets it down
@@ -871,7 +835,7 @@ func ConfigureLink(link netlink.Link, info *cnicurrent.Result) error {
 // and addresses in an order opposite to that of their creation in SetupContainerSideNetwork.
 // The end result is the same network configuration in the container network namespace
 // as it was before SetupContainerSideNetwork() call.
-func (csn *ContainerSideNetwork) Teardown() error {
+func Teardown(csn *network.ContainerSideNetwork) error {
 	for _, i := range csn.Interfaces {
 		i.Fo.Close()
 	}
@@ -940,9 +904,9 @@ func (csn *ContainerSideNetwork) Teardown() error {
 // ReconstructVFs iterates over stored PCI addresses, rebinding each
 // corresponding interface to its host driver, changing its MAC address
 // to the stored value and then moving it into the container namespace
-func (csn *ContainerSideNetwork) ReconstructVFs(netns ns.NetNS) error {
+func ReconstructVFs(csn *network.ContainerSideNetwork, netns ns.NetNS) error {
 	for _, iface := range csn.Interfaces {
-		if iface.Type != InterfaceTypeVF {
+		if iface.Type != network.InterfaceTypeVF {
 			continue
 		}
 		if err := rebindDriverToDevice(iface.PCIAddress); err != nil {

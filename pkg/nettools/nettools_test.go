@@ -540,7 +540,7 @@ func TestTeardownContainerSideNetwork(t *testing.T) {
 			log.Panicf("failed to set up container side network: %v", err)
 		}
 
-		if err := csn.Teardown(); err != nil {
+		if err := Teardown(csn); err != nil {
 			log.Panicf("failed to tear down container side network: %v", err)
 		}
 

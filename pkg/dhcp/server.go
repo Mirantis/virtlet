@@ -30,7 +30,7 @@ import (
 	"github.com/golang/glog"
 	"go.universe.tf/netboot/dhcp4"
 
-	"github.com/Mirantis/virtlet/pkg/nettools"
+	"github.com/Mirantis/virtlet/pkg/network"
 )
 
 const (
@@ -44,11 +44,11 @@ var (
 )
 
 type Server struct {
-	config   *nettools.ContainerSideNetwork
+	config   *network.ContainerSideNetwork
 	listener *dhcp4.Conn
 }
 
-func NewServer(config *nettools.ContainerSideNetwork) *Server {
+func NewServer(config *network.ContainerSideNetwork) *Server {
 	return &Server{config: config}
 }
 

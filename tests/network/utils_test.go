@@ -34,7 +34,7 @@ import (
 	"github.com/vishvananda/netlink"
 
 	"github.com/Mirantis/virtlet/pkg/dhcp"
-	"github.com/Mirantis/virtlet/pkg/nettools"
+	"github.com/Mirantis/virtlet/pkg/network"
 )
 
 const (
@@ -158,10 +158,10 @@ func (g *NetTestGroup) Wait() {
 }
 
 type DhcpServerTester struct {
-	config *nettools.ContainerSideNetwork
+	config *network.ContainerSideNetwork
 }
 
-func NewDhcpServerTester(config *nettools.ContainerSideNetwork) *DhcpServerTester {
+func NewDhcpServerTester(config *network.ContainerSideNetwork) *DhcpServerTester {
 	return &DhcpServerTester{config}
 }
 

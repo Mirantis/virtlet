@@ -40,7 +40,7 @@ func (m podSandboxMeta) GetID() string {
 // Retrieve loads from DB and returns pod sandbox data bound to the object
 func (m podSandboxMeta) Retrieve() (*PodSandboxInfo, error) {
 	if m.GetID() == "" {
-		return nil, errors.New("Pod sandbox D cannot be empty")
+		return nil, errors.New("Pod sandbox ID cannot be empty")
 	}
 	var psi *PodSandboxInfo
 	err := m.client.db.View(func(tx *bolt.Tx) error {
