@@ -213,7 +213,7 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 
 	psi, err := metadata.NewPodSandboxInfo(config, csnBytes, state, clockwork.NewRealClock())
 	if err != nil {
-		glog.Errorf("Error serializing bod %q (%q) sandbox configuration: %v", podName, podId, err)
+		glog.Errorf("Error serializing pod %q (%q) sandbox configuration: %v", podName, podId, err)
 		return nil, err
 	}
 

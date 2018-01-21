@@ -169,14 +169,14 @@ func NewPodSandboxInfo(config *kubeapi.PodSandboxConfig, csnData interface{}, st
 	case string:
 		data := csnData.(string)
 		if len(data) > 0 {
-			if err := json.Unmarshal([]byte(data), csn); err != nil {
+			if err := json.Unmarshal([]byte(data), &csn); err != nil {
 				return nil, err
 			}
 		}
 	case []byte:
 		data := csnData.([]byte)
 		if len(data) > 0 {
-			if err := json.Unmarshal((data), csn); err != nil {
+			if err := json.Unmarshal((data), &csn); err != nil {
 				return nil, err
 			}
 		}

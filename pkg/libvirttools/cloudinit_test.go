@@ -65,12 +65,23 @@ func newFakeFlexvolume(t *testing.T, parentDir string, uuid string, part int) *f
 }
 
 func buildNetworkedPodConfig(cniResult *cnicurrent.Result, imageType string) *VMConfig {
+	var descs []network.InterfaceDescription
+	for _, iface := range cniResult.Interfaces {
+		if iface.Sandbox != "" {
+			mac, _ := net.ParseMAC(iface.Mac)
+			descs = append(descs, network.InterfaceDescription{
+				HardwareAddr: mac,
+				MTU:          1500,
+			})
+		}
+	}
 	return &VMConfig{
 		PodName:           "foo",
 		PodNamespace:      "default",
 		ParsedAnnotations: &VirtletAnnotations{ImageType: ImageType(imageType)},
 		ContainerSideNetwork: &network.ContainerSideNetwork{
-			Result: cniResult,
+			Result:     cniResult,
+			Interfaces: descs,
 		},
 	}
 }
@@ -423,6 +434,7 @@ func TestCloudInitGenerator(t *testing.T) {
 								"type":    "static",
 							},
 						},
+						"mtu":  float64(1500),
 						"type": "physical",
 					},
 					map[string]interface{}{
@@ -508,6 +520,7 @@ func TestCloudInitGenerator(t *testing.T) {
 							},
 						},
 						"type": "physical",
+						"mtu":  float64(1500),
 					},
 					map[string]interface{}{
 						"mac_address": "00:11:22:33:ab:cd",
@@ -520,6 +533,7 @@ func TestCloudInitGenerator(t *testing.T) {
 							},
 						},
 						"type": "physical",
+						"mtu":  float64(1500),
 					},
 					map[string]interface{}{
 						"destination": "0.0.0.0/0",
@@ -580,6 +594,7 @@ func TestCloudInitGenerator(t *testing.T) {
 						"ethernet_mac_address": "00:11:22:33:44:55",
 						"id":   "cni0",
 						"type": "phy",
+						"mtu":  float64(1500),
 					},
 				},
 				"networks": []interface{}{
@@ -680,11 +695,13 @@ func TestCloudInitGenerator(t *testing.T) {
 						"id":                   "cni0",
 						"type":                 "phy",
 						"ethernet_mac_address": "00:11:22:33:44:55",
+						"mtu": float64(1500),
 					},
 					map[string]interface{}{
 						"type":                 "phy",
 						"ethernet_mac_address": "00:11:22:33:ab:cd",
-						"id": "cni1",
+						"id":  "cni1",
+						"mtu": float64(1500),
 					},
 				},
 				"networks": []interface{}{
