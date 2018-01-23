@@ -723,7 +723,7 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 // structure based on a network namespace that was already adjusted for Virtlet
 func RecreateContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks []netlink.Link) (*network.ContainerSideNetwork, error) {
 	if len(info.Interfaces) == 0 {
-		return nil, fmt.Errorf("wrong cni configuration - missing interfaces list: %v", spew.Sdump(info))
+		return nil, fmt.Errorf("wrong cni configuration: no interfaces defined: %s", spew.Sdump(info))
 	}
 
 	// FIXME: this will not work with sr-iov device passed to VM

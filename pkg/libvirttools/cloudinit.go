@@ -159,7 +159,7 @@ func (g *CloudInitGenerator) generateNetworkConfigurationNoCloud() ([]byte, erro
 		}
 		subnets, curGateways := g.getSubnetsAndGatewaysForNthInterface(i, cniResult)
 		gateways = append(gateways, curGateways...)
-		mtu, err := mtuForParticularMac(iface.Mac, g.config.ContainerSideNetwork.Interfaces)
+		mtu, err := mtuForMacAddress(iface.Mac, g.config.ContainerSideNetwork.Interfaces)
 		if err != nil {
 			return nil, err
 		}
@@ -282,7 +282,7 @@ func (g *CloudInitGenerator) generateNetworkConfigurationConfigDrive() ([]byte, 
 			// skip host interfaces
 			continue
 		}
-		mtu, err := mtuForParticularMac(iface.Mac, g.config.ContainerSideNetwork.Interfaces)
+		mtu, err := mtuForMacAddress(iface.Mac, g.config.ContainerSideNetwork.Interfaces)
 		if err != nil {
 			return nil, err
 		}
@@ -349,7 +349,7 @@ func routesForIP(sourceIP net.IPNet, allRoutes []*cnitypes.Route) []map[string]i
 	return routes
 }
 
-func mtuForParticularMac(mac string, ifaces []network.InterfaceDescription) (uint16, error) {
+func mtuForMacAddress(mac string, ifaces []network.InterfaceDescription) (uint16, error) {
 	for _, iface := range ifaces {
 		if iface.HardwareAddr.String() == mac {
 			return iface.MTU, nil
