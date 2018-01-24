@@ -32,6 +32,7 @@ func extractImageSizeFromInfo(out []byte) (uint64, error) {
 	return parsed.VirtualSize, nil
 }
 
+// GetImageVirtualSize returns the virtual size of the specified QCOW2 image
 func GetImageVirtualSize(imagePath string) (uint64, error) {
 	cmd := exec.Command("qemu-img", "info", "--output", "json", imagePath)
 	out, err := cmd.Output()

@@ -29,6 +29,7 @@ import (
 	"github.com/golang/glog"
 )
 
+// Image describes an image
 type Image struct {
 	Digest string
 	Name   string
@@ -47,18 +48,45 @@ func (img *Image) hexDigest() (string, error) {
 // ImageTranslator translates image name to a Endpoint
 type ImageTranslator func(string) Endpoint
 
+// ImageRefGetter is a function that returns the list of images
+// that are currently in use
 type ImageRefGetter func() (map[string]bool, error)
 
+// ImageStore is an interface for the image store
 type ImageStore interface {
+	// ListImage returns the list of images in the store.
+	// If filter is specified, the list will only contain the
+	// image with the same name as the value of 'filter',
+	// or no images at all if there are no such images
 	ListImages(filter string) ([]*Image, error)
+
+	// ImageStatus returns the description of the specified image.
+	// If the image doesn't exist, no error is returned, just
+	// nil instead of an image
 	ImageStatus(name string) (*Image, error)
+
+	// PullImage pulls the image using specified image name translation
+	// function
 	PullImage(name string, translator ImageTranslator) (string, error)
+
+	// RemoveImage removes the specified image
 	RemoveImage(name string) error
+
+	// GC removes all unused or partially downloaded images
 	GC() error
+
+	// GetImagePathAndVirtualSize returns the path to image data
+	// and virtual size for the specified image. It accepts
+	// an image reference or a digest.
 	GetImagePathAndVirtualSize(ref string) (string, uint64, error)
+
+	// SetRefGetter sets a function that will be used to determine
+	// the set of images that are currently in use.
 	SetRefGetter(imageRefGetter ImageRefGetter)
 }
 
+// VirtualSizeFunc specifies a function that returns the virtual
+// size of the specified QCOW2 image file
 type VirtualSizeFunc func(string) (uint64, error)
 
 // ImageFileStore implements ImageStore
@@ -95,6 +123,10 @@ type ImageFileStore struct {
 
 var _ ImageStore = &ImageFileStore{}
 
+// NewImageFileStore creates a new ImageFileStore that will be using
+// the specified dir to store the images, image downloader and
+// a function for getting virtual size of the image. If vsizeFunc
+// is nil, the default GetImageVirtualSize function will be used
 func NewImageFileStore(dir string, downloader Downloader, vsizeFunc VirtualSizeFunc) *ImageFileStore {
 	if vsizeFunc == nil {
 		vsizeFunc = GetImageVirtualSize
@@ -322,6 +354,7 @@ func (s *ImageFileStore) listImagesUnlocked(filter string) ([]*Image, error) {
 	return r, nil
 }
 
+// ListImages implements ListImages method of ImageStore interface
 func (s *ImageFileStore) ListImages(filter string) ([]*Image, error) {
 	s.Lock()
 	defer s.Unlock()
@@ -341,12 +374,14 @@ func (s *ImageFileStore) imageStatusUnlocked(name string) (*Image, error) {
 	}
 }
 
+// ImageStatus implements ImageStatus method of ImageStore interface
 func (s *ImageFileStore) ImageStatus(name string) (*Image, error) {
 	s.Lock()
 	defer s.Unlock()
 	return s.imageStatusUnlocked(name)
 }
 
+// PullImage implements PullImage method of ImageStore interface
 func (s *ImageFileStore) PullImage(name string, translator ImageTranslator) (string, error) {
 	name = stripTags(name)
 	ep := translator(name)
@@ -391,6 +426,7 @@ func (s *ImageFileStore) PullImage(name string, translator ImageTranslator) (str
 	return withDigest.String(), nil
 }
 
+// RemoveImage implements RemoveImage method of ImageStore interface
 func (s *ImageFileStore) RemoveImage(name string) error {
 	s.Lock()
 	defer s.Unlock()
@@ -398,6 +434,7 @@ func (s *ImageFileStore) RemoveImage(name string) error {
 	return err
 }
 
+// GC implements GC method of ImageStore interface
 func (s *ImageFileStore) GC() error {
 	s.Lock()
 	defer s.Unlock()
@@ -422,6 +459,7 @@ func (s *ImageFileStore) GC() error {
 	return nil
 }
 
+// GetImagePathAndVirtualSize implements GC method of GetImagePathAndVirtualSize interface
 func (s *ImageFileStore) GetImagePathAndVirtualSize(ref string) (string, uint64, error) {
 	s.Lock()
 	defer s.Unlock()
@@ -484,6 +522,7 @@ func (s *ImageFileStore) GetImagePathAndVirtualSize(ref string) (string, uint64,
 	return path, vsize, nil
 }
 
+// SetRefGetter implements SetRefGetter method of ImageStore interface
 func (s *ImageFileStore) SetRefGetter(imageRefGetter ImageRefGetter) {
 	s.refGetter = imageRefGetter
 }
