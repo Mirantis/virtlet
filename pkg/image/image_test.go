@@ -82,6 +82,7 @@ type ifsTester struct {
 	store            *ImageFileStore
 	images           []*Image
 	refs             []string
+	referencedImages []string
 	translatorPrefix string
 }
 
@@ -97,6 +98,13 @@ func newIfsTester(t *testing.T) *ifsTester {
 		store:  NewImageFileStore(tmpDir, newFakeDownloader(t), fakeVirtualSize),
 	}
 	tst.images, tst.refs = tst.sampleImages()
+	tst.store.SetRefGetter(func() (map[string]bool, error) {
+		r := make(map[string]bool)
+		for _, imgSpec := range tst.referencedImages {
+			r[imgSpec] = true
+		}
+		return r, nil
+	})
 	return tst
 }
 
@@ -115,6 +123,8 @@ func (tst *ifsTester) subpath(p string) string {
 	return filepath.Join(tst.tmpDir, p)
 }
 
+// sampleImages returns a list of sample images.
+// 1th (from zero) and 2nd images share the same data file.
 func (tst *ifsTester) sampleImages() ([]*Image, []string) {
 	var images []*Image
 	var refs []string
@@ -229,6 +239,7 @@ func (tst *ifsTester) verifyDataFiles(expectedNames ...string) {
 	}
 	nameStr := strings.Join(names, "\n")
 	sort.Strings(names)
+	sort.Strings(expectedNames)
 	expectedNameStr := strings.Join(expectedNames, "\n")
 	if nameStr != expectedNameStr {
 		tst.t.Errorf("bad file list:\n%s\n-- instead of --\n%s", nameStr, expectedNameStr)
@@ -241,16 +252,19 @@ func TestImagePullListStatus(t *testing.T) {
 	tst.verifyListImages("")
 	tst.verifyListImages("foobar")
 
-	tst.pullImage(tst.images[0].Name, tst.refs[0])
-	tst.verifyListImages("foobar")
-	tst.verifyImageStatus("foobar", nil)
-	tst.verifyListImages("", tst.images[0])
-	tst.verifyListImages(tst.images[0].Name, tst.images[0])
-	tst.verifySubpathContents("links/example.com:1234%foo%bar", "###example.com:1234/foo/bar")
-	tst.verifyImage(tst.refs[0], "###example.com:1234/foo/bar")
-	tst.verifyImage(tst.images[0].Name, "###example.com:1234/foo/bar")
-	tst.verifyImage(tst.images[0].Digest, "###example.com:1234/foo/bar")
-	tst.verifyImageStatus(tst.images[0].Name, tst.images[0])
+	// make sure that pulling the same image multiple times is ok
+	for i := 0; i < 3; i++ {
+		tst.pullImage(tst.images[0].Name, tst.refs[0])
+		tst.verifyListImages("foobar")
+		tst.verifyImageStatus("foobar", nil)
+		tst.verifyListImages("", tst.images[0])
+		tst.verifyListImages(tst.images[0].Name, tst.images[0])
+		tst.verifySubpathContents("links/example.com:1234%foo%bar", "###example.com:1234/foo/bar")
+		tst.verifyImage(tst.refs[0], "###example.com:1234/foo/bar")
+		tst.verifyImage(tst.images[0].Name, "###example.com:1234/foo/bar")
+		tst.verifyImage(tst.images[0].Digest, "###example.com:1234/foo/bar")
+		tst.verifyImageStatus(tst.images[0].Name, tst.images[0])
+	}
 
 	tst.pullImage(tst.images[1].Name+":latest", tst.refs[1])
 	tst.verifyListImages("", tst.images[1], tst.images[0]) // alphabetically sorted by name
@@ -280,6 +294,7 @@ func TestReplaceImage(t *testing.T) {
 		Path:   tst.subpath("data/" + sha256),
 		Size:   uint64(8),
 	}
+
 	updatedRef := updatedImage.Name + "@" + updatedImage.Digest
 	tst.pullImage(updatedImage.Name, updatedRef)
 	tst.verifyListImages("", updatedImage, tst.images[0], tst.images[2]) // alphabetically sorted by name
@@ -292,6 +307,66 @@ func TestReplaceImage(t *testing.T) {
 	tst.verifyImageStatus(tst.images[0].Name, tst.images[0])
 	tst.verifyImageStatus(updatedImage.Name, updatedImage)
 	tst.verifyImageStatus(tst.images[2].Name, tst.images[2])
+	tst.verifyDataFiles(sha256str("###example.com:1234/foo/bar"), sha256str("###baz"), sha256str("###xxbaz"))
+}
+
+func TestReplaceReferencedImage(t *testing.T) {
+	tst := newIfsTester(t)
+	defer tst.teardown()
+	tst.pullAllImages()
+	tst.translatorPrefix = "xx"
+	sha256 := sha256str("###xxexample.com:1234/foo/bar")
+	updatedImage := &Image{
+		Digest: "sha256:" + sha256,
+		Name:   tst.images[0].Name,
+		Path:   tst.subpath("data/" + sha256),
+		Size:   uint64(29),
+	}
+
+	tst.referencedImages = []string{tst.images[0].Digest}
+	updatedRef := updatedImage.Name + "@" + updatedImage.Digest
+	tst.pullImage(updatedImage.Name, updatedRef)
+	tst.verifyListImages("", tst.images[1], updatedImage, tst.images[2]) // alphabetically sorted by name
+	tst.verifySubpathContents("links/example.com:1234%foo%bar", "###xxexample.com:1234/foo/bar")
+	tst.verifySubpathContents("links/baz", "###baz")
+	tst.verifySubpathContents("links/foobar", "###baz")
+	tst.verifyImage(updatedRef, "###xxexample.com:1234/foo/bar")
+	tst.verifyImage(tst.refs[1], "###baz")
+	tst.verifyImage(tst.refs[2], "###baz")
+	tst.verifyImageStatus(updatedImage.Name, updatedImage)
+	tst.verifyImageStatus(tst.images[1].Name, tst.images[1])
+	tst.verifyImageStatus(tst.images[2].Name, tst.images[2])
+	// the old image must be kept
+	tst.verifyDataFiles(sha256str("###example.com:1234/foo/bar"), sha256str("###xxexample.com:1234/foo/bar"), sha256str("###baz"))
+}
+
+func TestReplaceUnreferencedImage(t *testing.T) {
+	tst := newIfsTester(t)
+	defer tst.teardown()
+	tst.pullAllImages()
+	tst.translatorPrefix = "xx"
+	sha256 := sha256str("###xxexample.com:1234/foo/bar")
+	updatedImage := &Image{
+		Digest: "sha256:" + sha256,
+		Name:   tst.images[0].Name,
+		Path:   tst.subpath("data/" + sha256),
+		Size:   uint64(29),
+	}
+
+	updatedRef := updatedImage.Name + "@" + updatedImage.Digest
+	tst.pullImage(updatedImage.Name, updatedRef)
+	tst.verifyListImages("", tst.images[1], updatedImage, tst.images[2]) // alphabetically sorted by name
+	tst.verifySubpathContents("links/example.com:1234%foo%bar", "###xxexample.com:1234/foo/bar")
+	tst.verifySubpathContents("links/baz", "###baz")
+	tst.verifySubpathContents("links/foobar", "###baz")
+	tst.verifyImage(updatedRef, "###xxexample.com:1234/foo/bar")
+	tst.verifyImage(tst.refs[1], "###baz")
+	tst.verifyImage(tst.refs[2], "###baz")
+	tst.verifyImageStatus(updatedImage.Name, updatedImage)
+	tst.verifyImageStatus(tst.images[1].Name, tst.images[1])
+	tst.verifyImageStatus(tst.images[2].Name, tst.images[2])
+	// the old image must be removed
+	tst.verifyDataFiles(sha256str("###xxexample.com:1234/foo/bar"), sha256str("###baz"))
 }
 
 func TestRemoveImage(t *testing.T) {
@@ -314,11 +389,12 @@ func TestRemoveImage(t *testing.T) {
 	tst.verifyListImages("", tst.images[0]) // alphabetically sorted by name
 	tst.verifySubpathContents("links/example.com:1234%foo%bar", "###example.com:1234/foo/bar")
 
+	tst.referencedImages = []string{tst.images[0].Digest}
 	if err := tst.store.RemoveImage(tst.images[0].Name); err != nil {
 		t.Errorf("RemoveImage(): %v", err)
 	}
-	tst.verifyListImages("") // alphabetically sorted by name
-	tst.verifyDataDirIsEmpty()
+	// the image is still referenced
+	tst.verifyDataFiles(sha256str("###example.com:1234/foo/bar"))
 }
 
 func TestImageGC(t *testing.T) {
@@ -343,6 +419,7 @@ func TestImageGC(t *testing.T) {
 	tst.verifyImage(tst.refs[2], "###baz")
 	tst.verifyDataFiles(sha256str("###example.com:1234/foo/bar"), sha256str("###baz"))
 
+	tst.referencedImages = []string{tst.images[1].Digest}
 	tst.removeFile("links/example.com:1234%foo%bar")
 	tst.store.GC()
 	tst.verifyListImages("", tst.images[2])
@@ -352,5 +429,14 @@ func TestImageGC(t *testing.T) {
 	tst.removeFile("links/foobar")
 	tst.store.GC()
 	tst.verifyListImages("")
+	tst.verifyDataFiles(sha256str("###baz"))
+
+	// the name in ref is already gone but the digest is still there
+	tst.referencedImages = []string{tst.refs[1]}
+	tst.store.GC()
+	tst.verifyDataFiles(sha256str("###baz"))
+
+	tst.referencedImages = nil
+	tst.store.GC()
 	tst.verifyDataFiles()
 }

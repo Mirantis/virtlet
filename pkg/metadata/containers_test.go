@@ -53,6 +53,22 @@ func TestSetGetContainerInfo(t *testing.T) {
 	}
 }
 
+func TestGetImagesInUse(t *testing.T) {
+	sandboxes := criapi.GetSandboxes(2)
+	containers := criapi.GetContainersConfig(sandboxes)
+
+	store := setUpTestStore(t, sandboxes, containers, nil)
+
+	expectedImagesInUse := map[string]bool{"testImage": true}
+	imagesInUse, err := store.ImagesInUse()
+	if err != nil {
+		t.Fatalf("ImagesInUse(): %v", err)
+	}
+	if !reflect.DeepEqual(imagesInUse, expectedImagesInUse) {
+		t.Errorf("bad result from ImagesInUse(): expected %#v, got #%v", expectedImagesInUse, imagesInUse)
+	}
+}
+
 func TestRemoveContainer(t *testing.T) {
 	sandboxes := criapi.GetSandboxes(2)
 	containers := criapi.GetContainersConfig(sandboxes)

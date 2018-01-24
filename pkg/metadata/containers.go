@@ -143,18 +143,45 @@ func (b *boltClient) ListPodContainers(podID string) ([]ContainerMetadata, error
 	if podID == "" {
 		return nil, errors.New("Pod sandbox ID cannot be empty")
 	}
+	prefix := []byte("containers/")
 	var result []ContainerMetadata
 	err := b.db.View(func(tx *bolt.Tx) error {
 		bucket, err := getSandboxBucket(tx, podID, false, false)
 		if err != nil {
 			return err
 		}
-		prefix := []byte("containers/")
 		c := bucket.Cursor()
 		for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
-			result = append(result, b.Container(string(k[11:])))
+			result = append(result, b.Container(string(k[len(prefix):])))
 		}
 		return nil
 	})
 	return result, err
+}
+
+// ImagesInUse returns a set of images in use by containers in the store.
+// The keys of the returned map are image names and the values are always true.
+func (b *boltClient) ImagesInUse() (map[string]bool, error) {
+	result := make(map[string]bool)
+	prefix := []byte("sandboxes/")
+	if err := b.db.View(func(tx *bolt.Tx) error {
+		c := tx.Cursor()
+		for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
+			containers, err := b.ListPodContainers(string(k[len(prefix):]))
+			if err != nil {
+				return err
+			}
+			for _, containerMeta := range containers {
+				ci, err := containerMeta.Retrieve()
+				if err != nil {
+					return err
+				}
+				result[ci.Image] = true
+			}
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return result, nil
 }

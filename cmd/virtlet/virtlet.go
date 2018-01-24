@@ -86,6 +86,8 @@ func runVirtlet() {
 
 	downloader := image.NewDownloader(*imageDownloadProtocol)
 	imageStore := image.NewImageFileStore(*imageDir, downloader, nil)
+	imageStore.SetRefGetter(metadataStore.ImagesInUse)
+
 	server, err := manager.NewVirtletManager(*libvirtUri, *rawDevices, *imageTranslationConfigsDir, imageStore, metadataStore, c)
 	if err != nil {
 		glog.Errorf("Initializing server failed: %v", err)

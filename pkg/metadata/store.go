@@ -128,6 +128,10 @@ type ContainerMetadataStore interface {
 
 	// ListPodContainers returns a list of containers that belong to the pod with given ID value
 	ListPodContainers(podID string) ([]ContainerMetadata, error)
+
+	// ImagesInUse returns a set of images in use by containers in the store.
+	// The keys of the returned map are image names and the values are always true.
+	ImagesInUse() (map[string]bool, error)
 }
 
 // MetadataStore provides single interface for metadata storage implementation

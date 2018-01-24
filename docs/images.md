@@ -49,7 +49,7 @@ the link target being the matching data file.
 
 The image store performs GC upon Virtlet startup, which consists of
 removing any part_* files and those files in data/ which have no
-symlinks leading to them.
+symlinks leading to them aren't being used by any containers.
 
 The VMs are started from QCOW2 volumes which use the boot images
 as backing store files. The images are stored under `/var/lib/libvirt/images/data`.

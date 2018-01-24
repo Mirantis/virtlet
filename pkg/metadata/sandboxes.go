@@ -94,11 +94,11 @@ func (b *boltClient) PodSandbox(podID string) PodSandboxMetadata {
 // ListPodSandboxes returns list of pod sandboxes that match given filter
 func (b *boltClient) ListPodSandboxes(filter *kubeapi.PodSandboxFilter) ([]PodSandboxMetadata, error) {
 	var result []PodSandboxMetadata
+	prefix := []byte("sandboxes/")
 	err := b.db.View(func(tx *bolt.Tx) error {
-		prefix := []byte("sandboxes/")
 		c := tx.Cursor()
 		for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
-			psm := podSandboxMeta{client: b, id: string(k[10:])}
+			psm := podSandboxMeta{client: b, id: string(k[len(prefix):])}
 			fv, err := filterPodSandboxMeta(&psm, filter)
 			if err != nil {
 				return err

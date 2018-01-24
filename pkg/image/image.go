@@ -47,6 +47,8 @@ func (img *Image) hexDigest() (string, error) {
 // ImageTranslator translates image name to a Endpoint
 type ImageTranslator func(string) Endpoint
 
+type ImageRefGetter func() (map[string]bool, error)
+
 type ImageStore interface {
 	ListImages(filter string) ([]*Image, error)
 	ImageStatus(name string) (*Image, error)
@@ -54,6 +56,7 @@ type ImageStore interface {
 	RemoveImage(name string) error
 	GC() error
 	GetImagePathAndVirtualSize(ref string) (string, uint64, error)
+	SetRefGetter(imageRefGetter ImageRefGetter)
 }
 
 type VirtualSizeFunc func(string) (uint64, error)
@@ -79,14 +82,15 @@ type VirtualSizeFunc func(string) (uint64, error)
 // with the name equal to docker image name but with '/' replaced by '%',
 // with the link target being the matching data file.
 //
-// The image store performs GC upon Virtlet startup, which consists
-// of removing any part_* files and those files in data/ which
-// have no symlinks leading to them.
+// The image store performs GC upon Virtlet startup, which consists of
+// removing any part_* files and those files in data/ which have no
+// symlinks leading to them and aren't being used by any containers.
 type ImageFileStore struct {
 	sync.Mutex
 	dir        string
 	downloader Downloader
 	vsizeFunc  VirtualSizeFunc
+	refGetter  ImageRefGetter
 }
 
 var _ ImageStore = &ImageFileStore{}
@@ -106,12 +110,23 @@ func (s *ImageFileStore) linkDir() string {
 	return filepath.Join(s.dir, "links")
 }
 
+func (s *ImageFileStore) linkDirExists() (bool, error) {
+	switch _, err := os.Stat(s.linkDir()); {
+	case err == nil:
+		return true, nil
+	case os.IsNotExist(err):
+		return false, nil
+	default:
+		return false, fmt.Errorf("error checking for link dir %q: %v", s.linkDir(), err)
+	}
+}
+
 func (s *ImageFileStore) dataDir() string {
 	return filepath.Join(s.dir, "data")
 }
 
-func (s *ImageFileStore) dataFileName(sha256 string) string {
-	return filepath.Join(s.dataDir(), sha256)
+func (s *ImageFileStore) dataFileName(hexDigest string) string {
+	return filepath.Join(s.dataDir(), hexDigest)
 }
 
 func (s *ImageFileStore) linkFileName(imageName string) string {
@@ -133,6 +148,78 @@ func (s *ImageFileStore) renameIfNewOrDelete(oldPath string, newPath string) (bo
 	}
 }
 
+func (s *ImageFileStore) getImageHexDigestsInUse() (map[string]bool, error) {
+	imagesInUse := make(map[string]bool)
+	var imgList []string
+	if s.refGetter != nil {
+		refSet, err := s.refGetter()
+		if err != nil {
+			return nil, fmt.Errorf("error listing images in use: %v", err)
+		}
+		for spec, present := range refSet {
+			if present {
+				imgList = append(imgList, spec)
+			}
+		}
+	}
+	for _, imgSpec := range imgList {
+		if d := getHexDigest(imgSpec); d != "" {
+			imagesInUse[d] = true
+		}
+	}
+	images, err := s.listImagesUnlocked("")
+	if err != nil {
+		return nil, err
+	}
+	for _, img := range images {
+		if hexDigest, err := img.hexDigest(); err != nil {
+			glog.Warningf("GC: error calculating digest for image %q: %v", img.Name, err)
+		} else {
+			imagesInUse[hexDigest] = true
+		}
+	}
+	return imagesInUse, nil
+}
+
+func (s *ImageFileStore) removeIfUnreferenced(hexDigest string) error {
+	imagesInUse, err := s.getImageHexDigestsInUse()
+	switch {
+	case err != nil:
+		return err
+	case imagesInUse[hexDigest]:
+		return nil
+	default:
+		dataFileName := s.dataFileName(hexDigest)
+		return os.Remove(dataFileName)
+	}
+}
+
+// removeImageUnlocked removes the specified image unless its dataFile name
+// is equal to one passed us keepData. Returns true if the file did not
+// exist or was removed.
+func (s *ImageFileStore) removeImageIfItsNotNeeded(name, keepData string) (bool, error) {
+	linkFileName := s.linkFileName(name)
+	switch _, err := os.Lstat(linkFileName); {
+	case err == nil:
+		dest, err := os.Readlink(linkFileName)
+		if err != nil {
+			return false, fmt.Errorf("error reading link %q: %v", linkFileName, err)
+		}
+		destName := filepath.Base(dest)
+		if destName == keepData {
+			return false, nil
+		}
+		if err := os.Remove(linkFileName); err != nil {
+			return false, fmt.Errorf("can't remove %q: %v", linkFileName)
+		}
+		return true, s.removeIfUnreferenced(destName)
+	case os.IsNotExist(err):
+		return true, nil
+	default:
+		return false, fmt.Errorf("can't stat %q: %v", linkFileName, err)
+	}
+}
+
 func (s *ImageFileStore) placeImage(tempPath string, dataName string, imageName string) error {
 	s.Lock()
 	defer s.Unlock()
@@ -150,8 +237,11 @@ func (s *ImageFileStore) placeImage(tempPath string, dataName string, imageName 
 	linkFileName := s.linkFileName(imageName)
 	switch _, err := os.Stat(linkFileName); {
 	case err == nil:
-		if err := os.Remove(linkFileName); err != nil {
+		if removed, err := s.removeImageIfItsNotNeeded(imageName, dataName); err != nil {
 			return fmt.Errorf("error removing old symlink %q: %v", linkFileName, err)
+		} else if !removed {
+			// same image with the same name
+			return nil
 		}
 	case os.IsNotExist(err):
 		// let's create the link
@@ -168,17 +258,6 @@ func (s *ImageFileStore) placeImage(tempPath string, dataName string, imageName 
 		return fmt.Errorf("error creating symbolic link %q for image %q: %v", linkFileName, imageName, err)
 	}
 	return nil
-}
-
-func (s *ImageFileStore) linkDirExists() (bool, error) {
-	switch _, err := os.Stat(s.linkDir()); {
-	case err == nil:
-		return true, nil
-	case os.IsNotExist(err):
-		return false, nil
-	default:
-		return false, fmt.Errorf("error checking for link dir %q: %v", s.linkDir(), err)
-	}
 }
 
 func (s *ImageFileStore) imageInfo(fi os.FileInfo) (*Image, error) {
@@ -312,60 +391,19 @@ func (s *ImageFileStore) PullImage(name string, translator ImageTranslator) (str
 	return withDigest.String(), nil
 }
 
-func (s *ImageFileStore) removeIfUnreferenced(sha256 string) error {
-	infos, err := ioutil.ReadDir(s.linkDir())
-	if err != nil {
-		return fmt.Errorf("readdir %q: %v", s.linkDir(), err)
-	}
-	for _, fi := range infos {
-		linkFileName := filepath.Join(s.linkDir(), fi.Name())
-		switch dest, err := os.Readlink(linkFileName); {
-		case err != nil:
-			glog.Warningf("error reading link %q: %v", linkFileName, err)
-		case filepath.Base(dest) == sha256:
-			// found a reference
-			return nil
-		}
-	}
-	dataFileName := s.dataFileName(sha256)
-	return os.Remove(dataFileName)
-}
-
 func (s *ImageFileStore) RemoveImage(name string) error {
 	s.Lock()
 	defer s.Unlock()
-	linkFileName := s.linkFileName(name)
-	switch _, err := os.Lstat(linkFileName); {
-	case err == nil:
-		dest, err := os.Readlink(linkFileName)
-		if err != nil {
-			return fmt.Errorf("error reading link %q: %v", linkFileName, err)
-		}
-		if err := os.Remove(linkFileName); err != nil {
-			return fmt.Errorf("can't remove %q: %v", linkFileName)
-		}
-		return s.removeIfUnreferenced(filepath.Base(dest))
-	case os.IsNotExist(err):
-		return nil
-	default:
-		return fmt.Errorf("can't stat %q: %v", linkFileName, err)
-	}
+	_, err := s.removeImageIfItsNotNeeded(name, "")
+	return err
 }
 
 func (s *ImageFileStore) GC() error {
 	s.Lock()
 	defer s.Unlock()
-	images, err := s.listImagesUnlocked("")
+	imagesInUse, err := s.getImageHexDigestsInUse()
 	if err != nil {
 		return err
-	}
-	imagesInUse := make(map[string]bool)
-	for _, img := range images {
-		if hexDigest, err := img.hexDigest(); err != nil {
-			glog.Warningf("GC: error calculating digest for image %q: %v", img.Name, err)
-		} else {
-			imagesInUse[hexDigest] = true
-		}
 	}
 	globExpr := filepath.Join(s.dataDir(), "*")
 	matches, err := filepath.Glob(globExpr)
@@ -446,6 +484,10 @@ func (s *ImageFileStore) GetImagePathAndVirtualSize(ref string) (string, uint64,
 	return path, vsize, nil
 }
 
+func (s *ImageFileStore) SetRefGetter(imageRefGetter ImageRefGetter) {
+	s.refGetter = imageRefGetter
+}
+
 func stripTags(imageName string) string {
 	ref, err := reference.Parse(imageName)
 	if err != nil {
@@ -456,4 +498,24 @@ func stripTags(imageName string) string {
 		return namedTagged.Name()
 	}
 	return imageName
+}
+
+func getHexDigest(imageSpec string) string {
+	if d, err := digest.ParseDigest(imageSpec); err == nil {
+		if d.Algorithm() != digest.SHA256 {
+			return ""
+		}
+		return d.Hex()
+	}
+
+	parsed, err := reference.Parse(imageSpec)
+	if err != nil {
+		return ""
+	}
+
+	if digested, ok := parsed.(reference.Digested); ok && digested.Digest().Algorithm() == digest.SHA256 {
+		return digested.Digest().Hex()
+	}
+
+	return ""
 }
