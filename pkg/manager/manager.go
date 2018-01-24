@@ -431,7 +431,12 @@ func (v *VirtletManager) RemoveContainer(ctx context.Context, in *kubeapi.Remove
 	glog.V(3).Infof("RemoveContainer: %s", spew.Sdump(in))
 
 	if err := v.libvirtVirtualizationTool.RemoveContainer(in.ContainerId); err != nil {
-		glog.Errorf("Error when removing container '%s': %v", in.ContainerId, err)
+		glog.Errorf("Error when removing container %q: %v", in.ContainerId, err)
+		return nil, err
+	}
+
+	if err := v.imageStore.GC(); err != nil {
+		glog.Errorf("Error doing image GC after removing container %q: %v", in.ContainerId, err)
 		return nil, err
 	}
 
