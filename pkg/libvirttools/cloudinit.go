@@ -35,8 +35,8 @@ import (
 	"github.com/golang/glog"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
-	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/flexvolume"
+	"github.com/Mirantis/virtlet/pkg/network"
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
@@ -141,15 +141,12 @@ func (g *CloudInitGenerator) generateNetworkConfiguration() ([]byte, error) {
 }
 
 func (g *CloudInitGenerator) generateNetworkConfigurationNoCloud() ([]byte, error) {
-	cniResult, err := cni.BytesToResult([]byte(g.config.CNIConfig))
-	if err != nil {
-		return nil, err
-	}
-	if cniResult == nil {
+	if g.config.ContainerSideNetwork == nil {
 		// This can only happen during integration tests
 		// where a dummy sandbox is used
 		return []byte("version: 1\n"), nil
 	}
+	cniResult := g.config.ContainerSideNetwork.Result
 
 	var config []map[string]interface{}
 	var gateways []net.IP
@@ -162,11 +159,16 @@ func (g *CloudInitGenerator) generateNetworkConfigurationNoCloud() ([]byte, erro
 		}
 		subnets, curGateways := g.getSubnetsAndGatewaysForNthInterface(i, cniResult)
 		gateways = append(gateways, curGateways...)
+		mtu, err := mtuForMacAddress(iface.Mac, g.config.ContainerSideNetwork.Interfaces)
+		if err != nil {
+			return nil, err
+		}
 		interfaceConf := map[string]interface{}{
 			"type":        "physical",
 			"name":        iface.Name,
 			"mac_address": iface.Mac,
 			"subnets":     subnets,
+			"mtu":         mtu,
 		}
 		config = append(config, interfaceConf)
 	}
@@ -264,15 +266,12 @@ func getDnsData(cniDns cnitypes.DNS) []map[string]interface{} {
 }
 
 func (g *CloudInitGenerator) generateNetworkConfigurationConfigDrive() ([]byte, error) {
-	cniResult, err := cni.BytesToResult([]byte(g.config.CNIConfig))
-	if err != nil {
-		return nil, err
-	}
-	if cniResult == nil {
+	if g.config.ContainerSideNetwork == nil {
 		// This can only happen during integration tests
 		// where a dummy sandbox is used
 		return []byte("{}"), nil
 	}
+	cniResult := g.config.ContainerSideNetwork.Result
 
 	config := make(map[string]interface{})
 
@@ -283,10 +282,15 @@ func (g *CloudInitGenerator) generateNetworkConfigurationConfigDrive() ([]byte, 
 			// skip host interfaces
 			continue
 		}
+		mtu, err := mtuForMacAddress(iface.Mac, g.config.ContainerSideNetwork.Interfaces)
+		if err != nil {
+			return nil, err
+		}
 		linkConf := map[string]interface{}{
 			"type": "phy",
 			"id":   iface.Name,
 			"ethernet_mac_address": iface.Mac,
+			"mtu": mtu,
 		}
 		links = append(links, linkConf)
 	}
@@ -343,6 +347,15 @@ func routesForIP(sourceIP net.IPNet, allRoutes []*cnitypes.Route) []map[string]i
 	}
 
 	return routes
+}
+
+func mtuForMacAddress(mac string, ifaces []network.InterfaceDescription) (uint16, error) {
+	for _, iface := range ifaces {
+		if iface.HardwareAddr.String() == mac {
+			return iface.MTU, nil
+		}
+	}
+	return 0, fmt.Errorf("interface with mac address %q not found in ContainerSideNetwork", mac)
 }
 
 func (g *CloudInitGenerator) IsoPath() string {

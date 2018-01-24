@@ -30,6 +30,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 
 	"github.com/Mirantis/virtlet/pkg/metadata"
+	"github.com/Mirantis/virtlet/pkg/network"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/Mirantis/virtlet/pkg/virt"
 )
@@ -501,7 +502,7 @@ func (v *VirtualizationTool) getVMConfigFromMetadata(containerId string) (*VMCon
 	}
 
 	podAnnotations := map[string]string{}
-	cniConfig := ""
+	var csn *network.ContainerSideNetwork
 	if containerInfo.SandboxID != "" {
 		sandbox, err := v.metadataStore.PodSandbox(containerInfo.SandboxID).Retrieve()
 		if err != nil {
@@ -509,7 +510,7 @@ func (v *VirtualizationTool) getVMConfigFromMetadata(containerId string) (*VMCon
 			return nil, kubeapi.ContainerState_CONTAINER_UNKNOWN, nil
 		}
 		podAnnotations = sandbox.Annotations
-		cniConfig = sandbox.CNIConfig
+		csn = sandbox.ContainerSideNetwork
 	}
 
 	// TODO: here we're using incomplete VMConfig to tear down the volumes
@@ -522,7 +523,7 @@ func (v *VirtualizationTool) getVMConfigFromMetadata(containerId string) (*VMCon
 		PodAnnotations:       podAnnotations,
 		ContainerAnnotations: containerInfo.Annotations,
 		ContainerLabels:      containerInfo.Labels,
-		CNIConfig:            cniConfig,
+		ContainerSideNetwork: csn,
 	}
 
 	if err := config.LoadAnnotations(); err != nil {

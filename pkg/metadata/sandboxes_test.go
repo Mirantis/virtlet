@@ -54,7 +54,7 @@ func TestRemovePodSandbox(t *testing.T) {
 		uid := ""
 		if tc.sandbox != nil {
 			uid = tc.sandbox.GetMetadata().Uid
-			psi, _ := NewPodSandboxInfo(tc.sandbox, []byte{}, kubeapi.PodSandboxState_SANDBOX_READY, clockwork.NewRealClock())
+			psi, _ := NewPodSandboxInfo(tc.sandbox, nil, kubeapi.PodSandboxState_SANDBOX_READY, clockwork.NewRealClock())
 			if err := store.PodSandbox(uid).Save(func(c *PodSandboxInfo) (*PodSandboxInfo, error) {
 				return psi, nil
 			}); err != nil {
@@ -88,7 +88,7 @@ func TestRetrieve(t *testing.T) {
 	store := setUpTestStore(t, sandboxes, []*criapi.ContainerTestConfig{}, fakeClock)
 
 	for _, sandbox := range sandboxes {
-		expectedSandboxInfo, err := NewPodSandboxInfo(sandbox, "", kubeapi.PodSandboxState_SANDBOX_READY, fakeClock)
+		expectedSandboxInfo, err := NewPodSandboxInfo(sandbox, nil, kubeapi.PodSandboxState_SANDBOX_READY, fakeClock)
 		if err != nil {
 			t.Fatal(err)
 		}

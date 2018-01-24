@@ -16,6 +16,10 @@ limitations under the License.
 
 package libvirttools
 
+import (
+	"github.com/Mirantis/virtlet/pkg/network"
+)
+
 // VMKeyValue denotes a key-value pair
 type VMKeyValue struct {
 	Key   string
@@ -68,8 +72,8 @@ type VMConfig struct {
 	// Host directories corresponding to the volumes which are to
 	// be mounted inside the VM
 	Mounts []*VMMount
-	// CNIConfig stores CNI configuration (CNI result)
-	CNIConfig string
+	// ContainerSideNetwork stores info about container side network configuration
+	ContainerSideNetwork *network.ContainerSideNetwork
 }
 
 // LoadAnnotations parses pod annotations in the VM config an

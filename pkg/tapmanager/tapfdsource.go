@@ -33,6 +33,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/dhcp"
 	"github.com/Mirantis/virtlet/pkg/nettools"
+	"github.com/Mirantis/virtlet/pkg/network"
 )
 
 const (
@@ -44,10 +45,10 @@ const (
 // InterfaceDescription contains interface type with additional data
 // needed to identify it
 type InterfaceDescription struct {
-	Type         nettools.InterfaceType `json:"type"`
-	HardwareAddr net.HardwareAddr       `json:"mac"`
-	FdIndex      int                    `json:"fdIndex"`
-	PCIAddress   string                 `json:"pciAddress"`
+	Type         network.InterfaceType `json:"type"`
+	HardwareAddr net.HardwareAddr      `json:"mac"`
+	FdIndex      int                   `json:"fdIndex"`
+	PCIAddress   string                `json:"pciAddress"`
 }
 
 // PodNetworkDesc contains the data that are required by TapFDSource
@@ -70,14 +71,14 @@ type GetFDPayload struct {
 	// Description specifies pod network description for already
 	// prepared network configuration
 	Description *PodNetworkDesc `json:"podNetworkDesc"`
-	// CNIConfig specifies CNI configuration used to configure retaken
+	// ContainerSideNetwork specifies configuration used to configure retaken
 	// environment
-	CNIConfig *cnicurrent.Result `json:"cniConfig"`
+	ContainerSideNetwork *network.ContainerSideNetwork `json:"csn"`
 }
 
 type podNetwork struct {
 	pnd        PodNetworkDesc
-	csn        *nettools.ContainerSideNetwork
+	csn        *network.ContainerSideNetwork
 	dhcpServer *dhcp.Server
 	doneCh     chan error
 }
@@ -126,29 +127,31 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 		return nil, nil, fmt.Errorf("error unmarshalling GetFD payload: %v", err)
 	}
 	pnd := payload.Description
+	csn := payload.ContainerSideNetwork
 
-	recover := payload.CNIConfig != nil
+	recover := csn != nil
+	var netConfig *cnicurrent.Result
 
 	if !recover {
 		if err := cni.CreateNetNS(pnd.PodId); err != nil {
 			return nil, nil, fmt.Errorf("error creating new netns for pod %s (%s): %v", pnd.PodName, pnd.PodId, err)
 		}
 
-		netConfig, err := s.cniClient.AddSandboxToNetwork(pnd.PodId, pnd.PodName, pnd.PodNs)
+		cniResult, err := s.cniClient.AddSandboxToNetwork(pnd.PodId, pnd.PodName, pnd.PodNs)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error adding pod %s (%s) to CNI network: %v", pnd.PodName, pnd.PodId, err)
 		}
-		glog.V(3).Infof("CNI configuration for pod %s (%s): %s", pnd.PodName, pnd.PodId, spew.Sdump(netConfig))
+		glog.V(3).Infof("CNI configuration for pod %s (%s): %s", pnd.PodName, pnd.PodId, spew.Sdump(cniResult))
 
 		if payload.Description.DNS != nil {
-			netConfig.DNS.Nameservers = pnd.DNS.Nameservers
-			netConfig.DNS.Search = pnd.DNS.Search
-			netConfig.DNS.Options = pnd.DNS.Options
+			cniResult.DNS.Nameservers = pnd.DNS.Nameservers
+			cniResult.DNS.Search = pnd.DNS.Search
+			cniResult.DNS.Options = pnd.DNS.Options
 		}
-		payload.CNIConfig = netConfig
+		netConfig = cniResult
+	} else {
+		netConfig = payload.ContainerSideNetwork.Result
 	}
-
-	netConfig := payload.CNIConfig
 
 	netNSPath := cni.PodNetNSPath(pnd.PodId)
 	vmNS, err := ns.GetNS(netNSPath)
@@ -156,7 +159,6 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 		return nil, nil, fmt.Errorf("failed to open network namespace at %q: %v", netNSPath, err)
 	}
 
-	var csn *nettools.ContainerSideNetwork
 	var dhcpServer *dhcp.Server
 	doneCh := make(chan error)
 	if err := vmNS.Do(func(ns.NetNS) error {
@@ -217,7 +219,7 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 		return nil, nil, err
 	}
 
-	respData, err := json.Marshal(netConfig)
+	respData, err := json.Marshal(csn)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error marshalling net config: %v", err)
 	}
@@ -253,7 +255,7 @@ func (s *TapFDSource) Release(key string) error {
 		return fmt.Errorf("failed to open network namespace at %q: %v", netNSPath, err)
 	}
 
-	if err := pn.csn.ReconstructVFs(vmNS); err != nil {
+	if err := nettools.ReconstructVFs(pn.csn, vmNS); err != nil {
 		return fmt.Errorf("failed to reconstruct SR-IOV devices: %v", err)
 	}
 
@@ -262,7 +264,7 @@ func (s *TapFDSource) Release(key string) error {
 			return fmt.Errorf("failed to stop dhcp server: %v", err)
 		}
 		<-pn.doneCh
-		if err := pn.csn.Teardown(); err != nil {
+		if err := nettools.Teardown(pn.csn); err != nil {
 			return err
 		}
 		return nil

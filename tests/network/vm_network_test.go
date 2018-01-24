@@ -35,6 +35,7 @@ import (
 	"github.com/vishvananda/netlink"
 
 	"github.com/Mirantis/virtlet/pkg/nettools"
+	"github.com/Mirantis/virtlet/pkg/network"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
@@ -242,7 +243,7 @@ func TestVmNetwork(t *testing.T) {
 
 	clientMac, _ := net.ParseMAC(clientMacAddrs[0])
 
-	var csn *nettools.ContainerSideNetwork
+	var csn *network.ContainerSideNetwork
 	if err := contNS.Do(func(ns.NetNS) error {
 		netlink.LinkSetHardwareAddr(clientVeth, clientMac)
 		allLinks, err := netlink.LinkList()
@@ -375,7 +376,7 @@ func TestTapFDSource(t *testing.T) {
 			},
 			interfaceDesc: []tapmanager.InterfaceDescription{
 				{
-					Type:         nettools.InterfaceTypeTap,
+					Type:         network.InterfaceTypeTap,
 					HardwareAddr: mustParseMAC(clientMacAddrs[0]),
 					FdIndex:      0,
 					PCIAddress:   "",
@@ -459,13 +460,13 @@ func TestTapFDSource(t *testing.T) {
 			},
 			interfaceDesc: []tapmanager.InterfaceDescription{
 				{
-					Type:         nettools.InterfaceTypeTap,
+					Type:         network.InterfaceTypeTap,
 					HardwareAddr: mustParseMAC(clientMacAddrs[0]),
 					FdIndex:      0,
 					PCIAddress:   "",
 				},
 				{
-					Type:         nettools.InterfaceTypeTap,
+					Type:         network.InterfaceTypeTap,
 					HardwareAddr: mustParseMAC(clientMacAddrs[1]),
 					FdIndex:      1,
 					PCIAddress:   "",
@@ -489,7 +490,7 @@ func TestTapFDSource(t *testing.T) {
 			},
 			interfaceDesc: []tapmanager.InterfaceDescription{
 				{
-					Type:         nettools.InterfaceTypeTap,
+					Type:         network.InterfaceTypeTap,
 					HardwareAddr: mustParseMAC(clientMacAddrs[0]),
 					FdIndex:      0,
 					PCIAddress:   "",
@@ -504,7 +505,7 @@ func TestTapFDSource(t *testing.T) {
 
 			withTapFDSource(t, tc.info, vnt.hostNS, func(podId string, cniClient *FakeCNIClient, c *tapmanager.FDClient) {
 				cniClient.UseBadResult(tc.useBadResult)
-				netConfigBytes, err := c.AddFDs(fdKey, &tapmanager.GetFDPayload{
+				csnBytes, err := c.AddFDs(fdKey, &tapmanager.GetFDPayload{
 					Description: &tapmanager.PodNetworkDesc{
 						PodId:   podId,
 						PodNs:   samplePodNS,
@@ -521,13 +522,14 @@ func TestTapFDSource(t *testing.T) {
 					}
 				}()
 
-				var result, expectedResult *cnicurrent.Result
-				if err := json.Unmarshal(netConfigBytes, &result); err != nil {
-					t.Errorf("error unmarshalling CNI result: %v", err)
+				var expectedResult *cnicurrent.Result
+				var csn *network.ContainerSideNetwork
+				if err := json.Unmarshal(csnBytes, &csn); err != nil {
+					t.Errorf("error unmarshalling containser side network: %v", err)
 				} else {
 					expectedResult = copyCNIResult(tc.info)
 					replaceSandboxPlaceholders(expectedResult, podId)
-					verifyNoDiff(t, "cni result", expectedResult, result)
+					verifyNoDiff(t, "cni result", expectedResult, csn.Result)
 				}
 
 				cniClient.VerifyAdded()

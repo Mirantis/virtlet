@@ -40,7 +40,7 @@ func (m podSandboxMeta) GetID() string {
 // Retrieve loads from DB and returns pod sandbox data bound to the object
 func (m podSandboxMeta) Retrieve() (*PodSandboxInfo, error) {
 	if m.GetID() == "" {
-		return nil, errors.New("Pod sandbox D cannot be empty")
+		return nil, errors.New("Pod sandbox ID cannot be empty")
 	}
 	var psi *PodSandboxInfo
 	err := m.client.db.View(func(tx *bolt.Tx) error {
@@ -50,7 +50,7 @@ func (m podSandboxMeta) Retrieve() (*PodSandboxInfo, error) {
 		}
 		return retrieveSandboxFromDB(bucket, &psi)
 	})
-	if err == nil {
+	if err == nil && psi != nil {
 		psi.podID = m.GetID()
 	}
 	return psi, err
@@ -160,6 +160,9 @@ func filterPodSandboxMeta(psm PodSandboxMetadata, filter *kubeapi.PodSandboxFilt
 	psi, err := psm.Retrieve()
 	if err != nil {
 		return false, err
+	}
+	if psi == nil {
+		return false, fmt.Errorf("no data found for pod id %q", psm.GetID())
 	}
 
 	if filter.State != nil && psi.State != filter.GetState().State {

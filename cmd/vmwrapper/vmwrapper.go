@@ -27,7 +27,7 @@ import (
 
 	"github.com/golang/glog"
 
-	"github.com/Mirantis/virtlet/pkg/nettools"
+	"github.com/Mirantis/virtlet/pkg/network"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
@@ -205,14 +205,14 @@ func main() {
 
 			for i, desc := range descriptions {
 				switch desc.Type {
-				case nettools.InterfaceTypeTap:
+				case network.InterfaceTypeTap:
 					netArgs = append(netArgs,
 						"-netdev",
 						fmt.Sprintf("tap,id=tap%d,fd=%d", desc.FdIndex, fds[desc.FdIndex]),
 						"-device",
 						fmt.Sprintf("virtio-net-pci,netdev=tap%d,id=net%d,mac=%s", desc.FdIndex, i, desc.HardwareAddr),
 					)
-				case nettools.InterfaceTypeVF:
+				case network.InterfaceTypeVF:
 					netArgs = append(netArgs,
 						"-device",
 						// fmt.Sprintf("pci-assign,configfd=%d,host=%s,id=hostdev%d,bus=pci.0,addr=0x%x",

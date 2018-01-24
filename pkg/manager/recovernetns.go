@@ -19,7 +19,6 @@ package manager
 import (
 	"fmt"
 
-	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
 )
@@ -41,16 +40,10 @@ func recoverNetworkNamespaces(metadataStore metadata.MetadataStore, fdManager ta
 			continue
 		}
 
-		cniConfig, err := cni.BytesToResult([]byte(psi.CNIConfig))
-		if err != nil {
-			allErrors = append(allErrors, fmt.Errorf("sanbox %q has incorrect cni configuration: %v", s.GetID(), err))
-			continue
-		}
-
 		if _, err := fdManager.AddFDs(
 			s.GetID(),
 			tapmanager.GetFDPayload{
-				CNIConfig: cniConfig,
+				ContainerSideNetwork: psi.ContainerSideNetwork,
 				Description: &tapmanager.PodNetworkDesc{
 					PodId:   s.GetID(),
 					PodNs:   psi.Metadata.GetNamespace(),
