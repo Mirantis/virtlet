@@ -6,8 +6,11 @@ Virtlet supports QCOW2 format for VM images.
 - `ImagePullSecrets` - not supported currently
 - protocol to use to download the image. By default `https` is
   used. In order to use `http` set `VIRTLET_DOWNLOAD_PROTOCOL` env var
-  to `http` for virtlet container. `<scheme>://` below denotes
-  the selected protocol
+  to `http` for the virtlet container. With the standard deployment
+  method (using [virtlet-ds.yaml](../deploy/virtlet-ds.yaml)) this can
+  be done by setting `download_protocol` key to `http` in the
+  `virtlet-config` ConfigMap.
+  `<scheme>://` below denotes the selected protocol.
 
 ## An example of container definition:
 
@@ -48,7 +51,7 @@ the name equal to docker image name but with `/` replaced by `%`, with
 the link target being the matching data file.
 
 The image store performs GC upon Virtlet startup, which consists of
-removing any part_* files and those files in data/ which have no
+removing any `part_*` files and those files in `data/` which have no
 symlinks leading to them aren't being used by any containers.
 
 The VMs are started from QCOW2 volumes which use the boot images

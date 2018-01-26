@@ -89,30 +89,8 @@ type ImageStore interface {
 // size of the specified QCOW2 image file
 type VirtualSizeFunc func(string) (uint64, error)
 
-// ImageFileStore implements ImageStore
-// The images are stored like this:
-// /var/lib/virtlet/images
-//   links/
-//     example.com%whatever%etc -> ../data/2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881
-//     example.com%same%image   -> ../data/2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881
-//     anotherimg               -> ../data/a1fce4363854ff888cff4b8e7875d600c2682390412a8cf79b37d0b11148b0fa
-//   data/
-//     2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881
-//     a1fce4363854ff888cff4b8e7875d600c2682390412a8cf79b37d0b11148b0fa
-//
-// The files are downloaded to data/
-//
-// Files are named part_SOME_RANDOM_STRING while being downloaded.
-// After the download finishes, sha256 is calculated to be used as the
-// data file name, and if the file with that name already exists, the
-// newly downloaded file is removed, otherwise it's renamed to that
-// sha256 digest string. In both cases a symbolic link is created
-// with the name equal to docker image name but with '/' replaced by '%',
-// with the link target being the matching data file.
-//
-// The image store performs GC upon Virtlet startup, which consists of
-// removing any part_* files and those files in data/ which have no
-// symlinks leading to them and aren't being used by any containers.
+// ImageFileStore implements ImageStore. For more info on its
+// workings, see docs/images.md
 type ImageFileStore struct {
 	sync.Mutex
 	dir        string
