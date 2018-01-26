@@ -24,6 +24,15 @@ import (
 	"github.com/boltdb/bolt"
 )
 
+var (
+	containersBucket   = []byte("containers")
+	containerKeyPrefix = []byte("containers/")
+)
+
+func containerKey(containerId string) []byte {
+	return append(containerKeyPrefix, []byte(containerId)...)
+}
+
 type containerMeta struct {
 	client *boltClient
 	id     string
@@ -41,7 +50,7 @@ func (m containerMeta) Retrieve() (*ContainerInfo, error) {
 	}
 	var ci *ContainerInfo
 	err := m.client.db.View(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket([]byte("containers"))
+		bucket := tx.Bucket(containersBucket)
 		if bucket == nil {
 			return nil
 		}
@@ -63,7 +72,7 @@ func (m containerMeta) Save(updater func(*ContainerInfo) (*ContainerInfo, error)
 		return errors.New("Container ID cannot be empty")
 	}
 	return m.client.db.Update(func(tx *bolt.Tx) error {
-		bucket, err := tx.CreateBucketIfNotExists([]byte("containers"))
+		bucket, err := tx.CreateBucketIfNotExists(containersBucket)
 		if err != nil {
 			return err
 		}
@@ -119,7 +128,7 @@ func addContainerToSandbox(tx *bolt.Tx, containerID, sandboxID string) error {
 	if err != nil {
 		return err
 	}
-	return bucket.Put([]byte("containers/"+containerID), []byte{})
+	return bucket.Put(containerKey(containerID), []byte{})
 }
 
 func removeContainerFromSandbox(tx *bolt.Tx, containerID, sandboxID string) error {
@@ -130,7 +139,7 @@ func removeContainerFromSandbox(tx *bolt.Tx, containerID, sandboxID string) erro
 	if bucket == nil {
 		return nil
 	}
-	return bucket.Delete([]byte("containers/" + containerID))
+	return bucket.Delete(containerKey(containerID))
 }
 
 // Container returns interface instance which manages container with given ID
@@ -143,7 +152,6 @@ func (b *boltClient) ListPodContainers(podID string) ([]ContainerMetadata, error
 	if podID == "" {
 		return nil, errors.New("Pod sandbox ID cannot be empty")
 	}
-	prefix := []byte("containers/")
 	var result []ContainerMetadata
 	err := b.db.View(func(tx *bolt.Tx) error {
 		bucket, err := getSandboxBucket(tx, podID, false, false)
@@ -151,8 +159,8 @@ func (b *boltClient) ListPodContainers(podID string) ([]ContainerMetadata, error
 			return err
 		}
 		c := bucket.Cursor()
-		for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
-			result = append(result, b.Container(string(k[len(prefix):])))
+		for k, _ := c.Seek(containerKeyPrefix); k != nil && bytes.HasPrefix(k, containerKeyPrefix); k, _ = c.Next() {
+			result = append(result, b.Container(string(k[len(containerKeyPrefix):])))
 		}
 		return nil
 	})
@@ -163,11 +171,10 @@ func (b *boltClient) ListPodContainers(podID string) ([]ContainerMetadata, error
 // The keys of the returned map are image names and the values are always true.
 func (b *boltClient) ImagesInUse() (map[string]bool, error) {
 	result := make(map[string]bool)
-	prefix := []byte("sandboxes/")
 	if err := b.db.View(func(tx *bolt.Tx) error {
 		c := tx.Cursor()
-		for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
-			containers, err := b.ListPodContainers(string(k[len(prefix):]))
+		for k, _ := c.Seek(sandboxKeyPrefix); k != nil && bytes.HasPrefix(k, sandboxKeyPrefix); k, _ = c.Next() {
+			containers, err := b.ListPodContainers(string(k[len(sandboxKeyPrefix):]))
 			if err != nil {
 				return err
 			}
