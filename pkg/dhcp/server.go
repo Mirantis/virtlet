@@ -202,7 +202,7 @@ func (s *Server) prepareResponse(pkt *dhcp4.Packet, serverIP net.IP, mt dhcp4.Me
 	// MTU option
 	p.Options[26] = []byte{uint8(mtu >> 8), uint8(mtu & 0xff)}
 
-	router, routeData, err := s.getStaticRoutes()
+	router, routeData, err := s.getStaticRoutes(cfg.Address)
 	if err != nil {
 		glog.Warningf("Can not transform static routes for mac %v: %v", pkt.HardwareAddr, err)
 	}
@@ -260,7 +260,7 @@ func (s *Server) ackDHCP(pkt *dhcp4.Packet, serverIP net.IP) (*dhcp4.Packet, err
 	return s.prepareResponse(pkt, serverIP, dhcp4.MsgAck)
 }
 
-func (s *Server) getStaticRoutes() (router, routes []byte, err error) {
+func (s *Server) getStaticRoutes(ip net.IPNet) (router, routes []byte, err error) {
 	if len(s.config.Result.Routes) == 0 {
 		return nil, nil, nil
 	}
@@ -286,6 +286,9 @@ func (s *Server) getStaticRoutes() (router, routes []byte, err error) {
 			}
 		} else {
 			gw = gw.To4()
+		}
+		if !ip.Contains(gw) {
+			continue
 		}
 		if gw != nil && dstIP.Equal(net.IPv4zero) {
 			if s, _ := route.Dst.Mask.Size(); s == 0 {
