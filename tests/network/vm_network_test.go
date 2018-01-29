@@ -445,18 +445,6 @@ func TestTapFDSource(t *testing.T) {
 					"new_subnet_mask='255.255.255.0'",
 					"tap0: offered 10.1.90.5 from 169.254.254.2",
 				},
-				{
-					// FIXME: this is a bug, we should not pass
-					// static routes for non-matching network
-					"new_classless_static_routes='10.10.42.0/24 10.1.90.90'",
-					"new_ip_address='10.2.90.5'",
-					"new_network_number='10.2.90.0'",
-					// FIXME: this is a bug, we should not pass
-					// the gateway for non-matching network
-					"new_routers='10.1.90.1'",
-					"new_subnet_mask='255.255.255.0'",
-					"tap1: offered 10.2.90.5 from 169.254.254.2",
-				},
 			},
 			interfaceDesc: []tapmanager.InterfaceDescription{
 				{
