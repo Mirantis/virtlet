@@ -20,31 +20,26 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
+
+	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 )
 
 func verifyWaitProc(t *testing.T, tmpDir string) {
 	procFile := filepath.Join(tmpDir, "sample.proc")
-	cmd := exec.Command("/bin/sh", "-c",
-		fmt.Sprintf("sleep 0.5 && echo \"$$ `cut -d' ' -f22 /proc/$$/stat`\" > '%s' && sleep 1000", procFile))
-	if err := cmd.Start(); err != nil {
-		t.Fatalf("couldn't run command: %v", err)
-	}
-	defer func() {
-		if err := cmd.Process.Kill(); err != nil {
-			t.Fatalf("couldn't kill the process")
-		}
-		cmd.Wait()
-	}()
+	tc := testutils.RunProcess(t, "/bin/sh", []string{
+		"-c",
+		fmt.Sprintf("sleep 0.5 && echo \"$$ `cut -d' ' -f22 /proc/$$/stat`\" > '%s' && sleep 1000", procFile),
+	}, nil)
+	defer tc.Stop()
 
 	pid, err := WaitForProcess(procFile)
 	if err != nil {
 		t.Fatalf("WaitForProcess(): %v", err)
-	} else if pid != cmd.Process.Pid {
-		t.Errorf("bad pid returned by WaitForProcess: %d instead of %d", pid, cmd.Process.Pid)
+	} else if pid != tc.Pid() {
+		t.Errorf("bad pid returned by WaitForProcess: %d instead of %d", pid, tc.Pid())
 	}
 }
 

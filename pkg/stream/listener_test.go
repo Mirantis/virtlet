@@ -20,10 +20,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
+
+	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 )
 
 func getServer() *UnixServer {
@@ -119,17 +120,13 @@ func TestCleaningReader(t *testing.T) {
 
 	// setup client
 	containerID := "1123ab2-baed-32e7-6d1d-13110da12345"
-	cmd := exec.Command("nc", "-U", u.SocketPath)
-	cmd.Env = append(os.Environ(),
+	tc := testutils.RunProcess(t, "nc", []string{"-U", u.SocketPath}, []string{
 		"VIRTLET_POD_UID=8c8e8cf1-acea-11e7-8e0e-02420ac00002",
 		"VIRTLET_CONTAINER_NAME=ubuntu",
 		fmt.Sprintf("VIRTLET_CONTAINER_ID=%s", containerID),
 		"CONTAINER_ATTEMPTS=0",
-	)
-	if err := cmd.Start(); err != nil {
-		t.Errorf("Error when starting command: %v", err)
-	}
-	defer cmd.Process.Kill()
+	})
+	defer tc.Stop()
 
 	u.Stop()
 	outputReaders, ok := u.outputReaders[containerID]
