@@ -23,20 +23,9 @@ if [ ! -d ${FLEXVOLUME_DIR}/virtlet~flexvolume_driver ]; then
     cp /flexvolume_driver ${FLEXVOLUME_DIR}/virtlet~flexvolume_driver/flexvolume_driver
 fi
 
-
 while [ ! -S /var/run/libvirt/libvirt-sock ] ; do
   echo >&1 "Waiting for libvirt..."
   sleep 0.3
 done
-
-# FIXME: make tapfdsource do netns stuff in a separate process
-if [ -d /opt/cni/bin.orig ]; then
-  mkdir /opt/cni/bin
-  find /opt/cni/bin.orig -maxdepth 1 -executable \( -type f -o -type l \) | while read p; do
-    newname="/opt/cni/bin/$(basename "$p")"
-    echo -e "#!/bin/sh\nexec /usr/bin/nsenter -t 1 -n ${p} \"\$@\"" >"${newname}"
-    chmod +x "${newname}"
-  done
-fi
 
 /usr/local/bin/virtlet -v=${VIRTLET_LOGLEVEL:-3} -logtostderr=true -image-download-protocol="${PROTOCOL}" -image-translations-dir="${IMAGE_TRANSLATIONS_DIR}" "${RAW_DEVICES}"
