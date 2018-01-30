@@ -1,13 +1,13 @@
 # Networking
 
 For now the only supported configuration is the use of
-[CNI plugins](https://github.com/containernetworking/cni). To use
-custom CNI configuration, mount your `/etc/cni` and optionally
-`/opt/cni` into the virtlet container.
+[CNI plugins](https://github.com/containernetworking/cni).
 
 Virtlet have the same behavior and default values for `--cni-bin-dir`
 and `--cni-conf-dir` as described in kubelet network plugins
 [documentation](http://kubernetes.io/docs/admin/network-plugins/).
+These parameters refer to paths on the host, it's not necessary to
+have them mounted into the Virtlet container.
 
 ## VM Network Setup Diagram
 

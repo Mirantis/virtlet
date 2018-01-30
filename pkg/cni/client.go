@@ -39,40 +39,17 @@ type CNIClient interface {
 }
 
 type Client struct {
-	cniConfig     *libcni.CNIConfig
-	netConfigList *libcni.NetworkConfigList
+	pluginsDir string
+	configsDir string
 }
 
 var _ CNIClient = &Client{}
 
 func NewClient(pluginsDir, configsDir string) (*Client, error) {
-	netConfigList, err := ReadConfiguration(configsDir)
-	glog.V(3).Infof("CNI config: name: %q type: %q", netConfigList.Plugins[0].Network.Name, netConfigList.Plugins[0].Network.Type)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read CNI configuration: %v", err)
-	}
-
 	return &Client{
-		cniConfig:     &libcni.CNIConfig{Path: []string{pluginsDir}},
-		netConfigList: netConfigList,
+		pluginsDir: pluginsDir,
+		configsDir: configsDir,
 	}, nil
-}
-
-func (c *Client) cniRuntimeConf(podId, podName, podNs string) *libcni.RuntimeConf {
-	r := &libcni.RuntimeConf{
-		ContainerID: podId,
-		NetNS:       PodNetNSPath(podId),
-		IfName:      "virtlet-eth0",
-	}
-	if podName != "" && podNs != "" {
-		r.Args = [][2]string{
-			{"IgnoreUnknown", "1"},
-			{"K8S_POD_NAMESPACE", podNs},
-			{"K8S_POD_NAME", podName},
-			{"K8S_POD_INFRA_CONTAINER_ID", podId},
-		}
-	}
-	return r
 }
 
 // GetDummyNetwork implements GetDummyNetwork method of CNIClient interface
@@ -94,20 +71,94 @@ func (c *Client) GetDummyNetwork() (*cnicurrent.Result, string, error) {
 
 // AddSandboxToNetwork implements AddSandboxToNetwork method of CNIClient interface
 func (c *Client) AddSandboxToNetwork(podId, podName, podNs string) (*cnicurrent.Result, error) {
-	rtConf := c.cniRuntimeConf(podId, podName, podNs)
+	var r cnicurrent.Result
+	if err := utils.SpawnInNamespaces(1, "cniAddSandboxToNetwork", cniRequest{
+		PluginsDir: c.pluginsDir,
+		ConfigsDir: c.configsDir,
+		PodId:      podId,
+		PodName:    podName,
+		PodNs:      podNs,
+	}, false, &r); err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
+// RemoveSandboxFromNetwork implements RemoveSandboxFromNetwork method of CNIClient interface
+func (c *Client) RemoveSandboxFromNetwork(podId, podName, podNs string) error {
+	return utils.SpawnInNamespaces(1, "cniRemoveSandboxToNetwork", cniRequest{
+		PluginsDir: c.pluginsDir,
+		ConfigsDir: c.configsDir,
+		PodId:      podId,
+		PodName:    podName,
+		PodNs:      podNs,
+	}, false, nil)
+}
+
+type cniRequest struct {
+	PluginsDir string
+	ConfigsDir string
+	PodId      string
+	PodName    string
+	PodNs      string
+}
+
+type realCNIClient struct {
+	cniConfig     *libcni.CNIConfig
+	netConfigList *libcni.NetworkConfigList
+}
+
+func newRealCNIClient(pluginsDir, configsDir string) (*realCNIClient, error) {
+	netConfigList, err := ReadConfiguration(configsDir)
+	glog.V(3).Infof("CNI config: name: %q type: %q", netConfigList.Plugins[0].Network.Name, netConfigList.Plugins[0].Network.Type)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read CNI configuration: %v", err)
+	}
+
+	return &realCNIClient{
+		cniConfig:     &libcni.CNIConfig{Path: []string{pluginsDir}},
+		netConfigList: netConfigList,
+	}, nil
+}
+
+func (c *realCNIClient) cniRuntimeConf(podId, podName, podNs string) *libcni.RuntimeConf {
+	r := &libcni.RuntimeConf{
+		ContainerID: podId,
+		NetNS:       PodNetNSPath(podId),
+		IfName:      "virtlet-eth0",
+	}
+	if podName != "" && podNs != "" {
+		r.Args = [][2]string{
+			{"IgnoreUnknown", "1"},
+			{"K8S_POD_NAMESPACE", podNs},
+			{"K8S_POD_NAME", podName},
+			{"K8S_POD_INFRA_CONTAINER_ID", podId},
+		}
+	}
+	return r
+}
+
+func handleAddSandboxToNetwork(arg interface{}) (interface{}, error) {
+	req := arg.(*cniRequest)
+	c, err := newRealCNIClient(req.PluginsDir, req.ConfigsDir)
+	if err != nil {
+		return nil, err
+	}
+
+	rtConf := c.cniRuntimeConf(req.PodId, req.PodName, req.PodNs)
 	// NOTE: this annotation is only need by CNI Genie
 	rtConf.Args = append(rtConf.Args, [2]string{
 		"K8S_ANNOT", `{"cni": "calico"}`,
 	})
-	glog.V(3).Infof("AddSandboxToNetwork: podId %q, podName %q, podNs %q, runtime config:\n%s",
-		podId, podName, podNs, spew.Sdump(rtConf))
+	glog.V(3).Infof("AddSandboxToNetwork: req.PodId %q, req.PodName %q, req.PodNs %q, runtime config:\n%s",
+		req.PodId, req.PodName, req.PodNs, spew.Sdump(rtConf))
 	result, err := c.cniConfig.AddNetworkList(c.netConfigList, rtConf)
 	if err == nil {
-		glog.V(3).Infof("AddSandboxToNetwork: podId %q, podName %q, podNs %q: result:\n%s",
-			podId, podName, podNs, spew.Sdump(result))
+		glog.V(3).Infof("AddSandboxToNetwork: req.PodId %q, req.PodName %q, req.PodNs %q: result:\n%s",
+			req.PodId, req.PodName, req.PodNs, spew.Sdump(result))
 	} else {
-		glog.V(3).Infof("AddSandboxToNetwork: podId %q, podName %q, podNs %q: error: %v",
-			podId, podName, podNs, err)
+		glog.V(3).Infof("AddSandboxToNetwork: req.PodId %q, req.PodName %q, req.PodNs %q: error: %v",
+			req.PodId, req.PodName, req.PodNs, err)
 		return nil, err
 	}
 	r, err := cnicurrent.NewResultFromResult(result)
@@ -117,16 +168,26 @@ func (c *Client) AddSandboxToNetwork(podId, podName, podNs string) (*cnicurrent.
 	return r, err
 }
 
-// RemoveSandboxFromNetwork implements RemoveSandboxFromNetwork method of CNIClient interface
-func (c *Client) RemoveSandboxFromNetwork(podId, podName, podNs string) error {
-	glog.V(3).Infof("RemoveSandboxFromNetwork: podId %q, podName %q, podNs %q", podId, podName, podNs)
-	err := c.cniConfig.DelNetworkList(c.netConfigList, c.cniRuntimeConf(podId, podName, podNs))
-	if err == nil {
-		glog.V(3).Infof("RemoveSandboxFromNetwork: podId %q, podName %q, podNs %q: success",
-			podId, podName, podNs)
-	} else {
-		glog.V(3).Infof("RemoveSandboxFromNetwork: podId %q, podName %q, podNs %q: error: %v",
-			podId, podName, podNs, err)
+func handleRemoveSandboxFromNetwork(arg interface{}) (interface{}, error) {
+	req := arg.(*cniRequest)
+	c, err := newRealCNIClient(req.PluginsDir, req.ConfigsDir)
+	if err != nil {
+		return nil, err
 	}
-	return err
+
+	glog.V(3).Infof("RemoveSandboxFromNetwork: req.PodId %q, req.PodName %q, req.PodNs %q", req.PodId, req.PodName, req.PodNs)
+	err = c.cniConfig.DelNetworkList(c.netConfigList, c.cniRuntimeConf(req.PodId, req.PodName, req.PodNs))
+	if err == nil {
+		glog.V(3).Infof("RemoveSandboxFromNetwork: req.PodId %q, req.PodName %q, req.PodNs %q: success",
+			req.PodId, req.PodName, req.PodNs)
+	} else {
+		glog.V(3).Infof("RemoveSandboxFromNetwork: req.PodId %q, req.PodName %q, req.PodNs %q: error: %v",
+			req.PodId, req.PodName, req.PodNs, err)
+	}
+	return nil, err
+}
+
+func init() {
+	utils.RegisterNsFixReexec("cniAddSandboxToNetwork", handleAddSandboxToNetwork, cniRequest{})
+	utils.RegisterNsFixReexec("cniRemoveSandboxFromNetwork", handleAddSandboxToNetwork, cniRequest{})
 }
