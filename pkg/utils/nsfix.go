@@ -185,12 +185,12 @@ func getEnvForExec(targetPid int, handlerName string, arg interface{}, dropPrivs
 		fmt.Sprintf("NSFIX_LOG_LEVEL=%d", getGlogLevel())), nil
 }
 
-// SwitchToNamespaces executes the specified handler using mount, UTS
-// and IPC namespaces of the specified process. It passes arg to the
-// handler using JSON serialization. The current process gets replaced
-// by the new one. If dropPrivs is true, the new process will execute
-// using non-root uid/gid (using real uid/gid of the process if
-// they're non-zero or 65534 which is nobody/nogroup)
+// SwitchToNamespaces executes the specified handler using network,
+// mount, UTS and IPC namespaces of the specified process. It passes
+// arg to the handler using JSON serialization. The current process
+// gets replaced by the new one. If dropPrivs is true, the new process
+// will execute using non-root uid/gid (using real uid/gid of the
+// process if they're non-zero or 65534 which is nobody/nogroup)
 func SwitchToNamespaces(targetPid int, handlerName string, arg interface{}, dropPrivs bool) error {
 	env, err := getEnvForExec(targetPid, handlerName, arg, dropPrivs, false)
 	if err != nil {
@@ -199,10 +199,10 @@ func SwitchToNamespaces(targetPid int, handlerName string, arg interface{}, drop
 	return syscall.Exec(os.Args[0], os.Args[:1], env)
 }
 
-// SpawnInNamespaces executes the specified handler using mount, UTS
-// and IPC namespaces of the specified process. It passes arg to the
-// handler using JSON serialization. It then returns the value
-// returned by the handler (also via JSON serialization +
+// SpawnInNamespaces executes the specified handler using network,
+// mount, UTS and IPC namespaces of the specified process. It passes
+// arg to the handler using JSON serialization. It then returns the
+// value returned by the handler (also via JSON serialization +
 // deserialization). If dropPrivs is true, the new process will
 // execute using non-root uid/gid (using real uid/gid of the process
 // if they're non-zero or 65534 which is nobody/nogroup)

@@ -88,6 +88,7 @@ __attribute__((constructor (200))) void nsfix_handle_reexec(void) {
 	nsfix_setns(my_pid, target_pid, CLONE_NEWNS, "mnt");
 	nsfix_setns(my_pid, target_pid, CLONE_NEWUTS, "uts");
 	nsfix_setns(my_pid, target_pid, CLONE_NEWIPC, "ipc");
+	nsfix_setns(my_pid, target_pid, CLONE_NEWNET, "net");
 
 	// remount /sys for the new netns
 	if (umount2("/sys", MNT_DETACH) < 0)
