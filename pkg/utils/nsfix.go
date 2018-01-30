@@ -101,8 +101,10 @@ func unmarshalResult(retBytes []byte, ret interface{}) error {
 	if !r.Success {
 		return errors.New(r.Error)
 	}
-	if err := json.Unmarshal(r.Result, ret); err != nil {
-		return fmt.Errorf("error unmarshalling the result: %v", err)
+	if ret != nil {
+		if err := json.Unmarshal(r.Result, ret); err != nil {
+			return fmt.Errorf("error unmarshalling the result: %v", err)
+		}
 	}
 	return nil
 }
@@ -125,18 +127,21 @@ func HandleNsFixReexec() {
 		glog.Fatalf("Bad NSFIX_HANDLER %q", handlerName)
 	}
 
-	arg := reflect.New(entry.argType).Interface()
-	argStr := os.Getenv("NSFIX_ARG")
-	if argStr != "" {
-		if err := json.Unmarshal([]byte(argStr), arg); err != nil {
-			glog.Fatalf("Can't unmarshal NSFIX_ARG (NSFIX_HANDLER %q):\n%s\n", handlerName, argStr)
+	var arg interface{}
+	if entry.argType != nil {
+		arg = reflect.New(entry.argType).Interface()
+		argStr := os.Getenv("NSFIX_ARG")
+		if argStr != "" {
+			if err := json.Unmarshal([]byte(argStr), arg); err != nil {
+				glog.Fatalf("Can't unmarshal NSFIX_ARG (NSFIX_HANDLER %q):\n%s\n", handlerName, argStr)
+			}
 		}
 	}
 
 	spawned := os.Getenv("NSFIX_SPAWN") != ""
 	switch ret, err := entry.handler(arg); {
 	case err != nil && !spawned:
-		glog.Fatalf("Error invoking NSFIX_HANDLER %q: %v\nNSFIX_ARG:\n%s\n", handlerName, err, argStr)
+		glog.Fatalf("Error invoking NSFIX_HANDLER %q: %v", handlerName)
 	case err == nil && !spawned:
 		os.Exit(0)
 	default:
