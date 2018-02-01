@@ -44,6 +44,30 @@ Password:
 $
 ```
 
+Another option to use this script is to install it as a [kubectl plugin](https://kubernetes.io/docs/tasks/extend-kubectl/kubectl-plugins/).
+At the moment, Virtlet only supports Kubernetes 1.7.x and 1.8.x.
+You can use a newer `kubectl` with these Kubernetes versions but this may cause
+problems with some kinds of objects such as `StatefulSets`. So the kubectl
+plugin feature can be considered experimental at the moment.
+You can install this script as kubectl plugin using this command:
+```bash
+./virsh.sh install
+```
+
+After it, `kubectl plugin` should have additional entry:
+
+```
+...
+Available Commands:
+  ...
+  virt        Interface to libvirt's virsh in Virtlet container
+...
+```
+
+Later it can be used e.g. as:
+```bash
+kubectl plugin virt console @cirros-vm
+```
 
 # Kubernetes on VM-based StatefulSet
 
