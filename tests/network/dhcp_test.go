@@ -78,7 +78,7 @@ func TestDhcpServer(t *testing.T) {
 						},
 					},
 				},
-				Interfaces: []network.InterfaceDescription{
+				Interfaces: []*network.InterfaceDescription{
 					{
 						HardwareAddr: clientMac,
 						MTU:          9000,

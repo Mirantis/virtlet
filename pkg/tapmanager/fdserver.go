@@ -92,6 +92,9 @@ type FDSource interface {
 	// GetInfo returns the information which needs to be
 	// propagated back the FDClient upon GetFDs() call
 	GetInfo(key string) ([]byte, error)
+	// Stop stops any goroutines associated with FDSource
+	// but doesn't release the namespaces
+	Stop() error
 }
 
 // FDServer listens on a Unix domain socket, serving requests to
@@ -326,14 +329,16 @@ func (s *FDServer) serveConn(c *net.UnixConn) error {
 }
 
 // Stop makes FDServer stop listening and close its socket
-func (s *FDServer) Stop() {
+func (s *FDServer) Stop() error {
 	s.Lock()
 	defer s.Unlock()
 	if s.stopCh != nil {
 		close(s.stopCh)
 		s.lst.Close()
 		s.stopCh = nil
+		return s.source.Stop()
 	}
+	return nil
 }
 
 // FDClient can be used to connect to an FDServer listening on a Unix

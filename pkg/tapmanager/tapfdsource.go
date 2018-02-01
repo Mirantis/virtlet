@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -175,22 +176,23 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 		if netConfig == nil {
 			netConfig = &cnicurrent.Result{}
 		}
+
 		allLinks, err := netlink.LinkList()
 		if err != nil {
 			return fmt.Errorf("error listing the links: %v", err)
 		}
-		if netConfig, err = nettools.ValidateAndFixCNIResult(netConfig, netNSPath, allLinks); err != nil {
-			return fmt.Errorf("error fixing cni configuration: %v", err)
-		}
-		if err := nettools.FixCalicoNetworking(netConfig, s.getDummyNetwork); err != nil {
-			// don't fail in this case because there may be even no Calico
-			glog.Warningf("Calico detection/fix didn't work: %v", err)
-		}
-		glog.V(3).Infof("CNI Result after fix:\n%s", spew.Sdump(netConfig))
 
 		if recover {
-			csn, err = nettools.RecreateContainerSideNetwork(netConfig, netNSPath, allLinks)
+			err = nettools.RecreateContainerSideNetwork(csn, netNSPath, allLinks)
 		} else {
+			if netConfig, err = nettools.ValidateAndFixCNIResult(netConfig, netNSPath, allLinks); err != nil {
+				return fmt.Errorf("error fixing cni configuration: %v", err)
+			}
+			if err := nettools.FixCalicoNetworking(netConfig, s.getDummyNetwork); err != nil {
+				// don't fail in this case because there may be even no Calico
+				glog.Warningf("Calico detection/fix didn't work: %v", err)
+			}
+			glog.V(3).Infof("CNI Result after fix:\n%s", spew.Sdump(netConfig))
 			csn, err = nettools.SetupContainerSideNetwork(netConfig, netNSPath, allLinks)
 		}
 		if err != nil {
@@ -306,4 +308,29 @@ func (s *TapFDSource) GetInfo(key string) ([]byte, error) {
 		return nil, fmt.Errorf("interface descriptions marshaling error: %v", err)
 	}
 	return data, nil
+}
+
+// Stop stops any running DHCP servers associated with TapFDSource
+// and closes tap fds without releasing any other resources.
+func (s *TapFDSource) Stop() error {
+	s.Lock()
+	defer s.Unlock()
+	var errors []string
+	for _, pn := range s.fdMap {
+		if err := pn.dhcpServer.Close(); err != nil {
+			errors = append(errors, fmt.Sprintf("error stopping dhcp server: %v", err.Error()))
+		} else {
+			<-pn.doneCh
+		}
+		for _, i := range pn.csn.Interfaces {
+			if err := i.Fo.Close(); err != nil {
+				errors = append(errors, fmt.Sprintf("error closing tap fd: %v", err))
+			}
+		}
+	}
+	s.fdMap = make(map[string]*podNetwork)
+	if errors != nil {
+		return fmt.Errorf("Errors while stopping TapFDSource:\n%s", strings.Join(errors, "\n"))
+	}
+	return nil
 }
