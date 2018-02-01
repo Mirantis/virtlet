@@ -57,5 +57,5 @@ type ContainerSideNetwork struct {
 	NsPath string
 	// Interfaces contains a list of interfaces with data needed
 	// to configure them
-	Interfaces []InterfaceDescription
+	Interfaces []*InterfaceDescription
 }

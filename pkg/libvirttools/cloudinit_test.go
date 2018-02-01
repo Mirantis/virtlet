@@ -65,11 +65,11 @@ func newFakeFlexvolume(t *testing.T, parentDir string, uuid string, part int) *f
 }
 
 func buildNetworkedPodConfig(cniResult *cnicurrent.Result, imageType string) *VMConfig {
-	var descs []network.InterfaceDescription
+	var descs []*network.InterfaceDescription
 	for _, iface := range cniResult.Interfaces {
 		if iface.Sandbox != "" {
 			mac, _ := net.ParseMAC(iface.Mac)
-			descs = append(descs, network.InterfaceDescription{
+			descs = append(descs, &network.InterfaceDescription{
 				HardwareAddr: mac,
 				MTU:          1500,
 			})
