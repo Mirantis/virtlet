@@ -298,7 +298,7 @@ func findLinkByAddress(links []netlink.Link, address net.IPNet) (netlink.Link, e
 			}
 		}
 	}
-	return nil, fmt.Errorf("interface with address %q not found in container namespace", address.String())
+	return nil, fmt.Errorf("interface with address %q not found in the container namespace", address.String())
 }
 
 // ValidateAndFixCNIResult verifies that netConfig contains proper list of
@@ -618,8 +618,7 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 		return nil, err
 	}
 
-	var interfaces []network.InterfaceDescription
-
+	var interfaces []*network.InterfaceDescription
 	for i, link := range contLinks {
 		hwAddr := link.Attrs().HardwareAddr
 		ifaceName := link.Attrs().Name
@@ -706,7 +705,7 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 			glog.V(3).Infof("Adding interface %q as %q", ifaceName, tapInterfaceName)
 		}
 
-		interfaces = append(interfaces, network.InterfaceDescription{
+		interfaces = append(interfaces, &network.InterfaceDescription{
 			Type:         ifaceType,
 			Name:         ifaceName,
 			Fo:           fo,
@@ -721,22 +720,28 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 
 // RecreateContainerSideNetwork tries to populate ContainerSideNetwork
 // structure based on a network namespace that was already adjusted for Virtlet
-func RecreateContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks []netlink.Link) (*network.ContainerSideNetwork, error) {
-	if len(info.Interfaces) == 0 {
-		return nil, fmt.Errorf("wrong cni configuration: no interfaces defined: %s", spew.Sdump(info))
+func RecreateContainerSideNetwork(csn *network.ContainerSideNetwork, nsPath string, allLinks []netlink.Link) error {
+	if len(csn.Result.Interfaces) == 0 {
+		return fmt.Errorf("wrong cni configuration: no interfaces defined: %s", spew.Sdump(csn.Result))
 	}
 
 	// FIXME: this will not work with sr-iov device passed to VM
-	contLinks, err := GetContainerLinks(info.Interfaces)
+	contLinks, err := GetContainerLinks(csn.Result.Interfaces)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	var interfaces []network.InterfaceDescription
-
+	oldDescs := map[string]*network.InterfaceDescription{}
+	for _, desc := range csn.Interfaces {
+		desc.Fo = nil
+		oldDescs[desc.Name] = desc
+	}
 	for i, link := range contLinks {
-		hwAddr := link.Attrs().HardwareAddr
 		ifaceName := link.Attrs().Name
+		desc, found := oldDescs[ifaceName]
+		if !found {
+			glog.Warningf("Recovering container side network: missing description for interface %q", ifaceName)
+		}
 		pciAddress := ""
 		var ifaceType network.InterfaceType
 		var fo *os.File
@@ -745,12 +750,12 @@ func RecreateContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLin
 			ifaceType = network.InterfaceTypeVF
 			pciAddress, err = getPCIAddressOfVF(ifaceName)
 			if err != nil {
-				return nil, err
+				return err
 			}
 
 			fo, err = openVfConfigFile(pciAddress)
 			if err != nil {
-				return nil, err
+				return err
 			}
 
 			// device should be already unbound, but after machine reboot that can be necessary
@@ -760,19 +765,25 @@ func RecreateContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLin
 			tapInterfaceName := fmt.Sprintf(tapInterfaceNameTemplate, i)
 			fo, err = OpenTAP(tapInterfaceName)
 			if err != nil {
-				return nil, fmt.Errorf("failed to open tap: %v", err)
+				return fmt.Errorf("failed to open tap: %v", err)
 			}
 		}
-		interfaces = append(interfaces, network.InterfaceDescription{
-			Type:         ifaceType,
-			Name:         ifaceName,
-			Fo:           fo,
-			HardwareAddr: hwAddr,
-			PCIAddress:   pciAddress,
-		})
+		if desc.Type != ifaceType {
+			return fmt.Errorf("bad interface type for %q", desc.Name)
+		}
+		if desc.PCIAddress != pciAddress {
+			return fmt.Errorf("PCI address mismatch for %q: %q instead of %q", desc.PCIAddress, pciAddress)
+		}
+		desc.Fo = fo
 	}
 
-	return &network.ContainerSideNetwork{info, nsPath, interfaces}, nil
+	for _, desc := range csn.Interfaces {
+		if desc.Fo == nil {
+			return fmt.Errorf("interface %q not found", desc.Name)
+		}
+	}
+
+	return nil
 }
 
 // TeardownBridge removes links from bridge and sets it down

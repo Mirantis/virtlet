@@ -18,6 +18,7 @@ package tapmanager
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -31,8 +32,9 @@ type sampleFDData struct {
 }
 
 type sampleFDSource struct {
-	tmpDir string
-	files  map[string]*os.File
+	tmpDir  string
+	files   map[string]*os.File
+	stopped bool
 }
 
 var _ FDSource = &sampleFDSource{}
@@ -45,6 +47,10 @@ func newSampleFDSource(tmpDir string) *sampleFDSource {
 }
 
 func (s *sampleFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
+	if s.stopped {
+		return nil, nil, errors.New("sampleFDSource is stopped")
+	}
+
 	var fdData sampleFDData
 	if err := json.Unmarshal(data, &fdData); err != nil {
 		return nil, nil, fmt.Errorf("error unmarshalling json: %v", err)
@@ -74,6 +80,10 @@ func (s *sampleFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) 
 }
 
 func (s *sampleFDSource) Release(key string) error {
+	if s.stopped {
+		return errors.New("sampleFDSource is stopped")
+	}
+
 	f, found := s.files[key]
 	if !found {
 		return fmt.Errorf("file not found: %q", key)
@@ -86,11 +96,20 @@ func (s *sampleFDSource) Release(key string) error {
 }
 
 func (s *sampleFDSource) GetInfo(key string) ([]byte, error) {
+	if s.stopped {
+		return nil, errors.New("sampleFDSource is stopped")
+	}
+
 	_, found := s.files[key]
 	if !found {
 		return nil, fmt.Errorf("file not found: %q", key)
 	}
 	return []byte("info_" + key), nil
+}
+
+func (s *sampleFDSource) Stop() error {
+	s.stopped = true
+	return nil
 }
 
 func (s *sampleFDSource) isEmpty() bool {
@@ -134,7 +153,12 @@ func TestFDServer(t *testing.T) {
 	if err := s.Serve(); err != nil {
 		t.Fatalf("Serve(): %v", err)
 	}
-	defer s.Stop()
+	defer func() {
+		s.Stop()
+		if !src.stopped {
+			t.Errorf("FDSource not stopped")
+		}
+	}()
 	c := NewFDClient(socketPath)
 	if err := c.Connect(); err != nil {
 		t.Fatalf("Connect(): %v", err)

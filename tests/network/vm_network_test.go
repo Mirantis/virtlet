@@ -280,39 +280,78 @@ func TestVmNetwork(t *testing.T) {
 	vnt.wait()
 }
 
-func withTapFDSource(t *testing.T, info *cnicurrent.Result, hostNS ns.NetNS, toCall func(string, *FakeCNIClient, *tapmanager.FDClient)) {
+type tapFDSourceTester struct {
+	t          *testing.T
+	podId      string
+	cniClient  *FakeCNIClient
+	tmpDir     string
+	socketPath string
+	s          *tapmanager.FDServer
+	c          *tapmanager.FDClient
+}
+
+func newTapFDSourceTester(t *testing.T, info *cnicurrent.Result, hostNS ns.NetNS) *tapFDSourceTester {
 	podId := utils.NewUuid()
 	cniClient := NewFakeCNIClient(info, hostNS, podId, samplePodName, samplePodNS)
-	defer cniClient.Cleanup()
-
-	src, err := tapmanager.NewTapFDSource(cniClient)
-	if err != nil {
-		t.Fatalf("Error creating tap fd source: %v", err)
-	}
 
 	tmpDir, err := ioutil.TempDir("", "pass-fd-test")
 	if err != nil {
 		t.Fatalf("ioutil.TempDir(): %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
-	socketPath := filepath.Join(tmpDir, "tapfdserver.sock")
-
-	s := tapmanager.NewFDServer(socketPath, src)
-	if err := s.Serve(); err != nil {
-		t.Fatalf("Serve(): %v", err)
+	return &tapFDSourceTester{
+		t:          t,
+		podId:      podId,
+		cniClient:  cniClient,
+		tmpDir:     tmpDir,
+		socketPath: filepath.Join(tmpDir, "tapfdserver.sock"),
 	}
-	defer s.Stop()
+}
 
-	c := tapmanager.NewFDClient(socketPath)
-	if err := c.Connect(); err != nil {
-		t.Fatalf("Connect(): %v", err)
-	}
-	defer func() {
-		if err := c.Close(); err != nil {
-			t.Errorf("Close(): %v", err)
+func (tst *tapFDSourceTester) stop() {
+	if tst.c != nil {
+		if err := tst.c.Close(); err != nil {
+			tst.t.Errorf("FDClient.Close(): %v", err)
 		}
-	}()
-	toCall(podId, cniClient, c)
+		tst.c = nil
+	}
+	if tst.s != nil {
+		if err := tst.s.Stop(); err != nil {
+			tst.t.Errorf("FDServer.Stop(): %v", err)
+		}
+		tst.s = nil
+		if err := os.Remove(tst.socketPath); err != nil {
+			tst.t.Errorf("Failed to remove %q: %v", tst.socketPath, err)
+		}
+	}
+}
+
+func (tst *tapFDSourceTester) tearDown() {
+	tst.stop()
+	tst.cniClient.Cleanup()
+	os.RemoveAll(tst.tmpDir)
+}
+
+func (tst *tapFDSourceTester) setupServerAndConnect() *tapmanager.FDClient {
+	if tst.c != nil || tst.s != nil {
+		tst.t.Fatalf("the server and/or the client is already present")
+	}
+
+	src, err := tapmanager.NewTapFDSource(tst.cniClient)
+	if err != nil {
+		tst.t.Fatalf("Error creating tap fd source: %v", err)
+	}
+
+	tst.s = tapmanager.NewFDServer(tst.socketPath, src)
+	if err := tst.s.Serve(); err != nil {
+		tst.t.Fatalf("Serve(): %v", err)
+	}
+
+	tst.c = tapmanager.NewFDClient(tst.socketPath)
+	if err := tst.c.Connect(); err != nil {
+		tst.t.Fatalf("Connect(): %v", err)
+	}
+
+	return tst.c
 }
 
 func verifyNoDiff(t *testing.T, what string, expected, actual interface{}) {
@@ -493,15 +532,23 @@ func TestTapFDSource(t *testing.T) {
 			useBadResult: true,
 		},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			vnt := newVMNetworkTester(t, tc.interfaceCount)
-			defer vnt.teardown()
+		for _, recover := range []bool{false, true} {
+			name := tc.name
+			if recover {
+				name += "/recover"
+			}
+			t.Run(name, func(t *testing.T) {
+				vnt := newVMNetworkTester(t, tc.interfaceCount)
+				defer vnt.teardown()
 
-			withTapFDSource(t, tc.info, vnt.hostNS, func(podId string, cniClient *FakeCNIClient, c *tapmanager.FDClient) {
-				cniClient.UseBadResult(tc.useBadResult)
+				tst := newTapFDSourceTester(t, tc.info, vnt.hostNS)
+				defer tst.tearDown()
+				c := tst.setupServerAndConnect()
+
+				tst.cniClient.UseBadResult(tc.useBadResult)
 				csnBytes, err := c.AddFDs(fdKey, &tapmanager.GetFDPayload{
 					Description: &tapmanager.PodNetworkDesc{
-						PodId:   podId,
+						PodId:   tst.podId,
 						PodNs:   samplePodNS,
 						PodName: samplePodName,
 					},
@@ -522,14 +569,30 @@ func TestTapFDSource(t *testing.T) {
 					t.Errorf("error unmarshalling containser side network: %v", err)
 				} else {
 					expectedResult = copyCNIResult(tc.info)
-					replaceSandboxPlaceholders(expectedResult, podId)
+					replaceSandboxPlaceholders(expectedResult, tst.podId)
 					verifyNoDiff(t, "cni result", expectedResult, csn.Result)
 				}
 
-				cniClient.VerifyAdded()
-				veths := cniClient.Veths()
+				tst.cniClient.VerifyAdded()
+				veths := tst.cniClient.Veths()
 				if len(veths) != tc.interfaceCount {
 					t.Fatalf("veth count mismatch: %d instead of %d", len(veths), tc.interfaceCount)
+				}
+
+				if recover {
+					tst.stop()
+					c = tst.setupServerAndConnect()
+					_, err := c.AddFDs(fdKey, &tapmanager.GetFDPayload{
+						ContainerSideNetwork: csn,
+						Description: &tapmanager.PodNetworkDesc{
+							PodId:   tst.podId,
+							PodNs:   samplePodNS,
+							PodName: samplePodName,
+						},
+					})
+					if err != nil {
+						t.Fatalf("AddFDs() [recovering]: %v", err)
+					}
 				}
 
 				fds, descBytes, err := c.GetFDs(fdKey)
@@ -574,15 +637,14 @@ func TestTapFDSource(t *testing.T) {
 					t.Errorf("ReleaseFDs(): %v", err)
 				}
 				released = true
-				cniClient.VerifyRemoved()
+				tst.cniClient.VerifyRemoved()
 
-				infoAfterTeardown := cniClient.NetworkInfoAfterTeardown()
+				infoAfterTeardown := tst.cniClient.NetworkInfoAfterTeardown()
 				verifyNoDiff(t, "network info after teardown", expectedResult, infoAfterTeardown)
 			})
-		})
+		}
 	}
 }
 
 // TODO: test Calico
-// TODO: test recovering netns
 // TODO: test SR-IOV (by making a fake sysfs dir)
