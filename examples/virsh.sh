@@ -4,6 +4,8 @@ set -o nounset
 set -o pipefail
 set -o errtrace
 
+PLUGINBASEDIR=~/.kube/plugins/virt
+
 opts=
 if [[ ${1:-} = "console" || $# == 0 ]]; then
   # using -it with `virsh list` causes it to use \r\n as line endings,
@@ -13,6 +15,17 @@ fi
 args=("$@")
 
 pod_output=""
+
+function install_as_kubectl_plugin {
+  mkdir -p "${PLUGINBASEDIR}"
+  cp ${0} "${PLUGINBASEDIR}/virt"
+  chmod +x "${PLUGINBASEDIR}/virt"
+  cat >"${PLUGINBASEDIR}/plugin.yaml" <<__EOF__
+name: "virt"
+shortDesc: "Interface to libvirt's virsh in Virtlet container"
+command: "./virt"
+__EOF__
+}
 
 function get_pod_domain_id {
   # @pod[:namespace]
@@ -43,6 +56,11 @@ function get_pod_domain_id {
   pod_output=${new_pod_output}
   domain="virtlet-${container_id}-${container_name}"
 }
+
+if [[ ${1:-} = "install" ]]; then
+  install_as_kubectl_plugin
+  exit 0
+fi
 
 if [[ ${1:-} = "poddomain" ]]; then
   if [[ $# != 2 ]]; then

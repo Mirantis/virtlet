@@ -44,6 +44,27 @@ Password:
 $
 ```
 
+Other option to use this script is to install it as a [kubectl plugin](https://kubernetes.io/docs/tasks/extend-kubectl/kubectl-plugins/).
+Note that this option is available only for `kubectl` starting from version `1.9.0`.
+You can do that using this command:
+```bash
+./virsh.sh install
+```
+
+After it, `kubectl plugin` should have additional entry:
+
+```
+...
+Available Commands:
+  ...
+  virt        Interface to libvirt's virsh in Virtlet container
+...
+```
+
+Later it can be used e.g. as:
+```bash
+kubectl plugin virt console @cirros-vm
+```
 
 # Kubernetes on VM-based StatefulSet
 
