@@ -154,7 +154,50 @@ func HandleNsFixReexec() {
 	}
 }
 
-func getEnvForExec(targetPid int, handlerName string, arg interface{}, dropPrivs, spawn bool) ([]string, error) {
+// NsFixCall describes a call to be executed in network, mount, UTS
+// and IPC namespaces of another process.
+type NsFixCall struct {
+	targetPid   int
+	handlerName string
+	arg         interface{}
+	remountSys  bool
+	dropPrivs   bool
+}
+
+// NewNsFixCall makes a new NsFixCall structure with specified
+// handlerName using PID 1.
+func NewNsFixCall(handlerName string) *NsFixCall {
+	return &NsFixCall{
+		targetPid:   1,
+		handlerName: handlerName,
+	}
+}
+
+// TargetPid sets target PID value for NsFixCall
+func (c *NsFixCall) TargetPid(targetPid int) *NsFixCall {
+	c.targetPid = targetPid
+	return c
+}
+
+// Arg sets argument for NsFixCall
+func (c *NsFixCall) Arg(arg interface{}) *NsFixCall {
+	c.arg = arg
+	return c
+}
+
+// RemountSys instructs NsFixCall to remount /sys in the new process
+func (c *NsFixCall) RemountSys() *NsFixCall {
+	c.remountSys = true
+	return c
+}
+
+// DropPrivs instructs NsFixCall to drop privileges in the new process
+func (c *NsFixCall) DropPrivs() *NsFixCall {
+	c.dropPrivs = true
+	return c
+}
+
+func (c *NsFixCall) getEnvForExec(spawn bool) ([]string, error) {
 	env := os.Environ()
 	filteredEnv := []string{}
 	for _, envItem := range env {
@@ -163,15 +206,19 @@ func getEnvForExec(targetPid int, handlerName string, arg interface{}, dropPrivs
 		}
 	}
 
-	if arg != nil {
-		argBytes, err := json.Marshal(arg)
+	if c.arg != nil {
+		argBytes, err := json.Marshal(c.arg)
 		if err != nil {
 			return nil, fmt.Errorf("error marshalling handler arg: %v", err)
 		}
 		filteredEnv = append(filteredEnv, fmt.Sprintf("NSFIX_ARG=%s", argBytes))
 	}
 
-	if dropPrivs {
+	if c.remountSys {
+		filteredEnv = append(filteredEnv, "NSFIX_REMOUNT_SYS=1")
+	}
+
+	if c.dropPrivs {
 		filteredEnv = append(filteredEnv, "NSFIX_DROP_PRIVS=1")
 	}
 
@@ -180,19 +227,19 @@ func getEnvForExec(targetPid int, handlerName string, arg interface{}, dropPrivs
 	}
 
 	return append(filteredEnv,
-		fmt.Sprintf("NSFIX_NS_PID=%d", targetPid),
-		fmt.Sprintf("NSFIX_HANDLER=%s", handlerName),
+		fmt.Sprintf("NSFIX_NS_PID=%d", c.targetPid),
+		fmt.Sprintf("NSFIX_HANDLER=%s", c.handlerName),
 		fmt.Sprintf("NSFIX_LOG_LEVEL=%d", getGlogLevel())), nil
 }
 
 // SwitchToNamespaces executes the specified handler using network,
 // mount, UTS and IPC namespaces of the specified process. It passes
-// arg to the handler using JSON serialization. The current process
-// gets replaced by the new one. If dropPrivs is true, the new process
-// will execute using non-root uid/gid (using real uid/gid of the
-// process if they're non-zero or 65534 which is nobody/nogroup)
-func SwitchToNamespaces(targetPid int, handlerName string, arg interface{}, dropPrivs bool) error {
-	env, err := getEnvForExec(targetPid, handlerName, arg, dropPrivs, false)
+// the argument to the handler using JSON serialization. The current
+// process gets replaced by the new one. If dropPrivs is true, the new
+// process will execute using non-root uid/gid (using real uid/gid of
+// the process if they're non-zero or 65534 which is nobody/nogroup)
+func (c *NsFixCall) SwitchToNamespaces() error {
+	env, err := c.getEnvForExec(false)
 	if err != nil {
 		return err
 	}
@@ -201,13 +248,13 @@ func SwitchToNamespaces(targetPid int, handlerName string, arg interface{}, drop
 
 // SpawnInNamespaces executes the specified handler using network,
 // mount, UTS and IPC namespaces of the specified process. It passes
-// arg to the handler using JSON serialization. It then returns the
-// value returned by the handler (also via JSON serialization +
-// deserialization). If dropPrivs is true, the new process will
-// execute using non-root uid/gid (using real uid/gid of the process
-// if they're non-zero or 65534 which is nobody/nogroup)
-func SpawnInNamespaces(targetPid int, handlerName string, arg interface{}, dropPrivs bool, ret interface{}) error {
-	env, err := getEnvForExec(targetPid, handlerName, arg, dropPrivs, true)
+// the argument to the handler using JSON serialization. It then
+// returns the value returned by the handler (also via JSON
+// serialization + deserialization). If dropPrivs is true, the new
+// process will execute using non-root uid/gid (using real uid/gid of
+// the process if they're non-zero or 65534 which is nobody/nogroup)
+func (c *NsFixCall) SpawnInNamespaces(ret interface{}) error {
+	env, err := c.getEnvForExec(true)
 	if err != nil {
 		return err
 	}

@@ -150,10 +150,16 @@ func main() {
 	args = append(args, netArgs...)
 	env := os.Environ()
 	if runInAnotherContainer {
+		nsFixCall := utils.NewNsFixCall("vmwrapper").
+			TargetPid(pid).
+			Arg(&reexecArg{args}).
+			RemountSys()
 		// Currently we don't drop privs when SR-IOV support is enabled
 		// because of an unresolved emulator permission problem.
-		dropPrivs := os.Getenv("VMWRAPPER_KEEP_PRIVS") == ""
-		if err := utils.SwitchToNamespaces(pid, "vmwrapper", &reexecArg{args}, dropPrivs); err != nil {
+		if os.Getenv("VMWRAPPER_KEEP_PRIVS") == "" {
+			nsFixCall.DropPrivs()
+		}
+		if err := nsFixCall.SwitchToNamespaces(); err != nil {
 			glog.Fatalf("Error reexecuting vmwrapper: %v", err)
 		}
 	} else {

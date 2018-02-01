@@ -72,13 +72,15 @@ func (c *Client) GetDummyNetwork() (*cnicurrent.Result, string, error) {
 // AddSandboxToNetwork implements AddSandboxToNetwork method of CNIClient interface
 func (c *Client) AddSandboxToNetwork(podId, podName, podNs string) (*cnicurrent.Result, error) {
 	var r cnicurrent.Result
-	if err := utils.SpawnInNamespaces(1, "cniAddSandboxToNetwork", cniRequest{
-		PluginsDir: c.pluginsDir,
-		ConfigsDir: c.configsDir,
-		PodId:      podId,
-		PodName:    podName,
-		PodNs:      podNs,
-	}, false, &r); err != nil {
+	if err := utils.NewNsFixCall("cniAddSandboxToNetwork").
+		Arg(cniRequest{
+			PluginsDir: c.pluginsDir,
+			ConfigsDir: c.configsDir,
+			PodId:      podId,
+			PodName:    podName,
+			PodNs:      podNs,
+		}).
+		SpawnInNamespaces(&r); err != nil {
 		return nil, err
 	}
 	return &r, nil
@@ -86,13 +88,15 @@ func (c *Client) AddSandboxToNetwork(podId, podName, podNs string) (*cnicurrent.
 
 // RemoveSandboxFromNetwork implements RemoveSandboxFromNetwork method of CNIClient interface
 func (c *Client) RemoveSandboxFromNetwork(podId, podName, podNs string) error {
-	return utils.SpawnInNamespaces(1, "cniRemoveSandboxToNetwork", cniRequest{
-		PluginsDir: c.pluginsDir,
-		ConfigsDir: c.configsDir,
-		PodId:      podId,
-		PodName:    podName,
-		PodNs:      podNs,
-	}, false, nil)
+	return utils.NewNsFixCall("cniRemoveSandboxToNetwork").
+		Arg(cniRequest{
+			PluginsDir: c.pluginsDir,
+			ConfigsDir: c.configsDir,
+			PodId:      podId,
+			PodName:    podName,
+			PodNs:      podNs,
+		}).
+		SpawnInNamespaces(nil)
 }
 
 type cniRequest struct {
