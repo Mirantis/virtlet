@@ -80,7 +80,7 @@ __attribute__((constructor (200))) void nsfix_handle_reexec(void) {
 	my_pid = getpid();
         target_pid = atoi(pid_str);
 
-        // Other namespaces:
+	// Other namespaces:
         // cgroup, user - not touching
         // pid - host pid namespace is used by virtlet
         // net - host network is used by virtlet
@@ -90,11 +90,13 @@ __attribute__((constructor (200))) void nsfix_handle_reexec(void) {
 	nsfix_setns(my_pid, target_pid, CLONE_NEWIPC, "ipc");
 	nsfix_setns(my_pid, target_pid, CLONE_NEWNET, "net");
 
-	// remount /sys for the new netns
-	if (umount2("/sys", MNT_DETACH) < 0)
-		nsfix_perr("umount2()");
-	if (mount("none", "/sys", "sysfs", 0, NULL) < 0)
-		nsfix_perr("mount()");
+	if (getenv("NSFIX_REMOUNT_SYS") != NULL) {
+		// remount /sys for the new netns
+		if (umount2("/sys", MNT_DETACH) < 0)
+			nsfix_perr("umount2()");
+		if (mount("none", "/sys", "sysfs", 0, NULL) < 0)
+			nsfix_perr("mount()");
+	}
 
 	// Permanently drop privs if asked to do so
 	if (getenv("NSFIX_DROP_PRIVS") != NULL) {

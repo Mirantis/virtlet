@@ -142,7 +142,10 @@ func verifyNsFix(t *testing.T, toRun func(tmpDir string, dirs map[string]string,
 func TestNsFix(t *testing.T) {
 	verifyNsFix(t, func(tmpDir string, dirs map[string]string, pids []int) {
 		var r nsFixTestRet
-		if err := SpawnInNamespaces(pids[0], "nsFixTest1", nsFixTestArg{dirs["b"]}, false, &r); err != nil {
+		if err := NewNsFixCall("nsFixTest1").
+			TargetPid(pids[0]).
+			Arg(nsFixTestArg{dirs["b"]}).
+			SpawnInNamespaces(&r); err != nil {
 			t.Fatalf("SpawnInNamespaces(): %v", err)
 		}
 		resultStr := strings.Join(r.Files, "\n")
@@ -154,7 +157,11 @@ func TestNsFix(t *testing.T) {
 			t.Errorf("SpawnInNamespaces dropped privs when not requested to do so")
 		}
 
-		if err := SpawnInNamespaces(pids[1], "nsFixTest1", nsFixTestArg{dirs["b"]}, true, &r); err != nil {
+		if err := NewNsFixCall("nsFixTest1").
+			TargetPid(pids[1]).
+			Arg(nsFixTestArg{dirs["b"]}).
+			DropPrivs().
+			SpawnInNamespaces(&r); err != nil {
 			t.Fatalf("SpawnInNamespaces(): %v", err)
 		}
 		resultStr = strings.Join(r.Files, "\n")
@@ -194,7 +201,9 @@ func TestNsFix(t *testing.T) {
 func TestNsFixWithNilArg(t *testing.T) {
 	verifyNsFix(t, func(tmpDir string, dirs map[string]string, pids []int) {
 		var r int
-		if err := SpawnInNamespaces(pids[0], "nsFixTestNilArg", nil, false, &r); err != nil {
+		if err := NewNsFixCall("nsFixTestNilArg").
+			TargetPid(pids[0]).
+			SpawnInNamespaces(&r); err != nil {
 			t.Fatalf("SpawnInNamespaces(): %v", err)
 		}
 		expectedResult := 42
@@ -206,7 +215,10 @@ func TestNsFixWithNilArg(t *testing.T) {
 
 func TestNsFixWithNilResult(t *testing.T) {
 	verifyNsFix(t, func(tmpDir string, dirs map[string]string, pids []int) {
-		if err := SpawnInNamespaces(pids[0], "nsFixTestNilResult", dirs["b"], false, nil); err != nil {
+		if err := NewNsFixCall("nsFixTestNilResult").
+			TargetPid(pids[0]).
+			Arg(dirs["b"]).
+			SpawnInNamespaces(nil); err != nil {
 			t.Fatalf("SpawnInNamespaces(): %v", err)
 		}
 		// dirs["a"] is bind-mounted under dirs["b"]
@@ -227,8 +239,11 @@ func init() {
 		if err != nil {
 			glog.Fatalf("bad TEST_NSFIX_SWITCH: %q", switchStr)
 		}
-		if err := SwitchToNamespaces(pid, "nsFixTest2", nsFixTestArg{parts[1]}, false); err != nil {
-			glog.Fatalf("SwitchToNamespace(): %v", err)
+		if err := NewNsFixCall("nsFixTest2").
+			TargetPid(pid).
+			Arg(nsFixTestArg{parts[1]}).
+			SwitchToNamespaces(); err != nil {
+			glog.Fatalf("SwitchToNamespaces(): %v", err)
 		}
 	}
 	RegisterNsFixReexec("nsFixTest1", handleNsFixTest1, nsFixTestArg{})
