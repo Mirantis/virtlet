@@ -26,6 +26,7 @@ import (
 	"github.com/golang/glog"
 
 	"github.com/Mirantis/virtlet/pkg/cni"
+	"github.com/Mirantis/virtlet/pkg/image"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
 	"github.com/Mirantis/virtlet/pkg/manager"
 	"github.com/Mirantis/virtlet/pkg/metadata"
@@ -36,10 +37,8 @@ import (
 var (
 	libvirtUri = flag.String("libvirt-uri", "qemu:///system",
 		"Libvirt connection URI")
-	pool = flag.String("pool", "default",
-		"Storage pool in which the images should be stored")
-	storageBackend = flag.String("storage-backend", "dir",
-		"Libvirt storage pool type/backend")
+	imageDir = flag.String("image dir", "/var/lib/virtlet/images",
+		"Image directory")
 	boltPath = flag.String("bolt-path", "/var/lib/virtlet/virtlet.db",
 		"Path to the bolt database file")
 	listen = flag.String("listen", "/run/virtlet.sock",
@@ -85,7 +84,11 @@ func runVirtlet() {
 		os.Exit(1)
 	}
 
-	server, err := manager.NewVirtletManager(*libvirtUri, *pool, *imageDownloadProtocol, *storageBackend, *rawDevices, *imageTranslationConfigsDir, metadataStore, c)
+	downloader := image.NewDownloader(*imageDownloadProtocol)
+	imageStore := image.NewImageFileStore(*imageDir, downloader, nil)
+	imageStore.SetRefGetter(metadataStore.ImagesInUse)
+
+	server, err := manager.NewVirtletManager(*libvirtUri, *rawDevices, *imageTranslationConfigsDir, imageStore, metadataStore, c)
 	if err != nil {
 		glog.Errorf("Initializing server failed: %v", err)
 		os.Exit(1)

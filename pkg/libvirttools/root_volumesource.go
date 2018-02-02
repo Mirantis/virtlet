@@ -39,29 +39,41 @@ func GetRootVolume(config *VMConfig, owner VolumeOwner) ([]VMVolume, error) {
 	}, nil
 }
 
-func (v *rootVolume) cloneName() string {
+func (v *rootVolume) volumeName() string {
 	return "virtlet_root_" + v.config.DomainUUID
 }
 
-func (v *rootVolume) cloneVolume(name string, from virt.VirtStorageVolume) (virt.VirtStorageVolume, error) {
-	return v.owner.StoragePool().CreateStorageVolClone(&libvirtxml.StorageVolume{
-		Name: name,
+func (v *rootVolume) createVolume() (virt.VirtStorageVolume, error) {
+	imagePath, virtualSize, err := v.owner.ImageManager().GetImagePathAndVirtualSize(v.config.Image)
+	if err != nil {
+		return nil, err
+	}
+
+	return v.owner.StoragePool().CreateStorageVol(&libvirtxml.StorageVolume{
 		Type: "file",
+		Name: v.volumeName(),
+		Allocation: &libvirtxml.StorageVolumeSize{
+			Unit:  "b",
+			Value: 0,
+		},
+		Capacity: &libvirtxml.StorageVolumeSize{
+			Unit:  "b",
+			Value: virtualSize,
+		},
 		Target: &libvirtxml.StorageVolumeTarget{
 			Format: &libvirtxml.StorageVolumeTargetFormat{Type: "qcow2"},
 		},
-	}, from)
+		BackingStore: &libvirtxml.StorageVolumeBackingStore{
+			Path:   imagePath,
+			Format: &libvirtxml.StorageVolumeTargetFormat{Type: "qcow2"},
+		},
+	})
 }
 
 func (v *rootVolume) Uuid() string { return "" }
 
 func (v *rootVolume) Setup() (*libvirtxml.DomainDisk, error) {
-	imageVolume, err := v.owner.ImageManager().GetImageVolume(v.config.Image)
-	if err != nil {
-		return nil, err
-	}
-
-	vol, err := v.cloneVolume(v.cloneName(), imageVolume)
+	vol, err := v.createVolume()
 	if err != nil {
 		return nil, err
 	}
@@ -79,5 +91,5 @@ func (v *rootVolume) Setup() (*libvirtxml.DomainDisk, error) {
 }
 
 func (v *rootVolume) Teardown() error {
-	return v.owner.StoragePool().RemoveVolumeByName(v.cloneName())
+	return v.owner.StoragePool().RemoveVolumeByName(v.volumeName())
 }

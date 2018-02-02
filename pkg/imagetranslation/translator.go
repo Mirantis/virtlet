@@ -31,7 +31,7 @@ import (
 
 	"github.com/golang/glog"
 
-	"github.com/Mirantis/virtlet/pkg/utils"
+	"github.com/Mirantis/virtlet/pkg/image"
 )
 
 type imageNameTranslator struct {
@@ -62,10 +62,10 @@ func (t *imageNameTranslator) LoadConfigs(ctx context.Context, sources ...Config
 	t.translations = translations
 }
 
-func convertEndpoint(rule TranslationRule, config *ImageTranslation) utils.Endpoint {
+func convertEndpoint(rule TranslationRule, config *ImageTranslation) image.Endpoint {
 	profile, exists := config.Transports[rule.Transport]
 	if !exists {
-		return utils.Endpoint{
+		return image.Endpoint{
 			Url:          rule.Url,
 			MaxRedirects: -1,
 		}
@@ -78,9 +78,9 @@ func convertEndpoint(rule TranslationRule, config *ImageTranslation) utils.Endpo
 		maxRedirects = *profile.MaxRedirects
 	}
 
-	var tlsConfig *utils.TLSConfig
+	var tlsConfig *image.TLSConfig
 	if profile.TLS != nil {
-		var certificates []utils.TLSCertificate
+		var certificates []image.TLSCertificate
 		for i, record := range profile.TLS.Certificates {
 			var x509Certs []*x509.Certificate
 			var privateKey crypto.PrivateKey
@@ -112,21 +112,21 @@ func convertEndpoint(rule TranslationRule, config *ImageTranslation) utils.Endpo
 			}
 
 			for _, c := range x509Certs {
-				certificates = append(certificates, utils.TLSCertificate{
+				certificates = append(certificates, image.TLSCertificate{
 					Certificate: c,
 					PrivateKey:  privateKey,
 				})
 			}
 		}
 
-		tlsConfig = &utils.TLSConfig{
+		tlsConfig = &image.TLSConfig{
 			ServerName:   profile.TLS.ServerName,
 			Insecure:     profile.TLS.Insecure,
 			Certificates: certificates,
 		}
 	}
 
-	return utils.Endpoint{
+	return image.Endpoint{
 		Url:          rule.Url,
 		Timeout:      time.Millisecond * time.Duration(profile.TimeoutMilliseconds),
 		Proxy:        profile.Proxy,
@@ -156,7 +156,7 @@ func parsePrivateKey(der []byte) (crypto.PrivateKey, error) {
 }
 
 // Translate implements ImageNameTranslator Translate
-func (t *imageNameTranslator) Translate(name string) utils.Endpoint {
+func (t *imageNameTranslator) Translate(name string) image.Endpoint {
 	for _, translation := range t.translations {
 		prefix := translation.Prefix + "/"
 		unprefixedName := name
@@ -190,7 +190,8 @@ func (t *imageNameTranslator) Translate(name string) utils.Endpoint {
 			}
 		}
 	}
-	return utils.Endpoint{}
+	glog.V(1).Infof("Using URL %q without translation", name)
+	return image.Endpoint{Url: name, MaxRedirects: -1}
 }
 
 // NewImageNameTranslator creates an instance of ImageNameTranslator

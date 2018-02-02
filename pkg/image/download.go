@@ -1,5 +1,5 @@
 /*
-Copyright 2017 Mirantis
+Copyright 2017-2018 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+package image
 
 import (
 	"crypto"
@@ -22,19 +22,24 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
 )
 
+const (
+	copyBufferSize = 1024 * 1024
+)
+
 // Endpoint contains all the endpoint parameters needed to download a file
 type Endpoint struct {
-	// Url is the image URL
+	// Url is the image URL. If protocol is omitted, the
+	// configured default one is used.
 	Url string
 
 	// MaxRedirects is the maximum number of redirects that downloader is allowed to follow. -1 for stdlib default (fails on request #10)
@@ -76,8 +81,8 @@ type TLSCertificate struct {
 
 // Downloader is an interface for downloading files from web
 type Downloader interface {
-	// DownloadFile downloads the specified file and returns path to it
-	DownloadFile(endpoint Endpoint) (string, error)
+	// DownloadFile downloads the specified file
+	DownloadFile(endpoint Endpoint, w io.Writer) error
 }
 
 type defaultDownloader struct {
@@ -174,7 +179,7 @@ func createHttpClient(endpoint Endpoint) (*http.Client, error) {
 	}, nil
 }
 
-func (d *defaultDownloader) DownloadFile(endpoint Endpoint) (string, error) {
+func (d *defaultDownloader) DownloadFile(endpoint Endpoint, w io.Writer) error {
 	url := endpoint.Url
 	if !strings.Contains(url, "://") {
 		url = fmt.Sprintf("%s://%s", d.protocol, url)
@@ -182,26 +187,25 @@ func (d *defaultDownloader) DownloadFile(endpoint Endpoint) (string, error) {
 
 	client, err := createHttpClient(endpoint)
 	if err != nil {
-		return "", err
+		return err
 	}
-	tempFile, err := ioutil.TempFile("", "virtlet_")
-	if err != nil {
-		return "", err
-	}
-	defer tempFile.Close()
 
 	glog.V(2).Infof("Start downloading %s", url)
 
 	resp, err := client.Get(url)
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer resp.Body.Close()
 
-	_, err = io.Copy(tempFile, resp.Body)
-	if err != nil {
-		return "", err
+	if _, err = io.CopyBuffer(w, resp.Body, make([]byte, copyBufferSize)); err != nil {
+		return err
 	}
-	glog.V(2).Infof("Data from url %s saved in %s", url, tempFile.Name())
-	return tempFile.Name(), nil
+
+	if f, ok := w.(*os.File); ok {
+		glog.V(2).Infof("Data from url %s saved as %q, sha256 digest = %s", url, f.Name())
+	}
+	return nil
 }
+
+// Note that the tests for defaultDownloader are in 'imagetranslation' package (FIXME)

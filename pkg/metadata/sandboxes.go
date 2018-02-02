@@ -27,6 +27,15 @@ import (
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
+var (
+	sandboxKeyPrefix  = []byte("sandboxes/")
+	sandboxDataBucket = []byte("data")
+)
+
+func sandboxKey(sandboxId string) []byte {
+	return append(sandboxKeyPrefix, []byte(sandboxId)...)
+}
+
 type podSandboxMeta struct {
 	client *boltClient
 	id     string
@@ -65,7 +74,7 @@ func (m podSandboxMeta) Save(updater func(*PodSandboxInfo) (*PodSandboxInfo, err
 		return errors.New("Pod sandbox ID cannot be empty")
 	}
 	return m.client.db.Update(func(tx *bolt.Tx) error {
-		key := "sandboxes/" + m.GetID()
+		key := sandboxKey(m.GetID())
 		var current *PodSandboxInfo
 		bucket, err := getSandboxBucket(tx, m.GetID(), true, false)
 		if err != nil {
@@ -80,7 +89,7 @@ func (m podSandboxMeta) Save(updater func(*PodSandboxInfo) (*PodSandboxInfo, err
 		}
 
 		if newData == nil {
-			return tx.DeleteBucket([]byte(key))
+			return tx.DeleteBucket(key)
 		}
 		return saveSandboxToDB(bucket, newData)
 	})
@@ -95,10 +104,9 @@ func (b *boltClient) PodSandbox(podID string) PodSandboxMetadata {
 func (b *boltClient) ListPodSandboxes(filter *kubeapi.PodSandboxFilter) ([]PodSandboxMetadata, error) {
 	var result []PodSandboxMetadata
 	err := b.db.View(func(tx *bolt.Tx) error {
-		prefix := []byte("sandboxes/")
 		c := tx.Cursor()
-		for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
-			psm := podSandboxMeta{client: b, id: string(k[10:])}
+		for k, _ := c.Seek(sandboxKeyPrefix); k != nil && bytes.HasPrefix(k, sandboxKeyPrefix); k, _ = c.Next() {
+			psm := podSandboxMeta{client: b, id: string(k[len(sandboxKeyPrefix):])}
 			fv, err := filterPodSandboxMeta(&psm, filter)
 			if err != nil {
 				return err
@@ -116,15 +124,15 @@ func (b *boltClient) ListPodSandboxes(filter *kubeapi.PodSandboxFilter) ([]PodSa
 }
 
 func getSandboxBucket(tx *bolt.Tx, podID string, create, optional bool) (*bolt.Bucket, error) {
-	key := "sandboxes/" + podID
+	key := sandboxKey(podID)
 	if create {
-		bucket, err := tx.CreateBucketIfNotExists([]byte(key))
+		bucket, err := tx.CreateBucketIfNotExists(key)
 		if err != nil {
 			return nil, err
 		}
 		return bucket, nil
 	}
-	bucket := tx.Bucket([]byte(key))
+	bucket := tx.Bucket(key)
 	if bucket == nil && !optional {
 		return nil, fmt.Errorf("pod sandbox %q does not exist", podID)
 	}
@@ -132,7 +140,7 @@ func getSandboxBucket(tx *bolt.Tx, podID string, create, optional bool) (*bolt.B
 }
 
 func retrieveSandboxFromDB(bucket *bolt.Bucket, psi **PodSandboxInfo) error {
-	data := bucket.Get([]byte("data"))
+	data := bucket.Get(sandboxDataBucket)
 	if data == nil {
 		return nil
 	}
@@ -145,7 +153,7 @@ func saveSandboxToDB(bucket *bolt.Bucket, psi *PodSandboxInfo) error {
 		return err
 	}
 
-	return bucket.Put([]byte("data"), data)
+	return bucket.Put(sandboxDataBucket, data)
 }
 
 func filterPodSandboxMeta(psm PodSandboxMetadata, filter *kubeapi.PodSandboxFilter) (bool, error) {

@@ -30,7 +30,7 @@ CD-ROM and all the flexvolume types that Virtlet supports.
    single VM (including implicit volumes for the boot disk and nocloud
    cloud-init CD-ROM) is 20 in case of `virtio-blk` and 26 in case of
    `virtio-scsi` driver. The limits can be exteneded in future.
-1. When generating libvirt domain definition, Virtlet constructs disk
+2. When generating libvirt domain definition, Virtlet constructs disk
    names as ```sd + <disk-char>``` in case of `virtio-scsi` and as
    ```vd + <disk-char>``` in case of `virtio-blk`, where `disk-char`
    is a lowercase latin letter starting with 'a'. The first block
@@ -98,8 +98,9 @@ See the following sections for more info on these.
           capacity: 1024MB
 ```
 
-All ephemeral volumes created by request as well as clones of boot images are stored
-at local storage libvirt pool "**volumes**" under `/var/lib/virtlet/volumes`.
+All ephemeral volumes created by request as well as VM root volumes
+are stored in the local libvirt storage pool "**volumes**" which is
+located at `/var/lib/virtlet/volumes`.
 
 Volume settings for ephemeral local storage volumes are passed via flexvolume options.
 
@@ -141,17 +142,16 @@ spec:
 
 According to this definition will be created VM-POD with VM with 2
 equal volumes, attached, which can be found in "volumes" pool under
-`<domain-uuid>-vol1` and `<domain-uuid>-vol2`. A clone of boot image is
-exposed as `sda` device to the guest OS.
-On a typical Linux system the additional volume disks are assigned to
-`/dev/sdX` (`/dev/vdX` in case of `virtio-blk`) devices in an
-alphabetical order, so vol1 will be `/dev/sdb` (`/dev/vdb`) and vol2
-will be `/dev/sdc` (`/dev/vdc`), but please refer to the caveat #3 at
-the beginning of this document.
+`<domain-uuid>-vol1` and `<domain-uuid>-vol2`. The root volume, which
+uses the VM's QCOW2 image as its backing file, is exposed as `sda`
+device to the guest OS.  On a typical Linux system the additional
+volume disks are assigned to `/dev/sdX` (`/dev/vdX` in case of
+`virtio-blk`) devices in an alphabetical order, so vol1 will be
+`/dev/sdb` (`/dev/vdb`) and vol2 will be `/dev/sdc` (`/dev/vdc`), but
+please refer to the caveat #3 at the beginning of this document.
 
 When a pod is removed, all the volumes related to it are removed
-too. This includes the root disk (a clone of the boot image) and any
-additional volumes.
+too. This includes the root volume and any additional volumes.
 
 ## Persistent Storage
 

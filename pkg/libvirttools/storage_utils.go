@@ -48,7 +48,6 @@ type diskPath struct {
 type diskPathMap map[string]diskPath
 
 var supportedStoragePools = map[string]string{
-	"default": "/var/lib/libvirt/images",
 	"volumes": "/var/lib/virtlet/volumes",
 }
 

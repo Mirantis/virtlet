@@ -28,6 +28,23 @@ const (
 	testUuid = "77f29a0e-46af-4188-a6af-9ff8b8a65224"
 )
 
+type FakeImageManager struct {
+	rec fake.Recorder
+}
+
+var _ ImageManager = &FakeImageManager{}
+
+func NewFakeImageManager(rec fake.Recorder) *FakeImageManager {
+	return &FakeImageManager{
+		rec: rec,
+	}
+}
+
+func (im *FakeImageManager) GetImagePathAndVirtualSize(imageName string) (string, uint64, error) {
+	im.rec.Rec("GetImagePathAndVirtualSize", imageName)
+	return "/fake/volume/path", 424242, nil
+}
+
 func TestRootVolumeNaming(t *testing.T) {
 	v := rootVolume{
 		volumeBase{
@@ -36,11 +53,9 @@ func TestRootVolumeNaming(t *testing.T) {
 		},
 	}
 	expected := "virtlet_root_" + testUuid
-
-	cloneName := v.cloneName()
-
-	if cloneName != expected {
-		t.Errorf("Incorrect root volume clone name. Expected %s, received %s", expected, cloneName)
+	volumeName := v.volumeName()
+	if volumeName != expected {
+		t.Errorf("Incorrect root volume image name. Expected %s, received %s", expected, volumeName)
 	}
 }
 
@@ -50,20 +65,19 @@ func TestRootVolumeLifeCycle(t *testing.T) {
 	volumesPoolPath := "/fake/volumes/pool"
 	expectedRootVolumePath := volumesPoolPath + "/virtlet_root_" + testUuid
 	spool := fake.NewFakeStoragePool(rec.Child("volumes"), "volumes", volumesPoolPath)
-	ipool := fake.NewFakeStoragePool(rec.Child("images"), "images", "/fake/images/pool")
 
-	im := fake.NewFakeImageManager(rec.Child("image"), ipool)
+	im := NewFakeImageManager(rec.Child("image"))
 
 	volumes, err := GetRootVolume(
 		&VMConfig{DomainUUID: testUuid, Image: "rootfs image name"},
 		newFakeVolumeOwner(spool, im),
 	)
 	if err != nil {
-		t.Errorf("GetRootVolume returned an error: %v", err)
+		t.Fatalf("GetRootVolume returned an error: %v", err)
 	}
 
 	if len(volumes) != 1 {
-		t.Errorf("GetRootVolumes returned non single number of volumes: %d", len(volumes))
+		t.Fatalf("GetRootVolumes returned non single number of volumes: %d", len(volumes))
 	}
 
 	rootVol := volumes[0]
@@ -96,12 +110,12 @@ func TestRootVolumeLifeCycle(t *testing.T) {
 
 type fakeVolumeOwner struct {
 	storagePool  *fake.FakeStoragePool
-	imageManager *fake.FakeImageManager
+	imageManager *FakeImageManager
 }
 
 var _ VolumeOwner = fakeVolumeOwner{}
 
-func newFakeVolumeOwner(storagePool *fake.FakeStoragePool, imageManager *fake.FakeImageManager) *fakeVolumeOwner {
+func newFakeVolumeOwner(storagePool *fake.FakeStoragePool, imageManager *FakeImageManager) *fakeVolumeOwner {
 	return &fakeVolumeOwner{
 		storagePool:  storagePool,
 		imageManager: imageManager,

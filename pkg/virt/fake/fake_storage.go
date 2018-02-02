@@ -18,7 +18,6 @@ package fake
 
 import (
 	"fmt"
-	"os"
 	"path"
 	"sort"
 
@@ -112,16 +111,6 @@ func (p *FakeStoragePool) CreateStorageVol(def *libvirtxml.StorageVolume) (virt.
 	return p.createStorageVol(def)
 }
 
-func (p *FakeStoragePool) CreateStorageVolClone(def *libvirtxml.StorageVolume, from virt.VirtStorageVolume) (virt.VirtStorageVolume, error) {
-	p.rec.Rec("CreateStorageVolClone", map[string]interface{}{
-		"def":  def,
-		"from": from.(*FakeStorageVolume).descriptiveName(),
-	})
-	d := *def
-	d.Capacity = &libvirtxml.StorageVolumeSize{Unit: "b", Value: from.(*FakeStorageVolume).size}
-	return p.createStorageVol(&d)
-}
-
 func (p *FakeStoragePool) ListAllVolumes() ([]virt.VirtStorageVolume, error) {
 	r := make([]virt.VirtStorageVolume, len(p.volumes))
 	names := make([]string, 0, len(p.volumes))
@@ -140,17 +129,6 @@ func (p *FakeStoragePool) LookupVolumeByName(name string) (virt.VirtStorageVolum
 		return v, nil
 	}
 	return nil, virt.ErrStorageVolumeNotFound
-}
-
-func (p *FakeStoragePool) ImageToVolume(def *libvirtxml.StorageVolume, sourcePath string) (virt.VirtStorageVolume, error) {
-	fi, err := os.Stat(sourcePath)
-	if err != nil {
-		return nil, fmt.Errorf("os.Stat(): %q: %v", sourcePath, err)
-	}
-	if fi.IsDir() {
-		return nil, fmt.Errorf("ImageToVolume(): %q is a directory", sourcePath)
-	}
-	return p.CreateStorageVol(def)
 }
 
 func (p *FakeStoragePool) removeVolumeByName(name string) error {
