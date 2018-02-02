@@ -43,6 +43,7 @@ spec:
         - name: k8s-flexvolume-plugins-dir
           mountPath: /kubelet-volume-plugins
         - name: run
+          mountPropagation: Bidirectional
           mountPath: /run
         - name: dockersock
           mountPath: /var/run/docker.sock
@@ -72,6 +73,7 @@ spec:
           readOnly: true
         - mountPath: /run
           name: run
+          mountPropagation: Bidirectional
         - mountPath: /var/lib/virtlet
           name: virtlet
         - mountPath: /var/lib/libvirt
@@ -101,6 +103,7 @@ spec:
         volumeMounts:
         - mountPath: /run
           name: run
+          mountPropagation: Bidirectional
         # /boot and /lib/modules are required by supermin
         - mountPath: /lib/modules
           name: modules
@@ -116,16 +119,9 @@ spec:
           name: libvirt-sockets
         - mountPath: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
           name: k8s-flexvolume-plugins-dir
-          # `:shared` below is an unofficial way to pass 'shared' option to Docker
-          # which will make it possible for Virtlet to see mounts made by kubelet in
-          # the underlying directories after Virtlet container is created
-        - mountPath: /var/lib/kubelet/pods:shared
+        - mountPath: /var/lib/kubelet/pods
           name: k8s-pods-dir
-          # /var/run/netns must be a shared mount so both Virtlet
-          # and CNI plugins (which run in the host netns) can work
-          # with network namespaces mounted there
-        - mountPath: /var/run/netns:shared
-          name: netns-dir
+          mountPropagation: Bidirectional
         - name: vms-log
           mountPath: /var/log/vms
         - mountPath: /etc/virtlet/images

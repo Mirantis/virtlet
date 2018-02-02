@@ -257,6 +257,12 @@ function start_dind {
         echo >&2 "Installing CRI proxy package the node container..."
         docker exec "${virtlet_node}" /bin/bash -c "curl -sSL '${CRIPROXY_DEB_URL}' >/criproxy.deb && dpkg -i /criproxy.deb && rm /criproxy.deb"
     fi
+
+    docker exec "${virtlet_node}" mount --make-shared /dind
+    docker exec "${virtlet_node}" mount --make-shared /dev
+    docker exec "${virtlet_node}" mount --make-shared /boot
+    docker exec "${virtlet_node}" mount --make-shared /sys/fs/cgroup
+
     if [[ ${VIRTLET_ON_MASTER} ]]; then
         if [[ $(kubectl get node kube-master -o jsonpath='{.spec.taints[?(@.key=="node-role.kubernetes.io/master")]}') ]]; then
             kubectl taint nodes kube-master node-role.kubernetes.io/master-

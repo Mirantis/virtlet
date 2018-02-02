@@ -123,6 +123,14 @@ function demo::install-cri-proxy {
   docker exec "${virtlet_node}" /bin/bash -c "curl -sSL '${CRIPROXY_DEB_URL}' >/criproxy.deb && dpkg -i /criproxy.deb && rm /criproxy.deb"
 }
 
+function demo::fix-mounts {
+  demo::step "Marking mounts used by virtlet as shared in ${virtlet_node} container"
+  docker exec "${virtlet_node}" mount --make-shared /dind
+  docker exec "${virtlet_node}" mount --make-shared /dev
+  docker exec "${virtlet_node}" mount --make-shared /boot
+  docker exec "${virtlet_node}" mount --make-shared /sys/fs/cgroup
+}
+
 function demo::inject-local-image {
   demo::step "Copying local mirantis/virtlet image into ${virtlet_node} container"
   docker save mirantis/virtlet | docker exec -i "${virtlet_node}" docker load
@@ -358,6 +366,7 @@ fi
 
 demo::get-dind-cluster
 demo::start-dind-cluster
+demo::fix-mounts
 demo::install-cri-proxy
 if [[ ${INJECT_LOCAL_IMAGE:-} ]]; then
   demo::inject-local-image
