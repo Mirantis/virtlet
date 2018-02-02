@@ -47,10 +47,10 @@ var _ CNIClient = &Client{}
 
 func NewClient(pluginsDir, configsDir string) (*Client, error) {
 	netConfigList, err := ReadConfiguration(configsDir)
-	glog.V(3).Infof("CNI config: name: %q type: %q", netConfigList.Plugins[0].Network.Name, netConfigList.Plugins[0].Network.Type)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read CNI configuration: %v", err)
+		return nil, fmt.Errorf("failed to read CNI configuration %q: %v", configsDir, err)
 	}
+	glog.V(3).Infof("CNI config: name: %q type: %q", netConfigList.Plugins[0].Network.Name, netConfigList.Plugins[0].Network.Type)
 
 	return &Client{
 		cniConfig:     &libcni.CNIConfig{Path: []string{pluginsDir}},
