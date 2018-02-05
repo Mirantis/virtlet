@@ -121,6 +121,12 @@ have `Should have default route` in their description:
 build/cmd.sh e2e -test.v -ginkgo.focus="Should have default route"
 ```
 
+Virtlet e2e tests can produce JUnit-style XML output if asked to do so:
+```
+build/cmd.sh e2e -test.v -junitOutput /tmp/junit.xml
+build/cmd.sh run 'cat /tmp/junit.xml' >junit.xml
+```
+
 ## Control flags
 
 Some of the script commands also be customized by using environment variables:

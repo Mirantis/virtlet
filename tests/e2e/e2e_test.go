@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
 
 	"github.com/Mirantis/virtlet/tests/e2e/framework"
@@ -44,5 +46,10 @@ func TestE2E(t *testing.T) {
 		controller.Finalize()
 	})
 
-	RunSpecs(t, "Virtlet E2E suite")
+	if *junitOutput == "" {
+		RunSpecs(t, "Virtlet E2E suite")
+	} else {
+		junitReporter := reporters.NewJUnitReporter(*junitOutput)
+		RunSpecsWithDefaultAndCustomReporters(t, "Virtlet E2E suite", []ginkgo.Reporter{junitReporter})
+	}
 }
