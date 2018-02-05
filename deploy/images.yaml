@@ -1,5 +1,5 @@
 translations:
   - name: cirros
-    url: https://github.com/mirantis/virtlet/releases/download/v0.8.2/cirros.img
+    url: https://github.com/mirantis/virtlet/releases/download/v0.9.3/cirros.img
   - name: fedora
     url: https://download.fedoraproject.org/pub/fedora/linux/releases/27/CloudImages/x86_64/images/Fedora-Cloud-Base-27-1.6.x86_64.qcow2
