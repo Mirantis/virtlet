@@ -61,8 +61,8 @@ var _ = Describe("Basic cirros tests", func() {
 
 		It("Should have internet connectivity [Conformance]", func(done Done) {
 			defer close(done)
-			Expect(framework.ExecSimple(ssh, "ping -c1 8.8.8.8")).To(ContainSubstring(
-				"1 packets transmitted, 1 packets received, 0% packet loss"))
+			Expect(framework.ExecSimple(ssh, "ping -c1 8.8.8.8")).To(MatchRegexp(
+				"1 .*transmitted, 1 .*received, 0% .*loss"))
 		}, 5)
 
 		Context("With nginx server", func() {
