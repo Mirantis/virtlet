@@ -35,6 +35,7 @@ var (
 	sshUser               = flag.String("sshuser", defaultSSHUser, "default SSH user for VMs")
 	includeCloudInitTests = flag.Bool("include-cloud-init-tests", false, "include Cloud-Init tests")
 	memoryLimit           = flag.Int("memoryLimit", 160, "default VM memory limit (in MiB)")
+	junitOutput           = flag.String("junitOutput", "", "JUnit XML output file")
 )
 
 // scheduleWaitSSH schedules SSH interface initialization before the test context starts
