@@ -96,7 +96,7 @@ func TestRootVolumeLifeCycle(t *testing.T) {
 	}
 
 	if vol.Source.File != expectedRootVolumePath {
-		t.Errorf("Expected '%s' as root volume path, received: %s", vol.Source.File)
+		t.Errorf("Expected '%s' as root volume path, received: %s", expectedRootVolumePath, vol.Source.File)
 	}
 
 	rec.Rec("root disk retuned by virtlet_root_volumesource", vol)
