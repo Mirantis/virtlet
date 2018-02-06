@@ -39,18 +39,28 @@ const (
 	fdAdd               = 0
 	fdRelease           = 1
 	fdGet               = 2
+	fdRecover           = 3
 	fdResponse          = 0x80
 	fdAddResponse       = fdAdd | fdResponse
 	fdReleaseResponse   = fdRelease | fdResponse
 	fdGetResponse       = fdGet | fdResponse
+	fdRecoverResponse   = fdRecover | fdResponse
 	fdError             = 0xff
 )
 
 // FDManager denotes an object that provides 'master'-side
 // functionality of FDClient
 type FDManager interface {
+	// AddFDs adds new file descriptor to the FDManager and returns
+	// the associated data
 	AddFDs(key string, data interface{}) ([]byte, error)
+	// ReleaseFDs makes FDManager close the file descriptor and destroy
+	// any associated resources
 	ReleaseFDs(key string) error
+	// Recover recovers the state regarding the
+	// specified key. It's intended to be called after
+	// an application restart
+	Recover(key string, data interface{}) error
 }
 
 type fdHeader struct {
@@ -92,6 +102,10 @@ type FDSource interface {
 	// GetInfo returns the information which needs to be
 	// propagated back the FDClient upon GetFDs() call
 	GetInfo(key string) ([]byte, error)
+	// Recover recovers FDSource's state regarding the
+	// specified key. It's intended to be called after
+	// an application restart
+	Recover(key string, data []byte) error
 	// Stop stops any goroutines associated with FDSource
 	// but doesn't release the namespaces
 	Stop() error
@@ -149,6 +163,16 @@ func (s *FDServer) getFDs(key string) ([]int, error) {
 		return nil, fmt.Errorf("bad fd key: %q", key)
 	}
 	return fds, nil
+}
+
+func (s *FDServer) markAsRecovered(key string) error {
+	s.Lock()
+	defer s.Unlock()
+	if _, found := s.fds[key]; found {
+		return fmt.Errorf("fd key %q is already present and thus can't be properly recovered")
+	}
+	s.fds[key] = nil
+	return nil
 }
 
 // Serve makes FDServer listen on its socket in a new goroutine.
@@ -271,6 +295,27 @@ func (s *FDServer) serveGet(c *net.UnixConn, hdr *fdHeader) (*fdHeader, []byte, 
 	}, info, rights, nil
 }
 
+func (s *FDServer) serveRecover(c *net.UnixConn, hdr *fdHeader) (*fdHeader, error) {
+	data := make([]byte, hdr.DataSize)
+	if len(data) > 0 {
+		if _, err := io.ReadFull(c, data); err != nil {
+			return nil, fmt.Errorf("error reading payload: %v", err)
+		}
+	}
+	key := hdr.getKey()
+	if err := s.source.Recover(key, data); err != nil {
+		return nil, fmt.Errorf("error recovering %q: %v", key, err)
+	}
+	if err := s.markAsRecovered(key); err != nil {
+		return nil, err
+	}
+	return &fdHeader{
+		Magic:   fdMagic,
+		Command: fdRecoverResponse,
+		Key:     hdr.Key,
+	}, nil
+}
+
 func (s *FDServer) serveConn(c *net.UnixConn) error {
 	defer c.Close()
 	for {
@@ -295,6 +340,8 @@ func (s *FDServer) serveConn(c *net.UnixConn) error {
 			respHdr, err = s.serveRelease(&hdr)
 		case fdGet:
 			respHdr, data, oobData, err = s.serveGet(c, &hdr)
+		case fdRecover:
+			respHdr, err = s.serveRecover(c, &hdr)
 		default:
 			err = errors.New("bad command")
 		}
@@ -437,7 +484,7 @@ func (c *FDClient) request(hdr *fdHeader, data []byte) (*fdHeader, []byte, []byt
 }
 
 // AddFDs requests the FDServer to add a new file descriptor
-// using its FDSource. It returns the CSN which is returned
+// using its FDSource. It returns the data which are returned
 // by FDSource's GetFDs() call
 func (c *FDClient) AddFDs(key string, data interface{}) ([]byte, error) {
 	bs, ok := data.([]byte)
@@ -462,14 +509,20 @@ func (c *FDClient) AddFDs(key string, data interface{}) ([]byte, error) {
 	return respData, nil
 }
 
-// ReleaseFDs makes FDServer to close the file descriptor and destroy
+// ReleaseFDs makes FDServer close the file descriptor and destroy
 // any associated resources
 func (c *FDClient) ReleaseFDs(key string) error {
-	_, _, _, err := c.request(&fdHeader{
+	respHdr, _, _, err := c.request(&fdHeader{
 		Command: fdRelease,
 		Key:     fdKey(key),
 	}, nil)
-	return err
+	if err != nil {
+		return err
+	}
+	if respHdr.getKey() != key {
+		return fmt.Errorf("fd key mismatch in the server response")
+	}
+	return nil
 }
 
 // GetFDs requests file descriptors from the FDServer. It returns a
@@ -497,4 +550,30 @@ func (c *FDClient) GetFDs(key string) ([]int, []byte, error) {
 		return nil, nil, fmt.Errorf("can't decode file descriptors: %v", err)
 	}
 	return fds, respData, nil
+}
+
+// Recover requests FDServer to recover the state regarding the
+// specified key. It's intended to be called after an application
+// restart
+func (c *FDClient) Recover(key string, data interface{}) error {
+	bs, ok := data.([]byte)
+	if !ok {
+		var err error
+		bs, err = json.Marshal(data)
+		if err != nil {
+			return fmt.Errorf("error marshalling json: %v", err)
+		}
+	}
+	respHdr, _, _, err := c.request(&fdHeader{
+		Command:  fdRecover,
+		DataSize: uint32(len(bs)),
+		Key:      fdKey(key),
+	}, bs)
+	if err != nil {
+		return err
+	}
+	if respHdr.getKey() != key {
+		return fmt.Errorf("fd key mismatch in the server response")
+	}
+	return nil
 }
