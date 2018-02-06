@@ -51,6 +51,10 @@ func (m *fakeFDManager) ReleaseFDs(key string) error {
 	return nil
 }
 
+func (m *fakeFDManager) Recover(key string, data interface{}) error {
+	return nil
+}
+
 type fakeImageFileSystem struct {
 	t     *testing.T
 	inner http.FileSystem

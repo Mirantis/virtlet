@@ -79,6 +79,28 @@ func (s *sampleFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) 
 	return []int{int(f.Fd())}, []byte("abcdef"), nil
 }
 
+func (s *sampleFDSource) Recover(key string, data []byte) error {
+	if s.stopped {
+		return errors.New("sampleFDSource is stopped")
+	}
+
+	var fdData sampleFDData
+	if err := json.Unmarshal(data, &fdData); err != nil {
+		return fmt.Errorf("error unmarshalling json: %v", err)
+	}
+
+	if fdData.Content != "42" {
+		return fmt.Errorf("bad data passed to Recover: %q", data)
+	}
+
+	if _, found := s.files[key]; found {
+		return fmt.Errorf("key %q is already present", key)
+	}
+
+	s.files[key] = nil
+	return nil
+}
+
 func (s *sampleFDSource) Release(key string) error {
 	if s.stopped {
 		return errors.New("sampleFDSource is stopped")
@@ -89,9 +111,14 @@ func (s *sampleFDSource) Release(key string) error {
 		return fmt.Errorf("file not found: %q", key)
 	}
 	delete(s.files, key)
-	if err := f.Close(); err != nil {
-		return fmt.Errorf("can't close file %q: %v", f.Name(), err)
+
+	// "recovered" entries don't have FDs
+	if f != nil {
+		if err := f.Close(); err != nil {
+			return fmt.Errorf("can't close file %q: %v", f.Name(), err)
+		}
 	}
+
 	return nil
 }
 
@@ -114,6 +141,11 @@ func (s *sampleFDSource) Stop() error {
 
 func (s *sampleFDSource) isEmpty() bool {
 	return len(s.files) == 0
+}
+
+func (s *sampleFDSource) isRecovered(key string) bool {
+	f, found := s.files[key]
+	return found && f == nil
 }
 
 func verifyFD(t *testing.T, c *FDClient, key string, data string) {
@@ -140,7 +172,7 @@ func verifyFD(t *testing.T, c *FDClient, key string, data string) {
 	}
 }
 
-func TestFDServer(t *testing.T) {
+func withFDClient(t *testing.T, toCall func(*FDClient, *sampleFDSource)) {
 	tmpDir, err := ioutil.TempDir("", "pass-fd-test")
 	if err != nil {
 		t.Fatalf("ioutil.TempDir(): %v", err)
@@ -169,42 +201,62 @@ func TestFDServer(t *testing.T) {
 		}
 	}()
 
-	content := []string{"foo", "bar", "baz"}
-	for _, data := range content {
-		var err error
-		key := "k_" + data
-		respData, err := c.AddFDs(key, sampleFDData{Content: data})
-		if err != nil {
-			t.Fatalf("AddFDs(): %v", err)
+	toCall(c, src)
+}
+
+func TestFDServer(t *testing.T) {
+	withFDClient(t, func(c *FDClient, src *sampleFDSource) {
+		content := []string{"foo", "bar", "baz"}
+		for _, data := range content {
+			var err error
+			key := "k_" + data
+			respData, err := c.AddFDs(key, sampleFDData{Content: data})
+			if err != nil {
+				t.Fatalf("AddFDs(): %v", err)
+			}
+			expectedRespData := "abcdef"
+			if string(respData) != expectedRespData {
+				t.Errorf("bad data returned from add: %q instead of %q", data, expectedRespData)
+			}
 		}
-		expectedRespData := "abcdef"
-		if string(respData) != expectedRespData {
-			t.Errorf("bad data returned from add: %q instead of %q", data, expectedRespData)
+
+		for _, data := range content {
+			key := "k_" + data
+			verifyFD(t, c, key, data)
 		}
-	}
 
-	for _, data := range content {
-		key := "k_" + data
-		verifyFD(t, c, key, data)
-	}
-
-	for _, data := range content {
-		key := "k_" + data
-		if err := c.ReleaseFDs(key); err != nil {
-			t.Fatalf("ReleaseFD(): key %q: %v", key, err)
+		for _, data := range content {
+			key := "k_" + data
+			if err := c.ReleaseFDs(key); err != nil {
+				t.Fatalf("ReleaseFD(): key %q: %v", key, err)
+			}
 		}
-	}
 
-	// here we make sure that releasing FDs works and also that passing errors from the
-	// server works, too
-	expectedErrorMessage := fmt.Sprintf("server returned error: bad fd key: \"k_foo\"")
-	if _, _, err := c.GetFDs("k_foo"); err == nil {
-		t.Errorf("GetFDs didn't return an error for a released fd")
-	} else if err.Error() != expectedErrorMessage {
-		t.Errorf("Bad error message from GetFD: %q instead of %q", err.Error(), expectedErrorMessage)
-	}
+		// here we make sure that releasing FDs works and also that passing errors from the
+		// server works, too
+		expectedErrorMessage := fmt.Sprintf("server returned error: bad fd key: \"k_foo\"")
+		if _, _, err := c.GetFDs("k_foo"); err == nil {
+			t.Errorf("GetFDs didn't return an error for a released fd")
+		} else if err.Error() != expectedErrorMessage {
+			t.Errorf("Bad error message from GetFD: %q instead of %q", err.Error(), expectedErrorMessage)
+		}
 
-	if !src.isEmpty() {
-		t.Errorf("fd source is not empty (but it should be)")
-	}
+		if !src.isEmpty() {
+			t.Errorf("fd source is not empty (but it should be)")
+		}
+	})
+}
+
+func TestFDServerRecovery(t *testing.T) {
+	withFDClient(t, func(c *FDClient, src *sampleFDSource) {
+		if err := c.Recover("foobar", sampleFDData{"42"}); err != nil {
+			t.Errorf("Recover(): %v", err)
+		}
+		if !src.isRecovered("foobar") {
+			t.Errorf("the key is not recovered")
+		}
+		if err := c.ReleaseFDs("foobar"); err != nil {
+			t.Errorf("Error releasing the recovered FDs: %v", err)
+		}
+	})
 }

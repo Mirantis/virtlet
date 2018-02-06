@@ -25,6 +25,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 
@@ -325,7 +326,7 @@ func (tst *tapFDSourceTester) stop() {
 	}
 }
 
-func (tst *tapFDSourceTester) tearDown() {
+func (tst *tapFDSourceTester) teardown() {
 	tst.stop()
 	tst.cniClient.Cleanup()
 	os.RemoveAll(tst.tmpDir)
@@ -542,7 +543,7 @@ func TestTapFDSource(t *testing.T) {
 				defer vnt.teardown()
 
 				tst := newTapFDSourceTester(t, tc.info, vnt.hostNS)
-				defer tst.tearDown()
+				defer tst.teardown()
 				c := tst.setupServerAndConnect()
 
 				tst.cniClient.UseBadResult(tc.useBadResult)
@@ -579,22 +580,6 @@ func TestTapFDSource(t *testing.T) {
 					t.Fatalf("veth count mismatch: %d instead of %d", len(veths), tc.interfaceCount)
 				}
 
-				if recover {
-					tst.stop()
-					c = tst.setupServerAndConnect()
-					_, err := c.AddFDs(fdKey, &tapmanager.GetFDPayload{
-						ContainerSideNetwork: csn,
-						Description: &tapmanager.PodNetworkDesc{
-							PodId:   tst.podId,
-							PodNs:   samplePodNS,
-							PodName: samplePodName,
-						},
-					})
-					if err != nil {
-						t.Fatalf("AddFDs() [recovering]: %v", err)
-					}
-				}
-
 				fds, descBytes, err := c.GetFDs(fdKey)
 				if err != nil {
 					t.Fatalf("GetFDs(): %v", err)
@@ -603,18 +588,43 @@ func TestTapFDSource(t *testing.T) {
 					t.Fatalf("fd count mismatch: %d instead of %d", len(fds), tc.interfaceCount)
 				}
 
+				vmTaps := []*os.File{}
+
+				if recover {
+					// Duplicate FDs to make them survive TapFDSource.Stop()
+					// which closes the tap devices. The FDs will be closed
+					// by tapConnector
+					for n, fd := range fds {
+						fds[n], err = syscall.Dup(fd)
+						if err != nil {
+							t.Fatalf("Dup(): %v", err)
+						}
+					}
+
+					tst.stop()
+					c = tst.setupServerAndConnect()
+					if err = c.Recover(fdKey, &tapmanager.GetFDPayload{
+						ContainerSideNetwork: csn,
+						Description: &tapmanager.PodNetworkDesc{
+							PodId:   tst.podId,
+							PodNs:   samplePodNS,
+							PodName: samplePodName,
+						},
+					}); err != nil {
+						t.Fatalf("Recover(): %v", err)
+					}
+				}
+
+				for _, fd := range fds {
+					vmTap := os.NewFile(uintptr(fd), "tap-fd")
+					vmTaps = append(vmTaps, vmTap)
+				}
+
 				var interfaceDesc []tapmanager.InterfaceDescription
 				if err := json.Unmarshal(descBytes, &interfaceDesc); err != nil {
 					t.Errorf("error unmarshalling interface desc: %v", err)
 				} else {
 					verifyNoDiff(t, "interfaceDesc", tc.interfaceDesc, interfaceDesc)
-				}
-
-				vmTaps := []*os.File{}
-				for _, fd := range fds {
-					vmTap := os.NewFile(uintptr(fd), "tap-fd")
-					defer vmTap.Close()
-					vmTaps = append(vmTaps, vmTap)
 				}
 
 				for n, veth := range veths {
