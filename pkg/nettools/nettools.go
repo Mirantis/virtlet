@@ -44,6 +44,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/containernetworking/cni/pkg/ns"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
@@ -718,9 +719,9 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 	return &network.ContainerSideNetwork{info, nsPath, interfaces}, nil
 }
 
-// RecreateContainerSideNetwork tries to populate ContainerSideNetwork
+// RecoverContainerSideNetwork tries to populate ContainerSideNetwork
 // structure based on a network namespace that was already adjusted for Virtlet
-func RecreateContainerSideNetwork(csn *network.ContainerSideNetwork, nsPath string, allLinks []netlink.Link) error {
+func RecoverContainerSideNetwork(csn *network.ContainerSideNetwork, nsPath string, allLinks []netlink.Link) error {
 	if len(csn.Result.Interfaces) == 0 {
 		return fmt.Errorf("wrong cni configuration: no interfaces defined: %s", spew.Sdump(csn.Result))
 	}
@@ -733,18 +734,18 @@ func RecreateContainerSideNetwork(csn *network.ContainerSideNetwork, nsPath stri
 
 	oldDescs := map[string]*network.InterfaceDescription{}
 	for _, desc := range csn.Interfaces {
-		desc.Fo = nil
 		oldDescs[desc.Name] = desc
 	}
-	for i, link := range contLinks {
+
+	for _, link := range contLinks {
 		ifaceName := link.Attrs().Name
 		desc, found := oldDescs[ifaceName]
 		if !found {
 			glog.Warningf("Recovering container side network: missing description for interface %q", ifaceName)
 		}
+		delete(oldDescs, ifaceName)
 		pciAddress := ""
 		var ifaceType network.InterfaceType
-		var fo *os.File
 
 		if isSriovVf(link) {
 			ifaceType = network.InterfaceTypeVF
@@ -753,34 +754,26 @@ func RecreateContainerSideNetwork(csn *network.ContainerSideNetwork, nsPath stri
 				return err
 			}
 
-			fo, err = openVfConfigFile(pciAddress)
-			if err != nil {
-				return err
+			if desc.PCIAddress != pciAddress {
+				return fmt.Errorf("PCI address mismatch for %q: %q instead of %q", desc.PCIAddress, pciAddress)
 			}
 
 			// device should be already unbound, but after machine reboot that can be necessary
-			_ = unbindDriverFromDevice(pciAddress)
+			unbindDriverFromDevice(pciAddress)
 		} else {
 			ifaceType = network.InterfaceTypeTap
-			tapInterfaceName := fmt.Sprintf(tapInterfaceNameTemplate, i)
-			fo, err = OpenTAP(tapInterfaceName)
-			if err != nil {
-				return fmt.Errorf("failed to open tap: %v", err)
-			}
 		}
 		if desc.Type != ifaceType {
 			return fmt.Errorf("bad interface type for %q", desc.Name)
 		}
-		if desc.PCIAddress != pciAddress {
-			return fmt.Errorf("PCI address mismatch for %q: %q instead of %q", desc.PCIAddress, pciAddress)
-		}
-		desc.Fo = fo
 	}
 
-	for _, desc := range csn.Interfaces {
-		if desc.Fo == nil {
-			return fmt.Errorf("interface %q not found", desc.Name)
+	if len(oldDescs) != 0 {
+		var notFound []string
+		for ifaceName := range oldDescs {
+			notFound = append(notFound, ifaceName)
 		}
+		return fmt.Errorf("interface(s) not found: %s", strings.Join(notFound, ", "))
 	}
 
 	return nil
