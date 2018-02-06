@@ -17,6 +17,7 @@ limitations under the License.
 package image
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -67,7 +68,7 @@ type ImageStore interface {
 
 	// PullImage pulls the image using specified image name translation
 	// function
-	PullImage(name string, translator ImageTranslator) (string, error)
+	PullImage(ctx context.Context, name string, translator ImageTranslator) (string, error)
 
 	// RemoveImage removes the specified image
 	RemoveImage(name string) error
@@ -360,7 +361,7 @@ func (s *ImageFileStore) ImageStatus(name string) (*Image, error) {
 }
 
 // PullImage implements PullImage method of ImageStore interface
-func (s *ImageFileStore) PullImage(name string, translator ImageTranslator) (string, error) {
+func (s *ImageFileStore) PullImage(ctx context.Context, name string, translator ImageTranslator) (string, error) {
 	name = stripTags(name)
 	ep := translator(name)
 	glog.V(1).Infof("Image translation: %q -> %q", name, ep.Url)
@@ -371,7 +372,7 @@ func (s *ImageFileStore) PullImage(name string, translator ImageTranslator) (str
 	if err != nil {
 		return "", fmt.Errorf("failed to create a temporary file: %v", err)
 	}
-	if err := s.downloader.DownloadFile(ep, tempFile); err != nil {
+	if err := s.downloader.DownloadFile(ctx, ep, tempFile); err != nil {
 		tempFile.Close()
 		if err := os.Remove(tempFile.Name()); err != nil {
 			glog.Warningf("Error removing %q: %v", tempFile.Name(), err)

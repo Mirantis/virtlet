@@ -17,6 +17,7 @@ limitations under the License.
 package image
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"io"
@@ -41,7 +42,9 @@ func sha256str(s string) string {
 }
 
 type fakeDownloader struct {
-	t *testing.T
+	t         *testing.T
+	cancelled bool
+	started   chan struct{}
 }
 
 var _ Downloader = &fakeDownloader{}
@@ -50,10 +53,16 @@ var _ Downloader = &fakeDownloader{}
 // endpoint's url passed to it into the file instead of actually
 // downloading it.
 func newFakeDownloader(t *testing.T) *fakeDownloader {
-	return &fakeDownloader{t}
+	return &fakeDownloader{t: t, started: make(chan struct{}, 100)}
 }
 
-func (d *fakeDownloader) DownloadFile(endpoint Endpoint, w io.Writer) error {
+func (d *fakeDownloader) DownloadFile(ctx context.Context, endpoint Endpoint, w io.Writer) error {
+	d.started <- struct{}{}
+	if strings.Contains(endpoint.Url, "cancelme") {
+		<-ctx.Done()
+		d.cancelled = true
+		return ctx.Err()
+	}
 	if f, ok := w.(*os.File); ok {
 		d.t.Logf("fakeDownloader: writing %q to %q", endpoint.Url, f.Name())
 	}
@@ -79,6 +88,7 @@ func fakeVirtualSize(imagePath string) (uint64, error) {
 type ifsTester struct {
 	t                *testing.T
 	tmpDir           string
+	downloader       *fakeDownloader
 	store            *ImageFileStore
 	images           []*Image
 	refs             []string
@@ -92,10 +102,12 @@ func newIfsTester(t *testing.T) *ifsTester {
 		t.Fatalf("TempDir(): %v", err)
 	}
 
+	downloader := newFakeDownloader(t)
 	tst := &ifsTester{
-		t:      t,
-		tmpDir: tmpDir,
-		store:  NewImageFileStore(tmpDir, newFakeDownloader(t), fakeVirtualSize),
+		t:          t,
+		tmpDir:     tmpDir,
+		downloader: downloader,
+		store:      NewImageFileStore(tmpDir, downloader, fakeVirtualSize),
 	}
 	tst.images, tst.refs = tst.sampleImages()
 	tst.store.SetRefGetter(func() (map[string]bool, error) {
@@ -205,7 +217,7 @@ func (tst *ifsTester) verifyDataDirIsEmpty() {
 }
 
 func (tst *ifsTester) pullImage(name, ref string) {
-	if s, err := tst.store.PullImage(name, tst.translateImageName); err != nil {
+	if s, err := tst.store.PullImage(context.Background(), name, tst.translateImageName); err != nil {
 		tst.t.Errorf("PullImage(): %v", err)
 	} else if s != ref {
 		tst.t.Errorf("bad image ref returned: %q instead of %q", s, ref)
@@ -439,4 +451,25 @@ func TestImageGC(t *testing.T) {
 	tst.referencedImages = nil
 	tst.store.GC()
 	tst.verifyDataFiles()
+}
+
+func TestCancelPullImage(t *testing.T) {
+	tst := newIfsTester(t)
+	defer tst.teardown()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		<-tst.downloader.started
+		cancel()
+	}()
+	_, err := tst.store.PullImage(ctx, "cancelme", tst.translateImageName)
+	switch {
+	case err == nil:
+		tst.t.Errorf("PullImage() din't return any error after being cancelled")
+	case !strings.Contains(err.Error(), "context canceled"):
+		t.Errorf("PullImage() is expected to return Cancelled error but returned %q", err)
+	}
+	if !tst.downloader.cancelled {
+		t.Errorf("the downloader isn't marked as canelled")
+	}
 }
