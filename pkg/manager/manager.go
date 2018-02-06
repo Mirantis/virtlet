@@ -171,11 +171,6 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 	glog.V(3).Infof("RunPodSandbox: %s", spew.Sdump(in))
 	glog.V(2).Infof("Sandbox config annotations: %v", config.GetAnnotations())
 
-	if err := validatePodSandboxConfig(config); err != nil {
-		glog.Errorf("Invalid pod config while creating pod sandbox for pod %s (%s): %v", podName, podId, err)
-		return nil, err
-	}
-
 	state := kubeapi.PodSandboxState_SANDBOX_READY
 	pnd := &tapmanager.PodNetworkDesc{
 		PodId:   podId,
