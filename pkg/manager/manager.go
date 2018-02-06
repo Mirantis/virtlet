@@ -557,7 +557,7 @@ func (v *VirtletManager) PullImage(ctx context.Context, in *kubeapi.PullImageReq
 	glog.V(2).Infof("PullImage called for: %s", imageName)
 
 	imageNameTranslator := v.getImageNameTranslator(ctx)
-	ref, err := v.imageStore.PullImage(imageName, imageNameTranslator.Translate)
+	ref, err := v.imageStore.PullImage(ctx, imageName, imageNameTranslator.Translate)
 	if err != nil {
 		glog.Errorf("PullImage: ERROR: %v", err)
 		return nil, err
