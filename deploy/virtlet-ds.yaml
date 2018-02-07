@@ -112,21 +112,20 @@ spec:
           name: virtlet
         - mountPath: /var/lib/libvirt
           name: libvirt
-        - mountPath: /etc/cni
-          name: cniconf
-        - mountPath: /opt/cni/bin.orig
-          name: cnibin
         - mountPath: /var/run/libvirt
           name: libvirt-sockets
-        - mountPath: /var/lib/cni
-          name: cnidata
         - mountPath: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
           name: k8s-flexvolume-plugins-dir
-          # below `:shared` is unofficial way to pass this option docker
-          # which then will allow virtlet to see what kubelet mounts in
-          # underlaying directories, after virtlet container is created
+          # `:shared` below is an unofficial way to pass 'shared' option to Docker
+          # which will make it possible for Virtlet to see mounts made by kubelet in
+          # the underlying directories after Virtlet container is created
         - mountPath: /var/lib/kubelet/pods:shared
           name: k8s-pods-dir
+          # /var/run/netns must be a shared mount so both Virtlet
+          # and CNI plugins (which run in the host netns) can work
+          # with network namespaces mounted there
+        - mountPath: /var/run/netns:shared
+          name: netns-dir
         - name: vms-log
           mountPath: /var/log/vms
         - mountPath: /etc/virtlet/images
@@ -226,15 +225,6 @@ spec:
           path: /var/lib/libvirt
         name: libvirt
       - hostPath:
-          path: /etc/cni
-        name: cniconf
-      - hostPath:
-          path: /opt/cni/bin
-        name: cnibin
-      - hostPath:
-          path: /var/lib/cni
-        name: cnidata
-      - hostPath:
           path: /var/log
         name: log
       - hostPath:
@@ -255,6 +245,9 @@ spec:
       - hostPath:
           path: /var/log/pods
         name: pods-log
+      - hostPath:
+          path: /var/run/netns
+        name: netns-dir
       - configMap:
           name: virtlet-image-translations
         name: image-name-translations

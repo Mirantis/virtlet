@@ -32,102 +32,6 @@ import (
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
-// Here we use cgo constructor trick to avoid threading-related problems
-// (not being able to enter the mount namespace)
-// when working with process uids/gids and namespaces
-// https://github.com/golang/go/issues/8676#issuecomment-66098496
-
-/*
-#define _GNU_SOURCE
-
-#include <stdlib.h>
-#include <stdio.h>
-#include <fcntl.h>
-#include <sched.h>
-#include <unistd.h>
-#include <sys/mount.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <linux/limits.h>
-
-static void vmwrapper_perr(const char* msg) {
-	perror(msg);
-	exit(1);
-}
-
-static void vmwrapper_setns(int my_pid, int target_pid, int nstype, const char* nsname) {
-	int my_ns_inode, fd;
-        struct stat st;
-	char my_ns_path[PATH_MAX], target_ns_path[PATH_MAX];
-	snprintf(my_ns_path, sizeof(my_ns_path), "/proc/%u/ns/%s", my_pid, nsname);
-	snprintf(target_ns_path, sizeof(target_ns_path), "/proc/%u/ns/%s", target_pid, nsname);
-	if (stat(my_ns_path, &st) < 0) {
-		vmwrapper_perr("stat() my ns");
-	}
-	my_ns_inode = st.st_ino;
-	if (stat(target_ns_path, &st) < 0) {
-		vmwrapper_perr("stat() target ns");
-	}
-
-	// Check if that's the same namespace
-	// (actually only critical for CLONE_NEWUSER)
-	if (my_ns_inode == st.st_ino)
-		return;
-
-	if ((fd = open(target_ns_path, O_RDONLY)) < 0) {
-		vmwrapper_perr("open() target ns");
-	}
-
-	if (setns(fd, nstype) < 0) {
-		vmwrapper_perr("setns()");
-	}
-}
-
-// This function is a high-priority constructor that will be invoked
-// before any Go code starts.
-__attribute__((constructor (200))) void vmwrapper_handle_reexec(void) {
-	int my_pid, target_pid;
-	char* pid_str;
-	if ((pid_str = getenv("VMWRAPPER_NS_PID")) == NULL)
-		return;
-
-	my_pid = getpid();
-        target_pid = atoi(pid_str);
-
-        // Other namespaces:
-        // cgroup, user - not touching
-        // pid - host pid namespace is used by virtlet
-        // net - host network is used by virtlet
-	fprintf(stderr, "vmwrapper reexec: entering vms container namespaces\n");
-	vmwrapper_setns(my_pid, target_pid, CLONE_NEWNS, "mnt");
-	vmwrapper_setns(my_pid, target_pid, CLONE_NEWUTS, "uts");
-	vmwrapper_setns(my_pid, target_pid, CLONE_NEWIPC, "ipc");
-
-	// remount /sys for the new netns
-	if (umount2("/sys", MNT_DETACH) < 0)
-		vmwrapper_perr("umount2()");
-	if (mount("none", "/sys", "sysfs", 0, NULL) < 0)
-		vmwrapper_perr("mount()");
-
-	// Permanently drop privs unless not to do so.
-	// Currently we don't drop privs when SR-IOV support is enabled
-	// because of an unresolved emulator permission problem.
-	if (getenv("VMWRAPPER_KEEP_PRIVS") == NULL) {
-		fprintf(stderr, "vmwrapper reexec: dropping privs\n");
-		if (setgid(getgid()) < 0)
-			vmwrapper_perr("setgid()");
-		if (setuid(getuid()) < 0)
-			vmwrapper_perr("setuid()");
-	} else {
-		if (setgid(0) < 0)
-			vmwrapper_perr("setgid()");
-		if (setuid(0) < 0)
-			vmwrapper_perr("setuid()");
-	}
-}
-*/
-import "C"
-
 const (
 	fdSocketPath    = "/var/lib/virtlet/tapfdserver.sock"
 	defaultEmulator = "/usr/bin/qemu-system-x86_64" // FIXME
@@ -149,16 +53,24 @@ func extractLastUsedPCIAddress(args []string) int {
 	return lastUsed
 }
 
-func main() {
-	// configure glog (apparently no better way to do it ...)
-	flag.CommandLine.Parse([]string{"-v=3", "-alsologtostderr=true"})
+type reexecArg struct {
+	Args []string
+}
 
-	if os.Getenv("VMWRAPPER_NS_PID") != "" {
-		if err := syscall.Exec(os.Args[1], os.Args[1:], os.Environ()); err != nil {
-			glog.Errorf("Can't exec emulator: %v", err)
-			os.Exit(1)
-		}
+func handleReexec(arg interface{}) (interface{}, error) {
+	args := arg.(*reexecArg).Args
+	if err := syscall.Exec(args[0], args, os.Environ()); err != nil {
+		return nil, fmt.Errorf("Can't exec emulator: %v", err)
 	}
+	return nil, nil // unreachable
+}
+
+func main() {
+	utils.RegisterNsFixReexec("vmwrapper", handleReexec, reexecArg{})
+	utils.HandleNsFixReexec()
+
+	// configure glog (apparently no better way to do it ...)
+	flag.CommandLine.Parse([]string{"-v=3", "-logtostderr=true"})
 
 	runInAnotherContainer := os.Getuid() != 0
 
@@ -238,16 +150,25 @@ func main() {
 	args = append(args, netArgs...)
 	env := os.Environ()
 	if runInAnotherContainer {
-		// re-execute itself because entering mount namespace
-		// is impossible after Go runtime spawns some threads
-		env = append(env, fmt.Sprintf("VMWRAPPER_NS_PID=%d", pid))
-		args = append([]string{os.Args[0]}, args...)
-	}
-
-	// below log hides any possible error in returned by libvirt virError
-	// glog.V(0).Infof("Executing emulator: %s", strings.Join(args, " "))
-	if err := syscall.Exec(args[0], args, env); err != nil {
-		glog.Errorf("Can't exec emulator: %v", err)
-		os.Exit(1)
+		nsFixCall := utils.NewNsFixCall("vmwrapper").
+			TargetPid(pid).
+			Arg(&reexecArg{args}).
+			RemountSys()
+		// Currently we don't drop privs when SR-IOV support is enabled
+		// because of an unresolved emulator permission problem.
+		if os.Getenv("VMWRAPPER_KEEP_PRIVS") == "" {
+			nsFixCall.DropPrivs()
+		}
+		if err := nsFixCall.SwitchToNamespaces(); err != nil {
+			glog.Fatalf("Error reexecuting vmwrapper: %v", err)
+		}
+	} else {
+		// this log hides errors returned by libvirt virError
+		// because of libvirt's output parsing approach
+		// glog.V(0).Infof("Executing emulator: %s", strings.Join(args, " "))
+		if err := syscall.Exec(args[0], args, env); err != nil {
+			glog.Errorf("Can't exec emulator: %v", err)
+			os.Exit(1)
+		}
 	}
 }

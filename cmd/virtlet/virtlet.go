@@ -32,6 +32,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/stream"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 var (
@@ -158,6 +159,7 @@ func startTapManagerProcess() {
 }
 
 func main() {
+	utils.HandleNsFixReexec()
 	flag.Parse()
 	rand.Seed(time.Now().UnixNano())
 	if os.Getenv(WantTapManagerEnv) == "" {
