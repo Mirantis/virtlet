@@ -30,6 +30,12 @@ import (
 	"github.com/golang/glog"
 )
 
+// NsFixReexecHandler is a function that can be passed to
+// RegisterNsFixReexec to be executed my nsfix mechanism after
+// self-reexec. arg can be safely casted to the type of arg
+// passed to RegisterNsFixReexec plus one level of pointer
+// inderection, i.e. if you pass somestruct{} to RegisterNsFixReexec
+// you may cast arg safely to *somestruct.
 type NsFixReexecHandler func(arg interface{}) (interface{}, error)
 
 type nsFixHandlerEntry struct {
@@ -47,8 +53,8 @@ type retStruct struct {
 
 // RegisterNsFixReexec registers the specified function as a reexec handler.
 // arg specifies the argument type to pass. Note that if you pass somestruct{}
-// as arg, the handler will receive somestruct* as its argument (i.e. a level
-// of pointer indirection is added)
+// as arg, the handler will receive *somestruct as its argument (i.e. a level
+// of pointer indirection is added).
 func RegisterNsFixReexec(name string, handler NsFixReexecHandler, arg interface{}) {
 	reexecMap[name] = nsFixHandlerEntry{handler, reflect.TypeOf(arg)}
 }
