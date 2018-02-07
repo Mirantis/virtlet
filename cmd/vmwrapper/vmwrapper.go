@@ -70,7 +70,7 @@ func main() {
 	utils.HandleNsFixReexec()
 
 	// configure glog (apparently no better way to do it ...)
-	flag.CommandLine.Parse([]string{"-v=3", "-alsologtostderr=true"})
+	flag.CommandLine.Parse([]string{"-v=3", "-logtostderr=true"})
 
 	runInAnotherContainer := os.Getuid() != 0
 

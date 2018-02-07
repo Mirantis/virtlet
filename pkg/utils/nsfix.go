@@ -70,7 +70,7 @@ func restoreGlogLevel() {
 		logLevelStr = "1"
 	}
 	// configure glog (apparently no better way to do it ...)
-	flag.CommandLine.Parse([]string{"-v=" + logLevelStr, "-alsologtostderr=true"})
+	flag.CommandLine.Parse([]string{"-v=" + logLevelStr, "-logtostderr=true"})
 }
 
 func marshalResult(ret interface{}, retErr error) ([]byte, error) {
