@@ -17,6 +17,7 @@ limitations under the License.
 package image
 
 import (
+	"context"
 	"crypto"
 	"crypto/tls"
 	"crypto/x509"
@@ -82,7 +83,7 @@ type TLSCertificate struct {
 // Downloader is an interface for downloading files from web
 type Downloader interface {
 	// DownloadFile downloads the specified file
-	DownloadFile(endpoint Endpoint, w io.Writer) error
+	DownloadFile(ctx context.Context, endpoint Endpoint, w io.Writer) error
 }
 
 type defaultDownloader struct {
@@ -179,7 +180,7 @@ func createHttpClient(endpoint Endpoint) (*http.Client, error) {
 	}, nil
 }
 
-func (d *defaultDownloader) DownloadFile(endpoint Endpoint, w io.Writer) error {
+func (d *defaultDownloader) DownloadFile(ctx context.Context, endpoint Endpoint, w io.Writer) error {
 	url := endpoint.Url
 	if !strings.Contains(url, "://") {
 		url = fmt.Sprintf("%s://%s", d.protocol, url)
@@ -192,7 +193,12 @@ func (d *defaultDownloader) DownloadFile(endpoint Endpoint, w io.Writer) error {
 
 	glog.V(2).Infof("Start downloading %s", url)
 
-	resp, err := client.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return err
+	}
+	req = req.WithContext(ctx)
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
