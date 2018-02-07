@@ -154,14 +154,14 @@ func handleAddSandboxToNetwork(arg interface{}) (interface{}, error) {
 	rtConf.Args = append(rtConf.Args, [2]string{
 		"K8S_ANNOT", `{"cni": "calico"}`,
 	})
-	glog.V(3).Infof("AddSandboxToNetwork: req.PodId %q, req.PodName %q, req.PodNs %q, runtime config:\n%s",
+	glog.V(3).Infof("AddSandboxToNetwork: PodId %q, PodName %q, PodNs %q, runtime config:\n%s",
 		req.PodId, req.PodName, req.PodNs, spew.Sdump(rtConf))
 	result, err := c.cniConfig.AddNetworkList(c.netConfigList, rtConf)
 	if err == nil {
-		glog.V(3).Infof("AddSandboxToNetwork: req.PodId %q, req.PodName %q, req.PodNs %q: result:\n%s",
+		glog.V(3).Infof("AddSandboxToNetwork: PodId %q, PodName %q, PodNs %q: result:\n%s",
 			req.PodId, req.PodName, req.PodNs, spew.Sdump(result))
 	} else {
-		glog.V(3).Infof("AddSandboxToNetwork: req.PodId %q, req.PodName %q, req.PodNs %q: error: %v",
+		glog.V(3).Infof("AddSandboxToNetwork: PodId %q, PodName %q, PodNs %q: error: %v",
 			req.PodId, req.PodName, req.PodNs, err)
 		return nil, err
 	}
@@ -179,13 +179,13 @@ func handleRemoveSandboxFromNetwork(arg interface{}) (interface{}, error) {
 		return nil, err
 	}
 
-	glog.V(3).Infof("RemoveSandboxFromNetwork: req.PodId %q, req.PodName %q, req.PodNs %q", req.PodId, req.PodName, req.PodNs)
+	glog.V(3).Infof("RemoveSandboxFromNetwork: PodId %q, PodName %q, PodNs %q", req.PodId, req.PodName, req.PodNs)
 	err = c.cniConfig.DelNetworkList(c.netConfigList, c.cniRuntimeConf(req.PodId, req.PodName, req.PodNs))
 	if err == nil {
-		glog.V(3).Infof("RemoveSandboxFromNetwork: req.PodId %q, req.PodName %q, req.PodNs %q: success",
+		glog.V(3).Infof("RemoveSandboxFromNetwork: PodId %q, PodName %q, PodNs %q: success",
 			req.PodId, req.PodName, req.PodNs)
 	} else {
-		glog.V(3).Infof("RemoveSandboxFromNetwork: req.PodId %q, req.PodName %q, req.PodNs %q: error: %v",
+		glog.V(3).Infof("RemoveSandboxFromNetwork: PodId %q, PodName %q, PodNs %q: error: %v",
 			req.PodId, req.PodName, req.PodNs, err)
 	}
 	return nil, err
