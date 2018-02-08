@@ -72,7 +72,7 @@ You need to set a correct version of kernel (the versions are listed
 [here](https://launchpad.net/ubuntu/+source/linux)) e.g.:
 
 ```sh
-kver="3.19.0-84.92"
+kver="4.13.0-32.35"
 ./bin/grab-kernels "$kver"
 ```
 
