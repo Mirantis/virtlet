@@ -25,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"google.golang.org/grpc"
 
@@ -32,7 +33,6 @@ import (
 	"github.com/Mirantis/virtlet/pkg/manager"
 	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
-	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 const (
@@ -131,7 +131,7 @@ func (v *VirtletManager) Run() {
 		v.t.Fatalf("Couldn't connect to virtlet socket: %v", err)
 	}
 
-	v.conn, err = grpc.Dial(virtletSocket, grpc.WithInsecure(), grpc.WithDialer(utils.Dial))
+	v.conn, err = grpc.Dial(virtletSocket, grpc.WithInsecure(), grpc.WithDialer(Dial))
 	if err != nil {
 		v.t.Fatalf("Couldn't connect to virtlet socket: %v", err)
 	}
@@ -145,4 +145,8 @@ func (v *VirtletManager) Close() {
 	os.RemoveAll(v.tempDir)
 	v.ts.Close()
 	<-v.doneCh
+}
+
+func Dial(socket string, timeout time.Duration) (net.Conn, error) {
+	return net.DialTimeout("unix", socket, timeout)
 }
