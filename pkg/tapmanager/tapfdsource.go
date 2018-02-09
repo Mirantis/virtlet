@@ -38,7 +38,6 @@ import (
 )
 
 const (
-	calicoNetType       = "calico"
 	calicoDefaultSubnet = 24
 	calicoSubnetVar     = "VIRTLET_CALICO_SUBNET"
 )
