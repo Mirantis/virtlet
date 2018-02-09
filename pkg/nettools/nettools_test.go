@@ -716,7 +716,7 @@ func TestCalicoDetection(t *testing.T) {
 			haveCalicoGateway: false,
 		},
 		{
-			name: "calico w/o default gw",
+			name: "calico with default gw",
 			routes: []netlink.Route{
 				{
 					Dst:   parseAddr("169.254.1.1/32").IPNet,
