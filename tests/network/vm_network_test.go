@@ -61,6 +61,7 @@ var clientAddrs = []string{
 var clientMacAddrs = []string{
 	"42:a4:a6:22:80:2e",
 	"42:a4:a6:22:80:2f",
+	"42:a4:a6:22:80:30",
 }
 
 func sampleCNIResult() *cnicurrent.Result {
@@ -291,7 +292,7 @@ type tapFDSourceTester struct {
 	c          *tapmanager.FDClient
 }
 
-func newTapFDSourceTester(t *testing.T, podId string, info *cnicurrent.Result, hostNS ns.NetNS, extraRoutes []netlink.Route) *tapFDSourceTester {
+func newTapFDSourceTester(t *testing.T, podId string, info *cnicurrent.Result, hostNS ns.NetNS, extraRoutes map[int][]netlink.Route) *tapFDSourceTester {
 	cniClient := NewFakeCNIClient()
 	cniClient.ExpectPod(podId, samplePodName, samplePodNS, info, hostNS, extraRoutes)
 
@@ -582,7 +583,7 @@ func TestTapFDSource(t *testing.T) {
 				Interfaces: []*cnicurrent.Interface{
 					{
 						Name:    "eth0",
-						Mac:     clientMacAddrs[1],
+						Mac:     clientMacAddrs[2],
 						Sandbox: "placeholder",
 					},
 				},
@@ -626,14 +627,16 @@ func TestTapFDSource(t *testing.T) {
 					},
 				},
 			},
-			extraRoutes: []netlink.Route{
-				{
-					Dst:   parseAddr(t, "169.254.1.1/32").IPNet,
-					Scope: nettools.SCOPE_LINK,
-				},
-				{
-					Gw:    parseAddr(t, "169.254.1.1/32").IPNet.IP,
-					Scope: nettools.SCOPE_UNIVERSE,
+			extraRoutes: map[int][]netlink.Route{
+				0: {
+					{
+						Dst:   parseAddr(t, "169.254.1.1/32").IPNet,
+						Scope: nettools.SCOPE_LINK,
+					},
+					{
+						Gw:    parseAddr(t, "169.254.1.1/32").IPNet.IP,
+						Scope: nettools.SCOPE_UNIVERSE,
+					},
 				},
 			},
 			tcpdumpStopOn: "192.168.135.100.4243 > 192.168.135.131.4242: UDP",
@@ -656,6 +659,154 @@ func TestTapFDSource(t *testing.T) {
 			},
 			outerAddrs:   []string{"192.168.135.100/24"},
 			clientAddrs:  []string{"192.168.135.131/24"},
+			useBadResult: true,
+		},
+		{
+			name:           "calico with multiple cnis",
+			interfaceCount: 2,
+			info: &cnicurrent.Result{
+				Interfaces: []*cnicurrent.Interface{
+					{
+						Name:    "eth0",
+						Mac:     clientMacAddrs[0],
+						Sandbox: "placeholder",
+					},
+					{
+						Name:    "eth1",
+						Mac:     clientMacAddrs[1],
+						Sandbox: "placeholder",
+					},
+				},
+				IPs: []*cnicurrent.IPConfig{
+					{
+						Version:   "4",
+						Interface: 0,
+						Address: net.IPNet{
+							IP:   net.IP{192, 168, 135, 131},
+							Mask: net.IPMask{255, 255, 255, 255},
+						},
+					},
+					{
+						Version:   "4",
+						Interface: 1,
+						Address: net.IPNet{
+							IP:   net.IP{10, 2, 90, 5},
+							Mask: net.IPMask{255, 255, 255, 0},
+						},
+					},
+				},
+			},
+			dummyInfo: &cnicurrent.Result{
+				Interfaces: []*cnicurrent.Interface{
+					{
+						Name:    "eth0",
+						Mac:     clientMacAddrs[2],
+						Sandbox: "placeholder",
+					},
+				},
+				IPs: []*cnicurrent.IPConfig{
+					{
+						Version:   "4",
+						Interface: 0,
+						Address: net.IPNet{
+							IP:   net.IP{192, 168, 135, 132},
+							Mask: net.IPMask{255, 255, 255, 255},
+						},
+					},
+				},
+			},
+			expectedResult: &cnicurrent.Result{
+				Interfaces: []*cnicurrent.Interface{
+					{
+						Name:    "eth0",
+						Mac:     clientMacAddrs[0],
+						Sandbox: "placeholder",
+					},
+					{
+						Name:    "eth1",
+						Mac:     clientMacAddrs[1],
+						Sandbox: "placeholder",
+					},
+				},
+				IPs: []*cnicurrent.IPConfig{
+					{
+						Version:   "4",
+						Interface: 0,
+						Address: net.IPNet{
+							IP:   net.IP{192, 168, 135, 131},
+							Mask: net.IPMask{255, 255, 255, 0},
+						},
+						Gateway: net.IP{192, 168, 135, 132},
+					},
+					{
+						Version:   "4",
+						Interface: 1,
+						Address: net.IPNet{
+							IP:   net.IP{10, 2, 90, 5},
+							Mask: net.IPMask{255, 255, 255, 0},
+						},
+					},
+				},
+				Routes: []*cnitypes.Route{
+					{
+						Dst: net.IPNet{
+							IP:   net.IP{0, 0, 0, 0},
+							Mask: net.IPMask{0, 0, 0, 0},
+						},
+						GW: net.IP{192, 168, 135, 132},
+					},
+				},
+			},
+			extraRoutes: map[int][]netlink.Route{
+				0: {
+					{
+						Dst:   parseAddr(t, "169.254.1.1/32").IPNet,
+						Scope: nettools.SCOPE_LINK,
+					},
+					{
+						Gw:    parseAddr(t, "169.254.1.1/32").IPNet.IP,
+						Scope: nettools.SCOPE_UNIVERSE,
+					},
+				},
+			},
+			tcpdumpStopOn: "192.168.135.100.4243 > 192.168.135.131.4242: UDP",
+			dhcpExpectedSubstrings: [][]string{
+				{
+					"new_ip_address='192.168.135.131'",
+					"new_network_number='192.168.135.0'",
+					"new_routers='192.168.135.132'",
+					"new_subnet_mask='255.255.255.0'",
+					"tap0: offered 192.168.135.131 from 169.254.254.2",
+				},
+				{
+					"new_ip_address='10.2.90.5'",
+					"new_network_number='10.2.90.0'",
+					"new_subnet_mask='255.255.255.0'",
+					"tap1: offered 10.2.90.5 from 169.254.254.2",
+				},
+			},
+			interfaceDesc: []tapmanager.InterfaceDescription{
+				{
+					Type:         network.InterfaceTypeTap,
+					HardwareAddr: mustParseMAC(clientMacAddrs[0]),
+					FdIndex:      0,
+					PCIAddress:   "",
+				},
+				{
+					Type:         network.InterfaceTypeTap,
+					HardwareAddr: mustParseMAC(clientMacAddrs[1]),
+					FdIndex:      1,
+					PCIAddress:   "",
+				},
+			},
+			outerAddrs: []string{
+				"192.168.135.100/24",
+				"10.2.90.1/24",
+			},
+			clientAddrs: []string{
+				"192.168.135.131/24",
+				"10.2.90.5/24",
+			},
 			useBadResult: true,
 		},
 	} {
@@ -789,6 +940,5 @@ func TestTapFDSource(t *testing.T) {
 	}
 }
 
-// TODO: test Calico with multiple interfaces
 // TODO: test DNS handling
 // TODO: test SR-IOV (by making a fake sysfs dir)
