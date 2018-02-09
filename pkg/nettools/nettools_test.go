@@ -734,7 +734,9 @@ func TestCalicoDetection(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
 				for _, r := range tc.routes {
-					r.LinkIndex = origContVeth.Attrs().Index
+					if r.Scope == SCOPE_LINK {
+						r.LinkIndex = origContVeth.Attrs().Index
+					}
 					addTestRoute(t, &r)
 				}
 				haveCalico, haveCalicoGateway, err := DetectCalico(origContVeth)
