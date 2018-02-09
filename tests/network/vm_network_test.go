@@ -391,18 +391,31 @@ func mustParseMAC(mac string) net.HardwareAddr {
 // TestVmNetwork verifies the network setup using TapFDSource
 func TestTapFDSource(t *testing.T) {
 	for _, tc := range []struct {
-		name                   string
-		interfaceCount         int
-		info                   *cnicurrent.Result
-		dummyInfo              *cnicurrent.Result
-		expectedResult         *cnicurrent.Result
-		tcpdumpStopOn          string
+		// name is the name of the test case
+		name string
+		// interfaceCount specifies the expected interface count
+		interfaceCount int
+		// info specifies CNI result to return from the fake CNI
+		info *cnicurrent.Result
+		// dummyInfo specifies CNI result to use for the dummy Calico gateway
+		dummyInfo *cnicurrent.Result
+		// expectedResult specifies the expected CNI result
+		expectedResult *cnicurrent.Result
+		// tcpdumpStopOn specifies a string after which tcpdump is stopped
+		tcpdumpStopOn string
+		// dhcpExpectedSubstrings specifies the substrings to expect in tcpdump output
 		dhcpExpectedSubstrings [][]string
-		interfaceDesc          []tapmanager.InterfaceDescription
-		useBadResult           bool
-		extraRoutes            []netlink.Route
-		outerAddrs             []string
-		clientAddrs            []string
+		// interfaceDesc specifies the expected interface description returned by TapFDSource
+		interfaceDesc []tapmanager.InterfaceDescription
+		// useBadResult specifies that the result should be mangled (route and interface info removed)
+		// This simulates the behavior of some CNI plugins
+		useBadResult bool
+		// extraRoutes map interface index from info to a slice of routes
+		extraRoutes map[int][]netlink.Route
+		// outerAddrs specifies per-interface addrs for the network tester peer
+		outerAddrs []string
+		// clientAddrs specifies per-interface VM IPs to ping
+		clientAddrs []string
 	}{
 		{
 			name:           "single cni",
