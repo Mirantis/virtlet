@@ -22,6 +22,7 @@ import (
 	uuid "github.com/nu7hatch/gouuid"
 )
 
+// NewUuid returns a new uuid4 as a string
 func NewUuid() string {
 	u, err := uuid.NewV4()
 	if err != nil {
@@ -30,6 +31,7 @@ func NewUuid() string {
 	return u.String()
 }
 
+// NewUuid5 returns a new uuid5 as a string
 func NewUuid5(nsUuid, s string) string {
 	ns, err := uuid.ParseHex(nsUuid)
 	if err != nil {
