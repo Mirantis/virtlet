@@ -37,6 +37,9 @@ if [[ ${VIRTLET_ON_MASTER} ]]; then
 fi
 
 dind_mounts='.items[0].spec.template.spec.volumes|=.+[{"name":"dind",hostPath:{"path":"/dind"}}]|.items[0].spec.template.spec.containers[].volumeMounts|=.+[{"name":"dind", "mountPath":"/dind"}]|.items[0].spec.template.spec.initContainers[].volumeMounts|=.+[{"name":"dind", "mountPath":"/dind"}]'
+containers_run='.items[0].spec.template.spec.containers|=map(.volumeMounts|=map(select(.name!="run"))+[{"mountPath": "/run:shared", "name": "run"}])'
+initContainers_run='.items[0].spec.template.spec.initContainers|=map(.volumeMounts|=map(select(.name!="run"))+[{"mountPath": "/run:shared", "name": "run"}])'
+containers_k8s_dir='.items[0].spec.template.spec.containers[1].volumeMounts|=map(select(.name!="k8s-pods-dir"))+[{"mountPath": "/var/lib/kubelet/pods:shared", "name": "k8s-pods-dir"}]'
 
 # from build/common.sh in k8s
 function rsync_probe {
@@ -279,9 +282,22 @@ function start_dind {
     kubectl label node --overwrite "${virtlet_node}" extraRuntime=virtlet
     kubectl create configmap -n kube-system virtlet-config "${virtlet_config[@]}"
     kubectl create configmap -n kube-system virtlet-image-translations --from-file "${project_dir}/deploy/images.yaml"
-    kubectl convert --local -o json -f "${project_dir}/deploy/virtlet-ds.yaml" |
-       jq "${dind_mounts}" |
-       kubectl apply -f -
+    start_virtlet
+}
+
+function start_virtlet {
+    # For k8s 1.7 removing MountPropagation option and restoring old hack with
+    # adding :shared to mountPath
+    if ! kubectl version | tail -n1 | grep -q 'v1\.7\.'; then
+        kubectl convert --local -o json -f "${project_dir}/deploy/virtlet-ds.yaml" |
+           jq "${dind_mounts}" |
+           kubectl apply -f -
+    else
+        filters="${dind_mounts}|${containers_run}|${initContainers_run}|${containers_k8s_dir}"
+        kubectl convert --local -o json -f "${project_dir}/deploy/virtlet-ds.yaml" |
+           jq "${filters}" |
+           kubectl apply -f -
+    fi
 }
 
 function virtlet_subdir {
