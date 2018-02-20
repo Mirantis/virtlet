@@ -333,6 +333,25 @@ jobs:
   push_tested:
     <<: *push_images
 
+  release:
+    <<: *defaults
+    steps:
+    - run:
+        <<: *prereqs
+    - checkout
+    - setup_remote_docker
+    - run:
+        <<: *setup_env
+    - restore_cache:
+        <<: *restore_image_cache
+    - run:
+        <<: *restore_images_and_vendor
+    - run:
+        name: Make a release
+        command: |
+          build/portforward.sh 18730&
+          build/cmd.sh release "${CIRCLE_TAG}"
+
 workflows:
   version: 2
   build-and-test:
@@ -413,6 +432,15 @@ workflows:
         filters:
           branches:
             only: master
+          tags:
+            only:
+              - /^v[0-9].*/
+    - release:
+        requires:
+        - push_tested
+        filters:
+          branches:
+            ignore: /.*/
           tags:
             only:
               - /^v[0-9].*/

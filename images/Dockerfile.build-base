@@ -1,7 +1,7 @@
 # TODO: generate this tag. unfortunately can't use ARG:
 # https://docs.docker.com/engine/reference/builder/#understand-how-arg-and-from-interact
 # (but add a note about it here for the future)
-FROM mirantis/virtlet-base:v1-13deb720a48ab153ce8bbe95840af75e
+FROM mirantis/virtlet-base:v1-22de6b4e88a489a2c0b441e3f3d01a3e
 MAINTAINER Ivan Shvedunov <ishvedunov@mirantis.com>
 
 LABEL virtlet.image="build-base"
@@ -9,8 +9,10 @@ LABEL virtlet.image="build-base"
 ENV DOCKER_CLIENT_VERSION 1.12.6
 ENV DOCKER_CLIENT_DOWNLOAD_URL_BASE https://get.docker.com/builds
 ENV DOCKER_CLIENT_SHA256 cce8aa52a33f007673b9c7ed0cb786359aa6f3f8a9875aaf69799c71f86e8a43
-ENV KUBECTL_VERSION v1.8.4
-ENV KUBECTL_SHA1 8e2314db816b9b4465c5f713c1152cb0603db15e
+ENV KUBECTL_VERSION v1.8.8
+ENV KUBECTL_SHA1 f6bc48e70202f168bd71e81dd1504686890cd5ed
+ENV OLD_KUBECTL_VERSION v1.7.12
+ENV OLD_KUBECTL_SHA1 385229d4189e4f7978de42f237d6c443c0534edd
 
 # Go installation commands are based on official Go container:
 # https://github.com/docker-library/golang/blob/18ee81a2ec649dd7b3d5126b24eef86bc9c86d80/1.7/Dockerfile
@@ -35,7 +37,8 @@ RUN apt-get update && \
                 dhcpcd5 \
                 tcpdump \
                 iputils-ping \
-                mercurial && \
+                mercurial \
+                jq && \
     apt-get clean
 
 # Install docker client
@@ -61,6 +64,12 @@ RUN echo "${KUBECTL_SHA1}  /usr/local/bin/kubectl" |sha1sum -c
 RUN mkdir -p /usr/local/bin
 RUN chmod +x /usr/local/bin/kubectl
 
+# Install old kubectl for v1.7 (needed to make the release yaml)
+RUN curl -L https://storage.googleapis.com/kubernetes-release/release/${OLD_KUBECTL_VERSION}/bin/linux/amd64/kubectl -o /usr/local/bin/kubectl.old
+RUN echo "${OLD_KUBECTL_SHA1}  /usr/local/bin/kubectl.old" | sha1sum -c
+RUN mkdir -p /usr/local/bin
+RUN chmod +x /usr/local/bin/kubectl.old
+
 # TODO: update CNI ver
 RUN mkdir -p ~/.ssh && \
     ssh-keyscan github.com >> ~/.ssh/known_hosts && \
@@ -73,3 +82,8 @@ RUN mkdir -p ~/.ssh && \
 RUN mkdir -p /images && \
     curl -L https://github.com/Mirantis/virtlet/releases/download/v0.8.2/cirros.img -o /images/cirros.img && \
     echo "${CIRROS_SHA256}  /images/cirros.img" | sha256sum -c -
+
+# Install Go tooling
+RUN go get github.com/aktau/github-release && \
+    go get github.com/Masterminds/glide
+

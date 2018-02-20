@@ -41,6 +41,13 @@ containers_run='.items[0].spec.template.spec.containers|=map(.volumeMounts|=map(
 initContainers_run='.items[0].spec.template.spec.initContainers|=map(.volumeMounts|=map(select(.name!="run"))+[{"mountPath": "/run:shared", "name": "run"}])'
 containers_k8s_dir='.items[0].spec.template.spec.containers[1].volumeMounts|=map(select(.name!="k8s-pods-dir"))+[{"mountPath": "/var/lib/kubelet/pods:shared", "name": "k8s-pods-dir"}]'
 
+function image_tags_filter {
+    local tag="${1}"
+    local prefix=".items[0].spec.template.spec."
+    local suffix="|=map(.image=\"mirantis/virtlet:${tag}\")"
+    echo -n "${prefix}containers${suffix}|${prefix}initContainers${suffix}"
+}
+
 # from build/common.sh in k8s
 function rsync_probe {
     # Wait unil rsync is up and running.
@@ -160,6 +167,7 @@ function ensure_build_container {
                -e CIRCLE_PULL_REQUEST="${CIRCLE_PULL_REQUEST:-}" \
                -e CIRCLE_BRANCH="${CIRCLE_PULL_REQUEST:-}" \
                -e VIRTLET_ON_MASTER="${VIRTLET_ON_MASTER:-}" \
+               -e GITHUB_TOKEN="${GITHUB_TOKEN:-}" \
                ${docker_cert_args[@]+"${docker_cert_args[@]}"} \
                --name virtlet-build \
                --tmpfs /tmp \
@@ -348,9 +356,6 @@ function build_image_internal {
 }
 
 function install_vendor_internal {
-    if ! hash glide 2>/dev/null; then
-        go get github.com/Masterminds/glide
-    fi
     if [ ! -d vendor ]; then
         glide install --strip-vendor
     fi
@@ -375,6 +380,46 @@ function build_internal {
     go test -i -c -o "${project_dir}/_output/virtlet-e2e-tests" ./tests/e2e
 }
 
+function patch_yaml {
+    local kubectl="${1}"
+    local filter="${2}"
+    "${kubectl}" convert --local -o json -f deploy/virtlet-ds.yaml |
+        jq "${filter}" |
+        "${kubectl}" convert --local -o yaml -f -
+}
+
+function release_internal {
+    local tag="${1}"
+    local -a opts=(--user Mirantis --repo virtlet --tag "${tag}")
+    local pre_release=
+    # TODO: uncomment this 'if/fi' once we start making 'non-pre' releases
+    # if [[ ${tag} =~ -(test|pre).*$ ]]; then
+    pre_release="--pre-release"
+    # fi
+    if github-release --quiet delete "${opts[@]}"; then
+        echo >&2 "Replacing the old Virtlet release"
+    fi
+    github-release release "${opts[@]}" \
+                   --name "$(git tag -l --format='%(contents:subject)' "${tag}")" \
+                   --description "$(git tag -l --format='%(contents:body)' "${tag}")" \
+                   ${pre_release}
+    # piping the patched yaml directly to
+    # 'github-release upload ... --file -' causes GH API error:
+    # "error: could not upload, status code (400 Bad Request), msg: Bad Content-Length: , errors:"
+    patch_yaml kubectl "$(image_tags_filter "${tag}")" >_output/virtlet-ds.yaml
+    github-release upload "${opts[@]}" \
+                   --name virtlet-ds.yaml \
+                   --replace \
+                   --file _output/virtlet-ds.yaml
+    # use older kubectl for 1.7 to avoid making yaml
+    # that can't be consumed by k8s 1.7
+    patch_yaml kubectl.old "$(image_tags_filter "${tag}")|${containers_run}|${initContainers_run}|${containers_k8s_dir}" >_output/virtlet-ds-1.7.yaml
+    github-release upload "${opts[@]}" \
+                   --name virtlet-ds-1.7.yaml \
+                   --replace \
+                   --file _output/virtlet-ds-1.7.yaml
+}
+
 function e2e {
     ensure_build_container
     local cluster_url
@@ -395,6 +440,7 @@ function usage {
     echo >&2 "  $0 gotest [TEST_ARGS...]"
     echo >&2 "  $0 gobuild [BUILD_ARGS...]"
     echo >&2 "  $0 run CMD..."
+    echo >&2 "  $0 release TAG"
     exit 1
 }
 
@@ -469,6 +515,15 @@ case "${cmd}" in
         ;;
     start-build-container)
         ensure_build_container
+        ;;
+    release)
+        if [[ ! ${1:-} ]]; then
+            echo >&2 "must specify the tag"
+        fi
+        ( vcmd "build/cmd.sh release-internal '${1}'" )
+        ;;
+    release-internal)
+        release_internal "$@"
         ;;
     *)
         usage
