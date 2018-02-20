@@ -261,11 +261,9 @@ func (c *FakeCNIClient) Cleanup() {
 		entry.cleanup()
 	}
 	if _, found := c.entries[podKey(c.DummyPodId, "", "")]; found {
-		cni.DestroyNetNS(c.DummyPodId)
-		// XXXX
-		// if err := cni.DestroyNetNS(c.DummyPodId); err != nil {
-		// 	log.Panicf("Error destroying dummy pod network ns: %v", err)
-		// }
+		if err := cni.DestroyNetNS(c.DummyPodId); err != nil {
+			log.Panicf("Error destroying dummy pod network ns: %v", err)
+		}
 	}
 }
 
