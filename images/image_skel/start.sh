@@ -17,12 +17,6 @@ fi
 PROTOCOL="${VIRTLET_DOWNLOAD_PROTOCOL:-https}"
 IMAGE_TRANSLATIONS_DIR="${IMAGE_TRANSLATIONS_DIR:-}"
 
-FLEXVOLUME_DIR=/usr/libexec/kubernetes/kubelet-plugins/volume/exec
-if [ ! -d ${FLEXVOLUME_DIR}/virtlet~flexvolume_driver ]; then
-    mkdir ${FLEXVOLUME_DIR}/virtlet~flexvolume_driver
-    cp /flexvolume_driver ${FLEXVOLUME_DIR}/virtlet~flexvolume_driver/flexvolume_driver
-fi
-
 while [ ! -S /var/run/libvirt/libvirt-sock ] ; do
   echo >&1 "Waiting for libvirt..."
   sleep 0.3
