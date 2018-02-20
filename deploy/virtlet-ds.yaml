@@ -52,6 +52,8 @@ spec:
         # for ensuring that /var/lib/libvirt/images exists on node
         - name: var-lib
           mountPath: /host-var-lib
+        - name: dev
+          mountPath: /dev
         securityContext:
           privileged: true
 
