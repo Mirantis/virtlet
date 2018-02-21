@@ -42,7 +42,8 @@ RUN apt-get update && \
     apt-get clean
 
 # Install docker client
-RUN curl -sSL "${DOCKER_CLIENT_DOWNLOAD_URL_BASE}/$(uname -s)/$(uname -m)/docker-${DOCKER_CLIENT_VERSION}.tgz" | \
+RUN mkdir -p /usr/local/bin && \
+    curl -sSL "${DOCKER_CLIENT_DOWNLOAD_URL_BASE}/$(uname -s)/$(uname -m)/docker-${DOCKER_CLIENT_VERSION}.tgz" | \
     tar -C /usr/local/bin -xz --strip-components=1 docker/docker && \
     echo "${DOCKER_CLIENT_SHA256}  /usr/local/bin/docker" | sha256sum -c -
 
@@ -58,17 +59,14 @@ ENV PATH /go/src/github.com/Mirantis/virtlet/_output:$GOPATH/bin:/usr/local/go/b
 RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" && chmod -R 777 "$GOPATH"
 WORKDIR $GOPATH
 
-# Install kubectl
-RUN curl -L https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl -o /usr/local/bin/kubectl
-RUN echo "${KUBECTL_SHA1}  /usr/local/bin/kubectl" |sha1sum -c
-RUN mkdir -p /usr/local/bin
-RUN chmod +x /usr/local/bin/kubectl
-
-# Install old kubectl for v1.7 (needed to make the release yaml)
-RUN curl -L https://storage.googleapis.com/kubernetes-release/release/${OLD_KUBECTL_VERSION}/bin/linux/amd64/kubectl -o /usr/local/bin/kubectl.old
-RUN echo "${OLD_KUBECTL_SHA1}  /usr/local/bin/kubectl.old" | sha1sum -c
-RUN mkdir -p /usr/local/bin
-RUN chmod +x /usr/local/bin/kubectl.old
+# Install kubectl.
+# Also install old kubectl for v1.7 (needed to make the release yaml)
+RUN curl -L https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl -o /usr/local/bin/kubectl && \
+    echo "${KUBECTL_SHA1}  /usr/local/bin/kubectl" | sha1sum -c && \
+    chmod +x /usr/local/bin/kubectl && \
+    curl -L https://storage.googleapis.com/kubernetes-release/release/${OLD_KUBECTL_VERSION}/bin/linux/amd64/kubectl -o /usr/local/bin/kubectl.old && \
+    echo "${OLD_KUBECTL_SHA1}  /usr/local/bin/kubectl.old" | sha1sum -c && \
+    chmod +x /usr/local/bin/kubectl.old
 
 # TODO: update CNI ver
 RUN mkdir -p ~/.ssh && \
