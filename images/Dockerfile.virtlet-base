@@ -12,3 +12,7 @@ RUN apt-get update && \
                        netbase iproute2 iptables ebtables vncsnapshot \
                        socat && \
     apt-get clean
+
+# 19 Feb 2018: bump: libvirt version problem
+# The following packages have unmet dependencies:
+#  libvirt-bin : Breaks: qemu-kvm (< 1:2.5+dfsg-5ubuntu10.20~) but 1:2.5+dfsg-5ubuntu10.16 is to be installed
