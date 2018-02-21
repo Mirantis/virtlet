@@ -22,10 +22,6 @@ import (
 	"github.com/Mirantis/virtlet/pkg/virt"
 )
 
-const (
-	secretNsUuid = "67b7fb47-7735-4b64-86d2-6d062d121966"
-)
-
 type ImageManager interface {
 	GetImagePathAndVirtualSize(ref string) (string, uint64, error)
 }

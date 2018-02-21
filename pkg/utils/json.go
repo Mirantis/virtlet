@@ -34,7 +34,7 @@ func MapToJson(m map[string]interface{}) string {
 	return string(bs)
 }
 
-// MapToJson converts the specified map object to unindented JSON.
+// MapToJsonUnindented converts the specified map object to unindented JSON.
 // It panics in case if the map connot be converted.
 func MapToJsonUnindented(m map[string]interface{}) string {
 	bs, err := json.Marshal(m)
@@ -44,6 +44,8 @@ func MapToJsonUnindented(m map[string]interface{}) string {
 	return string(bs)
 }
 
+// ReadJson converts data from file specified by `filename` to provided as `v`
+// interface.
 func ReadJson(filename string, v interface{}) error {
 	content, err := ioutil.ReadFile(filename)
 	if err != nil {
@@ -57,6 +59,8 @@ func ReadJson(filename string, v interface{}) error {
 	return nil
 }
 
+// WriteJson saves under specified `filename` data provided in `v` interface
+// setting file mode according to `perm` value.
 func WriteJson(filename string, v interface{}, perm os.FileMode) error {
 	content, err := json.Marshal(v)
 	if err != nil {
