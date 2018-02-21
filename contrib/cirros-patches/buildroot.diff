@@ -284,3 +284,22 @@ index 0000000..0c26a0c
 +PYTHON_PRETTYTABLE_SETUP_TYPE = setuptools
 +
 +$(eval $(python-package))
+diff --git a/package/uclibc/0004-fix-posix-spawn.patch b/package/uclibc/0004-fix-posix-spawn.patch
+new file mode 100644
+index 0000000..3d4558b
+--- /dev/null
++++ b/package/uclibc/0004-fix-posix-spawn.patch
+@@ -0,0 +1,13 @@
++diff --git a/librt/spawn.c b/librt/spawn.c
++index 25e3994..808c398 100644
++--- a/librt/spawn.c
+++++ b/librt/spawn.c
++@@ -155,7 +155,7 @@ __spawni(pid_t *pid, const char *file,
++ 		memset(&sa, 0, sizeof(sa));
++ 		sa.sa_handler = SIG_DFL;
++ 
++-		for (sig = 1; sig <= _NSIG; ++sig) {
+++		for (sig = 1; sig < _NSIG; ++sig) {
++ 			if (sigismember(&attrp->__sd, sig)) {
++ 				if (sigaction(sig, &sa, NULL) != 0)
++ 					goto error;
