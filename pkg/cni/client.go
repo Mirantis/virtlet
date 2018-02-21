@@ -29,12 +29,13 @@ import (
 
 // CNIClient provides an interface to CNI
 type CNIClient interface {
-	// AddSandboxToNetwork adds a pod sandbox to the CNI network
+	// AddSandboxToNetwork adds a pod sandbox to the CNI network.
 	AddSandboxToNetwork(podId, podName, podNs string) (*cnicurrent.Result, error)
-	// RemoveSandboxFromNetwork removes a pod sandbox from the CNI network
+	// RemoveSandboxFromNetwork removes a pod sandbox from the CNI network.
 	RemoveSandboxFromNetwork(podId, podName, podNs string) error
 	// GetDummyNetwork creates a dummy network using CNI plugin.
-	// It's used for making a dummy gateway for Calico CNI plugin
+	// It's used for making a dummy gateway for Calico CNI plugin.
+	// It returns a CNI result and a path to the network namespace.
 	GetDummyNetwork() (*cnicurrent.Result, string, error)
 }
 
