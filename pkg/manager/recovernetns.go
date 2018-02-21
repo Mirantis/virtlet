@@ -40,7 +40,7 @@ func recoverNetworkNamespaces(metadataStore metadata.MetadataStore, fdManager ta
 			continue
 		}
 
-		if _, err := fdManager.AddFDs(
+		if err := fdManager.Recover(
 			s.GetID(),
 			tapmanager.GetFDPayload{
 				ContainerSideNetwork: psi.ContainerSideNetwork,

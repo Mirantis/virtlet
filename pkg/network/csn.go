@@ -35,7 +35,9 @@ type InterfaceDescription struct {
 	// Type contains interface type designator
 	Type InterfaceType
 	// Fo contains open File object pointing to tap device inside network
-	// namespace or to control file in sysfs for sr-iov VF
+	// namespace or to control file in sysfs for sr-iov VF.
+	// It may be nil if the interface was recovered after restarting Virtlet.
+	// It's only needed during the initial VM startup
 	Fo *os.File
 	// Name containes original interface name for sr-iov interface
 	Name string
@@ -57,5 +59,5 @@ type ContainerSideNetwork struct {
 	NsPath string
 	// Interfaces contains a list of interfaces with data needed
 	// to configure them
-	Interfaces []InterfaceDescription
+	Interfaces []*InterfaceDescription
 }
