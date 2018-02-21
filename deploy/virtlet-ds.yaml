@@ -56,6 +56,13 @@ spec:
           mountPath: /dev
         securityContext:
           privileged: true
+        env:
+        - name: VIRTLET_DISABLE_KVM
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: disable_kvm
+              optional: true
 
       containers:
       - name: libvirt
