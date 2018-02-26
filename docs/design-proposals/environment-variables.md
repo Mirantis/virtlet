@@ -1,6 +1,6 @@
 # Passing environment variables to VM
 
-Virtlet uses [cloud-init](cloud-init-data-generation.md) mechanism to pass
+Virtlet uses [cloud-init](../cloud-init-data-generation.md) mechanism to pass
 the environment variables from pod definition to the VM.
 
 ## Virtlet-aware images
