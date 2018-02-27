@@ -27,16 +27,15 @@ import (
 
 var _ = Describe("Hung VM", func() {
 	var (
-		vm    *framework.VMInterface
-		vmPod *framework.PodInterface
-		ssh   framework.Executor
+		vm  *framework.VMInterface
+		ssh framework.Executor
 	)
 
 	BeforeAll(func() {
 		vm = controller.VM("hung-vm")
 		vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, nil)
 		var err error
-		vmPod, err = vm.Pod()
+		_, err = vm.Pod()
 		Expect(err).NotTo(HaveOccurred())
 	})
 

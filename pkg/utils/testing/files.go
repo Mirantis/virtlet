@@ -54,7 +54,8 @@ func DirToMap(dir string) (map[string]interface{}, error) {
 		case strings.HasSuffix(filename, ".iso"):
 			m[filename], err = IsoToMap(p)
 		default:
-			if bs, err := ioutil.ReadFile(p); err != nil {
+			var bs []byte
+			if bs, err = ioutil.ReadFile(p); err != nil {
 				err = fmt.Errorf("ioutil.ReadFile(): %v", err)
 			} else {
 				m[filename] = string(bs)
