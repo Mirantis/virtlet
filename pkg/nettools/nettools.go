@@ -1112,7 +1112,8 @@ func netmaskForCalico() net.IPMask {
 	n := calicoDefaultSubnet
 	subnetStr := os.Getenv(calicoSubnetVar)
 	if subnetStr != "" {
-		n, err := strconv.Atoi(subnetStr)
+		var err error
+		n, err = strconv.Atoi(subnetStr)
 		if err != nil || n <= 0 || n > 30 {
 			glog.Warningf("bad calico subnet %q, using /%d", subnetStr, calicoDefaultSubnet)
 			n = calicoDefaultSubnet
