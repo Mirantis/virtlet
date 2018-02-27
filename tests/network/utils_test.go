@@ -558,4 +558,4 @@ func (tc *tapConnector) Run(readyCh, stopCh chan struct{}) error {
 }
 
 // TODO: document NetTester / NetTestGroup
-// TODO: block ip trafic from br0 ip
+// TODO: block ip traffic from br0 ip

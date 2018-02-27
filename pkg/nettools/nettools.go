@@ -1005,7 +1005,7 @@ func getLinkForIPConfig(netConfig *cnicurrent.Result, ipConfigIndex int) (netlin
 
 	iface := netConfig.Interfaces[ipConfig.Interface]
 	if iface.Sandbox == "" {
-		return nil, errors.New("error: IP config has non-sandboxed interace")
+		return nil, errors.New("error: IP config has non-sandboxed interface")
 	}
 
 	link, err := netlink.LinkByName(iface.Name)

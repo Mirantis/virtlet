@@ -142,7 +142,7 @@ var _ = Describe("Ceph volumes tests", func() {
 			}
 
 			vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, podCustomization)
-			do(vm.Pod()).(*framework.PodInterface)
+			_ = do(vm.Pod()).(*framework.PodInterface)
 		})
 
 		AfterAll(func() {

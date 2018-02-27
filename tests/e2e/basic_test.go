@@ -146,7 +146,7 @@ var _ = Describe("Basic cirros tests", func() {
 					}
 				}
 				if found != 1 {
-					return fmt.Errorf("expected login prompt to appear exactly once in the log, but got %d occurences", found)
+					return fmt.Errorf("expected login prompt to appear exactly once in the log, but got %d occurrences", found)
 				}
 				return nil
 			})
