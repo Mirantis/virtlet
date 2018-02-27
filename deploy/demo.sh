@@ -5,11 +5,11 @@ set -o nounset
 set -o pipefail
 set -o errtrace
 
-CRIPROXY_DEB_URL="${CRIPROXY_DEB_URL:-https://github.com/Mirantis/criproxy/releases/download/v0.9.5/criproxy-nodeps_0.9.5_amd64.deb}"
+CRIPROXY_DEB_URL="${CRIPROXY_DEB_URL:-https://347-109821784-gh.circle-artifacts.com/0/criproxy/criproxy-nodeps_0.9.5-6_amd64.deb}"
 NONINTERACTIVE="${NONINTERACTIVE:-}"
 NO_VM_CONSOLE="${NO_VM_CONSOLE:-}"
 INJECT_LOCAL_IMAGE="${INJECT_LOCAL_IMAGE:-}"
-dind_script="dind-cluster-v1.8.sh"
+dind_script="dind-cluster-v1.9.sh"
 kubectl="${HOME}/.kubeadm-dind-cluster/kubectl"
 BASE_LOCATION="${BASE_LOCATION:-https://raw.githubusercontent.com/Mirantis/virtlet/master/}"
 RELEASE_LOCATION="${RELEASE_LOCATION:-https://github.com/Mirantis/virtlet/releases/download/}"
@@ -112,7 +112,7 @@ function demo::start-dind-cluster {
   if [[ ! ${NONINTERACTIVE} ]]; then
     echo "Cirros ssh connection will be open after Virtlet setup is complete, press Ctrl-D to disconnect." >&2
   fi
-  echo "To clean up the cluster, use './dind-cluster-v1.8.sh clean'" >&2
+  echo "To clean up the cluster, use './dind-cluster-v1.9.sh clean'" >&2
   demo::ask-before-continuing
   "./${dind_script}" clean
   "./${dind_script}" up
@@ -357,7 +357,7 @@ can be used to disconnect from it.
 Use 'curl http://nginx.default.svc.cluster.local' from VM console to test
 cluster networking.
 
-To clean up the cluster, use './dind-cluster-v1.8.sh clean'
+To clean up the cluster, use './dind-cluster-v1.9.sh clean'
 [1] https://github.com/Mirantis/virtlet
 [2] https://github.com/Mirantis/kubeadm-dind-cluster
 EOF
