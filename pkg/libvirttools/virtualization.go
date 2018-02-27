@@ -147,14 +147,14 @@ func (ds *domainSettings) createDomain(config *VMConfig) *libvirtxml.Domain {
 
 		QEMUCommandline: &libvirtxml.DomainQEMUCommandline{
 			Envs: []libvirtxml.DomainQEMUCommandlineEnv{
-				libvirtxml.DomainQEMUCommandlineEnv{Name: "VIRTLET_EMULATOR", Value: emulator},
-				libvirtxml.DomainQEMUCommandlineEnv{Name: "VIRTLET_NET_KEY", Value: ds.netFdKey},
-				libvirtxml.DomainQEMUCommandlineEnv{Name: "VIRTLET_POD_NAME", Value: config.PodName},
-				libvirtxml.DomainQEMUCommandlineEnv{Name: "VIRTLET_POD_NAMESPACE", Value: config.PodNamespace},
-				libvirtxml.DomainQEMUCommandlineEnv{Name: "VIRTLET_POD_UID", Value: config.PodSandboxId},
-				libvirtxml.DomainQEMUCommandlineEnv{Name: "VIRTLET_CONTAINER_ID", Value: config.DomainUUID},
-				libvirtxml.DomainQEMUCommandlineEnv{Name: "VIRTLET_CONTAINER_NAME", Value: config.Name},
-				libvirtxml.DomainQEMUCommandlineEnv{Name: "CONTAINER_ATTEMPTS", Value: fmt.Sprint(config.Attempt)},
+				{Name: "VIRTLET_EMULATOR", Value: emulator},
+				{Name: "VIRTLET_NET_KEY", Value: ds.netFdKey},
+				{Name: "VIRTLET_POD_NAME", Value: config.PodName},
+				{Name: "VIRTLET_POD_NAMESPACE", Value: config.PodNamespace},
+				{Name: "VIRTLET_POD_UID", Value: config.PodSandboxId},
+				{Name: "VIRTLET_CONTAINER_ID", Value: config.DomainUUID},
+				{Name: "VIRTLET_CONTAINER_NAME", Value: config.Name},
+				{Name: "CONTAINER_ATTEMPTS", Value: fmt.Sprint(config.Attempt)},
 			},
 		},
 	}

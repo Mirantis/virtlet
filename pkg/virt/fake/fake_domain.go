@@ -117,7 +117,7 @@ func (dc *FakeDomainConnection) DefineDomain(def *libvirtxml.Domain) (virt.VirtD
 func (dc *FakeDomainConnection) ListDomains() ([]virt.VirtDomain, error) {
 	r := make([]virt.VirtDomain, len(dc.domains))
 	names := make([]string, 0, len(dc.domains))
-	for name, _ := range dc.domains {
+	for name := range dc.domains {
 		names = append(names, name)
 	}
 	sort.Strings(names)

@@ -114,7 +114,7 @@ func (p *FakeStoragePool) CreateStorageVol(def *libvirtxml.StorageVolume) (virt.
 func (p *FakeStoragePool) ListAllVolumes() ([]virt.VirtStorageVolume, error) {
 	r := make([]virt.VirtStorageVolume, len(p.volumes))
 	names := make([]string, 0, len(p.volumes))
-	for name, _ := range p.volumes {
+	for name := range p.volumes {
 		names = append(names, name)
 	}
 	sort.Strings(names)

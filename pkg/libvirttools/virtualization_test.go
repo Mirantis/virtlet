@@ -350,7 +350,7 @@ func TestDomainDefinitions(t *testing.T) {
 		{
 			name: "raw devices",
 			flexVolumes: map[string]map[string]interface{}{
-				"raw": map[string]interface{}{
+				"raw": {
 					"type": "raw",
 					// FIXME: here we depend upon the fact that /dev/loop0
 					// indeed exists in the build container. But we shouldn't.
@@ -361,14 +361,14 @@ func TestDomainDefinitions(t *testing.T) {
 		{
 			name: "volumes",
 			flexVolumes: map[string]map[string]interface{}{
-				"vol1": map[string]interface{}{
+				"vol1": {
 					"type": "qcow2",
 				},
-				"vol2": map[string]interface{}{
+				"vol2": {
 					"type":     "qcow2",
 					"capacity": "2MB",
 				},
-				"vol3": map[string]interface{}{
+				"vol3": {
 					"type": "qcow2",
 				},
 			},
@@ -382,7 +382,7 @@ func TestDomainDefinitions(t *testing.T) {
 		{
 			name: "ceph flexvolume",
 			flexVolumes: map[string]map[string]interface{}{
-				"ceph": map[string]interface{}{
+				"ceph": {
 					"type":    "ceph",
 					"monitor": "127.0.0.1:6789",
 					"pool":    "libvirt-pool",
