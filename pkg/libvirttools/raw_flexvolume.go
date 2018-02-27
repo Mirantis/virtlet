@@ -33,7 +33,7 @@ type rawVolumeOptions struct {
 
 func (vo *rawVolumeOptions) validate() error {
 	if !strings.HasPrefix(vo.Path, "/dev/") {
-		return fmt.Errorf("raw volume path needs to be prefixed by '/dev/', but it's whole value is: ", vo.Path)
+		return fmt.Errorf("raw volume path needs to be prefixed by '/dev/', but it's whole value is: %s", vo.Path)
 	}
 	return nil
 }

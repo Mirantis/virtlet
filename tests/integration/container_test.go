@@ -82,13 +82,13 @@ func (ct *containerTester) cleanupContainers() {
 			ContainerId: container.Id,
 		})
 		if err != nil {
-			ct.t.Log("warning: couldn't stop container %q", container.Id)
+			ct.t.Logf("warning: couldn't stop container %q", container.Id)
 		}
 		_, err = ct.runtimeServiceClient.RemoveContainer(ctx, &kubeapi.RemoveContainerRequest{
 			ContainerId: container.Id,
 		})
 		if err != nil {
-			ct.t.Log("warning: couldn't remove container %q", container.Id)
+			ct.t.Logf("warning: couldn't remove container %q", container.Id)
 		}
 	}
 }

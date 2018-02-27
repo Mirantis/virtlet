@@ -86,7 +86,7 @@ func FormatDisk(path string) error {
 		return errors.New(gErr.String())
 	}
 	if len(partitions) != 1 {
-		errors.New("expected a single partition from list-partitions")
+		return errors.New("expected a single partition from list-partitions")
 	}
 
 	/* Create a filesystem on the partition. */

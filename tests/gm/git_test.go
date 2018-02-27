@@ -49,7 +49,7 @@ func TestGitDiff(t *testing.T) {
 		t.Fatalf("os.Chdir(): %v", err)
 	}
 	if err := ioutil.WriteFile("samplefile", []byte("foobar"), 0777); err != nil {
-		t.Fatalf("ioutil.WriteFile(): %v")
+		t.Fatalf("ioutil.WriteFile(): %v", err)
 	}
 
 	out, err := exec.Command("/bin/sh", "-c", gitSetupCmd).CombinedOutput()
@@ -66,7 +66,7 @@ func TestGitDiff(t *testing.T) {
 	}
 
 	if err := ioutil.WriteFile("samplefile", []byte("baz"), 0777); err != nil {
-		t.Fatalf("ioutil.WriteFile(): %v")
+		t.Fatalf("ioutil.WriteFile(): %v", err)
 	}
 
 	diffOut, err = GitDiff(filepath.Join(tmpDir, "samplefile"))
@@ -101,7 +101,7 @@ func TestGitDiff(t *testing.T) {
 	}
 
 	if err := ioutil.WriteFile("newfile", []byte("newcontent"), 0777); err != nil {
-		t.Fatalf("ioutil.WriteFile(): %v")
+		t.Fatalf("ioutil.WriteFile(): %v", err)
 	}
 
 	diffOut, err = GitDiff(filepath.Join(tmpDir, "newfile"))

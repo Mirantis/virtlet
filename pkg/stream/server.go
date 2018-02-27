@@ -24,6 +24,7 @@ import (
 
 	"github.com/Mirantis/virtlet/pkg/metadata"
 
+	"github.com/golang/glog"
 	knet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 )
@@ -77,13 +78,12 @@ func (s *Server) Start() error {
 	// start http server
 	go func() {
 		if err := s.streamServer.Start(true); err != nil {
-			fmt.Errorf("Failed to start streaming server: %v", err)
+			glog.Fatalf("Failed to start streaming server: %v", err)
 		}
 	}()
 	// start socket server
 	go s.unixServer.Listen()
 	return nil
-
 }
 
 // Stop stops all goroutines
