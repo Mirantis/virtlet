@@ -36,7 +36,7 @@ const (
 
 var badFilenameCharRx = regexp.MustCompile(`[^\w-]`)
 
-// GetFilenameForTest convers a Go test name to filename
+// GetFilenameForTest converts a Go test name to filename
 func GetFilenameForTest(testName string) (string, error) {
 	filename := strings.Replace(testName, "/", "__", -1)
 	filename = badFilenameCharRx.ReplaceAllString(filename, "_") + ".json"

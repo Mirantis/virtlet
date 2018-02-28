@@ -583,7 +583,7 @@ func (v *VirtualizationTool) removeDomain(containerId string, config *VMConfig, 
 			if _, err := v.domainConn.LookupDomainByUUIDString(containerId); err == virt.ErrDomainNotFound {
 				return true, nil
 			} else if err != nil {
-				// Unexpected error occured
+				// Unexpected error occurred
 				return false, fmt.Errorf("error looking up domain %q: %v", containerId, err)
 			}
 			return false, nil

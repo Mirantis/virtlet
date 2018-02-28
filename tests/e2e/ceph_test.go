@@ -49,8 +49,7 @@ var _ = Describe("Ceph volumes tests", func() {
 
 	Context("RBD volumes", func() {
 		var (
-			vm    *framework.VMInterface
-			vmPod *framework.PodInterface
+			vm *framework.VMInterface
 		)
 
 		BeforeAll(func() {
@@ -68,7 +67,7 @@ var _ = Describe("Ceph volumes tests", func() {
 
 			vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, podCustomization)
 			var err error
-			vmPod, err = vm.Pod()
+			_, err = vm.Pod()
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -95,8 +94,7 @@ var _ = Describe("Ceph volumes tests", func() {
 
 	Context("RBD volumes defined with PV/PVC", func() {
 		var (
-			vm    *framework.VMInterface
-			vmPod *framework.PodInterface
+			vm *framework.VMInterface
 		)
 
 		BeforeAll(func() {
@@ -144,7 +142,7 @@ var _ = Describe("Ceph volumes tests", func() {
 			}
 
 			vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, podCustomization)
-			vmPod = do(vm.Pod()).(*framework.PodInterface)
+			_ = do(vm.Pod()).(*framework.PodInterface)
 		})
 
 		AfterAll(func() {

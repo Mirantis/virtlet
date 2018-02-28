@@ -32,7 +32,7 @@ import (
 )
 
 // UnixServer listens for connections from qemu instances and sends its
-// stdout to registerd channels.
+// stdout to registered channels.
 type UnixServer struct {
 	SocketPath      string
 	kubernetesDir   string

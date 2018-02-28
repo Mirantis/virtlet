@@ -280,9 +280,8 @@ func (s *TapFDSource) Recover(key string, data []byte) error {
 	if csn == nil {
 		return fmt.Errorf("ContainerSideNetwork not passed to Recover()")
 	}
-	netConfig := payload.ContainerSideNetwork.Result
-	if netConfig == nil {
-		netConfig = &cnicurrent.Result{}
+	if csn.Result == nil {
+		csn.Result = &cnicurrent.Result{}
 	}
 	return s.setupNetNS(key, pnd, func(netNSPath string, allLinks []netlink.Link) (*network.ContainerSideNetwork, error) {
 		if err := nettools.RecoverContainerSideNetwork(csn, netNSPath, allLinks); err != nil {

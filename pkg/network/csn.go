@@ -39,7 +39,7 @@ type InterfaceDescription struct {
 	// It may be nil if the interface was recovered after restarting Virtlet.
 	// It's only needed during the initial VM startup
 	Fo *os.File
-	// Name containes original interface name for sr-iov interface
+	// Name contains original interface name for sr-iov interface
 	Name string
 	// HardwareAddr contains original hardware address for CNI-created
 	// veth link
