@@ -21,13 +21,15 @@ import (
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
-	// "k8s.io/client-go/kubernetes/scheme"
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/exec"
-	//"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api"
+
+	// register standard k8s types
+	_ "k8s.io/kubernetes/pkg/api/install"
 )
 
 // SubCommandCommon contains attributes and methods useful for all subcommands.
@@ -57,10 +59,11 @@ func (s *SubCommandCommon) GetVirtletPods() ([]v1.Pod, error) {
 // ExecCommandOnContainer given a pod, container, namespace and command
 // executes that command remotely returning stdout and stderr output
 // as strings and error if any occured.
-// If there is provided bytes.Buffer as stdin - it's content will be passed
-// to remote command.
+// If there is provided io.Reader as stdin - it's content will be passed
+// to remote command. Similarly if there will be provided instances of io.Writer
+// as stdout/stderr - they also will be passed.
 // Command is executed without a TTY as stdin.
-func (s *SubCommandCommon) ExecCommandOnContainer(
+func (s *SubCommandCommon) ExecInContainer(
 	pod, container, namespace string,
 	stdin io.Reader, stdout, stderr io.Writer,
 	command ...string,
@@ -73,34 +76,14 @@ func (s *SubCommandCommon) ExecCommandOnContainer(
 		SubResource("exec").
 		Param("container", container)
 
-	if stdin != nil {
-		req.Param("stdin", "true")
-	}
-	if stdout != nil {
-		req.Param("stdout", "true")
-	}
-	if stderr != nil {
-		req.Param("stderr", "true")
-	}
-	for _, cmd := range command {
-		req.Param("command", cmd)
-	}
-
-	// Above replaces different below attempts which are producing incorrect
-	// urls
-
-	// req.VersionedParams(&scheme.PodExecOptions{
-	// req.VersionedParams(&v1.PodExecOptions{
-	// req.VersionedParams(&api.PodExecOptions{
-	// 	Container: container,
-	// 	Command: command,
-	// 	Stdin: stdin != nil,
-	// 	Stdout: stdout != nil,
-	// 	Stderr: stderr != nil,
-	// 	TTY: false,
-	// }, api.ParameterCodec)
-	// }, scheme.ParameterCodec)
-	// fmt.Printf("Constructed url: %s\n", req.URL())
+	req.VersionedParams(&api.PodExecOptions{
+		Container: container,
+		Command:   command,
+		Stdin:     stdin != nil,
+		Stdout:    stdout != nil,
+		Stderr:    stderr != nil,
+		TTY:       false,
+	}, api.ParameterCodec)
 
 	executor, err := remotecommand.NewExecutor(s.config, "POST", req.URL())
 	if err != nil {
