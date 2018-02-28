@@ -111,7 +111,7 @@ func main() {
 
 			var descriptions []tapmanager.InterfaceDescription
 			if err := json.Unmarshal(marshaledData, &descriptions); err != nil {
-				glog.Errorf("Failed to unmarshal network interface info", err)
+				glog.Errorf("Failed to unmarshal network interface info: %v", err)
 				os.Exit(1)
 			}
 

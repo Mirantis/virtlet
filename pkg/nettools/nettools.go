@@ -755,7 +755,7 @@ func RecoverContainerSideNetwork(csn *network.ContainerSideNetwork, nsPath strin
 			}
 
 			if desc.PCIAddress != pciAddress {
-				return fmt.Errorf("PCI address mismatch for %q: %q instead of %q", desc.PCIAddress, pciAddress)
+				return fmt.Errorf("PCI address mismatch for %q: %q instead of %q", ifaceName, desc.PCIAddress, pciAddress)
 			}
 
 			// device should be already unbound, but after machine reboot that can be necessary
@@ -922,7 +922,7 @@ func ReconstructVFs(csn *network.ContainerSideNetwork, netns ns.NetNS) error {
 		}
 		link, err := netlink.LinkByName(devName)
 		if err != nil {
-			return fmt.Errorf("can't find link with name %q: %v", err)
+			return fmt.Errorf("can't find link with name %q: %v", devName, err)
 		}
 		if err := netlink.LinkSetHardwareAddr(link, iface.HardwareAddr); err != nil {
 			return fmt.Errorf("can't set hwaddr %q on device %q: %v", iface.HardwareAddr, devName, err)

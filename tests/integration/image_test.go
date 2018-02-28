@@ -223,6 +223,6 @@ func TestImagesWithSameName(t *testing.T) {
 
 	imagesCount := len(it.listImages(nil))
 	if imagesCount != 2 {
-		t.Fatal("Expected two images in store, get: %d", imagesCount)
+		t.Fatalf("Expected two images in store, get: %d", imagesCount)
 	}
 }

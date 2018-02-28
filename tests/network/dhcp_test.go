@@ -137,7 +137,7 @@ func runDhcpTestCase(t *testing.T, testCase *dhcpTestCase) {
 		}
 		addr, err := netlink.ParseAddr("169.254.254.2/24")
 		if err != nil {
-			return fmt.Errorf("failed to parse dhcp interface address", err)
+			return fmt.Errorf("failed to parse dhcp interface address: %v", err)
 		}
 		if err = netlink.AddrAdd(serverVeth, addr); err != nil {
 			return fmt.Errorf("failed to add addr for serverVeth: %v", err)

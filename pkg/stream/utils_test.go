@@ -41,7 +41,7 @@ func TestGetPidFromConnection(t *testing.T) {
 	// wait for nc to start
 	time.Sleep(2 * time.Second)
 
-	conn, err := net.DialUnix("unix", nil, &net.UnixAddr{socketPath, "unix"})
+	conn, err := net.DialUnix("unix", nil, &net.UnixAddr{Name: socketPath, Net: "unix"})
 	if err != nil {
 		t.Fatal("Error when connecting to socket:", err)
 	}

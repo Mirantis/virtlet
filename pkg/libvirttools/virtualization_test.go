@@ -187,7 +187,7 @@ func (ct *containerTester) removeContainer(containerId string) {
 func (ct *containerTester) verifyContainerRootfsExists(container *kubeapi.Container) bool {
 	storagePool, err := ct.storageConn.LookupStoragePoolByName("volumes")
 	if err != nil {
-		ct.t.Fatal("Expected to found 'volumes' storage pool but failed with: %v", err)
+		ct.t.Fatalf("Expected to found 'volumes' storage pool but failed with: %v", err)
 	}
 	// TODO: this is third place where rootfs volume name is calculated
 	// so there should be a func which will do it in consistent way there,

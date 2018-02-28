@@ -69,7 +69,7 @@ func (u *UnixServer) Listen() {
 		u.listenDone <- true
 	}()
 
-	l, err := net.ListenUnix("unix", &net.UnixAddr{u.SocketPath, "unix"})
+	l, err := net.ListenUnix("unix", &net.UnixAddr{Name: u.SocketPath, Net: "unix"})
 	if err != nil {
 		glog.Error("listen error:", err)
 		return

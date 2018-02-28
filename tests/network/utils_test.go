@@ -432,7 +432,7 @@ func (t *tcpdump) waitForSubstring(stopCh chan struct{}) error {
 	for n := 0; n < tcpdumpSubstringWaitCount; n++ {
 		select {
 		case <-stopCh:
-			return fmt.Errorf("tcpdump stopped before producing expected output %q, out:\n", t.stopOn, t.bOut.String())
+			return fmt.Errorf("tcpdump stopped before producing expected output %q, out:\n%s", t.stopOn, t.bOut.String())
 		case <-time.After(tcpdumpPollPeriod):
 			s := t.bOut.String()
 			if strings.Contains(s, t.failOn) {

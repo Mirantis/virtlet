@@ -147,7 +147,7 @@ func HandleNsFixReexec() {
 	spawned := os.Getenv("NSFIX_SPAWN") != ""
 	switch ret, err := entry.handler(arg); {
 	case err != nil && !spawned:
-		glog.Fatalf("Error invoking NSFIX_HANDLER %q: %v", handlerName)
+		glog.Fatalf("Error invoking NSFIX_HANDLER %q: %v", handlerName, err)
 	case err == nil && !spawned:
 		os.Exit(0)
 	default:

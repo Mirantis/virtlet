@@ -659,7 +659,7 @@ func TestMultiInterfaces(t *testing.T) {
 			t.Errorf("error during validate/fix cni result: %v", err)
 		}
 		if !reflect.DeepEqual(result, expectedInfo) {
-			t.Errorf("result different than expected: %\nActual:\n%s\nExpected:\n%s",
+			t.Errorf("result different than expected:\nActual:\n%s\nExpected:\n%s",
 				spew.Sdump(result), spew.Sdump(expectedInfo))
 		}
 	})
@@ -674,7 +674,7 @@ func TestMultiInterfacesWithMissingInterface(t *testing.T) {
 			t.Errorf("error during validate/fix cni result: %v", err)
 		}
 		if !reflect.DeepEqual(result, expectedInfo) {
-			t.Errorf("result different than expected: %\nActual:\n%s\nExpected:\n%s",
+			t.Errorf("result different than expected:\nActual:\n%s\nExpected:\n%s",
 				spew.Sdump(result), spew.Sdump(expectedInfo))
 		}
 	})

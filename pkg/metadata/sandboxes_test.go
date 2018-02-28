@@ -242,7 +242,7 @@ func TestListPodSandbox(t *testing.T) {
 				}
 			}
 			if !found {
-				t.Errorf("Didn't find expected sandbox id %s in returned sandbox list %v", len(tc.expectedIds), sandboxes)
+				t.Errorf("Didn't find expected sandbox id %d in returned sandbox list %v", len(tc.expectedIds), sandboxes)
 			}
 		}
 	}

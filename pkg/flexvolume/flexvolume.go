@@ -155,7 +155,7 @@ func (d *FlexVolumeDriver) mount(targetMountDir, jsonOptions string) (map[string
 // Invocation: <driver executable> unmount <mount dir>
 func (d *FlexVolumeDriver) unmount(targetMountDir string) (map[string]interface{}, error) {
 	if err := d.mounter.Unmount(targetMountDir); err != nil {
-		return nil, fmt.Errorf("unmount %q: %v", err.Error())
+		return nil, fmt.Errorf("unmount %q: %v", targetMountDir, err.Error())
 	}
 
 	if err := os.RemoveAll(targetMountDir); err != nil {
