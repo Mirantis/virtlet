@@ -127,7 +127,7 @@ func (v *cephVolume) Setup() (*libvirtxml.DomainDisk, error) {
 			Protocol: "rbd",
 			Name:     v.opts.Pool + "/" + v.opts.Volume,
 			Hosts: []libvirtxml.DomainDiskSourceHost{
-				libvirtxml.DomainDiskSourceHost{
+				{
 					Name: ipPortPair[0],
 					Port: ipPortPair[1],
 				},

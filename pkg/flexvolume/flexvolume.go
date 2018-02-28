@@ -173,37 +173,37 @@ type cmdInfo struct {
 }
 
 var commands = map[string]cmdInfo{
-	"init": cmdInfo{
+	"init": {
 		0, func(d *FlexVolumeDriver, args []string) (map[string]interface{}, error) {
 			return d.init()
 		},
 	},
-	"attach": cmdInfo{
+	"attach": {
 		2, func(d *FlexVolumeDriver, args []string) (map[string]interface{}, error) {
 			return d.attach(args[0], args[1])
 		},
 	},
-	"detach": cmdInfo{
+	"detach": {
 		2, func(d *FlexVolumeDriver, args []string) (map[string]interface{}, error) {
 			return d.detach(args[0], args[1])
 		},
 	},
-	"waitforattach": cmdInfo{
+	"waitforattach": {
 		2, func(d *FlexVolumeDriver, args []string) (map[string]interface{}, error) {
 			return d.waitForAttach(args[0], args[1])
 		},
 	},
-	"isattached": cmdInfo{
+	"isattached": {
 		2, func(d *FlexVolumeDriver, args []string) (map[string]interface{}, error) {
 			return d.isAttached(args[0], args[1])
 		},
 	},
-	"mount": cmdInfo{
+	"mount": {
 		2, func(d *FlexVolumeDriver, args []string) (map[string]interface{}, error) {
 			return d.mount(args[0], args[1])
 		},
 	},
-	"unmount": cmdInfo{
+	"unmount": {
 		1, func(d *FlexVolumeDriver, args []string) (map[string]interface{}, error) {
 			return d.unmount(args[0])
 		},
