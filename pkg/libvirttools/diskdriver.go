@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/davecgh/go-spew/spew"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 )
 
@@ -137,7 +136,6 @@ func (d *scsiDriver) diskPath(domainDef *libvirtxml.Domain) (*diskPath, error) {
 
 	devPath, sysfsPath, err := pciPath(domainDef, scsiControllers[0].Address)
 	if err != nil {
-		panic("XXX\n" + spew.Sdump(domainDef) + "\n" + err.Error())
 		return nil, err
 	}
 	return &diskPath{

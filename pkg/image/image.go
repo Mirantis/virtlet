@@ -221,7 +221,7 @@ func (s *ImageFileStore) removeImageIfItsNotNeeded(name, keepData string) (bool,
 			return false, nil
 		}
 		if err := os.Remove(linkFileName); err != nil {
-			return false, fmt.Errorf("can't remove %q: %v", linkFileName)
+			return false, fmt.Errorf("can't remove %q: %v", linkFileName, err)
 		}
 		return true, s.removeIfUnreferenced(destName)
 	case os.IsNotExist(err):
