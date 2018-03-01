@@ -1,5 +1,5 @@
-hash: bfd14f42587c81cc3854fc6f09048c251afec1d92ff4c3e5c036803c4626be91
-updated: 2018-01-09T22:14:57.030177862+03:00
+hash: 60efbebee697d6a5b5fcee704c7de1508e1d629c5c658b7693c7bed7d01e6630
+updated: 2018-03-01T19:00:39.202833901+03:00
 imports:
 - name: github.com/boltdb/bolt
   version: 583e8937c61f1af6513608ccc75c97b6abdf4ff9
@@ -106,12 +106,7 @@ imports:
 - name: github.com/golang/protobuf
   version: 4bd1920723d7b7c925de087aa32e2187708897f7
   subpackages:
-  - jsonpb
   - proto
-  - ptypes
-  - ptypes/any
-  - ptypes/duration
-  - ptypes/timestamp
 - name: github.com/google/gofuzz
   version: 44d81051d367757e1c7c6a5a86423ece9afcf63c
 - name: github.com/hashicorp/golang-lru
@@ -122,6 +117,8 @@ imports:
   version: bf9dde6d0d2c004a008c27aaee91170c786f6db8
 - name: github.com/imdario/mergo
   version: 6633656539c1639d9d78127b7d47c622b5d7b6dc
+- name: github.com/inconshreveable/mousetrap
+  version: 76626ae9c91c4f2a10f34cad8ce83ea42c93bb75
 - name: github.com/jonboulle/clockwork
   version: bcac9884e7502bb2b474c0339d889cb981a2f27f
 - name: github.com/juju/ratelimit
@@ -200,10 +197,16 @@ imports:
   version: 8a290539e2e8629dbc4e6bad948158f790ec31f4
 - name: github.com/PuerkitoBio/urlesc
   version: 5bd2802263f21d8788851d5305584c82a5c75d7e
+- name: github.com/renstrom/dedent
+  version: a1eba44eaecc89804e4b05ce2d17168eb353d524
 - name: github.com/Sirupsen/logrus
-  version: 51fe59aca108dc5680109e7b2051cbdcfa5a253c
+  version: 55eb11d21d2a31a3cc93838241d04800f52e823d
+  subpackages:
+  - formatters/logstash
+- name: github.com/spf13/cobra
+  version: 7b2c5ac9fc04fc5efafb60700713d4fa609b777b
 - name: github.com/spf13/pflag
-  version: 9ff6c6923cfffbcd502984b8e0c80539a94968b7
+  version: ee5fd03fd6acfd43e44aea0b4135958546ed8e73
 - name: github.com/ugorji/go
   version: ded73eae5db7e7a0ef6f55aace87a2873c5d2b74
   subpackages:
