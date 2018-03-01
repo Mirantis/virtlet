@@ -18,15 +18,15 @@ package tools
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
 
 	"github.com/davecgh/go-spew/spew"
-	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	v1 "k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/rest"
+	"github.com/renstrom/dedent"
+	"github.com/spf13/cobra"
 
 	"github.com/Mirantis/virtlet/pkg/metadata"
 )
@@ -39,53 +39,68 @@ const (
 )
 
 // DumpMetadata contains data needed by dump-metedata subcommand.
-type DumpMetadata struct {
-	SubCommandCommon
+type dumpMetadataCommand struct {
+	VirtletCommand
 }
 
-var _ SubCommand = &DumpMetadata{}
-
-// RegisterFlags implements RegisterFlags method of SubCommand interface.
-func (d DumpMetadata) RegisterFlags() {
+// NewDumpMetadataCmd returns a cobra.Command that dumps Virtlet metadata
+func NewDumpMetadataCmd() *cobra.Command {
+	dump := &dumpMetadataCommand{}
+	cmd := &cobra.Command{
+		Use:     "dump-metadata",
+		Aliases: []string{"dump"},
+		Short:   "dump Virtlet metadata db",
+		Long: dedent.Dedent(`
+                        This commands dumps the contents of Virtlet metadata db in
+                        a human-readable format.`),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) != 0 {
+				return errors.New("This command does not accept arguments")
+			}
+			return dump.EnsureKubeClient()
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return dump.Run()
+		},
+	}
+	return cmd
 }
 
 // Run implements Run method of SubCommand interface.
-func (d DumpMetadata) Run(clientset *typedv1.CoreV1Client, config *rest.Config, args []string) error {
-	d.Setup(clientset, config)
-
-	pods, err := d.GetVirtletPods()
+func (d *dumpMetadataCommand) Run() error {
+	podNames, err := d.GetVirtletPodNames()
 	if err != nil {
 		return err
 	}
 
-	if len(pods) == 0 {
-		return fmt.Errorf("Not found any Virtlet pod")
+	if len(podNames) == 0 {
+		return fmt.Errorf("No Virtlet pods found")
 	}
 
-	for _, pod := range pods {
-		fname, err := d.copyOutFile(&pod)
+	for _, podName := range podNames {
+		fname, err := d.copyOutFile(podName)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Can't extract metadata db for pod %q: %v\n", pod.Name, err)
+			fmt.Fprintf(os.Stderr, "Can't extract metadata db for pod %q: %v\n", podName, err)
 			continue
 		}
 		defer os.Remove(fname)
 		if err := dumpMetadata(fname); err != nil {
-			fmt.Fprintf(os.Stderr, "Can't dump metadata for pod %q: %v\n", pod.Name, err)
+			fmt.Fprintf(os.Stderr, "Can't dump metadata for pod %q: %v\n", podName, err)
 		}
 	}
 
 	return nil
 }
 
-func (d *DumpMetadata) copyOutFile(pod *v1.Pod) (string, error) {
-	fmt.Printf("Virtlet pod name: %s\n", pod.Name)
+func (d *dumpMetadataCommand) copyOutFile(podName string) (string, error) {
+	fmt.Printf("Virtlet pod name: %s\n", podName)
 
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 	stdin := bytes.NewBufferString("")
 
 	exitCode, err := d.ExecInContainer(
-		pod.Name,
+		podName,
 		"virtlet",
 		"kube-system",
 		stdin,
