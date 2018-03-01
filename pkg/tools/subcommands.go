@@ -52,7 +52,7 @@ type SubCommand interface {
 // requested command was not recognized.
 func ParseFlags(command string) error {
 	flag.StringVar(&kubeconfig, "kubeconfig", "~/.kube/config", "absolute path to the kubeconfig file")
-	flag.StringVar(&master, "master", "http://127.0.0.1:8080", "master url")
+	flag.StringVar(&master, "master", "", "master url")
 
 	if subcommand, err := getSubcommand(command); err != nil {
 		return err
