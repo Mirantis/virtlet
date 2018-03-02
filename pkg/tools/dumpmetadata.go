@@ -38,37 +38,36 @@ const (
 	defaultIndentString = " "
 )
 
-// DumpMetadata contains data needed by dump-metedata subcommand.
+// dumpMetadataCommand contains the data needed by the dump-metedata subcommand
+// which is used to dump the contents of Virtlet boltdb in a human-readable
+// format.
 type dumpMetadataCommand struct {
-	VirtletCommand
+	client KubeClient
 }
 
 // NewDumpMetadataCmd returns a cobra.Command that dumps Virtlet metadata
-func NewDumpMetadataCmd() *cobra.Command {
-	dump := &dumpMetadataCommand{}
+func NewDumpMetadataCmd(client KubeClient) *cobra.Command {
+	dump := &dumpMetadataCommand{client: client}
 	cmd := &cobra.Command{
 		Use:     "dump-metadata",
 		Aliases: []string{"dump"},
 		Short:   "dump Virtlet metadata db",
 		Long: dedent.Dedent(`
-                        This commands dumps the contents of Virtlet metadata db in
+                        This command dumps the contents of Virtlet metadata db in
                         a human-readable format.`),
-		PreRunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 0 {
 				return errors.New("This command does not accept arguments")
 			}
-			return dump.EnsureKubeClient()
-		},
-		RunE: func(cmd *cobra.Command, args []string) error {
 			return dump.Run()
 		},
 	}
 	return cmd
 }
 
-// Run implements Run method of SubCommand interface.
+// Run executes the command.
 func (d *dumpMetadataCommand) Run() error {
-	podNames, err := d.GetVirtletPodNames()
+	podNames, err := d.client.GetVirtletPodNames()
 	if err != nil {
 		return err
 	}
@@ -99,16 +98,10 @@ func (d *dumpMetadataCommand) copyOutFile(podName string) (string, error) {
 	stderr := &bytes.Buffer{}
 	stdin := bytes.NewBufferString("")
 
-	exitCode, err := d.ExecInContainer(
-		podName,
-		"virtlet",
-		"kube-system",
-		stdin,
-		stdout,
-		stderr,
-		"/bin/cat",
-		virtletDBPath,
-	)
+	exitCode, err := d.client.ExecInContainer(
+		podName, "virtlet", "kube-system",
+		stdin, stdout, stderr,
+		[]string{"/bin/cat", virtletDBPath})
 	if err != nil {
 		return "", err
 	}
