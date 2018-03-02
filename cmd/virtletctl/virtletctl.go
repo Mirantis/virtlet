@@ -21,24 +21,24 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Mirantis/virtlet/pkg/tools"
+	"github.com/Mirantis/virtlet/pkg/tools"  
 )
 
-func main() {
-	if len(os.Args) < 2 {
+func main() {  
+	if len(os.Args) < 2 {  
 		fmt.Fprintln(os.Stderr, "Error: missing subcommand name")
-		os.Exit(1)
+		os.Exit(1)   
 	}
 
 	if err := tools.ParseFlags(os.Args[1]); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, err)   
 		os.Exit(1)
 	}
 
 	args := flag.Args()
 
 	if err := tools.RunSubcommand(args[0], args[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, err)  
 		os.Exit(1)
 	}
 }
