@@ -37,7 +37,6 @@ func TestDiskPath(t *testing.T) {
 			devList: libvirtxml.DomainDeviceList{
 				Disks: []libvirtxml.DomainDisk{
 					{
-						Type:   "file",
 						Device: "disk",
 						// NOTE: Source & Driver aren't used here, so omitting them for the sake of simplicity
 						Target: &libvirtxml.DomainDiskTarget{
@@ -47,7 +46,6 @@ func TestDiskPath(t *testing.T) {
 						Address: scsiAddress(0, 0, 0, 0),
 					},
 					{
-						Type:   "file",
 						Device: "disk",
 						Target: &libvirtxml.DomainDiskTarget{
 							Dev: "sdb",
@@ -56,7 +54,6 @@ func TestDiskPath(t *testing.T) {
 						Address: scsiAddress(0, 0, 0, 1),
 					},
 					{
-						Type:   "file",
 						Device: "cdrom",
 						Target: &libvirtxml.DomainDiskTarget{
 							// this one is usually sr0 in the VM,
@@ -103,7 +100,6 @@ func TestDiskPath(t *testing.T) {
 			devList: libvirtxml.DomainDeviceList{
 				Disks: []libvirtxml.DomainDisk{
 					{
-						Type:   "file",
 						Device: "disk",
 						Target: &libvirtxml.DomainDiskTarget{
 							Dev: "vda",
@@ -112,7 +108,6 @@ func TestDiskPath(t *testing.T) {
 						Address: pciAddress(0, 1, 1, 0),
 					},
 					{
-						Type:   "file",
 						Device: "disk",
 						Target: &libvirtxml.DomainDiskTarget{
 							Dev: "vdb",
@@ -121,7 +116,6 @@ func TestDiskPath(t *testing.T) {
 						Address: pciAddress(0, 1, 2, 0),
 					},
 					{
-						Type:   "file",
 						Device: "cdrom",
 						Target: &libvirtxml.DomainDiskTarget{
 							Dev: "vdc",

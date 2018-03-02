@@ -50,36 +50,57 @@
         "Space": "",
         "Local": ""
       },
-      "Type": "file",
       "Device": "disk",
+      "RawIO": "",
+      "SGIO": "",
       "Snapshot": "",
       "Driver": {
         "Name": "qemu",
         "Type": "qcow2",
         "Cache": "",
-        "IO": "",
         "ErrorPolicy": "",
-        "Discard": ""
+        "RErrorPolicy": "",
+        "IO": "",
+        "IOEventFD": "",
+        "EventIDX": "",
+        "CopyOnRead": "",
+        "Discard": "",
+        "IOThread": null,
+        "DetectZeros": "",
+        "Queues": null,
+        "IOMMU": "",
+        "ATS": ""
       },
       "Auth": null,
       "Source": {
-        "File": "/fake/volumes/pool/virtlet_root_77f29a0e-46af-4188-a6af-9ff8b8a65224",
-        "Device": "",
-        "Protocol": "",
-        "Name": "",
-        "Pool": "",
-        "Volume": "",
-        "Hosts": null,
-        "StartupPolicy": ""
+        "File": {
+          "File": "/fake/volumes/pool/virtlet_root_77f29a0e-46af-4188-a6af-9ff8b8a65224",
+          "SecLabel": null
+        },
+        "Block": null,
+        "Dir": null,
+        "Network": null,
+        "Volume": null,
+        "StartupPolicy": "",
+        "Encryption": null
       },
+      "BackingStore": null,
+      "Geometry": null,
+      "BlockIO": null,
+      "Mirror": null,
       "Target": null,
       "IOTune": null,
-      "Serial": "",
       "ReadOnly": null,
       "Shareable": null,
-      "Address": null,
+      "Transient": null,
+      "Serial": "",
+      "WWN": "",
+      "Vendor": "",
+      "Product": "",
+      "Encryption": null,
       "Boot": null,
-      "WWN": ""
+      "Alias": null,
+      "Address": null
     }
   },
   {

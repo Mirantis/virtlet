@@ -73,14 +73,20 @@
         "Local": "domain"
       },
       "Type": "kvm",
+      "ID": null,
       "Name": "virtlet-231700d5-c9a6-container1",
       "UUID": "231700d5-c9a6-5a49-738d-99a954c51550",
+      "Title": "",
+      "Description": "",
+      "MaximumMemory": null,
       "Memory": {
         "Value": 1024,
-        "Unit": "MiB"
+        "Unit": "MiB",
+        "DumpCore": ""
       },
       "CurrentMemory": null,
-      "MaximumMemory": null,
+      "BlockIOTune": null,
+      "MemoryTune": null,
       "MemoryBacking": null,
       "VCPU": {
         "Placement": "",
@@ -89,6 +95,8 @@
         "Value": 1
       },
       "VCPUs": null,
+      "IOThreads": 0,
+      "IOThreadIDs": null,
       "CPUTune": {
         "Shares": {
           "Value": 0
@@ -98,32 +106,53 @@
         },
         "Quota": {
           "Value": 0
-        }
+        },
+        "GlobalPeriod": null,
+        "GlobalQuota": null,
+        "EmulatorPeriod": null,
+        "EmulatorQuota": null,
+        "IOThreadPeriod": null,
+        "IOThreadQuota": null,
+        "VCPUPin": null,
+        "EmulatorPin": null,
+        "IOThreadPin": null,
+        "VCPUSched": null,
+        "IOThreadSched": null
       },
+      "NUMATune": null,
       "Resource": null,
       "SysInfo": null,
+      "Bootloader": "",
+      "BootloaderArgs": "",
       "OS": {
         "Type": {
           "Arch": "",
           "Machine": "",
           "Type": "hvm"
         },
+        "Init": "",
+        "InitArgs": null,
+        "InitEnv": null,
+        "InitDir": "",
+        "InitUser": "",
+        "InitGroup": "",
         "Loader": null,
         "NVRam": null,
         "Kernel": "",
         "Initrd": "",
-        "KernelArgs": "",
+        "Cmdline": "",
+        "DTB": "",
+        "ACPI": null,
         "BootDevices": [
           {
             "Dev": "hd"
           }
         ],
         "BootMenu": null,
-        "SMBios": null,
         "BIOS": null,
-        "Init": "",
-        "InitArgs": null
+        "SMBios": null
       },
+      "IDMap": null,
       "Features": {
         "PAE": null,
         "ACPI": {},
@@ -137,83 +166,80 @@
         "PMU": null,
         "VMPort": null,
         "GIC": null,
-        "SMM": null
+        "SMM": null,
+        "IOAPIC": null,
+        "HPT": null,
+        "Capabilities": null
       },
       "CPU": null,
       "Clock": null,
       "OnPoweroff": "destroy",
       "OnReboot": "restart",
       "OnCrash": "restart",
+      "PM": null,
       "Devices": {
         "Emulator": "/vmwrapper",
-        "Controllers": [
-          {
-            "XMLName": {
-              "Space": "",
-              "Local": "controller"
-            },
-            "Type": "scsi",
-            "Index": 0,
-            "Model": "virtio-scsi",
-            "Address": {
-              "USB": null,
-              "PCI": {
-                "Domain": 0,
-                "Bus": 0,
-                "Slot": 1,
-                "Function": 0
-              },
-              "Drive": null,
-              "DIMM": null
-            }
-          },
-          {
-            "XMLName": {
-              "Space": "",
-              "Local": "controller"
-            },
-            "Type": "pci",
-            "Index": null,
-            "Model": "pci-root",
-            "Address": null
-          }
-        ],
         "Disks": [
           {
             "XMLName": {
               "Space": "",
               "Local": "disk"
             },
-            "Type": "file",
             "Device": "disk",
+            "RawIO": "",
+            "SGIO": "",
             "Snapshot": "",
             "Driver": {
               "Name": "qemu",
               "Type": "qcow2",
               "Cache": "",
-              "IO": "",
               "ErrorPolicy": "",
-              "Discard": ""
+              "RErrorPolicy": "",
+              "IO": "",
+              "IOEventFD": "",
+              "EventIDX": "",
+              "CopyOnRead": "",
+              "Discard": "",
+              "IOThread": null,
+              "DetectZeros": "",
+              "Queues": null,
+              "IOMMU": "",
+              "ATS": ""
             },
             "Auth": null,
             "Source": {
-              "File": "/var/lib/virtlet/volumes/virtlet_root_231700d5-c9a6-5a49-738d-99a954c51550",
-              "Device": "",
-              "Protocol": "",
-              "Name": "",
-              "Pool": "",
-              "Volume": "",
-              "Hosts": null,
-              "StartupPolicy": ""
+              "File": {
+                "File": "/var/lib/virtlet/volumes/virtlet_root_231700d5-c9a6-5a49-738d-99a954c51550",
+                "SecLabel": null
+              },
+              "Block": null,
+              "Dir": null,
+              "Network": null,
+              "Volume": null,
+              "StartupPolicy": "",
+              "Encryption": null
             },
+            "BackingStore": null,
+            "Geometry": null,
+            "BlockIO": null,
+            "Mirror": null,
             "Target": {
               "Dev": "sda",
-              "Bus": "scsi"
+              "Bus": "scsi",
+              "Tray": "",
+              "Removable": ""
             },
             "IOTune": null,
-            "Serial": "",
             "ReadOnly": null,
             "Shareable": null,
+            "Transient": null,
+            "Serial": "",
+            "WWN": "",
+            "Vendor": "",
+            "Product": "",
+            "Encryption": null,
+            "Boot": null,
+            "Alias": null,
             "Address": {
               "USB": null,
               "PCI": null,
@@ -223,46 +249,74 @@
                 "Target": 0,
                 "Unit": 0
               },
-              "DIMM": null
-            },
-            "Boot": null,
-            "WWN": ""
+              "DIMM": null,
+              "ISA": null,
+              "VirtioMMIO": null,
+              "CCW": null,
+              "VirtioSerial": null,
+              "SpaprVIO": null
+            }
           },
           {
             "XMLName": {
               "Space": "",
               "Local": "disk"
             },
-            "Type": "block",
             "Device": "disk",
+            "RawIO": "",
+            "SGIO": "",
             "Snapshot": "",
             "Driver": {
               "Name": "qemu",
               "Type": "raw",
               "Cache": "",
-              "IO": "",
               "ErrorPolicy": "",
-              "Discard": ""
+              "RErrorPolicy": "",
+              "IO": "",
+              "IOEventFD": "",
+              "EventIDX": "",
+              "CopyOnRead": "",
+              "Discard": "",
+              "IOThread": null,
+              "DetectZeros": "",
+              "Queues": null,
+              "IOMMU": "",
+              "ATS": ""
             },
             "Auth": null,
             "Source": {
-              "File": "",
-              "Device": "/dev/loop0",
-              "Protocol": "",
-              "Name": "",
-              "Pool": "",
-              "Volume": "",
-              "Hosts": null,
-              "StartupPolicy": ""
+              "File": null,
+              "Block": {
+                "Dev": "/dev/loop0",
+                "SecLabel": null
+              },
+              "Dir": null,
+              "Network": null,
+              "Volume": null,
+              "StartupPolicy": "",
+              "Encryption": null
             },
+            "BackingStore": null,
+            "Geometry": null,
+            "BlockIO": null,
+            "Mirror": null,
             "Target": {
               "Dev": "sdb",
-              "Bus": "scsi"
+              "Bus": "scsi",
+              "Tray": "",
+              "Removable": ""
             },
             "IOTune": null,
-            "Serial": "",
             "ReadOnly": null,
             "Shareable": null,
+            "Transient": null,
+            "Serial": "",
+            "WWN": "",
+            "Vendor": "",
+            "Product": "",
+            "Encryption": null,
+            "Boot": null,
+            "Alias": null,
             "Address": {
               "USB": null,
               "PCI": null,
@@ -272,46 +326,74 @@
                 "Target": 0,
                 "Unit": 1
               },
-              "DIMM": null
-            },
-            "Boot": null,
-            "WWN": ""
+              "DIMM": null,
+              "ISA": null,
+              "VirtioMMIO": null,
+              "CCW": null,
+              "VirtioSerial": null,
+              "SpaprVIO": null
+            }
           },
           {
             "XMLName": {
               "Space": "",
               "Local": "disk"
             },
-            "Type": "file",
             "Device": "cdrom",
+            "RawIO": "",
+            "SGIO": "",
             "Snapshot": "",
             "Driver": {
               "Name": "qemu",
               "Type": "raw",
               "Cache": "",
-              "IO": "",
               "ErrorPolicy": "",
-              "Discard": ""
+              "RErrorPolicy": "",
+              "IO": "",
+              "IOEventFD": "",
+              "EventIDX": "",
+              "CopyOnRead": "",
+              "Discard": "",
+              "IOThread": null,
+              "DetectZeros": "",
+              "Queues": null,
+              "IOMMU": "",
+              "ATS": ""
             },
             "Auth": null,
             "Source": {
-              "File": "/var/lib/virtlet/config/config-231700d5-c9a6-5a49-738d-99a954c51550.iso",
-              "Device": "",
-              "Protocol": "",
-              "Name": "",
-              "Pool": "",
-              "Volume": "",
-              "Hosts": null,
-              "StartupPolicy": ""
+              "File": {
+                "File": "/var/lib/virtlet/config/config-231700d5-c9a6-5a49-738d-99a954c51550.iso",
+                "SecLabel": null
+              },
+              "Block": null,
+              "Dir": null,
+              "Network": null,
+              "Volume": null,
+              "StartupPolicy": "",
+              "Encryption": null
             },
+            "BackingStore": null,
+            "Geometry": null,
+            "BlockIO": null,
+            "Mirror": null,
             "Target": {
               "Dev": "sdc",
-              "Bus": "scsi"
+              "Bus": "scsi",
+              "Tray": "",
+              "Removable": ""
             },
             "IOTune": null,
-            "Serial": "",
             "ReadOnly": {},
             "Shareable": null,
+            "Transient": null,
+            "Serial": "",
+            "WWN": "",
+            "Vendor": "",
+            "Product": "",
+            "Encryption": null,
+            "Boot": null,
+            "Alias": null,
             "Address": {
               "USB": null,
               "PCI": null,
@@ -321,12 +403,68 @@
                 "Target": 0,
                 "Unit": 2
               },
-              "DIMM": null
-            },
-            "Boot": null,
-            "WWN": ""
+              "DIMM": null,
+              "ISA": null,
+              "VirtioMMIO": null,
+              "CCW": null,
+              "VirtioSerial": null,
+              "SpaprVIO": null
+            }
           }
         ],
+        "Controllers": [
+          {
+            "XMLName": {
+              "Space": "",
+              "Local": "controller"
+            },
+            "Type": "scsi",
+            "Index": 0,
+            "Model": "virtio-scsi",
+            "Driver": null,
+            "PCI": null,
+            "USB": null,
+            "VirtIOSerial": null,
+            "Alias": null,
+            "Address": {
+              "USB": null,
+              "PCI": {
+                "Domain": 0,
+                "Bus": 0,
+                "Slot": 1,
+                "Function": 0,
+                "MultiFunction": ""
+              },
+              "Drive": null,
+              "DIMM": null,
+              "ISA": null,
+              "VirtioMMIO": null,
+              "CCW": null,
+              "VirtioSerial": null,
+              "SpaprVIO": null
+            }
+          },
+          {
+            "XMLName": {
+              "Space": "",
+              "Local": ""
+            },
+            "Type": "pci",
+            "Index": null,
+            "Model": "pci-root",
+            "Driver": null,
+            "PCI": {
+              "Model": null,
+              "Target": null,
+              "Hole64": null
+            },
+            "USB": null,
+            "VirtIOSerial": null,
+            "Alias": null,
+            "Address": null
+          }
+        ],
+        "Leases": null,
         "Filesystems": null,
         "Interfaces": null,
         "Serials": [
@@ -335,21 +473,41 @@
               "Space": "",
               "Local": "serial"
             },
-            "Type": "unix",
             "Source": {
-              "Mode": "connect",
-              "Path": "/var/lib/libvirt/streamer.sock",
-              "Append": ""
+              "Null": null,
+              "VC": null,
+              "Pty": null,
+              "Dev": null,
+              "File": null,
+              "Pipe": null,
+              "StdIO": null,
+              "UDP": null,
+              "TCP": null,
+              "UNIX": {
+                "Mode": "connect",
+                "Path": "/var/lib/libvirt/streamer.sock",
+                "Reconnect": {
+                  "Enabled": "yes",
+                  "Timeout": 1
+                },
+                "SecLabel": null
+              },
+              "SpiceVMC": null,
+              "SpicePort": null,
+              "NMDM": null
             },
+            "Protocol": null,
             "Target": {
               "Type": "",
               "Port": 0
             },
+            "Log": null,
             "Alias": null,
             "Address": null
           }
         ],
         "Consoles": null,
+        "Channels": null,
         "Inputs": [
           {
             "XMLName": {
@@ -358,6 +516,9 @@
             },
             "Type": "tablet",
             "Bus": "usb",
+            "Driver": null,
+            "Source": null,
+            "Alias": null,
             "Address": null
           }
         ],
@@ -365,29 +526,28 @@
           {
             "XMLName": {
               "Space": "",
-              "Local": "graphics"
+              "Local": ""
             },
-            "Type": "vnc",
-            "AutoPort": "",
-            "Port": -1,
-            "TLSPort": 0,
-            "WebSocket": 0,
-            "Listen": "",
-            "Socket": "",
-            "Keymap": "",
-            "Passwd": "",
-            "PasswdValidTo": "",
-            "Connected": "",
-            "SharePolicy": "",
-            "DefaultMode": "",
-            "Display": "",
-            "XAuth": "",
-            "FullScreen": "",
-            "ReplaceUser": "",
-            "MultiUser": "",
-            "Listeners": null
+            "SDL": null,
+            "VNC": {
+              "Socket": "",
+              "Port": -1,
+              "AutoPort": "",
+              "WebSocket": 0,
+              "Keymap": "",
+              "SharePolicy": "",
+              "Passwd": "",
+              "PasswdValidTo": "",
+              "Connected": "",
+              "Listen": "",
+              "Listeners": null
+            },
+            "RDP": null,
+            "Desktop": null,
+            "Spice": null
           }
         ],
+        "Sounds": null,
         "Videos": [
           {
             "XMLName": {
@@ -399,18 +559,27 @@
               "Heads": 0,
               "Ram": 0,
               "VRam": 0,
-              "VGAMem": 0
+              "VRam64": 0,
+              "VGAMem": 0,
+              "Primary": "",
+              "Accel": null
             },
+            "Driver": null,
+            "Alias": null,
             "Address": null
           }
         ],
-        "Channels": null,
-        "MemBalloon": null,
-        "Sounds": null,
-        "RNGs": null,
         "Hostdevs": null,
-        "Memorydevs": null
+        "Hubs": null,
+        "Watchdog": null,
+        "MemBalloon": null,
+        "RNGs": null,
+        "NVRAM": null,
+        "Panics": null,
+        "Memorydevs": null,
+        "IOMMU": null
       },
+      "SecLabel": null,
       "QEMUCommandline": {
         "XMLName": {
           "Space": "http://libvirt.org/schemas/domain/qemu/1.0",
@@ -451,7 +620,9 @@
             "Value": "42"
           }
         ]
-      }
+      },
+      "LXCNamespace": null,
+      "KeyWrap": null
     }
   },
   {

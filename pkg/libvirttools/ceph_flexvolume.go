@@ -113,7 +113,6 @@ func (v *cephVolume) Setup() (*libvirtxml.DomainDisk, error) {
 	}
 
 	return &libvirtxml.DomainDisk{
-		Type:   "network",
 		Device: "disk",
 		Driver: &libvirtxml.DomainDiskDriver{Name: "qemu", Type: "raw"},
 		Auth: &libvirtxml.DomainDiskAuth{
@@ -124,12 +123,14 @@ func (v *cephVolume) Setup() (*libvirtxml.DomainDisk, error) {
 			},
 		},
 		Source: &libvirtxml.DomainDiskSource{
-			Protocol: "rbd",
-			Name:     v.opts.Pool + "/" + v.opts.Volume,
-			Hosts: []libvirtxml.DomainDiskSourceHost{
-				{
-					Name: ipPortPair[0],
-					Port: ipPortPair[1],
+			Network: &libvirtxml.DomainDiskSourceNetwork{
+				Protocol: "rbd",
+				Name:     v.opts.Pool + "/" + v.opts.Volume,
+				Hosts: []libvirtxml.DomainDiskSourceHost{
+					{
+						Name: ipPortPair[0],
+						Port: ipPortPair[1],
+					},
 				},
 			},
 		},

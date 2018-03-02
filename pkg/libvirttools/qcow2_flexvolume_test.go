@@ -89,16 +89,16 @@ func TestQCOW2VolumeLifeCycle(t *testing.T) {
 		t.Errorf("Setup returned an error: %v", err)
 	}
 
-	if vol.Type != "file" {
-		t.Errorf("Expected 'file' volume type, received: %s", vol.Type)
+	if vol.Source.File == nil {
+		t.Errorf("Expected 'file' volume type")
 	}
 
 	if vol.Device != "disk" {
 		t.Errorf("Expected 'disk' as volume device, received: %s", vol.Device)
 	}
 
-	if vol.Source.File != expectedVolumePath {
-		t.Errorf("Expected '%s' as volume path, received: %s", expectedVolumePath, vol.Source.File)
+	if vol.Source.File.File != expectedVolumePath {
+		t.Errorf("Expected '%s' as volume path, received: %s", expectedVolumePath, vol.Source.File.File)
 	}
 
 	rec.Rec("volume retuned by qcow2_flexvolume", vol)

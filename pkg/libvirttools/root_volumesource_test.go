@@ -87,15 +87,15 @@ func TestRootVolumeLifeCycle(t *testing.T) {
 		t.Errorf("Setup returned an error: %v", err)
 	}
 
-	if vol.Type != "file" {
-		t.Errorf("Expected 'file' volume type, received: %s", vol.Type)
+	if vol.Source.File == nil {
+		t.Errorf("Expected 'file' volume type")
 	}
 
 	if vol.Device != "disk" {
 		t.Errorf("Expected 'disk' as volume device, received: %s", vol.Device)
 	}
 
-	if vol.Source.File != expectedRootVolumePath {
+	if vol.Source.File.File != expectedRootVolumePath {
 		t.Errorf("Expected '%s' as root volume path, received: %s", expectedRootVolumePath, vol.Source.File)
 	}
 

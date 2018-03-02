@@ -100,12 +100,12 @@ func (dc *FakeDomainConnection) DefineDomain(def *libvirtxml.Domain) (virt.Domai
 	updatedDef := copyDomain(def)
 	if updatedDef.Devices != nil {
 		for _, disk := range updatedDef.Devices.Disks {
-			if disk.Type != "file" || disk.Source == nil {
+			if disk.Source == nil || disk.Source.File == nil {
 				continue
 			}
-			p := strings.Index(disk.Source.File, configPathHint)
+			p := strings.Index(disk.Source.File.File, configPathHint)
 			if p >= 0 {
-				disk.Source.File = configPathReplacement + disk.Source.File[p+len(configPathHint):]
+				disk.Source.File.File = configPathReplacement + disk.Source.File.File[p+len(configPathHint):]
 			}
 		}
 	}
@@ -191,10 +191,10 @@ func (d *FakeDomain) Create() error {
 	d.rec.Rec("Create", nil)
 	if d.def.Devices != nil {
 		for _, disk := range d.def.Devices.Disks {
-			if disk.Type != "file" || disk.Source == nil {
+			if disk.Source == nil || disk.Source.File == nil {
 				continue
 			}
-			origPath := disk.Source.File
+			origPath := disk.Source.File.File
 			if filepath.Ext(origPath) == ".iso" || strings.HasPrefix(filepath.Base(origPath), "config-iso") {
 				m, err := testutils.IsoToMap(origPath)
 				if err != nil {
