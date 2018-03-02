@@ -38,7 +38,9 @@ const (
 	defaultIndentString = " "
 )
 
-// DumpMetadata contains data needed by dump-metedata subcommand.
+// dumpMetadataCommand contains the data needed by the dump-metedata subcommand
+// which is used to dump the contents of Virtlet boltdb in a human-readable
+// format.
 type dumpMetadataCommand struct {
 	VirtletCommand
 }
@@ -51,22 +53,19 @@ func NewDumpMetadataCmd() *cobra.Command {
 		Aliases: []string{"dump"},
 		Short:   "dump Virtlet metadata db",
 		Long: dedent.Dedent(`
-                        This commands dumps the contents of Virtlet metadata db in
+                        This command dumps the contents of Virtlet metadata db in
                         a human-readable format.`),
-		PreRunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 0 {
 				return errors.New("This command does not accept arguments")
 			}
-			return dump.EnsureKubeClient()
-		},
-		RunE: func(cmd *cobra.Command, args []string) error {
 			return dump.Run()
 		},
 	}
 	return cmd
 }
 
-// Run implements Run method of SubCommand interface.
+// Run executes the command.
 func (d *dumpMetadataCommand) Run() error {
 	podNames, err := d.GetVirtletPodNames()
 	if err != nil {
@@ -100,15 +99,9 @@ func (d *dumpMetadataCommand) copyOutFile(podName string) (string, error) {
 	stdin := bytes.NewBufferString("")
 
 	exitCode, err := d.ExecInContainer(
-		podName,
-		"virtlet",
-		"kube-system",
-		stdin,
-		stdout,
-		stderr,
-		"/bin/cat",
-		virtletDBPath,
-	)
+		podName, "virtlet", "kube-system",
+		stdin, stdout, stderr,
+		[]string{"/bin/cat", virtletDBPath})
 	if err != nil {
 		return "", err
 	}

@@ -25,6 +25,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 const (
@@ -34,32 +35,45 @@ const (
 var (
 	kubeConfig string
 	apiServer  string
+	namespace  string
 )
 
 func AddGlobalFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&kubeConfig, "kubeconfig", DefaultKubeConfig, "absolute path to the kubeconfig file")
 	fs.StringVar(&apiServer, "apiserver", "", "apiserver url")
+	fs.StringVarP(&namespace, "namespace", "n", "", "vm pod namespace to use")
 }
 
-func getKubeClient() (*rest.Config, kubernetes.Interface, error) {
+func getKubeClient() (*rest.Config, string, kubernetes.Interface, error) {
 	configPath := kubeConfig
 	if kubeConfig[:2] == "~/" {
 		usr, err := user.Current()
 		if err != nil {
-			return nil, nil, err
+			return nil, "", nil, err
 		}
 		configPath = filepath.Join(usr.HomeDir, kubeConfig[2:])
 	}
 
-	config, err := clientcmd.BuildConfigFromFlags(apiServer, configPath)
+	cfg := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: configPath},
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: apiServer}})
+	clientCfg, err := cfg.ClientConfig()
 	if err != nil {
-		return nil, nil, fmt.Errorf("Can't create kubernetes api client config: %v", err)
+		return nil, "", nil, err
+	}
+	client, err := kubernetes.NewForConfig(clientCfg)
+	if err != nil {
+		return nil, "", nil, fmt.Errorf("Can't create kubernetes api client: %v", err)
 	}
 
-	client, err := kubernetes.NewForConfig(config)
+	ns, _, err := cfg.Namespace()
 	if err != nil {
-		return nil, nil, fmt.Errorf("Can't create kubernetes api client: %v", err)
+		return nil, "", nil, err
 	}
-
-	return config, client, nil
+	if namespace != "" {
+		ns = namespace
+	} else if ns == "" {
+		ns = "default"
+	}
+	return clientCfg, ns, client, nil
 }

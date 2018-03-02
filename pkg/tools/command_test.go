@@ -24,7 +24,8 @@ import (
 	"strings"
 	"testing"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/davecgh/go-spew/spew"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	fakekube "k8s.io/client-go/kubernetes/fake"
@@ -34,6 +35,10 @@ import (
 	fakerest "k8s.io/client-go/rest/fake"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/remotecommand"
+)
+
+const (
+	sampleContainerId = "docker://virtlet.cloud__2232e3bf-d702-5824-5e3c-f12e60e616b0"
 )
 
 type fakeExecutor struct {
@@ -71,20 +76,10 @@ func TestGetVirtletPodNames(t *testing.T) {
 		if action.GetNamespace() != expectedNamespace {
 			t.Errorf("wrong namespace: %q instead of %q", action.GetNamespace(), expectedNamespace)
 		}
-		listAction := action.(testcore.ListAction)
-		expectedLabels := "runtime=virtlet"
-		lr := listAction.GetListRestrictions()
-		if lr.Labels.String() != expectedLabels {
-			t.Errorf("bad labels: %q instead of %q", lr.Labels, expectedLabels)
-		}
-		if !lr.Fields.Empty() {
-			t.Errorf("bad field selectors: %q instead of empty", lr.Fields)
-		}
-
 		return true, &v1.PodList{
 			Items: []v1.Pod{
 				{
-					ObjectMeta: metav1.ObjectMeta{
+					ObjectMeta: meta_v1.ObjectMeta{
 						Name:      "virtlet-g9wtz",
 						Namespace: "kube-system",
 						Labels: map[string]string{
@@ -93,12 +88,20 @@ func TestGetVirtletPodNames(t *testing.T) {
 					},
 				},
 				{
-					ObjectMeta: metav1.ObjectMeta{
+					ObjectMeta: meta_v1.ObjectMeta{
 						Name:      "virtlet-foo42",
 						Namespace: "kube-system",
 						Labels: map[string]string{
 							"runtime": "virtlet",
 						},
+					},
+				},
+				// this pod doesn't have proper labels and thus
+				// it should be ignored
+				{
+					ObjectMeta: meta_v1.ObjectMeta{
+						Name:      "whatever",
+						Namespace: "kube-system",
 					},
 				},
 			},
@@ -113,7 +116,105 @@ func TestGetVirtletPodNames(t *testing.T) {
 	podNamesStr := strings.Join(podNames, ",")
 	expectedPodNamesStr := "virtlet-g9wtz,virtlet-foo42"
 	if podNamesStr != expectedPodNamesStr {
-		t.Errorf("bad pod names: %q instead of %q", podNamesStr, expectedPodNamesStr)
+		t.Errorf("Bad pod names: %q instead of %q", podNamesStr, expectedPodNamesStr)
+	}
+}
+
+func TestGetVMPodInfo(t *testing.T) {
+	fc := &fakekube.Clientset{}
+	fc.AddReactor("get", "pods", func(action testcore.Action) (bool, runtime.Object, error) {
+		expectedNamespace := "default"
+		if action.GetNamespace() != expectedNamespace {
+			t.Errorf("Wrong namespace: %q instead of %q", action.GetNamespace(), expectedNamespace)
+		}
+		getAction := action.(testcore.GetAction)
+		expectedName := "cirros-vm"
+		if getAction.GetName() != expectedName {
+			t.Errorf("Bad pod name: %q instead of %q", getAction.GetName(), expectedName)
+		}
+		return true, &v1.Pod{
+			ObjectMeta: meta_v1.ObjectMeta{
+				Name:      "cirros-vm",
+				Namespace: "default",
+			},
+			Spec: v1.PodSpec{
+				NodeName: "kube-node-1",
+				Containers: []v1.Container{
+					{
+						Name: "foobar",
+					},
+				},
+			},
+			Status: v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:        "foobar",
+						ContainerID: sampleContainerId,
+					},
+				},
+			},
+		}, nil
+	})
+	fc.AddReactor("list", "pods", func(action testcore.Action) (bool, runtime.Object, error) {
+		expectedNamespace := "kube-system"
+		if action.GetNamespace() != expectedNamespace {
+			t.Errorf("wrong namespace: %q instead of %q", action.GetNamespace(), expectedNamespace)
+		}
+		// fake Clientset doesn't handle the field selector currently
+		listAction := action.(testcore.ListAction)
+		expectedFieldSelector := "spec.nodeName=kube-node-1"
+		fieldSelector := listAction.GetListRestrictions().Fields.String()
+		if fieldSelector != expectedFieldSelector {
+			t.Errorf("bad fieldSelector: %q instead of %q", fieldSelector, expectedFieldSelector)
+		}
+		return true, &v1.PodList{
+			Items: []v1.Pod{
+				{
+					ObjectMeta: meta_v1.ObjectMeta{
+						Name:      "virtlet-g9wtz",
+						Namespace: "kube-system",
+						Labels: map[string]string{
+							"runtime": "virtlet",
+						},
+					},
+					Spec: v1.PodSpec{
+						NodeName: "kube-node-1",
+					},
+				},
+				// this pod doesn't have proper labels and thus
+				// it should be ignored
+				{
+					ObjectMeta: meta_v1.ObjectMeta{
+						Name:      "whatever",
+						Namespace: "kube-system",
+					},
+					Spec: v1.PodSpec{
+						NodeName: "kube-node-1",
+					},
+				},
+			},
+		}, nil
+	})
+
+	c := &VirtletCommand{client: fc, namespace: "default"}
+	vmPodInfo, err := c.GetVMPodInfo("cirros-vm")
+	if err != nil {
+		t.Fatalf("GetVirtletPodNames(): %v", err)
+	}
+
+	expectedVMPodInfo := &VMPodInfo{
+		NodeName:       "kube-node-1",
+		VirtletPodName: "virtlet-g9wtz",
+		ContainerId:    sampleContainerId,
+		ContainerName:  "foobar",
+	}
+	if !reflect.DeepEqual(expectedVMPodInfo, vmPodInfo) {
+		t.Errorf("Bad VM PodInfo: got:\n%s\ninstead of\n%s", spew.Sdump(vmPodInfo), spew.Sdump(expectedVMPodInfo))
+	}
+
+	expectedDomainName := "virtlet-2232e3bf-d702-foobar"
+	if vmPodInfo.LibvirtDomainName() != expectedDomainName {
+		t.Errorf("Bad libvirt domain name: %q instead of %q", vmPodInfo.LibvirtDomainName(), expectedDomainName)
 	}
 }
 
@@ -137,7 +238,7 @@ func TestExecInContainer(t *testing.T) {
 		executorFactory: fakeExecutorFactory(t, &fe),
 	}
 	var stdin, stdout, stderr bytes.Buffer
-	exitCode, err := c.ExecInContainer("virtlet-foo42", "virtlet", "kube-system", &stdin, &stdout, &stderr, "echo", "foobar")
+	exitCode, err := c.ExecInContainer("virtlet-foo42", "virtlet", "kube-system", &stdin, &stdout, &stderr, []string{"echo", "foobar"})
 	if err != nil {
 		t.Errorf("ExecInContainer returned error: %v", err)
 	}
@@ -180,3 +281,9 @@ func TestExecInContainer(t *testing.T) {
 		t.Errorf("Bad query: %#v", fe.url.Query())
 	}
 }
+
+// TODO: test not finding Virtlet pod
+// TODO: add checks for whether the target pod is a VM pod
+// (via the pod annotation, the runtime name must be configurable though)
+// TODO: add test for 'virsh' command
+// TODO: don't require --node on a single-Virtlet-node clusters

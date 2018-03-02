@@ -37,6 +37,7 @@ func newRootCmd() *cobra.Command {
 	}
 	tools.AddGlobalFlags(cmd.PersistentFlags())
 	cmd.AddCommand(tools.NewDumpMetadataCmd())
+	cmd.AddCommand(tools.NewVirshCmd())
 	return cmd
 }
 

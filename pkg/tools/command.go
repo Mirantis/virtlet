@@ -17,13 +17,16 @@ limitations under the License.
 package tools
 
 import (
+	"fmt"
 	"io"
 	"net/url"
+	"strings"
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
+	v1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/exec"
@@ -31,6 +34,31 @@ import (
 	// register standard k8s types
 	_ "k8s.io/client-go/pkg/api/install"
 )
+
+// VMPodInfo describes a VM pod in a way that's necessary for virtletctl to
+// handle it
+type VMPodInfo struct {
+	// NodeName is the name of the node where the VM pod runs
+	NodeName string
+	// VirtletPodName is the name of the virtlet pod that manages this VM pod
+	VirtletPodName string
+	// ContainerId is the id of the container in the VM pod
+	ContainerId string
+	// ContainerName is the name of the container in the VM pod
+	ContainerName string
+}
+
+// LibvirtDomainName returns the name of the libvirt domain for the VMPodInfo.
+func (podInfo VMPodInfo) LibvirtDomainName() string {
+	containerId := podInfo.ContainerId
+	if p := strings.Index(containerId, "__"); p >= 0 {
+		containerId = containerId[p+2:]
+	}
+	if len(containerId) > 13 {
+		containerId = containerId[:13]
+	}
+	return fmt.Sprintf("virtlet-%s-%s", containerId, podInfo.ContainerName)
+}
 
 type ExecutorFactory func(config *rest.Config, method string, url *url.URL) (remotecommand.Executor, error)
 
@@ -44,6 +72,7 @@ type VirtletCommand struct {
 	client          kubernetes.Interface
 	restClient      rest.Interface
 	config          *rest.Config
+	namespace       string
 }
 
 func (c *VirtletCommand) EnsureKubeClient() error {
@@ -53,25 +82,28 @@ func (c *VirtletCommand) EnsureKubeClient() error {
 	if c.client != nil {
 		return nil
 	}
-	config, client, err := getKubeClient()
+	config, namespace, client, err := getKubeClient()
 	if err != nil {
 		return err
 	}
 	c.client = client
 	c.config = config
+	c.namespace = namespace
 	c.restClient = client.CoreV1().RESTClient()
 	return nil
 }
 
-// GetVirtletPodNames returns a list of names of the virtlet pods
-// present in the cluster.
-func (c *VirtletCommand) GetVirtletPodNames() ([]string, error) {
+func (c *VirtletCommand) getVirtletPodNames(nodeName string) ([]string, error) {
 	if err := c.EnsureKubeClient(); err != nil {
 		return nil, err
 	}
-	pods, err := c.client.CoreV1().Pods("kube-system").List(meta_v1.ListOptions{
+	opts := meta_v1.ListOptions{
 		LabelSelector: "runtime=virtlet",
-	})
+	}
+	if nodeName != "" {
+		opts.FieldSelector = "spec.nodeName=" + nodeName
+	}
+	pods, err := c.client.CoreV1().Pods("kube-system").List(opts)
 	if err != nil {
 		return nil, err
 	}
@@ -83,6 +115,69 @@ func (c *VirtletCommand) GetVirtletPodNames() ([]string, error) {
 	return r, nil
 }
 
+func (c *VirtletCommand) getVMPod(podName string) (*v1.Pod, error) {
+	if err := c.EnsureKubeClient(); err != nil {
+		return nil, err
+	}
+	return c.client.CoreV1().Pods(c.namespace).Get(podName, meta_v1.GetOptions{})
+}
+
+// GetVirtletPodNames returns a list of names of the virtlet pods
+// present in the cluster.
+func (c *VirtletCommand) GetVirtletPodNames() ([]string, error) {
+	return c.getVirtletPodNames("")
+}
+
+// GetVirtletPodNameForNode returns a name of the virtlet pod on
+// the specified k8s node.
+func (c *VirtletCommand) GetVirtletPodNameForNode(nodeName string) (string, error) {
+	virtletPodNames, err := c.getVirtletPodNames(nodeName)
+	if err != nil {
+		return "", err
+	}
+
+	if len(virtletPodNames) == 0 {
+		return "", fmt.Errorf("no Virtlet pods found on the node %q", nodeName)
+	}
+
+	if len(virtletPodNames) > 1 {
+		return "", fmt.Errorf("more than one Virtlet pod found on the node %q", nodeName)
+	}
+
+	return virtletPodNames[0], nil
+}
+
+// GetVMPodInfo returns then name of the virtlet pod and the vm container name for
+// the specified VM pod.
+func (c *VirtletCommand) GetVMPodInfo(podName string) (*VMPodInfo, error) {
+	pod, err := c.getVMPod(podName)
+	if err != nil {
+		return nil, err
+	}
+	if pod.Spec.NodeName == "" {
+		return nil, fmt.Errorf("pod %q doesn't have a node associated with it", podName)
+	}
+	if len(pod.Spec.Containers) != 1 {
+		return nil, fmt.Errorf("vm pod %q is expected to have just one container but it has %d containers instead", podName, len(pod.Spec.Containers))
+	}
+
+	if len(pod.Status.ContainerStatuses) != 1 {
+		return nil, fmt.Errorf("vm pod %q is expected to have just one container status but it has %d container statuses instead", podName, len(pod.Status.ContainerStatuses))
+	}
+
+	virtletPodName, err := c.GetVirtletPodNameForNode(pod.Spec.NodeName)
+	if err != nil {
+		return nil, err
+	}
+
+	return &VMPodInfo{
+		NodeName:       pod.Spec.NodeName,
+		VirtletPodName: virtletPodName,
+		ContainerId:    pod.Status.ContainerStatuses[0].ContainerID,
+		ContainerName:  pod.Spec.Containers[0].Name,
+	}, nil
+}
+
 // ExecCommandOnContainer given a pod, container, namespace and command
 // executes that command remotely returning stdout and stderr output
 // as strings and an error if it occured.
@@ -92,7 +187,7 @@ func (c *VirtletCommand) GetVirtletPodNames() ([]string, error) {
 func (c *VirtletCommand) ExecInContainer(
 	pod, container, namespace string,
 	stdin io.Reader, stdout, stderr io.Writer,
-	command ...string,
+	command []string,
 ) (int, error) {
 	if err := c.EnsureKubeClient(); err != nil {
 		return 0, err
