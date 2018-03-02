@@ -9,6 +9,9 @@ import:
   - context
 - package: golang.org/x/crypto
   version: d172538b2cfce0c13cee31e647d0367aa8cd2486
+  subpackages:
+  - context
+  - bpf
 - package: google.golang.org/grpc
   version: 777daa17ff9b5daef1cfdf915088a2ada3332bf0
 - package: github.com/davecgh/go-spew
@@ -19,7 +22,7 @@ import:
 - package: github.com/containernetworking/cni
   version: v0.5.2
 - package: github.com/vishvananda/netlink
-  version: 1882fa99fc5adc217f354c6f37a172876877f77d
+  version: fe3b5664d23a11b52ba59bece4ff29c52772a56b
 - package: github.com/pmezard/go-difflib
   version: ~1.0.0
   subpackages:
@@ -27,7 +30,7 @@ import:
 - package: github.com/libvirt/libvirt-go
   version: c3209e4ba8b8dda65c85ca0ac04302e55895caf7
 - package: github.com/libvirt/libvirt-go-xml
-  version: b80a3ac43b6d354cd28dbf86de016639c0e5cd87
+  version: 661c62056664441ce89e9224e1ce401b67fa0f07
 - package: k8s.io/kubernetes
   version: v1.7.0
 - package: k8s.io/client-go
@@ -46,7 +49,7 @@ import:
   subpackages:
   - syncmap
 - package: golang.org/x/sys
-  version: b9cf5f96b68d9eaa53d5db5fef235718767f416a
+  version: 076b546753157f758b316e59bcb51e6807c04057
   subpackages:
   - unix
   - windows
@@ -56,7 +59,12 @@ import:
   version: 4bd1920723d7b7c925de087aa32e2187708897f7
 - package: github.com/renstrom/dedent
   version: ^1.0.0
-- package: github.com/spf13/pflag
-  version: ee5fd03fd6acfd43e44aea0b4135958546ed8e73
 - package: github.com/russross/blackfriday
   version: v2.0.0
+- package: github.com/docker/distribution
+  version: cd27f179f2c10c5d300e6d09025b538c475b0d51
+  subpackages:
+  - digest
+  - reference
+- package: github.com/spf13/pflag
+  version: 4c012f6dcd9546820e378d0bdda4d8fc772cdfea
