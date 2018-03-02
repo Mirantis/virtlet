@@ -36,7 +36,9 @@ func newRootCmd() *cobra.Command {
                         Kubernetes cluster.`),
 	}
 	tools.AddGlobalFlags(cmd.PersistentFlags())
-	cmd.AddCommand(tools.NewDumpMetadataCmd())
+	client := tools.NewRealKubeClient()
+	cmd.AddCommand(tools.NewDumpMetadataCmd(client))
+	cmd.AddCommand(tools.NewVirshCmd(client, os.Stdout))
 	return cmd
 }
 
