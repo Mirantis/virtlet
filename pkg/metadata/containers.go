@@ -29,8 +29,8 @@ var (
 	containerKeyPrefix = []byte("containers/")
 )
 
-func containerKey(containerId string) []byte {
-	return append(containerKeyPrefix, []byte(containerId)...)
+func containerKey(containerID string) []byte {
+	return append(containerKeyPrefix, []byte(containerID)...)
 }
 
 type containerMeta struct {

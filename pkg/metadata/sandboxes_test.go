@@ -46,7 +46,7 @@ func TestRemovePodSandbox(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		store, err := NewFakeMetadataStore()
+		store, err := NewFakeStore()
 		if err != nil {
 			t.Fatal(err)
 		}
