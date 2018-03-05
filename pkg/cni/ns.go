@@ -31,15 +31,17 @@ const (
 	netnsBasePath = "/var/run/netns"
 )
 
+// CreateNetNS creates new network namespace using provided name.
 func CreateNetNS(name string) error {
-	return callIpNetns("add", name)
+	return callIPNetns("add", name)
 }
 
+// DestroyNetNS deletes the network namespace pointed by provided name.
 func DestroyNetNS(name string) error {
-	return callIpNetns("del", name)
+	return callIPNetns("del", name)
 }
 
-func callIpNetns(command, name string) error {
+func callIPNetns(command, name string) error {
 	cmd := exec.Command("ip", "netns", command, name)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -48,6 +50,7 @@ func callIpNetns(command, name string) error {
 	return err
 }
 
+// PodNetNSPath converts netns name to its path in host filesystem.
 func PodNetNSPath(name string) string {
 	return path.Join(netnsBasePath, name)
 }
