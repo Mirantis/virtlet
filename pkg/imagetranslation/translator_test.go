@@ -28,15 +28,15 @@ func TestTranslations(t *testing.T) {
 			Rules: []TranslationRule{
 				{
 					Regex: `^image(\d+)`,
-					Url:   "http://example.net/image_$1.qcow2",
+					URL:   "http://example.net/image_$1.qcow2",
 				},
 				{
 					Regex: `image(\d+)`,
-					Url:   "http://example.net/alt_$1.qcow2",
+					URL:   "http://example.net/alt_$1.qcow2",
 				},
 				{
 					Name: "image1",
-					Url:  "https://example.net/base.qcow2",
+					URL:  "https://example.net/base.qcow2",
 				},
 			},
 		},
@@ -45,11 +45,11 @@ func TestTranslations(t *testing.T) {
 			Rules: []TranslationRule{
 				{
 					Regex: `^linux/(\d+\.\d+)`,
-					Url:   "http://acme.org/linux_$1.qcow2",
+					URL:   "http://acme.org/linux_$1.qcow2",
 				},
 				{
 					Name: "linux/1",
-					Url:  "https://acme.org/linux.qcow2",
+					URL:  "https://acme.org/linux.qcow2",
 				},
 			},
 		},
@@ -62,74 +62,74 @@ func TestTranslations(t *testing.T) {
 		name        string
 		allowRegexp bool
 		imageName   string
-		expectedUrl string
+		expectedURL string
 	}{
 		{
 			name:        "strict translation",
 			allowRegexp: false,
 			imageName:   "image1",
-			expectedUrl: "https://example.net/base.qcow2",
+			expectedURL: "https://example.net/base.qcow2",
 		},
 		{
 			name:        "negative strict translation",
 			allowRegexp: false,
 			imageName:   "image2",
-			expectedUrl: "image2",
+			expectedURL: "image2",
 		},
 		{
 			name:        "strict translation precedes regexps",
 			allowRegexp: true,
 			imageName:   "image1",
-			expectedUrl: "https://example.net/base.qcow2",
+			expectedURL: "https://example.net/base.qcow2",
 		},
 		{
 			name:        "regexp translation",
 			allowRegexp: true,
 			imageName:   "image2",
-			expectedUrl: "http://example.net/image_2.qcow2",
+			expectedURL: "http://example.net/image_2.qcow2",
 		},
 		{
 			name:        "negative regexp translation",
 			allowRegexp: true,
 			imageName:   "image",
-			expectedUrl: "image",
+			expectedURL: "image",
 		},
 		{
 			name:        "translation with prefix",
 			allowRegexp: false,
 			imageName:   "prod/linux/1",
-			expectedUrl: "https://acme.org/linux.qcow2",
+			expectedURL: "https://acme.org/linux.qcow2",
 		},
 		{
 			name:        "regexp translation with prefix",
 			allowRegexp: true,
 			imageName:   "prod/linux/2.11",
-			expectedUrl: "http://acme.org/linux_2.11.qcow2",
+			expectedURL: "http://acme.org/linux_2.11.qcow2",
 		},
 		{
 			name:        "negative translation with prefix",
 			allowRegexp: false,
 			imageName:   "prod/image1",
-			expectedUrl: "prod/image1",
+			expectedURL: "prod/image1",
 		},
 		{
 			name:        "empty string translation",
 			allowRegexp: true,
 			imageName:   "",
-			expectedUrl: "",
+			expectedURL: "",
 		},
 		{
 			name:        "misleading translation with prefix",
 			allowRegexp: true,
 			imageName:   "prod/image1",
-			expectedUrl: "http://example.net/alt_1.qcow2",
+			expectedURL: "http://example.net/alt_1.qcow2",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			translator.AllowRegexp = tc.allowRegexp
 			endpoint := translator.Translate(tc.imageName)
-			if tc.expectedUrl != endpoint.Url {
-				t.Errorf("expected URL %q, but got %q", tc.expectedUrl, endpoint.Url)
+			if tc.expectedURL != endpoint.Url {
+				t.Errorf("expected URL %q, but got %q", tc.expectedURL, endpoint.Url)
 			}
 		})
 	}
