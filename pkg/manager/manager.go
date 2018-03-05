@@ -49,6 +49,9 @@ const (
 	defaultDownloadProtocol = "https"
 )
 
+// VirtletManager serves grpc CRI requests translating them to libvirt calls
+// using additional data stored in metadata store. Network part also uses
+// tapmanager to prepare and cleanup network environment for VM.
 type VirtletManager struct {
 	server *grpc.Server
 	// libvirt
@@ -61,13 +64,17 @@ type VirtletManager struct {
 	StreamServer               *stream.Server
 }
 
-func NewVirtletManager(libvirtUri, rawDevices, imageTranslationConfigsDir string, imageStore image.Store, metadataStore metadata.Store, fdManager tapmanager.FDManager) (*VirtletManager, error) {
+// NewVirtletManager prepares libvirt connection, volumes component,
+// using them to prepare virtualization tool.  It calls garbage collection
+// for virtualization tool and image store, then it registers newly prepared
+// VirtletManager instance as runtime and image service through a grpc server.
+func NewVirtletManager(libvirtURI, rawDevices, imageTranslationConfigsDir string, imageStore image.Store, metadataStore metadata.Store, fdManager tapmanager.FDManager) (*VirtletManager, error) {
 	err := imagetranslation.RegisterCustomResourceType()
 	if err != nil {
 		return nil, err
 	}
 
-	conn, err := libvirttools.NewConnection(libvirtUri)
+	conn, err := libvirttools.NewConnection(libvirtURI)
 	if err != nil {
 		return nil, err
 	}
@@ -118,6 +125,8 @@ func NewVirtletManager(libvirtUri, rawDevices, imageTranslationConfigsDir string
 	return virtletManager, nil
 }
 
+// Serve prepares a listener on unix socket, than it passes that listener to
+// main loop of grpc server which handles CRI calls.
 func (v *VirtletManager) Serve(addr string) error {
 	if err := syscall.Unlink(addr); err != nil && !os.IsNotExist(err) {
 		return err
@@ -130,10 +139,12 @@ func (v *VirtletManager) Serve(addr string) error {
 	return v.server.Serve(ln)
 }
 
+// Stop halts the manager.
 func (v *VirtletManager) Stop() {
 	v.server.Stop()
 }
 
+// Version implements Version method of CRI.
 func (v *VirtletManager) Version(ctx context.Context, in *kubeapi.VersionRequest) (*kubeapi.VersionResponse, error) {
 	vRuntimeAPIVersion := runtimeAPIVersion
 	vRuntimeName := runtimeName
@@ -150,6 +161,7 @@ func (v *VirtletManager) Version(ctx context.Context, in *kubeapi.VersionRequest
 // Sandboxes
 //
 
+// RunPodSandbox implements RunPodSandbox method of CRI.
 func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSandboxRequest) (*kubeapi.RunPodSandboxResponse, error) {
 	config := in.GetConfig()
 	if config == nil {
@@ -164,16 +176,16 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 		glog.Errorf("Invalid pod config while creating pod sandbox for pod %s: %v", podName, err)
 		return nil, err
 	}
-	podId := config.Metadata.Uid
+	podID := config.Metadata.Uid
 	podNs := config.Metadata.Namespace
 
-	glog.V(2).Infof("RunPodSandbox called for pod %s (%s)", podName, podId)
+	glog.V(2).Infof("RunPodSandbox called for pod %s (%s)", podName, podID)
 	glog.V(3).Infof("RunPodSandbox: %s", spew.Sdump(in))
 	glog.V(2).Infof("Sandbox config annotations: %v", config.GetAnnotations())
 
 	state := kubeapi.PodSandboxState_SANDBOX_READY
 	pnd := &tapmanager.PodNetworkDesc{
-		PodID:   podId,
+		PodID:   podID,
 		PodNs:   podNs,
 		PodName: podName,
 	}
@@ -191,17 +203,17 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 		}
 	}
 	fdPayload := &tapmanager.GetFDPayload{Description: pnd}
-	csnBytes, err := v.fdManager.AddFDs(podId, fdPayload)
+	csnBytes, err := v.fdManager.AddFDs(podID, fdPayload)
 	if err != nil {
 		// this will cause kubelet to delete the pod sandbox and then retry
 		// its creation
 		state = kubeapi.PodSandboxState_SANDBOX_NOTREADY
-		glog.Errorf("Error when adding pod %s (%s) to CNI network: %v", podName, podId, err)
+		glog.Errorf("Error when adding pod %s (%s) to CNI network: %v", podName, podID, err)
 	}
 
 	psi, err := metadata.NewPodSandboxInfo(config, csnBytes, state, clockwork.NewRealClock())
 	if err != nil {
-		glog.Errorf("Error serializing pod %q (%q) sandbox configuration: %v", podName, podId, err)
+		glog.Errorf("Error serializing pod %q (%q) sandbox configuration: %v", podName, podID, err)
 		return nil, err
 	}
 
@@ -211,14 +223,14 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 			return psi, nil
 		},
 	); storeErr != nil {
-		glog.Errorf("Error when creating pod sandbox for pod %s (%s): %v", podName, podId, storeErr)
+		glog.Errorf("Error when creating pod sandbox for pod %s (%s): %v", podName, podID, storeErr)
 		return nil, storeErr
 	}
 
 	// If we don't return PodSandboxId upon RunPodSandbox, kubelet will not retry
 	// RunPodSandbox for this pod after CNI failure
 	return &kubeapi.RunPodSandboxResponse{
-		PodSandboxId: podId,
+		PodSandboxId: podID,
 	}, err
 }
 
@@ -231,6 +243,7 @@ func validatePodSandboxConfig(config *kubeapi.PodSandboxConfig) error {
 	return nil
 }
 
+// StopPodSandbox implements StopPodSandbox method of CRI.
 func (v *VirtletManager) StopPodSandbox(ctx context.Context, in *kubeapi.StopPodSandboxRequest) (*kubeapi.StopPodSandboxResponse, error) {
 	glog.V(2).Infof("StopPodSandbox called for pod %s", in.PodSandboxId)
 	glog.V(3).Infof("StopPodSandbox: %s", spew.Sdump(in))
@@ -270,17 +283,18 @@ func (v *VirtletManager) StopPodSandbox(ctx context.Context, in *kubeapi.StopPod
 	return response, nil
 }
 
+// RemovePodSandbox method implements RemovePodSandbox from CRI.
 func (v *VirtletManager) RemovePodSandbox(ctx context.Context, in *kubeapi.RemovePodSandboxRequest) (*kubeapi.RemovePodSandboxResponse, error) {
-	podSandboxId := in.PodSandboxId
-	glog.V(2).Infof("RemovePodSandbox called for pod %s", podSandboxId)
+	podSandboxID := in.PodSandboxId
+	glog.V(2).Infof("RemovePodSandbox called for pod %s", podSandboxID)
 	glog.V(3).Infof("RemovePodSandbox: %s", spew.Sdump(in))
 
-	if err := v.metadataStore.PodSandbox(podSandboxId).Save(
+	if err := v.metadataStore.PodSandbox(podSandboxID).Save(
 		func(c *metadata.PodSandboxInfo) (*metadata.PodSandboxInfo, error) {
 			return nil, nil
 		},
 	); err != nil {
-		glog.Errorf("Error when removing pod sandbox %q: %v", podSandboxId, err)
+		glog.Errorf("Error when removing pod sandbox %q: %v", podSandboxID, err)
 		return nil, err
 	}
 
@@ -289,14 +303,15 @@ func (v *VirtletManager) RemovePodSandbox(ctx context.Context, in *kubeapi.Remov
 	return response, nil
 }
 
+// PodSandboxStatus method implements PodSandboxStatus from CRI.
 func (v *VirtletManager) PodSandboxStatus(ctx context.Context, in *kubeapi.PodSandboxStatusRequest) (*kubeapi.PodSandboxStatusResponse, error) {
 	glog.V(3).Infof("PodSandboxStatusStatus: %s", spew.Sdump(in))
-	podSandboxId := in.PodSandboxId
+	podSandboxID := in.PodSandboxId
 
-	sandbox := v.metadataStore.PodSandbox(podSandboxId)
+	sandbox := v.metadataStore.PodSandbox(podSandboxID)
 	sandboxInfo, err := sandbox.Retrieve()
 	if err != nil {
-		glog.Errorf("Error when getting pod sandbox '%s': %v", podSandboxId, err)
+		glog.Errorf("Error when getting pod sandbox '%s': %v", podSandboxID, err)
 		return nil, err
 	}
 	status := sandboxInfo.AsPodSandboxStatus()
@@ -316,6 +331,7 @@ func (v *VirtletManager) PodSandboxStatus(ctx context.Context, in *kubeapi.PodSa
 	return response, nil
 }
 
+// ListPodSandbox method implements ListPodSandbox from CRI.
 func (v *VirtletManager) ListPodSandbox(ctx context.Context, in *kubeapi.ListPodSandboxRequest) (*kubeapi.ListPodSandboxResponse, error) {
 	filter := in.GetFilter()
 	glog.V(4).Infof("Listing sandboxes with filter: %s", spew.Sdump(filter))
@@ -343,9 +359,10 @@ func (v *VirtletManager) ListPodSandbox(ctx context.Context, in *kubeapi.ListPod
 // Containers
 //
 
+// CreateContainer method implements CreateContainer from CRI.
 func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.CreateContainerRequest) (*kubeapi.CreateContainerResponse, error) {
 	config := in.GetConfig()
-	podSandboxId := in.PodSandboxId
+	podSandboxID := in.PodSandboxId
 	name := config.GetMetadata().Name
 
 	glog.V(2).Infof("CreateContainer called for name: %s", name)
@@ -356,9 +373,9 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 	// NOTE: there is no distinction between lack of key and other types of
 	// errors when accessing boltdb. This will be changed when we switch to
 	// storing whole marshaled sandbox metadata as json.
-	remainingContainers, err := v.metadataStore.ListPodContainers(podSandboxId)
+	remainingContainers, err := v.metadataStore.ListPodContainers(podSandboxID)
 	if err != nil {
-		glog.V(3).Infof("Error retrieving pod %q containers", podSandboxId)
+		glog.V(3).Infof("Error retrieving pod %q containers", podSandboxID)
 	} else {
 		for _, container := range remainingContainers {
 			glog.V(3).Infof("CreateContainer: there's already a container in the sandbox (id: %s), cleaning it up", container.GetID())
@@ -369,13 +386,13 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 		}
 	}
 
-	sandboxInfo, err := v.metadataStore.PodSandbox(podSandboxId).Retrieve()
+	sandboxInfo, err := v.metadataStore.PodSandbox(podSandboxID).Retrieve()
 	if err != nil {
-		glog.Errorf("Error when retrieving pod network configuration for sandbox '%s': %v", podSandboxId, err)
+		glog.Errorf("Error when retrieving pod network configuration for sandbox '%s': %v", podSandboxID, err)
 		return nil, err
 	}
 
-	fdKey := podSandboxId
+	fdKey := podSandboxID
 	vmConfig, err := libvirttools.GetVMConfig(in, sandboxInfo.ContainerSideNetwork)
 	if err != nil {
 		glog.Errorf("Error getting vm config for container %s: %v", name, err)
@@ -396,6 +413,7 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 	return response, nil
 }
 
+// StartContainer method implements StartContainer from CRI.
 func (v *VirtletManager) StartContainer(ctx context.Context, in *kubeapi.StartContainerRequest) (*kubeapi.StartContainerResponse, error) {
 	glog.V(2).Infof("StartContainer called for containerID: %s", in.ContainerId)
 	glog.V(3).Infof("StartContainer: %s", spew.Sdump(in))
@@ -408,6 +426,7 @@ func (v *VirtletManager) StartContainer(ctx context.Context, in *kubeapi.StartCo
 	return response, nil
 }
 
+// StopContainer method implements StopContainer from CRI.
 func (v *VirtletManager) StopContainer(ctx context.Context, in *kubeapi.StopContainerRequest) (*kubeapi.StopContainerResponse, error) {
 	glog.V(2).Infof("StopContainer called for containerID: %s", in.ContainerId)
 	glog.V(3).Infof("StopContainer: %s", spew.Sdump(in))
@@ -421,6 +440,7 @@ func (v *VirtletManager) StopContainer(ctx context.Context, in *kubeapi.StopCont
 	return response, nil
 }
 
+// RemoveContainer method implements RemoveContainer from CRI.
 func (v *VirtletManager) RemoveContainer(ctx context.Context, in *kubeapi.RemoveContainerRequest) (*kubeapi.RemoveContainerResponse, error) {
 	glog.V(2).Infof("RemoveContainer called for containerID: %s", in.ContainerId)
 	glog.V(3).Infof("RemoveContainer: %s", spew.Sdump(in))
@@ -439,6 +459,7 @@ func (v *VirtletManager) RemoveContainer(ctx context.Context, in *kubeapi.Remove
 	return response, nil
 }
 
+// ListContainers method implements ListContainers from CRI.
 func (v *VirtletManager) ListContainers(ctx context.Context, in *kubeapi.ListContainersRequest) (*kubeapi.ListContainersResponse, error) {
 	filter := in.GetFilter()
 	glog.V(4).Infof("Listing containers with filter: %s", spew.Sdump(filter))
@@ -453,6 +474,7 @@ func (v *VirtletManager) ListContainers(ctx context.Context, in *kubeapi.ListCon
 	return response, nil
 }
 
+// ContainerStatus method implements ContainerStatus from CRI.
 func (v *VirtletManager) ContainerStatus(ctx context.Context, in *kubeapi.ContainerStatusRequest) (*kubeapi.ContainerStatusResponse, error) {
 	glog.V(4).Infof("ContainerStatus: %s", spew.Sdump(in))
 	status, err := v.libvirtVirtualizationTool.ContainerStatus(in.ContainerId)
@@ -466,31 +488,37 @@ func (v *VirtletManager) ContainerStatus(ctx context.Context, in *kubeapi.Contai
 	return response, nil
 }
 
+// ExecSync is a place holder for non implemented functionality from CRI.
 func (v *VirtletManager) ExecSync(context.Context, *kubeapi.ExecSyncRequest) (*kubeapi.ExecSyncResponse, error) {
 	glog.Errorf("ExecSync() not implemented")
 	return nil, errors.New("not implemented")
 }
 
+// Exec is a place holder for non implemented functionality from CRI.
 func (v *VirtletManager) Exec(context.Context, *kubeapi.ExecRequest) (*kubeapi.ExecResponse, error) {
 	glog.Errorf("Exec() not implemented")
 	return nil, errors.New("not implemented")
 }
 
+// Attach calls streamer server to implement Attach functionality from CRI.
 func (v *VirtletManager) Attach(ctx context.Context, req *kubeapi.AttachRequest) (*kubeapi.AttachResponse, error) {
 	glog.V(3).Infof("Attach called: %s", spew.Sdump(req))
 	return v.StreamServer.GetAttach(req)
 }
 
+// PortForward calls streamer server to implement PortForward functionality from CRI.
 func (v *VirtletManager) PortForward(ctx context.Context, req *kubeapi.PortForwardRequest) (*kubeapi.PortForwardResponse, error) {
 	glog.Errorf("PortForward() not implemented")
 	return v.StreamServer.GetPortForward(req)
 }
 
+// UpdateRuntimeConfig is a place holder for non implemented functionality from CRI.
 func (v *VirtletManager) UpdateRuntimeConfig(context.Context, *kubeapi.UpdateRuntimeConfigRequest) (*kubeapi.UpdateRuntimeConfigResponse, error) {
 	// we don't need to do anything here for now
 	return &kubeapi.UpdateRuntimeConfigResponse{}, nil
 }
 
+// Status method implements Status from CRI for both types of service, Image and Runtime.
 func (v *VirtletManager) Status(context.Context, *kubeapi.StatusRequest) (*kubeapi.StatusResponse, error) {
 	ready := true
 	runtimeReadyStr := kubeapi.RuntimeReady
@@ -511,11 +539,13 @@ func (v *VirtletManager) Status(context.Context, *kubeapi.StatusRequest) (*kubea
 	}, nil
 }
 
+// ContainerStats is a place holder for non implemented functionality from CRI.
 func (v *VirtletManager) ContainerStats(ctx context.Context, in *kubeapi.ContainerStatsRequest) (*kubeapi.ContainerStatsResponse, error) {
 	glog.V(2).Infof("ContainerStats: %s", spew.Sdump(in))
 	return nil, errors.New("ContainerStats() not implemented")
 }
 
+// ListContainerStats is a place holder for non implemented functionality from CRI.
 func (v *VirtletManager) ListContainerStats(ctx context.Context, in *kubeapi.ListContainerStatsRequest) (*kubeapi.ListContainerStatsResponse, error) {
 	glog.V(2).Infof("ListContainerStats: %s", spew.Sdump(in))
 	return nil, errors.New("ListContainerStats() not implemented")
@@ -525,6 +555,7 @@ func (v *VirtletManager) ListContainerStats(ctx context.Context, in *kubeapi.Lis
 // Images
 //
 
+// ListImages method implements ListImages from CRI.
 func (v *VirtletManager) ListImages(ctx context.Context, in *kubeapi.ListImagesRequest) (*kubeapi.ListImagesResponse, error) {
 	images, err := v.imageStore.ListImages(in.GetFilter().GetImage().GetImage())
 	if err != nil {
@@ -541,6 +572,7 @@ func (v *VirtletManager) ListImages(ctx context.Context, in *kubeapi.ListImagesR
 	return response, err
 }
 
+// ImageStatus method implements ImageStatus from CRI.
 func (v *VirtletManager) ImageStatus(ctx context.Context, in *kubeapi.ImageStatusRequest) (*kubeapi.ImageStatusResponse, error) {
 	img, err := v.imageStore.ImageStatus(in.GetImage().GetImage())
 	if err != nil {
@@ -552,6 +584,7 @@ func (v *VirtletManager) ImageStatus(ctx context.Context, in *kubeapi.ImageStatu
 	return response, err
 }
 
+// PullImage method implements PullImage from CRI.
 func (v *VirtletManager) PullImage(ctx context.Context, in *kubeapi.PullImageRequest) (*kubeapi.PullImageResponse, error) {
 	imageName := in.GetImage().GetImage()
 	glog.V(2).Infof("PullImage called for: %s", imageName)
@@ -579,6 +612,7 @@ func (v *VirtletManager) getImageNameTranslator(ctx context.Context) imagetransl
 	return translator
 }
 
+// RemoveImage method implements RemoveImage from CRI.
 func (v *VirtletManager) RemoveImage(ctx context.Context, in *kubeapi.RemoveImageRequest) (*kubeapi.RemoveImageResponse, error) {
 	imageName := in.GetImage().GetImage()
 	glog.V(2).Infof("RemoveImage called for: %s", imageName)
@@ -589,6 +623,7 @@ func (v *VirtletManager) RemoveImage(ctx context.Context, in *kubeapi.RemoveImag
 	return &kubeapi.RemoveImageResponse{}, nil
 }
 
+// ImageFsInfo is a place holder for non implemented functionality from CRI.
 func (v *VirtletManager) ImageFsInfo(ctx context.Context, in *kubeapi.ImageFsInfoRequest) (*kubeapi.ImageFsInfoResponse, error) {
 	glog.V(2).Infof("ImageFsInfo: %s", spew.Sdump(in))
 	return nil, errors.New("ImageFsInfo() not implemented")
