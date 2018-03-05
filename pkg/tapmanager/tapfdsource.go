@@ -88,7 +88,7 @@ type podNetwork struct {
 type TapFDSource struct {
 	sync.Mutex
 
-	cniClient          cni.CNIClient
+	cniClient          cni.Client
 	dummyNetwork       *cnicurrent.Result
 	dummyNetworkNsPath string
 	fdMap              map[string]*podNetwork
@@ -98,7 +98,7 @@ var _ FDSource = &TapFDSource{}
 
 // NewTapFDSource returns a TapFDSource for the specified CNI plugin &
 // config dir
-func NewTapFDSource(cniClient cni.CNIClient) (*TapFDSource, error) {
+func NewTapFDSource(cniClient cni.Client) (*TapFDSource, error) {
 	s := &TapFDSource{
 		cniClient: cniClient,
 		fdMap:     make(map[string]*podNetwork),
