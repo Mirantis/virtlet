@@ -43,28 +43,38 @@ var (
 	defaultDNS = []byte{8, 8, 8, 8}
 )
 
+// Server describes an object prepared to be started in container namespace
+// as a goroutine, serving network configuration data to a client in
+// the same container namespace.
 type Server struct {
 	config   *network.ContainerSideNetwork
 	listener *dhcp4.Conn
 }
 
+// NewServer returns an initialized instance of Server.
 func NewServer(config *network.ContainerSideNetwork) *Server {
 	return &Server{config: config}
 }
 
+// SetupListener prepares a dhcp4 listener to be listening on default dhcp port,
+// on provided IP address.
 func (s *Server) SetupListener(laddr string) error {
-	if listener, err := dhcp4.NewConn(fmt.Sprintf("%s:%d", laddr, serverPort)); err != nil {
+	var listener *dhcp4.Conn
+	var err error
+	if listener, err = dhcp4.NewConn(fmt.Sprintf("%s:%d", laddr, serverPort)); err != nil {
 		return err
-	} else {
-		s.listener = listener
 	}
+	s.listener = listener
+
 	return nil
 }
 
+// Close shuts down dhcp listener.
 func (s *Server) Close() error {
 	return s.listener.Close()
 }
 
+// Serve waits in a endless loop for dhcp client packets and reacts on them.
 func (s *Server) Serve() error {
 	for {
 		pkt, intf, err := s.listener.RecvDHCP()
