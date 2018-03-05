@@ -152,7 +152,7 @@ type FakeCNIClient struct {
 	entries    map[string]*fakeCNIEntry
 }
 
-var _ cni.CNIClient = &FakeCNIClient{}
+var _ cni.Client = &FakeCNIClient{}
 
 func NewFakeCNIClient() *FakeCNIClient {
 	return &FakeCNIClient{
