@@ -43,28 +43,36 @@ var (
 	defaultDNS = []byte{8, 8, 8, 8}
 )
 
+// Server implements a DHCP server that runs in the container network namespace.
 type Server struct {
 	config   *network.ContainerSideNetwork
 	listener *dhcp4.Conn
 }
 
+// NewServer returns an initialized instance of Server.
 func NewServer(config *network.ContainerSideNetwork) *Server {
 	return &Server{config: config}
 }
 
+// SetupListener sets up a DHCP4 listener that listens on the default DHCP
+// port and the specified IP address.
 func (s *Server) SetupListener(laddr string) error {
-	if listener, err := dhcp4.NewConn(fmt.Sprintf("%s:%d", laddr, serverPort)); err != nil {
+	var listener *dhcp4.Conn
+	var err error
+	if listener, err = dhcp4.NewConn(fmt.Sprintf("%s:%d", laddr, serverPort)); err != nil {
 		return err
-	} else {
-		s.listener = listener
 	}
+	s.listener = listener
+
 	return nil
 }
 
+// Close shuts down DHCP listener.
 func (s *Server) Close() error {
 	return s.listener.Close()
 }
 
+// Serve waits in an endless loop for DHCP requests and answers them.
 func (s *Server) Serve() error {
 	for {
 		pkt, intf, err := s.listener.RecvDHCP()
