@@ -27,11 +27,11 @@ type TranslationRule struct {
 	// Name defines a mapping from a fixed name
 	Name string `yaml:"name,omitempty" json:"name,omitempty"`
 
-	// Regex defines a mapping from all names that match this regexp. In this case replacements can be used for Endpoint.Url
+	// Regex defines a mapping from all names that match this regexp. In this case replacements can be used for Endpoint.URL
 	Regex string `yaml:"regexp,omitempty" json:"regexp,omitempty"`
 
-	// Url is the image URL
-	Url string `yaml:"url,omitempty" json:"url,omitempty"`
+	// URL is the image URL
+	URL string `yaml:"url,omitempty" json:"url,omitempty"`
 
 	// Transport is the optional transport profile name to be used for the downloading
 	Transport string `yaml:"transport,omitempty" json:"transport,omitempty"`

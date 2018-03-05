@@ -66,7 +66,7 @@ func convertEndpoint(rule TranslationRule, config *ImageTranslation) image.Endpo
 	profile, exists := config.Transports[rule.Transport]
 	if !exists {
 		return image.Endpoint{
-			Url:          rule.Url,
+			URL:          rule.URL,
 			MaxRedirects: -1,
 		}
 	}
@@ -127,7 +127,7 @@ func convertEndpoint(rule TranslationRule, config *ImageTranslation) image.Endpo
 	}
 
 	return image.Endpoint{
-		Url:          rule.Url,
+		URL:          rule.URL,
 		Timeout:      time.Millisecond * time.Duration(profile.TimeoutMilliseconds),
 		Proxy:        profile.Proxy,
 		ProfileName:  rule.Transport,
@@ -185,13 +185,13 @@ func (t *imageNameTranslator) Translate(name string) image.Endpoint {
 			}
 			submatchIndexes := re.FindStringSubmatchIndex(unprefixedName)
 			if len(submatchIndexes) > 0 {
-				r.Url = string(re.ExpandString(nil, r.Url, unprefixedName, submatchIndexes))
+				r.URL = string(re.ExpandString(nil, r.URL, unprefixedName, submatchIndexes))
 				return convertEndpoint(r, translation)
 			}
 		}
 	}
 	glog.V(1).Infof("Using URL %q without translation", name)
-	return image.Endpoint{Url: name, MaxRedirects: -1}
+	return image.Endpoint{URL: name, MaxRedirects: -1}
 }
 
 // NewImageNameTranslator creates an instance of ImageNameTranslator
