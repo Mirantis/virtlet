@@ -64,8 +64,8 @@ const (
 	// Address for dhcp server internal interface
 	internalDhcpAddr = "169.254.254.2/24"
 
-	SizeOfIfReq = 40
-	IFNAMSIZ    = 16
+	sizeOfIfReq = 40
+	ifnamsiz    = 16
 
 	calicoDefaultSubnet = 24
 	calicoSubnetVar     = "VIRTLET_CALICO_SUBNET"
@@ -73,9 +73,9 @@ const (
 
 // Had to duplicate ifReq here as it's not exported
 type ifReq struct {
-	Name  [IFNAMSIZ]byte
+	Name  [ifnamsiz]byte
 	Flags uint16
-	pad   [SizeOfIfReq - IFNAMSIZ - 2]byte
+	pad   [sizeOfIfReq - ifnamsiz - 2]byte
 }
 
 func makeVethPair(name, peer string, mtu int) (netlink.Link, error) {
@@ -529,6 +529,7 @@ func disableMacLearning(nsPath string, bridgeName string) error {
 	return nil
 }
 
+// SetHardwareAddr sets hardware address on provided link.
 func SetHardwareAddr(link netlink.Link, hwAddr net.HardwareAddr) error {
 	if err := netlink.LinkSetDown(link); err != nil {
 		return fmt.Errorf("can't bring down the link: %v", err)
@@ -945,7 +946,9 @@ func ReconstructVFs(csn *network.ContainerSideNetwork, netns ns.NetNS) error {
 	return nil
 }
 
-// copied from:
+// GenerateMacAddress returns a random locally administrated unicast
+// hardware address.
+// Copied from:
 // https://github.com/coreos/rkt/blob/56564bac090b44788684040f2ffd66463f29d5d0/stage1/init/kvm/network.go#L71
 func GenerateMacAddress() (net.HardwareAddr, error) {
 	mac := net.HardwareAddr{
