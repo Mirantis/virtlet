@@ -113,7 +113,7 @@ func (d *DumpMetadata) copyOutFile(pod *v1.Pod) (string, error) {
 }
 
 func dumpMetadata(fname string) error {
-	s, err := metadata.NewMetadataStore(fname)
+	s, err := metadata.NewStore(fname)
 	if err != nil {
 		return fmt.Errorf("can't open metadata db: %v", err)
 	}
@@ -145,7 +145,7 @@ func dumpMetadata(fname string) error {
 	return nil
 }
 
-func dumpSandbox(podid string, sandbox *metadata.PodSandboxInfo, s metadata.MetadataStore) error {
+func dumpSandbox(podid string, sandbox *metadata.PodSandboxInfo, s metadata.Store) error {
 	printlnIndented(2, "Sandbox id: %s", podid)
 	printlnIndented(0, spew.Sdump(sandbox))
 

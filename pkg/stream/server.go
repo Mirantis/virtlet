@@ -40,13 +40,13 @@ type Server struct {
 	streamServerCloseCh chan struct{}
 	streaming.Runtime
 
-	metadataStore metadata.MetadataStore //required for port-forward
+	metadataStore metadata.Store //required for port-forward
 }
 
 var _ streaming.Runtime = (*Server)(nil)
 
 // NewServer creates a new Server
-func NewServer(kubernetesDir, socketPath string, metadataStore metadata.MetadataStore) (*Server, error) {
+func NewServer(kubernetesDir, socketPath string, metadataStore metadata.Store) (*Server, error) {
 	s := &Server{DeadlineSeconds: 10}
 
 	// Prepare unix server

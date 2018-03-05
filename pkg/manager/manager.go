@@ -55,13 +55,13 @@ type VirtletManager struct {
 	imageStore                image.ImageStore
 	libvirtVirtualizationTool *libvirttools.VirtualizationTool
 	// metadata
-	metadataStore              metadata.MetadataStore
+	metadataStore              metadata.Store
 	fdManager                  tapmanager.FDManager
 	imageTranslationConfigsDir string
 	StreamServer               *stream.Server
 }
 
-func NewVirtletManager(libvirtUri, rawDevices, imageTranslationConfigsDir string, imageStore image.ImageStore, metadataStore metadata.MetadataStore, fdManager tapmanager.FDManager) (*VirtletManager, error) {
+func NewVirtletManager(libvirtUri, rawDevices, imageTranslationConfigsDir string, imageStore image.ImageStore, metadataStore metadata.Store, fdManager tapmanager.FDManager) (*VirtletManager, error) {
 	err := imagetranslation.RegisterCustomResourceType()
 	if err != nil {
 		return nil, err

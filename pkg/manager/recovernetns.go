@@ -26,7 +26,7 @@ import (
 // recoverNetworkNamespaces recovers all the active VM network namespaces
 // from previous Virtlet run by scanning the metadata store and starting
 // dhcp server for each namespace that's still active
-func recoverNetworkNamespaces(metadataStore metadata.MetadataStore, fdManager tapmanager.FDManager) (allErrors []error) {
+func recoverNetworkNamespaces(metadataStore metadata.Store, fdManager tapmanager.FDManager) (allErrors []error) {
 	sandboxes, err := metadataStore.ListPodSandboxes(nil)
 	if err != nil {
 		allErrors = append(allErrors, err)

@@ -108,7 +108,7 @@ func (v *VirtletManager) Run() {
 		v.t.Fatalf("Can't create temp directory: %v", err)
 	}
 
-	metadataStore, err := metadata.NewMetadataStore(filepath.Join(v.tempDir, "virtlet.db"))
+	metadataStore, err := metadata.NewStore(filepath.Join(v.tempDir, "virtlet.db"))
 	if err != nil {
 		v.t.Fatalf("Failed to create metadata store: %v", err)
 	}
