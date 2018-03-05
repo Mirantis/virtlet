@@ -39,6 +39,7 @@ func newRootCmd() *cobra.Command {
 	client := tools.NewRealKubeClient()
 	cmd.AddCommand(tools.NewDumpMetadataCmd(client))
 	cmd.AddCommand(tools.NewVirshCmd(client, os.Stdout))
+	cmd.AddCommand(tools.NewSshCmd(client, os.Stdout, ""))
 	return cmd
 }
 

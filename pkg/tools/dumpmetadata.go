@@ -39,7 +39,7 @@ const (
 )
 
 // dumpMetadataCommand contains the data needed by the dump-metedata subcommand
-// which is used to dump the contents of Virtlet boltdb in a human-readable
+// which is used to dump the contents of the Virtlet metadata db in a human-readable
 // format.
 type dumpMetadataCommand struct {
 	client KubeClient
@@ -51,7 +51,7 @@ func NewDumpMetadataCmd(client KubeClient) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "dump-metadata",
 		Aliases: []string{"dump"},
-		Short:   "dump Virtlet metadata db",
+		Short:   "Dump Virtlet metadata db",
 		Long: dedent.Dedent(`
                         This command dumps the contents of Virtlet metadata db in
                         a human-readable format.`),

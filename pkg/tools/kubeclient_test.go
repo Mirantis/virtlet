@@ -18,11 +18,15 @@ package tools
 
 import (
 	"bytes"
+	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,34 +42,110 @@ import (
 )
 
 const (
-	sampleContainerId = "docker://virtlet.cloud__2232e3bf-d702-5824-5e3c-f12e60e616b0"
+	sampleContainerId   = "docker://virtlet.cloud__2232e3bf-d702-5824-5e3c-f12e60e616b0"
+	portForwardWaitTime = 1 * time.Minute
 )
 
 type fakeExecutor struct {
 	t             *testing.T
+	called        bool
 	config        *rest.Config
 	method        string
 	url           *url.URL
 	streamOptions *remotecommand.StreamOptions
 }
 
-func fakeExecutorFactory(t *testing.T, dest *fakeExecutor) ExecutorFactory {
-	return func(config *rest.Config, method string, url *url.URL) (remotecommand.Executor, error) {
-		*dest = fakeExecutor{
-			t:      t,
-			config: config,
-			method: method,
-			url:    url,
-		}
-		return dest, nil
-	}
-}
+var _ remoteExecutor = &fakeExecutor{}
 
-func (e *fakeExecutor) Stream(options remotecommand.StreamOptions) error {
-	if e.streamOptions != nil {
+func (e *fakeExecutor) Stream(config *rest.Config, method string, url *url.URL, options remotecommand.StreamOptions) error {
+	if e.called {
 		e.t.Errorf("Stream called twice")
 	}
+	e.called = true
+	e.config = config
+	e.method = method
+	e.url = url
 	e.streamOptions = &options
+	return nil
+}
+
+func parsePort(portStr string) (uint16, uint16, error) {
+	var localStr, remoteStr string
+	parts := strings.Split(portStr, ":")
+	switch {
+	case len(parts) == 1:
+		localStr = parts[0]
+		remoteStr = parts[0]
+	case len(parts) == 2:
+		localStr = parts[0]
+		if localStr == "" {
+			localStr = "0"
+		}
+		remoteStr = parts[1]
+	default:
+		return 0, 0, fmt.Errorf("invalid port string %q", portStr)
+	}
+
+	localPort, err := strconv.ParseUint(localStr, 10, 16)
+	if err != nil {
+		return 0, 0, fmt.Errorf("bad local port string %q", localStr)
+	}
+
+	remotePort, err := strconv.ParseUint(remoteStr, 10, 16)
+	if err != nil {
+		return 0, 0, fmt.Errorf("bad remtoe port string %q", remoteStr)
+	}
+
+	if remotePort == 0 {
+		return 0, 0, fmt.Errorf("remote port must not be zero")
+	}
+
+	return uint16(localPort), uint16(remotePort), nil
+}
+
+type fakePortForwarder struct {
+	t      *testing.T
+	called bool
+	config *rest.Config
+	method string
+	url    *url.URL
+	ports  string
+}
+
+var _ portForwarder = &fakePortForwarder{}
+
+func (pf *fakePortForwarder) ForwardPorts(config *rest.Config, method string, url *url.URL, ports []string, stopChannel, readyChannel chan struct{}, out io.Writer) error {
+	if pf.called {
+		pf.t.Errorf("ForwardPorts called twice")
+	}
+	pf.called = true
+	pf.config = config
+	pf.method = method
+	pf.url = url
+	pf.ports = strings.Join(ports, " ")
+	if readyChannel != nil {
+		close(readyChannel)
+	}
+	for n, portStr := range ports {
+		localPort, remotePort, err := parsePort(portStr)
+		if err != nil {
+			return err
+		}
+		if localPort == 0 {
+			// "random" local port https://xkcd.com/221/
+			localPort = 4242 + uint16(n)
+		}
+		fmt.Fprintf(out, "Forwarding from 127.0.0.1:%d -> %d\n", localPort, remotePort)
+	}
+	if stopChannel == nil {
+		pf.t.Errorf("no stop channel set")
+	} else {
+		select {
+		case <-stopChannel:
+		case <-time.After(portForwardWaitTime):
+			pf.t.Errorf("timed out waiting for the port forwarder to stop")
+		}
+	}
 	return nil
 }
 
@@ -230,12 +310,12 @@ func TestExecInContainer(t *testing.T) {
 		}),
 	}
 	config := &rest.Config{Host: "foo-host"}
-	var fe fakeExecutor
+	fe := &fakeExecutor{t: t}
 	c := &RealKubeClient{
-		client:          &fakekube.Clientset{},
-		config:          config,
-		restClient:      restClient,
-		executorFactory: fakeExecutorFactory(t, &fe),
+		client:     &fakekube.Clientset{},
+		config:     config,
+		restClient: restClient,
+		executor:   fe,
 	}
 	var stdin, stdout, stderr bytes.Buffer
 	exitCode, err := c.ExecInContainer("virtlet-foo42", "virtlet", "kube-system", &stdin, &stdout, &stderr, []string{"echo", "foobar"})
@@ -245,12 +325,21 @@ func TestExecInContainer(t *testing.T) {
 	if exitCode != 0 {
 		t.Errorf("ExecInContainer returned non-zero exit code %v", exitCode)
 	}
-	if fe.config.Host != "foo-host" {
+	if fe.config == nil {
+		t.Errorf("fe.config not set")
+	} else if fe.config.Host != "foo-host" {
 		t.Errorf("Bad host in rest config: %q instead of foo-host", fe.config.Host)
 	}
 	if fe.method != "POST" {
 		t.Errorf("Bad method %q instead of POST", fe.method)
 	}
+	expectedPath := "/namespaces/kube-system/pods/virtlet-foo42/exec"
+	if fe.url == nil {
+		t.Errorf("fe.url not set")
+	} else if fe.url.Path != expectedPath {
+		t.Errorf("Bad expectedPath: %q instead of %q", fe.url.Path, expectedPath)
+	}
+
 	if fe.streamOptions == nil {
 		t.Errorf("StreamOptions not set (perhaps Stream() not called)")
 	} else {
@@ -265,11 +354,6 @@ func TestExecInContainer(t *testing.T) {
 		}
 	}
 
-	expectedPath := "/namespaces/kube-system/pods/virtlet-foo42/exec"
-	if fe.url.Path != expectedPath {
-		t.Errorf("Bad expectedPath: %q instead of %q", fe.url.Path, expectedPath)
-	}
-
 	expectedValues := url.Values{
 		"command":   {"echo", "foobar"},
 		"container": {"virtlet"},
@@ -279,6 +363,108 @@ func TestExecInContainer(t *testing.T) {
 	}
 	if !reflect.DeepEqual(expectedValues, fe.url.Query()) {
 		t.Errorf("Bad query: %#v", fe.url.Query())
+	}
+}
+
+func TestPortForward(t *testing.T) {
+	fc := &fakekube.Clientset{}
+	fc.AddReactor("get", "pods", func(action testcore.Action) (bool, runtime.Object, error) {
+		expectedNamespace := "kube-system"
+		if action.GetNamespace() != expectedNamespace {
+			t.Errorf("Wrong namespace: %q instead of %q", action.GetNamespace(), expectedNamespace)
+		}
+		getAction := action.(testcore.GetAction)
+		expectedName := "virtlet-foo42"
+		if getAction.GetName() != expectedName {
+			t.Errorf("Bad pod name: %q instead of %q", getAction.GetName(), expectedName)
+		}
+		return true, &v1.Pod{
+			ObjectMeta: meta_v1.ObjectMeta{
+				Name:      "virtlet-foo42",
+				Namespace: "kube-system",
+			},
+			Status: v1.PodStatus{
+				Phase: v1.PodRunning,
+			},
+		}, nil
+	})
+	restClient := &fakerest.RESTClient{
+		// NOTE: APIRegistry will no longer be necessary in newer client-go
+		APIRegistry: api.Registry,
+		NegotiatedSerializer://testapi.Default.NegotiatedSerializer(),
+		dynamic.ContentConfig().NegotiatedSerializer,
+		Client: fakerest.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			// this handler is not actually invoked
+			return nil, nil
+		}),
+	}
+	config := &rest.Config{Host: "foo-host"}
+	pf := &fakePortForwarder{t: t}
+	c := &RealKubeClient{
+		client:        fc,
+		config:        config,
+		restClient:    restClient,
+		portForwarder: pf,
+	}
+	portsToForward := []*ForwardedPort{
+		{
+			LocalPort:  59000,
+			RemotePort: 5900,
+		},
+		{
+			RemotePort: 5901,
+		},
+		{
+			RemotePort: 5902,
+		},
+	}
+	stopCh, err := c.ForwardPorts("virtlet-foo42", "kube-system", portsToForward)
+	if err != nil {
+		t.Fatalf("ForwardPorts(): %v", err)
+	}
+	if pf.config == nil {
+		t.Errorf("pf.config not set")
+	} else if pf.config.Host != "foo-host" {
+		t.Errorf("Bad host in rest config: %q instead of foo-host", pf.config.Host)
+	}
+	if pf.method != "POST" {
+		t.Errorf("Bad method %q instead of POST", pf.method)
+	}
+
+	expectedPath := "/namespaces/kube-system/pods/virtlet-foo42/portforward"
+	if pf.url == nil {
+		t.Errorf("pf.url is not set")
+	} else if pf.url.Path != expectedPath {
+		t.Errorf("Bad expectedPath: %q instead of %q", pf.url.Path, expectedPath)
+	}
+
+	expectedPortStr := "59000:5900 :5901 :5902"
+	if pf.ports != expectedPortStr {
+		t.Errorf("Bad requested port forward list: %q instead of %q", pf.ports, expectedPortStr)
+	}
+
+	expectedPorts := []*ForwardedPort{
+		{
+			LocalPort:  59000,
+			RemotePort: 5900,
+		},
+		{
+			LocalPort:  4243, // 1st "random" port
+			RemotePort: 5901,
+		},
+		{
+			LocalPort:  4244, // 2nd "random" port
+			RemotePort: 5902,
+		},
+	}
+	if !reflect.DeepEqual(expectedPorts, portsToForward) {
+		t.Errorf("Bad ports:\n%s", spew.Sdump(portsToForward))
+	}
+
+	if stopCh == nil {
+		t.Error("Stop channel is nil")
+	} else {
+		close(stopCh)
 	}
 }
 
