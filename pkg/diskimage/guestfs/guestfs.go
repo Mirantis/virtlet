@@ -1,4 +1,6 @@
-/* libguestfs generated file
+/* Code generated DO NOT EDIT.
+ *
+ * libguestfs generated file
  * WARNING: THIS FILE IS GENERATED FROM:
  *   generator/ *.ml
  * ANY CHANGES YOU MAKE TO THIS FILE WILL BE LOST.

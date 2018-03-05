@@ -36,8 +36,8 @@ func initLibForImage(path string) (*guestfs.Guestfs, error) {
 	return g, nil
 }
 
-// FormatDisk given a path will partition the image with MBR partition table
-// creating a single partition, then formatting it to ext4 filesystem.
+// FormatDisk partitions the specified image file by writing an MBR with
+// a single partition and then formatting that partition as an ext4 filesystem.
 func FormatDisk(path string) error {
 	g, err := initLibForImage(path)
 	if err != nil {
