@@ -114,7 +114,7 @@ func (v *VirtletManager) Run() {
 	}
 
 	downloader := image.NewDownloader("http")
-	imageStore := image.NewImageFileStore(filepath.Join(v.tempDir, "images"), downloader, nil)
+	imageStore := image.NewFileStore(filepath.Join(v.tempDir, "images"), downloader, nil)
 
 	os.Setenv("KUBERNETES_CLUSTER_URL", "")
 	os.Setenv("VIRTLET_DISABLE_LOGGING", "true")

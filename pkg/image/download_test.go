@@ -59,7 +59,7 @@ func TestDownload(t *testing.T) {
 	ts := httptest.NewServer(downloadHandler("foobar"))
 	defer ts.Close()
 	verifyDownload(t, "http", "foobar", Endpoint{
-		Url: ts.Listener.Addr().String() + "/base.qcow2",
+		URL: ts.Listener.Addr().String() + "/base.qcow2",
 	})
 }
 
@@ -78,7 +78,7 @@ func TestTLSDownload(t *testing.T) {
 	ts.StartTLS()
 	defer ts.Close()
 	verifyDownload(t, "https", "foobar", Endpoint{
-		Url: ts.Listener.Addr().String() + "/base.qcow2",
+		URL: ts.Listener.Addr().String() + "/base.qcow2",
 		TLS: &TLSConfig{
 			Certificates: []TLSCertificate{
 				{Certificate: ca},
@@ -114,7 +114,7 @@ func TestCancelDownload(t *testing.T) {
 	}()
 
 	err := downloader.DownloadFile(ctx, Endpoint{
-		Url: ts.Listener.Addr().String() + "/base.qcow2",
+		URL: ts.Listener.Addr().String() + "/base.qcow2",
 	}, &buf)
 	switch {
 	case err == nil:

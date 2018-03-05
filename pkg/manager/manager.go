@@ -52,7 +52,7 @@ const (
 type VirtletManager struct {
 	server *grpc.Server
 	// libvirt
-	imageStore                image.ImageStore
+	imageStore                image.Store
 	libvirtVirtualizationTool *libvirttools.VirtualizationTool
 	// metadata
 	metadataStore              metadata.MetadataStore
@@ -61,7 +61,7 @@ type VirtletManager struct {
 	StreamServer               *stream.Server
 }
 
-func NewVirtletManager(libvirtUri, rawDevices, imageTranslationConfigsDir string, imageStore image.ImageStore, metadataStore metadata.MetadataStore, fdManager tapmanager.FDManager) (*VirtletManager, error) {
+func NewVirtletManager(libvirtUri, rawDevices, imageTranslationConfigsDir string, imageStore image.Store, metadataStore metadata.MetadataStore, fdManager tapmanager.FDManager) (*VirtletManager, error) {
 	err := imagetranslation.RegisterCustomResourceType()
 	if err != nil {
 		return nil, err
