@@ -31,7 +31,7 @@ func GetSandboxes(sandboxNum int) []*kubeapi.PodSandboxConfig {
 		attempt := uint32(0)
 		metadata := &kubeapi.PodSandboxMetadata{
 			Name:      name,
-			Uid:       utils.NewUuid5(samplePodNsUuid, name),
+			Uid:       utils.NewUUID5(samplePodNsUuid, name),
 			Namespace: namespace,
 			Attempt:   attempt,
 		}
@@ -85,7 +85,7 @@ func GetContainersConfig(sandboxConfigs []*kubeapi.PodSandboxConfig) []*Containe
 			SandboxId:           sandbox.Metadata.Uid,
 			Image:               "testImage",
 			RootImageVolumeName: "sample_name",
-			ContainerId:         utils.NewUuid5(sampleContainerNsUuid, name),
+			ContainerId:         utils.NewUUID5(sampleContainerNsUuid, name),
 			Labels:              map[string]string{"foo": "bar", "fizz": "buzz"},
 			Annotations:         map[string]string{"hello": "world", "virt": "let"},
 		}

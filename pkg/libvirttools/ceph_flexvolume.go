@@ -55,7 +55,7 @@ func newCephVolume(volumeName, configPath string, config *VMConfig, owner Volume
 	v := &cephVolume{
 		volumeBase: volumeBase{config, owner},
 	}
-	if err := utils.ReadJson(configPath, &v.opts); err != nil {
+	if err := utils.ReadJSON(configPath, &v.opts); err != nil {
 		return nil, fmt.Errorf("failed to parse ceph flexvolume config %q: %v", configPath, err)
 	}
 	v.volumeName = volumeName
@@ -64,14 +64,14 @@ func newCephVolume(volumeName, configPath string, config *VMConfig, owner Volume
 	// but we don't need secret content at that time anymore
 	safeOpts := *v.opts
 	safeOpts.Secret = ""
-	if err := utils.WriteJson(configPath, safeOpts, 0700); err != nil {
+	if err := utils.WriteJSON(configPath, safeOpts, 0700); err != nil {
 		return nil, fmt.Errorf("failed to overwrite ceph flexvolume config %q: %v", configPath, err)
 	}
 	return v, nil
 }
 
 func (v *cephVolume) secretUsageName() string {
-	return v.opts.User + "-" + utils.NewUuid5(ContainerNsUuid, v.config.PodSandboxId) + "-" + v.volumeName
+	return v.opts.User + "-" + utils.NewUUID5(ContainerNsUuid, v.config.PodSandboxId) + "-" + v.volumeName
 }
 
 func (v *cephVolume) secretDef() *libvirtxml.Secret {
@@ -83,7 +83,7 @@ func (v *cephVolume) secretDef() *libvirtxml.Secret {
 		// it's more convenient to use it for manipulating secrets
 		// and preserve using UUIDv5 as part of value
 		// UUID value is generated randomly
-		UUID:  utils.NewUuid(),
+		UUID:  utils.NewUUID(),
 		Usage: &libvirtxml.SecretUsage{Name: v.secretUsageName(), Type: "ceph"},
 	}
 }

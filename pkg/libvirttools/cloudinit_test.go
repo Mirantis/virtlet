@@ -54,8 +54,8 @@ func newFakeFlexvolume(t *testing.T, parentDir string, uuid string, part int) *f
 		t.Fatalf("MkdirAll(): %q: %v", volDir, err)
 	}
 	infoPath := filepath.Join(volDir, "virtlet-flexvolume.json")
-	if err := utils.WriteJson(infoPath, info, 0777); err != nil {
-		t.Fatalf("WriteJson(): %q: %v", infoPath, err)
+	if err := utils.WriteJSON(infoPath, info, 0777); err != nil {
+		t.Fatalf("WriteJSON(): %q: %v", infoPath, err)
 	}
 	return &fakeFlexvolume{
 		uuid: uuid,

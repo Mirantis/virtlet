@@ -75,7 +75,7 @@ func NewFlexVolumeDriver(uuidGen UuidGen, mounter Mounter) *FlexVolumeDriver {
 }
 
 func (d *FlexVolumeDriver) populateVolumeDir(targetDir string, opts map[string]interface{}) error {
-	return utils.WriteJson(filepath.Join(targetDir, flexvolumeDataFile), opts, 0700)
+	return utils.WriteJSON(filepath.Join(targetDir, flexvolumeDataFile), opts, 0700)
 }
 
 // The following functions are not currently needed, but still
@@ -275,7 +275,7 @@ func formatResult(fields map[string]interface{}, err error) string {
 func GetFlexvolumeInfo(dir string) (string, int, error) {
 	dataFile := filepath.Join(dir, flexvolumeDataFile)
 	var opts map[string]interface{}
-	if err := utils.ReadJson(dataFile, &opts); err != nil {
+	if err := utils.ReadJSON(dataFile, &opts); err != nil {
 		return "", 0, fmt.Errorf("can't read flexvolume data file %q: %v", dataFile, err)
 	}
 	uuidRaw, found := opts[uuidOptionsKey]

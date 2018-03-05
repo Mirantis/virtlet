@@ -22,8 +22,8 @@ import (
 	uuid "github.com/nu7hatch/gouuid"
 )
 
-// NewUuid returns a new uuid4 as a string
-func NewUuid() string {
+// NewUUID returns a new uuid4 as a string
+func NewUUID() string {
 	u, err := uuid.NewV4()
 	if err != nil {
 		log.Panicf("can't generate new uuid4: %v", err)
@@ -31,9 +31,9 @@ func NewUuid() string {
 	return u.String()
 }
 
-// NewUuid5 returns a new uuid5 as a string
-func NewUuid5(nsUuid, s string) string {
-	ns, err := uuid.ParseHex(nsUuid)
+// NewUUID5 returns a new uuid5 as a string
+func NewUUID5(nsUUID, s string) string {
+	ns, err := uuid.ParseHex(nsUUID)
 	if err != nil {
 		log.Panicf("can't parse namespace uuid: %v", err)
 	}

@@ -816,7 +816,7 @@ func TestTapFDSource(t *testing.T) {
 				name += "/recover"
 			}
 			t.Run(name, func(t *testing.T) {
-				podId := utils.NewUuid()
+				podId := utils.NewUUID()
 				vnt := newVMNetworkTester(t, tc.interfaceCount)
 				defer vnt.teardown()
 
