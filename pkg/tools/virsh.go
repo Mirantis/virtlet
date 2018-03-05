@@ -35,11 +35,12 @@ type virshCommand struct {
 	out      io.Writer
 }
 
+// NewVirshCmd returns a cobra.Command that executes virsh for a VM pod.
 func NewVirshCmd(client KubeClient, out io.Writer) *cobra.Command {
 	virsh := &virshCommand{client: client, out: out}
 	cmd := &cobra.Command{
 		Use:   "virsh",
-		Short: "execute a virsh command",
+		Short: "Execute a virsh command",
 		Long: dedent.Dedent(`
                         This command executes libvirt virsh command.
 

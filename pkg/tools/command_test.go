@@ -25,10 +25,12 @@ import (
 )
 
 type fakeKubeClient struct {
-	t                *testing.T
-	virtletPods      map[string]string
-	vmPods           map[string]VMPodInfo
-	expectedCommands map[string]string
+	t                       *testing.T
+	virtletPods             map[string]string
+	vmPods                  map[string]VMPodInfo
+	expectedCommands        map[string]string
+	expectedPortForwards    []string
+	portForwardStopChannels []chan struct{}
 }
 
 var _ KubeClient = &fakeKubeClient{}
@@ -72,4 +74,34 @@ func (c *fakeKubeClient) ExecInContainer(podName, containerName, namespace strin
 		}
 	}
 	return 0, nil
+}
+
+func (c *fakeKubeClient) ForwardPorts(podName, namespace string, ports []*ForwardedPort) (stopCh chan struct{}, err error) {
+	var portStrs []string
+	for n, p := range ports {
+		portStrs = append(portStrs, p.String())
+		if p.LocalPort == 0 {
+			p.LocalPort = 4242 + uint16(n)
+		}
+	}
+	if namespace == "" {
+		namespace = "default"
+	}
+	key := fmt.Sprintf("%s/%s: %s", podName, namespace, strings.Join(portStrs, " "))
+	var pfs []string
+	found := false
+	for _, pf := range c.expectedPortForwards {
+		if pf == key {
+			found = true
+		} else {
+			pfs = append(pfs, pf)
+		}
+	}
+	if !found {
+		c.t.Errorf("unexpected portforward: %q", key)
+	}
+	c.expectedPortForwards = pfs
+	stopCh = make(chan struct{})
+	c.portForwardStopChannels = append(c.portForwardStopChannels, stopCh)
+	return stopCh, nil
 }
