@@ -829,7 +829,7 @@ func TestTapFDSource(t *testing.T) {
 				tst.cniClient.UseBadResult(tst.podId, samplePodName, samplePodNS, tc.useBadResult)
 				csnBytes, err := c.AddFDs(fdKey, &tapmanager.GetFDPayload{
 					Description: &tapmanager.PodNetworkDesc{
-						PodId:   tst.podId,
+						PodID:   tst.podId,
 						PodNs:   samplePodNS,
 						PodName: samplePodName,
 					},
@@ -890,7 +890,7 @@ func TestTapFDSource(t *testing.T) {
 					if err = c.Recover(fdKey, &tapmanager.GetFDPayload{
 						ContainerSideNetwork: csn,
 						Description: &tapmanager.PodNetworkDesc{
-							PodId:   tst.podId,
+							PodID:   tst.podId,
 							PodNs:   samplePodNS,
 							PodName: samplePodName,
 						},

@@ -173,7 +173,7 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 
 	state := kubeapi.PodSandboxState_SANDBOX_READY
 	pnd := &tapmanager.PodNetworkDesc{
-		PodId:   podId,
+		PodID:   podId,
 		PodNs:   podNs,
 		PodName: podName,
 	}

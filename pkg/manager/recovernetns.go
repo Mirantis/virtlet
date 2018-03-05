@@ -45,7 +45,7 @@ func recoverNetworkNamespaces(metadataStore metadata.MetadataStore, fdManager ta
 			tapmanager.GetFDPayload{
 				ContainerSideNetwork: psi.ContainerSideNetwork,
 				Description: &tapmanager.PodNetworkDesc{
-					PodId:   s.GetID(),
+					PodID:   s.GetID(),
 					PodNs:   psi.Metadata.GetNamespace(),
 					PodName: psi.Metadata.GetName(),
 				},
