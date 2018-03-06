@@ -21,18 +21,32 @@ import (
 )
 
 // VerifyNamed generates a file name based on current test name and
-// the 'name' argument and compares its content in git index (i.e.
-// staged or committed if now changes are staged for the file) to
-// the JSON serializes of 'data' argument, ignoring any JSON
-// formatting differences. The test will fail if the data
+// the 'name' argument and compares its contents in git index (i.e.
+// staged or committed if the changes are staged for the file) to
+// that of of 'data' argument. The test will fail if the data
 // differs. In this case the target file is updated and the user
 // must stage or commit the changes to make the test pass.
+// If data is string or []byte, it's compared directly to the contents
+// of the file (the data are supposed to be human-readable and
+// easily diffable).
+// If data implements Verifier interface, the comparison is done
+// by invoking it's Verify method on the contents of the file.
+// Otherwise, the comparison is done based on JSON representation
+// of the data ignoring any changes in JSON formatting and any
+// changes introduced by the encoding/json marshalling mechanism.
+// If data implements Verifier interface, the updated contents of the
+// data file is generated using its Marshal() method.
+// The suffix of the data file name is generated based on the
+// data argument, too. For text content, ".out.txt" suffix is used.
+// For json content, the suffix is ".out.json". For Verifier type,
+// the suffix is ".out" concatenated with the value of the Suffix()
+// method.
 func VerifyNamed(t *testing.T, name string, data interface{}) {
 	testName := t.Name()
 	if name != "" {
 		testName += "__" + name
 	}
-	filename, err := GetFilenameForTest(testName)
+	filename, err := GetFilenameForTest(testName, data)
 	if err != nil {
 		t.Errorf("can't get filename for test %q: %v", testName, err)
 		return
