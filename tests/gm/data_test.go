@@ -28,21 +28,38 @@ func TestFileNaming(t *testing.T) {
 	if err != nil {
 		t.Fatalf("os.Getwd(): %v", err)
 	}
-	for _, tc := range []struct{ testName, filename string }{
+	for _, tc := range []struct {
+		testName string
+		filename string
+		data     interface{}
+	}{
 		{
 			"TestSomething",
-			"TestSomething.json",
+			"TestSomething.out.json",
+			[]string{"foobar"},
 		},
 		{
 			"TestSomething/qqq",
-			"TestSomething__qqq.json",
+			"TestSomething__qqq.out.json",
+			[]string{"foobar"},
 		},
 		{
 			"TestSomething/it's_foobar",
-			"TestSomething__it_s_foobar.json",
+			"TestSomething__it_s_foobar.out.json",
+			[]string{"foobar"},
+		},
+		{
+			"TestSomething",
+			"TestSomething.out.txt",
+			"foobar",
+		},
+		{
+			"TestSomething",
+			"TestSomething.out.yaml",
+			NewYamlVerifier([]string{"foobar"}),
 		},
 	} {
-		filename, err := GetFilenameForTest(tc.testName)
+		filename, err := GetFilenameForTest(tc.testName, tc.data)
 		if err != nil {
 			t.Errorf("GetFilenameForTest failed for %q: %v", tc.testName, err)
 		}
@@ -58,65 +75,134 @@ func TestFileNaming(t *testing.T) {
 }
 
 func TestData(t *testing.T) {
-	f, err := ioutil.TempFile("", "gm-test-")
-	if err != nil {
-		t.Fatalf("ioutil.TempFile(): %v", err)
-	}
-	tmpFile := f.Name()
-	defer os.Remove(tmpFile)
-	if err := f.Close(); err != nil {
-		t.Fatalf("Close(): %v", err)
-	}
+	for _, tc := range []struct {
+		name        string
+		toWrite     interface{}
+		toWriteRaw  string
+		compareWith interface{}
+		diff        bool
+	}{
+		{
+			name:        "non-existent file",
+			compareWith: map[string]interface{}{"x": 42},
+			diff:        true,
+		},
+		{
+			name:        "unchanged",
+			toWrite:     map[string]interface{}{"x": 42},
+			compareWith: map[string]interface{}{"x": 42},
+			diff:        false,
+		},
+		{
+			name:        "changed",
+			toWrite:     map[string]interface{}{"x": 42},
+			compareWith: map[string]interface{}{"x": 43},
+			diff:        true,
+		},
+		{
+			name:        "unchanged with different formatting",
+			toWriteRaw:  `{   "x":   42}  `,
+			compareWith: map[string]interface{}{"x": 42},
+			diff:        false,
+		},
+		{
+			name:        "malformed golden master data file",
+			toWriteRaw:  `{   `,
+			compareWith: map[string]interface{}{"x": 42},
+			diff:        true,
+		},
+		{
+			name:        "text content",
+			toWrite:     "abcdef",
+			compareWith: "abcdef",
+			diff:        false,
+		},
+		{
+			name:        "text content with changes",
+			toWrite:     "abcdef",
+			compareWith: "abcdefgh",
+			diff:        true,
+		},
+		{
+			name:        "text content (raw)",
+			toWriteRaw:  "abcdef",
+			compareWith: "abcdef",
+			diff:        false,
+		},
+		{
+			name:        "yaml content",
+			toWrite:     NewYamlVerifier(map[string]interface{}{"x": 42}),
+			compareWith: NewYamlVerifier(map[string]interface{}{"x": 42}),
+			diff:        false,
+		},
+		{
+			name:        "yaml content with changes",
+			toWrite:     NewYamlVerifier(map[string]interface{}{"x": 42}),
+			compareWith: NewYamlVerifier(map[string]interface{}{"x": 43}),
+			diff:        true,
+		},
+		{
+			name:        "yaml content (raw)",
+			toWriteRaw:  "x: 42",
+			compareWith: NewYamlVerifier(map[string]interface{}{"x": 42}),
+			diff:        false,
+		},
+		{
+			name:        "yaml content (raw comparison, string)",
+			toWriteRaw:  "x: 42",
+			compareWith: NewYamlVerifier("x: 42"),
+			diff:        false,
+		},
+		{
+			name:        "yaml content with changes (raw comparison, string)",
+			toWriteRaw:  "x: 42",
+			compareWith: NewYamlVerifier("x: 43"),
+			diff:        true,
+		},
+		{
+			name:        "yaml content (raw comparison, []byte)",
+			toWriteRaw:  "x: 42",
+			compareWith: NewYamlVerifier([]byte("x: 42")),
+			diff:        false,
+		},
+		{
+			name:        "yaml content with changes (raw comparison, []byte)",
+			toWriteRaw:  "x: 42",
+			compareWith: NewYamlVerifier([]byte("x: 43")),
+			diff:        true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f, err := ioutil.TempFile("", "gm-test-")
+			if err != nil {
+				t.Fatalf("ioutil.TempFile(): %v", err)
+			}
+			tmpFile := f.Name()
+			defer os.Remove(tmpFile)
+			if err := f.Close(); err != nil {
+				t.Fatalf("Close(): %v", err)
+			}
 
-	hasDiff, err := DataFileDiffers(tmpFile, map[string]interface{}{"x": 42})
-	switch {
-	case err != nil:
-		t.Errorf("DataFileDiffers failed on a non-existing file: %v", err)
-	case !hasDiff:
-		t.Errorf("got no diff for non-existing file")
-	}
+			if tc.toWrite != nil {
+				if err := WriteDataFile(tmpFile, tc.toWrite); err != nil {
+					t.Fatalf("WriteDataFile(): %v", err)
+				}
+			} else if tc.toWriteRaw != "" {
+				if err := ioutil.WriteFile(tmpFile, []byte(tc.toWriteRaw), 0777); err != nil {
+					t.Fatalf("error writing %q: %v", tmpFile, err)
+				}
+			}
 
-	if err := WriteDataFile(tmpFile, map[string]interface{}{"x": 42}); err != nil {
-		t.Fatalf("WriteDataFile(): %v", err)
-	}
+			hasDiff, err := DataFileDiffers(tmpFile, tc.compareWith)
+			switch {
+			case err != nil:
+				t.Errorf("DataFileDiffers failed: %v", err)
+			case tc.diff && !hasDiff:
+				t.Errorf("diff expected but got no diff")
+			case !tc.diff && hasDiff:
+				t.Errorf("no diff expected but got diff")
+			}
+		})
 
-	hasDiff, err = DataFileDiffers(tmpFile, map[string]interface{}{"x": 42})
-	switch {
-	case err != nil:
-		t.Errorf("DataFileDiffers failed on an unchanged file: %v", err)
-	case hasDiff:
-		t.Errorf("got diff for unchanged file")
-	}
-
-	hasDiff, err = DataFileDiffers(tmpFile, map[string]interface{}{"x": 43})
-	switch {
-	case err != nil:
-		t.Errorf("DataFileDiffers failed on a changed file: %v", err)
-	case !hasDiff:
-		t.Errorf("didn't get diff for a changed file")
-	}
-
-	if err := ioutil.WriteFile(tmpFile, []byte(`{   "x":   42}  `), 0777); err != nil {
-		t.Fatalf("error writing %q: %v", tmpFile, err)
-	}
-
-	hasDiff, err = DataFileDiffers(tmpFile, map[string]interface{}{"x": 42})
-	switch {
-	case err != nil:
-		t.Errorf("DataFileDiffers failed: %v", err)
-	case hasDiff:
-		t.Errorf("got diff for unchanged file with different json formatting")
-	}
-
-	if err := ioutil.WriteFile(tmpFile, []byte(`{   `), 0777); err != nil {
-		t.Fatalf("error writing %q: %v", tmpFile, err)
-	}
-
-	hasDiff, err = DataFileDiffers(tmpFile, map[string]interface{}{"x": 42})
-	switch {
-	case err != nil:
-		t.Errorf("DataFileDiffers failed on a malformed file: %v", err)
-	case !hasDiff:
-		t.Errorf("got no diff for malformed target file")
 	}
 }
