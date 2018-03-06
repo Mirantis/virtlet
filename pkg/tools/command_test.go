@@ -22,6 +22,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/spf13/cobra"
 )
 
 type fakeKubeClient struct {
@@ -104,4 +106,34 @@ func (c *fakeKubeClient) ForwardPorts(podName, namespace string, ports []*Forwar
 	stopCh = make(chan struct{})
 	c.portForwardStopChannels = append(c.portForwardStopChannels, stopCh)
 	return stopCh, nil
+}
+
+func fakeCobraCommand() *cobra.Command {
+	topCmd := &cobra.Command{
+		Use:   "topcmd",
+		Short: "Topmost command",
+		Long:  "Lorem ipsum dolor sit amet",
+	}
+	var a string
+	var b, c int
+	topCmd.Flags().StringVarP(&a, "someflag", "f", "someflagvalue", "a flag")
+	topCmd.Flags().IntVar(&b, "anotherflag", 42, "another flag")
+
+	fooCmd := &cobra.Command{
+		Use:     "foo",
+		Short:   "Foo command",
+		Long:    "Consectetur adipiscing elit",
+		Example: "kubectl plugin topcmd foo",
+	}
+	fooCmd.Flags().IntVar(&c, "fooflag", 4242, "foo flag")
+	topCmd.AddCommand(fooCmd)
+
+	barCmd := &cobra.Command{
+		Use:   "bar",
+		Short: "Bar command",
+		Long:  "Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua",
+	}
+	topCmd.AddCommand(barCmd)
+
+	return topCmd
 }
