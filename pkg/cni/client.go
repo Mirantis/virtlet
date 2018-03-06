@@ -111,25 +111,25 @@ type cniRequest struct {
 	PodNs      string
 }
 
-type realclient struct {
+type realClient struct {
 	cniConfig     *libcni.CNIConfig
 	netConfigList *libcni.NetworkConfigList
 }
 
-func newRealclient(pluginsDir, configsDir string) (*realclient, error) {
+func newRealclient(pluginsDir, configsDir string) (*realClient, error) {
 	netConfigList, err := ReadConfiguration(configsDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read CNI configuration %q: %v", configsDir, err)
 	}
 	glog.V(3).Infof("CNI config: name: %q type: %q", netConfigList.Plugins[0].Network.Name, netConfigList.Plugins[0].Network.Type)
 
-	return &realclient{
+	return &realClient{
 		cniConfig:     &libcni.CNIConfig{Path: []string{pluginsDir}},
 		netConfigList: netConfigList,
 	}, nil
 }
 
-func (c *realclient) cniRuntimeConf(podID, podName, podNs string) *libcni.RuntimeConf {
+func (c *realClient) cniRuntimeConf(podID, podName, podNs string) *libcni.RuntimeConf {
 	r := &libcni.RuntimeConf{
 		ContainerID: podID,
 		NetNS:       PodNetNSPath(podID),
