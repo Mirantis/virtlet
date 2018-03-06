@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"flag"
 	"os"
 
 	"github.com/renstrom/dedent"
@@ -35,16 +36,37 @@ func newRootCmd() *cobra.Command {
                         virtletctl provides a number of utilities for Virtet-enabled
                         Kubernetes cluster.`),
 	}
-	tools.AddGlobalFlags(cmd.PersistentFlags())
-	client := tools.NewRealKubeClient()
+
+	clientCfg := tools.BindFlags(cmd.PersistentFlags())
+	// Fix unwanted glog warnings, see
+	// https://github.com/kubernetes/kubernetes/issues/17162#issuecomment-225596212
+	flag.CommandLine.Parse([]string{})
+
+	client := tools.NewRealKubeClient(clientCfg)
 	cmd.AddCommand(tools.NewDumpMetadataCmd(client))
 	cmd.AddCommand(tools.NewVirshCmd(client, os.Stdout))
 	cmd.AddCommand(tools.NewSshCmd(client, os.Stdout, ""))
+	cmd.AddCommand(tools.NewInstallCmd(cmd, "", ""))
+
+	for _, c := range cmd.Commands() {
+		c.PreRunE = func(*cobra.Command, []string) error {
+			return tools.SetLocalPluginFlags(c)
+		}
+	}
+
 	return cmd
 }
 
 func main() {
 	cmd := newRootCmd()
+	if tools.InPlugin() && len(os.Args) > 1 {
+		// in case of a kubectl plugin, all the options are
+		// already removed from the command line
+		args := []string{os.Args[1]}
+		args = append(args, "--")
+		args = append(args, os.Args[2:]...)
+		cmd.SetArgs(args)
+	}
 	if err := cmd.Execute(); err != nil {
 		os.Exit(1)
 	}
