@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/exec"
@@ -179,6 +180,7 @@ func (pf defaultPortForwarder) ForwardPorts(config *rest.Config, method string, 
 // RealKubeClient is used to access a Kubernetes cluster.
 type RealKubeClient struct {
 	client        kubernetes.Interface
+	clientCfg     clientcmd.ClientConfig
 	restClient    rest.Interface
 	config        *rest.Config
 	namespace     string
@@ -188,8 +190,10 @@ type RealKubeClient struct {
 
 var _ KubeClient = &RealKubeClient{}
 
-func NewRealKubeClient() *RealKubeClient {
+// NewRealKubeClient creates a RealKubeClient for the specified ClientConfig.
+func NewRealKubeClient(clientCfg clientcmd.ClientConfig) *RealKubeClient {
 	return &RealKubeClient{
+		clientCfg:     clientCfg,
 		executor:      defaultExecutor{},
 		portForwarder: defaultPortForwarder{},
 	}
@@ -199,13 +203,25 @@ func (c *RealKubeClient) setup() error {
 	if c.client != nil {
 		return nil
 	}
-	config, namespace, client, err := getApiClient()
+
+	config, err := c.clientCfg.ClientConfig()
 	if err != nil {
 		return err
 	}
+
+	client, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("Can't create kubernetes api client: %v", err)
+	}
+
+	ns, _, err := c.clientCfg.Namespace()
+	if err != nil {
+		return err
+	}
+
 	c.client = client
 	c.config = config
-	c.namespace = namespace
+	c.namespace = ns
 	c.restClient = client.CoreV1().RESTClient()
 	return nil
 }
