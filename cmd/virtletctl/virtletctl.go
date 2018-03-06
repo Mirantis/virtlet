@@ -46,6 +46,7 @@ func newRootCmd() *cobra.Command {
 	cmd.AddCommand(tools.NewDumpMetadataCmd(client))
 	cmd.AddCommand(tools.NewVirshCmd(client, os.Stdout))
 	cmd.AddCommand(tools.NewSSHCmd(client, os.Stdout, ""))
+	cmd.AddCommand(tools.NewVNCCmd(client))
 	cmd.AddCommand(tools.NewInstallCmd(cmd, "", ""))
 	cmd.AddCommand(tools.NewGenDocCmd(cmd))
 
