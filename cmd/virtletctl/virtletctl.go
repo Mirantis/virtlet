@@ -40,6 +40,7 @@ func newRootCmd() *cobra.Command {
 	cmd.AddCommand(tools.NewDumpMetadataCmd(client))
 	cmd.AddCommand(tools.NewVirshCmd(client, os.Stdout))
 	cmd.AddCommand(tools.NewSshCmd(client, os.Stdout, ""))
+	cmd.AddCommand(tools.NewVNCCmd(client))
 	return cmd
 }
 
