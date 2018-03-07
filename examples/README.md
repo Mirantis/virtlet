@@ -24,9 +24,10 @@ of each Virtlet release on GitHub starting from Virtlet 1.0):
 virtletctl ssh cirros@cirros-vm -- -i examples/vmkey [command...]
 ```
 
-Besides [cirros-vm.yaml](cirros-vm.yaml), there's also [ubuntu-vm.yaml](ubuntu-vm.yaml) that can be used to start an Ubuntu Xenial VM. It can also be accessed using `virtletctl ssh` after it boots:
+Besides [cirros-vm.yaml](cirros-vm.yaml), there's also [ubuntu-vm.yaml](ubuntu-vm.yaml) that can be used to start an Ubuntu Xenial VM and [fedora-vm.yaml](fedora-vm.yaml) that starts a Fedora VM. These VMs can also be accessed using `virtletctl ssh` after it boots:
 ```bash
 virtletctl ssh ubuntu@ubuntu-vm -- -i examples/vmkey [command...]
+virtletctl ssh fedora@fedora-vm -- -i examples/vmkey [command...]
 ```
 
 # Kubernetes on VM-based StatefulSet
