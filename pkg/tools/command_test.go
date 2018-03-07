@@ -37,13 +37,19 @@ type fakeKubeClient struct {
 
 var _ KubeClient = &fakeKubeClient{}
 
-func (c *fakeKubeClient) GetVirtletPodNames() ([]string, error) {
-	var r []string
-	for _, podName := range c.virtletPods {
-		r = append(r, podName)
+func (c *fakeKubeClient) GetVirtletPodAndNodeNames() ([]string, []string, error) {
+	var nodeNames []string
+	for nodeName := range c.virtletPods {
+		nodeNames = append(nodeNames, nodeName)
 	}
-	sort.Strings(r)
-	return r, nil
+	sort.Strings(nodeNames)
+
+	var podNames []string
+	for _, nodeName := range nodeNames {
+		podNames = append(podNames, c.virtletPods[nodeName])
+	}
+
+	return podNames, nodeNames, nil
 }
 
 func (c *fakeKubeClient) GetVirtletPodNameForNode(nodeName string) (string, error) {

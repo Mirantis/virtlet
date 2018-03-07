@@ -24,37 +24,60 @@ import (
 
 func TestVirshCommand(t *testing.T) {
 	for _, tc := range []struct {
-		args            string
-		expectedCommand string
-		errSubstring    string
+		args             string
+		expectedCommands map[string]string
+		expectedOutput   string
+		errSubstring     string
 	}{
 		{
-			args:            "list --node=kube-node-1",
-			expectedCommand: "virtlet-foo42/libvirt/kube-system: virsh list",
+			args: "list --node=kube-node-1",
+			expectedCommands: map[string]string{
+				"virtlet-foo42/libvirt/kube-system: virsh list": "foobar",
+			},
+			expectedOutput: "foobar",
 		},
 		{
-			args:         "list",
-			errSubstring: "please specify Virtlet node with --node",
+			args: "list",
+			expectedCommands: map[string]string{
+				"virtlet-foo42/libvirt/kube-system: virsh list": "foobar",
+				"virtlet-bar42/libvirt/kube-system: virsh list": "baz",
+			},
+			expectedOutput: "*** node: kube-node-1 pod: virtlet-foo42 ***\n" +
+				"foobar\n" +
+				"*** node: kube-node-2 pod: virtlet-bar42 ***\n" +
+				"baz\n",
 		},
 		{
-			args:            "dumpxml @cirros",
-			expectedCommand: "virtlet-foo42/libvirt/kube-system: virsh dumpxml virtlet-cc349e91-dcf7-foocontainer",
+			args: "dumpxml @cirros",
+			expectedCommands: map[string]string{
+				"virtlet-foo42/libvirt/kube-system: virsh dumpxml virtlet-cc349e91-dcf7-foocontainer": "foobar",
+			},
+			expectedOutput: "foobar",
 		},
 		{
-			args:            "dumpxml @ubuntu",
-			expectedCommand: "virtlet-bar42/libvirt/kube-system: virsh dumpxml virtlet-4707196f-1d93-vm",
+			args: "dumpxml @ubuntu",
+			expectedCommands: map[string]string{
+				"virtlet-bar42/libvirt/kube-system: virsh dumpxml virtlet-4707196f-1d93-vm": "foobar",
+			},
+			expectedOutput: "foobar",
 		},
 		{
-			args:            "dumpxml @cirros --node=kube-node-1",
-			expectedCommand: "virtlet-foo42/libvirt/kube-system: virsh dumpxml virtlet-cc349e91-dcf7-foocontainer",
+			args: "dumpxml @cirros --node=kube-node-1",
+			expectedCommands: map[string]string{
+				"virtlet-foo42/libvirt/kube-system: virsh dumpxml virtlet-cc349e91-dcf7-foocontainer": "foobar",
+			},
+			expectedOutput: "foobar",
 		},
 		{
 			args:         "dumpxml @cirros --node=kube-node-2",
 			errSubstring: "--node specifies a node other than one that runs the VM pod",
 		},
 		{
-			args:            "whatever @cirros @cirros1",
-			expectedCommand: "virtlet-foo42/libvirt/kube-system: virsh whatever virtlet-cc349e91-dcf7-foocontainer virtlet-68e6fede-aab2-qq",
+			args: "whatever @cirros @cirros1",
+			expectedCommands: map[string]string{
+				"virtlet-foo42/libvirt/kube-system: virsh whatever virtlet-cc349e91-dcf7-foocontainer virtlet-68e6fede-aab2-qq": "foobar",
+			},
+			expectedOutput: "foobar",
 		},
 		{
 			args:         "whatever @cirros @ubuntu",
@@ -88,11 +111,7 @@ func TestVirshCommand(t *testing.T) {
 						ContainerName:  "vm",
 					},
 				},
-			}
-			if tc.expectedCommand != "" {
-				c.expectedCommands = map[string]string{
-					tc.expectedCommand: "foobar",
-				}
+				expectedCommands: tc.expectedCommands,
 			}
 			var out bytes.Buffer
 			cmd := NewVirshCmd(c, &out)
@@ -106,11 +125,11 @@ func TestVirshCommand(t *testing.T) {
 				t.Errorf("Didn't get expected error (substring %q), output: %q", tc.errSubstring, out.String())
 			case err != nil && !strings.Contains(err.Error(), tc.errSubstring):
 				t.Errorf("Didn't get expected substring %q in the error: %v", tc.errSubstring, err)
-			case err == nil && out.String() != "foobar":
-				t.Errorf("Unexpected output from the command: %q instead of foobar", out.String())
+			case err == nil && out.String() != tc.expectedOutput:
+				t.Errorf("Unexpected output from the command: %q instead of %q", out.String(), tc.expectedOutput)
 			}
-			if len(c.expectedCommands) != 0 {
-				t.Errorf("command not executed: %q", tc.expectedCommand)
+			for c := range tc.expectedCommands {
+				t.Errorf("command not executed: %q", c)
 			}
 		})
 	}

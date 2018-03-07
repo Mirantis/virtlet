@@ -29,10 +29,13 @@ import (
 // virshCommand contains the data needed by the virsh subcommand
 // which allows one to execute virsh commands for a VM pod.
 type virshCommand struct {
-	client   KubeClient
-	nodeName string
-	args     []string
-	out      io.Writer
+	client         KubeClient
+	nodeName       string
+	args           []string
+	out            io.Writer
+	realArgs       []string
+	domainNodeName string
+	virtletPodName string
 }
 
 // NewVirshCmd returns a cobra.Command that executes virsh for a VM pod.
@@ -48,8 +51,9 @@ func NewVirshCmd(client KubeClient, out io.Writer) *cobra.Command {
                         corresponding libvirt domain name. If @podname is specified,
                         the target k8s node name is inferred automatically based
                         on the information of the VM pod. In case if no @podname
-                        is specified, it's necessary to provide the node name
-                        using the --node flag.`),
+                        is specified, the command is executed on every node
+                        and the output for every node is prepended with a line
+                        with the node name and corresponding Virtlet pod name.`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			virsh.args = args
 			return virsh.Run()
@@ -59,16 +63,15 @@ func NewVirshCmd(client KubeClient, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-// Run executes the command.
-func (v *virshCommand) Run() error {
+func (v *virshCommand) processArgs() error {
 	if len(v.args) == 0 {
 		return errors.New("missing virsh argument(s)")
 	}
-	var nodeName, virtletPodName string
-	var realArgs []string
+
+	v.realArgs = nil
 	for _, arg := range v.args {
 		if len(arg) < 2 || arg[0] != '@' {
-			realArgs = append(realArgs, arg)
+			v.realArgs = append(v.realArgs, arg)
 			continue
 		}
 		podName := arg[1:]
@@ -76,34 +79,66 @@ func (v *virshCommand) Run() error {
 		switch {
 		case err != nil:
 			return fmt.Errorf("can't get VM pod info for %q: %v", podName, err)
-		case nodeName == "":
-			nodeName = vmPodInfo.NodeName
-			virtletPodName = vmPodInfo.VirtletPodName
-		case nodeName != vmPodInfo.NodeName:
+		case v.domainNodeName == "":
+			v.domainNodeName = vmPodInfo.NodeName
+			v.virtletPodName = vmPodInfo.VirtletPodName
+		case v.domainNodeName != vmPodInfo.NodeName:
 			return errors.New("can't reference VM pods that run on different nodes")
 		}
-		realArgs = append(realArgs, vmPodInfo.LibvirtDomainName())
-	}
-	switch {
-	case v.nodeName == "" && nodeName == "":
-		return errors.New("please specify Virtlet node with --node")
-	case nodeName == "":
-		var err error
-		virtletPodName, err = v.client.GetVirtletPodNameForNode(v.nodeName)
-		if err != nil {
-			return fmt.Errorf("couldn't get Virtlet pod name for node %q: %v", v.nodeName, err)
-		}
-	case v.nodeName != "" && nodeName != v.nodeName:
-		return errors.New("--node specifies a node other than one that runs the VM pod")
+		v.realArgs = append(v.realArgs, vmPodInfo.LibvirtDomainName())
 	}
 
-	exitCode, err := v.client.ExecInContainer(virtletPodName, "libvirt", "kube-system", nil, v.out, os.Stderr, append([]string{"virsh"}, realArgs...))
+	return nil
+}
+
+func (v *virshCommand) runInVirtletPod(virtletPodName string) error {
+	exitCode, err := v.client.ExecInContainer(virtletPodName, "libvirt", "kube-system", nil, v.out, os.Stderr, append([]string{"virsh"}, v.realArgs...))
 	if err != nil {
 		return fmt.Errorf("error executing virsh in Virtlet pod %q: %v", virtletPodName, err)
 	}
 	if exitCode != 0 {
 		return fmt.Errorf("virsh returned non-zero exit code %d", exitCode)
 	}
-
 	return nil
+}
+
+func (v *virshCommand) runOnAllNodes() error {
+	podNames, nodeNames, err := v.client.GetVirtletPodAndNodeNames()
+	if err != nil {
+		return err
+	}
+	gotErrors := false
+	for n, nodeName := range nodeNames {
+		fmt.Fprintf(v.out, "*** node: %s pod: %s ***\n", nodeName, podNames[n])
+		if err := v.runInVirtletPod(podNames[n]); err != nil {
+			fmt.Fprintf(v.out, "ERROR: %v\n", err)
+			gotErrors = true
+		}
+		fmt.Fprint(v.out, "\n")
+	}
+	if gotErrors {
+		return errors.New("some of the nodes returned errors")
+	}
+	return nil
+}
+
+// Run executes the command.
+func (v *virshCommand) Run() error {
+	if err := v.processArgs(); err != nil {
+		return err
+	}
+	switch {
+	case v.nodeName == "" && v.domainNodeName == "":
+		return v.runOnAllNodes()
+	case v.domainNodeName == "":
+		var err error
+		v.virtletPodName, err = v.client.GetVirtletPodNameForNode(v.nodeName)
+		if err != nil {
+			return fmt.Errorf("couldn't get Virtlet pod name for node %q: %v", v.nodeName, err)
+		}
+	case v.nodeName != "" && v.domainNodeName != v.nodeName:
+		return errors.New("--node specifies a node other than one that runs the VM pod")
+	}
+
+	return v.runInVirtletPod(v.virtletPodName)
 }
