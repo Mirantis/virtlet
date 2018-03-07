@@ -12,8 +12,9 @@ A VM pod name in the form @podname is translated to the
 corresponding libvirt domain name. If @podname is specified,
 the target k8s node name is inferred automatically based
 on the information of the VM pod. In case if no @podname
-is specified, it's necessary to provide the node name
-using the --node flag.
+is specified, the command is executed on every node
+and the output for every node is prepended with a line
+with the node name and corresponding Virtlet pod name.
 
 ```
 virtletctl virsh [flags] virsh_command -- [virsh_command_args...]

@@ -67,7 +67,7 @@ func NewDumpMetadataCmd(client KubeClient) *cobra.Command {
 
 // Run executes the command.
 func (d *dumpMetadataCommand) Run() error {
-	podNames, err := d.client.GetVirtletPodNames()
+	podNames, nodeNames, err := d.client.GetVirtletPodAndNodeNames()
 	if err != nil {
 		return err
 	}
@@ -76,8 +76,8 @@ func (d *dumpMetadataCommand) Run() error {
 		return fmt.Errorf("No Virtlet pods found")
 	}
 
-	for _, podName := range podNames {
-		fname, err := d.copyOutFile(podName)
+	for n, podName := range podNames {
+		fname, err := d.copyOutFile(podName, nodeNames[n])
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Can't extract metadata db for pod %q: %v\n", podName, err)
 			continue
@@ -91,8 +91,8 @@ func (d *dumpMetadataCommand) Run() error {
 	return nil
 }
 
-func (d *dumpMetadataCommand) copyOutFile(podName string) (string, error) {
-	fmt.Printf("Virtlet pod name: %s\n", podName)
+func (d *dumpMetadataCommand) copyOutFile(podName, nodeName string) (string, error) {
+	fmt.Printf("Virtlet pod name: %s; node name: %s\n", podName, nodeName)
 
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}

@@ -160,20 +160,26 @@ func TestGetVirtletPodNames(t *testing.T) {
 			Items: []v1.Pod{
 				{
 					ObjectMeta: meta_v1.ObjectMeta{
+						Name:      "virtlet-foo42",
+						Namespace: "kube-system",
+						Labels: map[string]string{
+							"runtime": "virtlet",
+						},
+					},
+					Spec: v1.PodSpec{
+						NodeName: "kube-node-1",
+					},
+				},
+				{
+					ObjectMeta: meta_v1.ObjectMeta{
 						Name:      "virtlet-g9wtz",
 						Namespace: "kube-system",
 						Labels: map[string]string{
 							"runtime": "virtlet",
 						},
 					},
-				},
-				{
-					ObjectMeta: meta_v1.ObjectMeta{
-						Name:      "virtlet-foo42",
-						Namespace: "kube-system",
-						Labels: map[string]string{
-							"runtime": "virtlet",
-						},
+					Spec: v1.PodSpec{
+						NodeName: "kube-node-2",
 					},
 				},
 				// this pod doesn't have proper labels and thus
@@ -189,13 +195,18 @@ func TestGetVirtletPodNames(t *testing.T) {
 	})
 
 	c := &RealKubeClient{client: fc}
-	podNames, err := c.GetVirtletPodNames()
+	podNames, nodeNames, err := c.GetVirtletPodAndNodeNames()
 	if err != nil {
 		t.Fatalf("GetVirtletPodNames(): %v", err)
 	}
 	podNamesStr := strings.Join(podNames, ",")
-	expectedPodNamesStr := "virtlet-g9wtz,virtlet-foo42"
+	expectedPodNamesStr := "virtlet-foo42,virtlet-g9wtz"
 	if podNamesStr != expectedPodNamesStr {
+		t.Errorf("Bad pod names: %q instead of %q", podNamesStr, expectedPodNamesStr)
+	}
+	nodeNamesStr := strings.Join(nodeNames, ",")
+	expectedNodeNamesStr := "kube-node-1,kube-node-2"
+	if nodeNamesStr != expectedNodeNamesStr {
 		t.Errorf("Bad pod names: %q instead of %q", podNamesStr, expectedPodNamesStr)
 	}
 }

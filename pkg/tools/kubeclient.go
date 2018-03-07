@@ -121,9 +121,10 @@ func parsePortForwardOutput(out string, ports []*ForwardedPort) error {
 
 // KubeClient contains methods for interfacing with Kubernetes clusters.
 type KubeClient interface {
-	// GetVirtletPodNames returns a list of names of the virtlet pods
-	// present in the cluster.
-	GetVirtletPodNames() ([]string, error)
+	// GetVirtletPodAndNodeNames returns a list of names of the
+	// virtlet pods present in the cluster and a list of
+	// corresponding node names that contain these pods.
+	GetVirtletPodAndNodeNames() (podNames []string, nodeNames []string, err error)
 	// GetVirtletPodNameForNode returns a name of the virtlet pod on
 	// the specified k8s node.
 	GetVirtletPodNameForNode(nodeName string) (string, error)
@@ -230,9 +231,9 @@ func (c *RealKubeClient) setup() error {
 	return nil
 }
 
-func (c *RealKubeClient) getVirtletPodNames(nodeName string) ([]string, error) {
+func (c *RealKubeClient) getVirtletPodAndNodeNames(nodeName string) (podNames []string, nodeNames []string, err error) {
 	if err := c.setup(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	opts := meta_v1.ListOptions{
 		LabelSelector: "runtime=virtlet",
@@ -242,14 +243,14 @@ func (c *RealKubeClient) getVirtletPodNames(nodeName string) ([]string, error) {
 	}
 	pods, err := c.client.CoreV1().Pods("kube-system").List(opts)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	var r []string
 	for _, item := range pods.Items {
-		r = append(r, item.Name)
+		podNames = append(podNames, item.Name)
+		nodeNames = append(nodeNames, item.Spec.NodeName)
 	}
-	return r, nil
+	return podNames, nodeNames, nil
 }
 
 func (c *RealKubeClient) getVMPod(podName string) (*v1.Pod, error) {
@@ -266,14 +267,14 @@ func (c *RealKubeClient) getVMPod(podName string) (*v1.Pod, error) {
 	return pod, nil
 }
 
-// GetVirtletPodNames implements GetVirtletPodNames method of KubeClient interface.
-func (c *RealKubeClient) GetVirtletPodNames() ([]string, error) {
-	return c.getVirtletPodNames("")
+// GetVirtletPodAndNodeNames implements GetVirtletPodAndNodeNames method of KubeClient interface.
+func (c *RealKubeClient) GetVirtletPodAndNodeNames() (podNames []string, nodeNames []string, err error) {
+	return c.getVirtletPodAndNodeNames("")
 }
 
 // GetVirtletPodNameForNode implements GetVirtletPodNameForNode method of KubeClient interface.
 func (c *RealKubeClient) GetVirtletPodNameForNode(nodeName string) (string, error) {
-	virtletPodNames, err := c.getVirtletPodNames(nodeName)
+	virtletPodNames, _, err := c.getVirtletPodAndNodeNames(nodeName)
 	if err != nil {
 		return "", err
 	}
