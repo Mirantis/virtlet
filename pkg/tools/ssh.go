@@ -40,7 +40,7 @@ type sshCommand struct {
 }
 
 // NewSshCmd returns a cobra.Command that performs ssh into a VM pod.
-func NewSshCmd(client KubeClient, out io.Writer, sshExecutable string) *cobra.Command {
+func NewSSHCmd(client KubeClient, out io.Writer, sshExecutable string) *cobra.Command {
 	ssh := &sshCommand{client: client, out: out, sshExecutable: sshExecutable}
 	return &cobra.Command{
 		Use:   "ssh user@pod -- [ssh args...]",

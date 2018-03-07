@@ -50,22 +50,22 @@ type VMPodInfo struct {
 	NodeName string
 	// VirtletPodName is the name of the virtlet pod that manages this VM pod
 	VirtletPodName string
-	// ContainerId is the id of the container in the VM pod
-	ContainerId string
+	// ContainerID is the id of the container in the VM pod
+	ContainerID string
 	// ContainerName is the name of the container in the VM pod
 	ContainerName string
 }
 
 // LibvirtDomainName returns the name of the libvirt domain for the VMPodInfo.
 func (podInfo VMPodInfo) LibvirtDomainName() string {
-	containerId := podInfo.ContainerId
-	if p := strings.Index(containerId, "__"); p >= 0 {
-		containerId = containerId[p+2:]
+	containerID := podInfo.ContainerID
+	if p := strings.Index(containerID, "__"); p >= 0 {
+		containerID = containerID[p+2:]
 	}
-	if len(containerId) > 13 {
-		containerId = containerId[:13]
+	if len(containerID) > 13 {
+		containerID = containerID[:13]
 	}
-	return fmt.Sprintf("virtlet-%s-%s", containerId, podInfo.ContainerName)
+	return fmt.Sprintf("virtlet-%s-%s", containerID, podInfo.ContainerName)
 }
 
 // ForwardedPort specifies an entry for the PortForward request
@@ -303,7 +303,7 @@ func (c *RealKubeClient) GetVMPodInfo(podName string) (*VMPodInfo, error) {
 	return &VMPodInfo{
 		NodeName:       pod.Spec.NodeName,
 		VirtletPodName: virtletPodName,
-		ContainerId:    pod.Status.ContainerStatuses[0].ContainerID,
+		ContainerID:    pod.Status.ContainerStatuses[0].ContainerID,
 		ContainerName:  pod.Spec.Containers[0].Name,
 	}, nil
 }

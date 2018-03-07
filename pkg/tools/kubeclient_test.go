@@ -42,7 +42,7 @@ import (
 )
 
 const (
-	sampleContainerId   = "docker://virtlet.cloud__2232e3bf-d702-5824-5e3c-f12e60e616b0"
+	sampleContainerID   = "docker://virtlet.cloud__2232e3bf-d702-5824-5e3c-f12e60e616b0"
 	portForwardWaitTime = 1 * time.Minute
 )
 
@@ -229,7 +229,7 @@ func TestGetVMPodInfo(t *testing.T) {
 				ContainerStatuses: []v1.ContainerStatus{
 					{
 						Name:        "foocontainer",
-						ContainerID: sampleContainerId,
+						ContainerID: sampleContainerID,
 					},
 				},
 			},
@@ -285,7 +285,7 @@ func TestGetVMPodInfo(t *testing.T) {
 	expectedVMPodInfo := &VMPodInfo{
 		NodeName:       "kube-node-1",
 		VirtletPodName: "virtlet-g9wtz",
-		ContainerId:    sampleContainerId,
+		ContainerID:    sampleContainerID,
 		ContainerName:  "foocontainer",
 	}
 	if !reflect.DeepEqual(expectedVMPodInfo, vmPodInfo) {
