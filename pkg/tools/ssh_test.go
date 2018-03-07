@@ -53,3 +53,20 @@ func TestSSHCommand(t *testing.T) {
 	}
 	// TODO: support alternative remote ports
 }
+
+func TestSSHErrorOnNonVMPod(t *testing.T) {
+	c := &fakeKubeClient{
+		t: t,
+		virtletPods: map[string]string{
+			"kube-node-1": "virtlet-foo42",
+		},
+	}
+	var out bytes.Buffer
+	cmd := NewSSHCmd(c, &out, "/bin/echo")
+	cmd.SetArgs([]string{"user@cirros", "--", "ls", "-l", "/"})
+	cmd.SilenceUsage = true
+	cmd.SilenceErrors = true
+	if err := cmd.Execute(); err == nil {
+		t.Errorf("didn't get an error for non-VM pod")
+	}
+}

@@ -216,6 +216,9 @@ func TestGetVMPodInfo(t *testing.T) {
 			ObjectMeta: meta_v1.ObjectMeta{
 				Name:      "cirros-vm",
 				Namespace: "default",
+				Annotations: map[string]string{
+					"kubernetes.io/target-runtime": "virtlet.cloud",
+				},
 			},
 			Spec: v1.PodSpec{
 				NodeName: "kube-node-1",
@@ -295,6 +298,61 @@ func TestGetVMPodInfo(t *testing.T) {
 	expectedDomainName := "virtlet-2232e3bf-d702-foocontainer"
 	if vmPodInfo.LibvirtDomainName() != expectedDomainName {
 		t.Errorf("Bad libvirt domain name: %q instead of %q", vmPodInfo.LibvirtDomainName(), expectedDomainName)
+	}
+}
+
+func TestCheckForVMPod(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		annotations map[string]string
+	}{
+		{
+			name:        "no annotations",
+			annotations: nil,
+		},
+		{
+			name: "wrong annotation",
+			annotations: map[string]string{
+				"kubernetes.io/target-runtime": "foobar",
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fc := &fakekube.Clientset{}
+			fc.AddReactor("get", "pods", func(action testcore.Action) (bool, runtime.Object, error) {
+				return true, &v1.Pod{
+					ObjectMeta: meta_v1.ObjectMeta{
+						Name:        "cirros-vm",
+						Namespace:   "default",
+						Annotations: tc.annotations,
+					},
+					Spec: v1.PodSpec{
+						NodeName: "kube-node-1",
+						Containers: []v1.Container{
+							{
+								Name: "foocontainer",
+							},
+						},
+					},
+					Status: v1.PodStatus{
+						ContainerStatuses: []v1.ContainerStatus{
+							{
+								Name:        "foocontainer",
+								ContainerID: sampleContainerID,
+							},
+						},
+					},
+				}, nil
+			})
+
+			c := &RealKubeClient{client: fc, namespace: "default"}
+			switch _, err := c.GetVMPodInfo("cirros-vm"); {
+			case err == nil:
+				t.Errorf("didn't get an expected error for a pod w/o Virtlet runtime annotation")
+			case !strings.Contains(err.Error(), "annotation"):
+				t.Errorf("wrong error message for a pod w/o Virtlet runtime annotation: %q", err)
+			}
+		})
 	}
 }
 
@@ -469,7 +527,5 @@ func TestPortForward(t *testing.T) {
 }
 
 // TODO: test not finding Virtlet pod
-// TODO: add checks for whether the target pod is a VM pod
-// (via the pod annotation, the runtime name must be configurable though)
 // TODO: add test for 'virsh' command
 // TODO: don't require --node on a single-Virtlet-node clusters

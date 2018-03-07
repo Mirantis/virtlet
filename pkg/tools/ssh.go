@@ -71,6 +71,12 @@ func NewSSHCmd(client KubeClient, out io.Writer, sshExecutable string) *cobra.Co
 
 // Run executes the command.
 func (s *sshCommand) Run() error {
+	// make sure we're dealing with a VM pod
+	_, err := s.client.GetVMPodInfo(s.podName)
+	if err != nil {
+		return err
+	}
+
 	pf := &ForwardedPort{
 		RemotePort: 22,
 	}
