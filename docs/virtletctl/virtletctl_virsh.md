@@ -16,7 +16,7 @@ is specified, it's necessary to provide the node name
 using the --node flag.
 
 ```
-virtletctl virsh command [flags]
+virtletctl virsh [flags] virsh_command -- [virsh_command_args...]
 ```
 
 ### Options

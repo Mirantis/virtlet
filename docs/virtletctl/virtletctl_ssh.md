@@ -10,7 +10,7 @@ This command runs ssh and makes it connect to a VM pod.
 
 
 ```
-virtletctl ssh user@pod -- [ssh args...] [flags]
+virtletctl ssh [flags] user@pod -- [ssh args...]
 ```
 
 ### Options
