@@ -43,6 +43,10 @@ import (
 	_ "k8s.io/client-go/pkg/api/install"
 )
 
+const (
+	runtimeAnnotation = "kubernetes.io/target-runtime"
+)
+
 // VMPodInfo describes a VM pod in a way that's necessary for virtletctl to
 // handle it
 type VMPodInfo struct {
@@ -252,7 +256,14 @@ func (c *RealKubeClient) getVMPod(podName string) (*v1.Pod, error) {
 	if err := c.setup(); err != nil {
 		return nil, err
 	}
-	return c.client.CoreV1().Pods(c.namespace).Get(podName, meta_v1.GetOptions{})
+	pod, err := c.client.CoreV1().Pods(c.namespace).Get(podName, meta_v1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	if pod.Annotations == nil || pod.Annotations[runtimeAnnotation] != virtletRuntime {
+		return nil, fmt.Errorf("%q is not a VM pod (missing annotation: %q=%q)", podName, runtimeAnnotation, virtletRuntime)
+	}
+	return pod, nil
 }
 
 // GetVirtletPodNames implements GetVirtletPodNames method of KubeClient interface.

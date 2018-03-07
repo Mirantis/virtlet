@@ -25,6 +25,14 @@ import (
 	"strings"
 )
 
+const (
+	defaultVirtletRuntimeName = "virtlet.cloud"
+)
+
+var (
+	virtletRuntime = defaultVirtletRuntimeName
+)
+
 // wordSepNormalizeFunc change "_" to "-" in the flags.
 func wordSepNormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedName {
 	if strings.Contains(name, "_") {
@@ -71,6 +79,7 @@ func BindFlags(flags *pflag.FlagSet) clientcmd.ClientConfig {
 	flags.AddGoFlagSet(flag.CommandLine)
 	flags.SetNormalizeFunc(wordSepNormalizeFunc)
 	clientConfig := defaultClientConfig(flags)
+	flags.StringVar(&virtletRuntime, "virtlet-runtime", defaultVirtletRuntimeName, "the name of virtlet runtime used in kubernetes.io/target-runtime annotation")
 	if InPlugin() {
 		for _, flagName := range []string{
 			// k8s client flags
@@ -99,6 +108,9 @@ func BindFlags(flags *pflag.FlagSet) clientcmd.ClientConfig {
 			"stderrthreshold",
 			"v",
 			"vmodule",
+
+			// virtletctl flags
+			"virtlet-runtime",
 		} {
 			v, found := os.LookupEnv(flagToEnvName(flagName, "KUBECTL_PLUGINS_GLOBAL_FLAG_"))
 			if found && (flagName != clientcmd.FlagImpersonateGroup || v != "[]") {
