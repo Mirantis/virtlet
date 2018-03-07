@@ -390,9 +390,22 @@ function patch_yaml {
         "${kubectl}" convert --local -o yaml -f -
 }
 
+function release_description {
+    local -a tag="${1}"
+    shift
+    git tag -l --format='%(contents:body)' "${tag}"
+    echo
+    echo "SHA256 sums for the files:"
+    echo '```'
+    (cd _output && sha256sum "$@")
+    echo '```'
+}
+
 function release_internal {
     local tag="${1}"
     local -a opts=(--user Mirantis --repo virtlet --tag "${tag}")
+    local -a files=(virtlet-ds.yaml virtlet-ds-1.7.yaml virtletctl virtletctl.darwin)
+    local description="$(release_description "${tag}" "${files[@]}")"
     local pre_release=
     # TODO: uncomment this 'if/fi' once we start making 'non-pre' releases
     # if [[ ${tag} =~ -(test|pre).*$ ]]; then
@@ -403,24 +416,23 @@ function release_internal {
     fi
     github-release release "${opts[@]}" \
                    --name "$(git tag -l --format='%(contents:subject)' "${tag}")" \
-                   --description "$(git tag -l --format='%(contents:body)' "${tag}")" \
+                   --description "${description}" \
                    ${pre_release}
     # piping the patched yaml directly to
     # 'github-release upload ... --file -' causes GH API error:
     # "error: could not upload, status code (400 Bad Request), msg: Bad Content-Length: , errors:"
     mkdir -p _output
     patch_yaml kubectl "$(image_tags_filter "${tag}")" >_output/virtlet-ds.yaml
-    github-release upload "${opts[@]}" \
-                   --name virtlet-ds.yaml \
-                   --replace \
-                   --file _output/virtlet-ds.yaml
     # use older kubectl for 1.7 to avoid making yaml
     # that can't be consumed by k8s 1.7
     patch_yaml kubectl.old "$(image_tags_filter "${tag}")|${containers_run}|${initContainers_run}|${containers_k8s_dir}" >_output/virtlet-ds-1.7.yaml
-    github-release upload "${opts[@]}" \
-                   --name virtlet-ds-1.7.yaml \
-                   --replace \
-                   --file _output/virtlet-ds-1.7.yaml
+    for filename in "${files[@]}"; do
+        echo >&2 "Uploading: ${filename}"
+        github-release upload "${opts[@]}" \
+                       --name "${filename}" \
+                       --replace \
+                       --file "_output/${filename}"
+    done
 }
 
 function e2e {
