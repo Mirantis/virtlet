@@ -110,9 +110,10 @@ func (c *fakeKubeClient) ForwardPorts(podName, namespace string, ports []*Forwar
 
 func fakeCobraCommand() *cobra.Command {
 	topCmd := &cobra.Command{
-		Use:   "topcmd",
-		Short: "Topmost command",
-		Long:  "Lorem ipsum dolor sit amet",
+		Use:               "topcmd",
+		Short:             "Topmost command",
+		Long:              "Lorem ipsum dolor sit amet",
+		DisableAutoGenTag: true,
 	}
 	var a string
 	var b, c int
