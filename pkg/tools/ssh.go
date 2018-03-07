@@ -43,7 +43,7 @@ type sshCommand struct {
 func NewSSHCmd(client KubeClient, out io.Writer, sshExecutable string) *cobra.Command {
 	ssh := &sshCommand{client: client, out: out, sshExecutable: sshExecutable}
 	return &cobra.Command{
-		Use:   "ssh user@pod -- [ssh args...]",
+		Use:   "ssh [flags] user@pod -- [ssh args...]",
 		Short: "Connect to a VM pod using ssh",
 		Long: dedent.Dedent(`
                         This command runs ssh and makes it connect to a VM pod.

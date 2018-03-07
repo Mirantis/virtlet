@@ -39,7 +39,7 @@ type virshCommand struct {
 func NewVirshCmd(client KubeClient, out io.Writer) *cobra.Command {
 	virsh := &virshCommand{client: client, out: out}
 	cmd := &cobra.Command{
-		Use:   "virsh command",
+		Use:   "virsh [flags] virsh_command -- [virsh_command_args...]",
 		Short: "Execute a virsh command",
 		Long: dedent.Dedent(`
                         This command executes libvirt virsh command.
