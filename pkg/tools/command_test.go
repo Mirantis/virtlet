@@ -124,6 +124,8 @@ func fakeCobraCommand() *cobra.Command {
 		Short:   "Foo command",
 		Long:    "Consectetur adipiscing elit",
 		Example: "kubectl plugin topcmd foo",
+		// make command "runnable" so gendocs works for it
+		Run: func(*cobra.Command, []string) {},
 	}
 	fooCmd.Flags().IntVar(&c, "fooflag", 4242, "foo flag")
 	topCmd.AddCommand(fooCmd)
@@ -132,6 +134,7 @@ func fakeCobraCommand() *cobra.Command {
 		Use:   "bar",
 		Short: "Bar command",
 		Long:  "Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua",
+		Run:   func(*cobra.Command, []string) {},
 	}
 	topCmd.AddCommand(barCmd)
 

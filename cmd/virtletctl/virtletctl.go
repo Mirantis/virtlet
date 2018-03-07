@@ -47,6 +47,7 @@ func newRootCmd() *cobra.Command {
 	cmd.AddCommand(tools.NewVirshCmd(client, os.Stdout))
 	cmd.AddCommand(tools.NewSshCmd(client, os.Stdout, ""))
 	cmd.AddCommand(tools.NewInstallCmd(cmd, "", ""))
+	cmd.AddCommand(tools.NewGenDocCmd(cmd))
 
 	for _, c := range cmd.Commands() {
 		c.PreRunE = func(*cobra.Command, []string) error {
