@@ -5,68 +5,28 @@ has nodes with Virtlet on it (see [the instructions](../deploy/README.md) in
 `deploy/` directory):
 
 1. Create a sample VM:
-```
+```bash
 kubectl create -f cirros-vm.yaml
 ```
 2. Wait for `cirros-vm` pod to become `Running`:
-```
+```bash
 kubectl get pods -w
 ```
 3. Connect to the VM console:
-```
+```bash
 kubectl attach -it cirros-vm
 ```
-4. As soon as the VM has booted, you can use the `vmssh.sh` script to access it using ssh:
-```
-./vmssh.sh cirros@cirros-vm [command...]
-```
+4. As soon as the VM has booted, you can use
+[virtletctl tool](../docs/virtletctl/virtletctl.md) (available as part
+of each Virtlet release on GitHub starting from Virtlet 1.0):
 
-Besides [cirros-vm.yaml](cirros-vm.yaml), there's also [ubuntu-vm.yaml](ubuntu-vm.yaml) that can be used to start an Ubuntu Xenial VM. It can also be accessed using `vmssh.sh` after it boots:
-```
-./vmssh.sh root@ubuntu-vm [command...]
-```
-
-Another way to access a vm is to use `virsh.sh` tool. It can be used to access a vm only when logging is disabled. See [vm-logging](../docs/devel/vm-logging.md) for more details.
-You can list libvirt domains with `virsh.sh`:
 ```bash
-./virsh.sh list
+virtletctl ssh cirros@cirros-vm -- -i examples/vmkey [command...]
 ```
 
-And then connect to console:
-
-```
-$ ./virsh.sh console @cirros-vm
-Connected to domain 411c70b0-1df3-46be-4838-c85474a1b44a-cirros-vm
-Escape character is ^]
-login as 'cirros' user. default password: 'gocubsgo'. use 'sudo' for root.
-cirros-vm login: cirros
-Password:
-$
-```
-
-Another option to use this script is to install it as a [kubectl plugin](https://kubernetes.io/docs/tasks/extend-kubectl/kubectl-plugins/).
-At the moment, Virtlet only supports Kubernetes 1.7.x and 1.8.x.
-You can use a newer `kubectl` with these Kubernetes versions but this may cause
-problems with some kinds of objects such as `StatefulSets`. So the kubectl
-plugin feature can be considered experimental at the moment.
-You can install this script as kubectl plugin using this command:
+Besides [cirros-vm.yaml](cirros-vm.yaml), there's also [ubuntu-vm.yaml](ubuntu-vm.yaml) that can be used to start an Ubuntu Xenial VM. It can also be accessed using `virtletctl ssh` after it boots:
 ```bash
-./virsh.sh install
-```
-
-After it, `kubectl plugin` should have additional entry:
-
-```
-...
-Available Commands:
-  ...
-  virt        Interface to libvirt's virsh in Virtlet container
-...
-```
-
-Later it can be used e.g. as:
-```bash
-kubectl plugin virt console @cirros-vm
+virtletctl ssh ubuntu@ubuntu-vm -- -i examples/vmkey [command...]
 ```
 
 # Kubernetes on VM-based StatefulSet
@@ -87,7 +47,7 @@ kubectl attach k8s-0
 After it's complete you can log into the master node:
 
 ```
-./vmssh.sh k8s-0
+virtletctl ssh ubuntu@k8s-0 -- -i examples/vmkey
 ```
 
 There you can wait a bit for k8s nodes and pods to become ready.
