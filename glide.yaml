@@ -58,3 +58,5 @@ import:
   version: ^1.0.0
 - package: github.com/spf13/pflag
   version: ee5fd03fd6acfd43e44aea0b4135958546ed8e73
+- package: github.com/russross/blackfriday
+  version: v2.0.0
