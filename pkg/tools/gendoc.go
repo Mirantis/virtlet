@@ -30,6 +30,8 @@ type genDocCommand struct {
 	outDir  string
 }
 
+// NewGenDocCmd returns a cobra.Command that generates markdown
+// documentation for virtletctl commands.
 func NewGenDocCmd(rootCmd *cobra.Command) *cobra.Command {
 	gd := &genDocCommand{rootCmd: rootCmd}
 	return &cobra.Command{

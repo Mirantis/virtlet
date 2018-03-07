@@ -72,19 +72,19 @@ func TestVirshCommand(t *testing.T) {
 					"cirros": {
 						NodeName:       "kube-node-1",
 						VirtletPodName: "virtlet-foo42",
-						ContainerId:    "cc349e91-dcf7-4f11-a077-36c3673c3fc4",
+						ContainerID:    "cc349e91-dcf7-4f11-a077-36c3673c3fc4",
 						ContainerName:  "foocontainer",
 					},
 					"cirros1": {
 						NodeName:       "kube-node-1",
 						VirtletPodName: "virtlet-foo42",
-						ContainerId:    "68e6fede-aab2-4abe-b339-466386734ddb",
+						ContainerID:    "68e6fede-aab2-4abe-b339-466386734ddb",
 						ContainerName:  "qq",
 					},
 					"ubuntu": {
 						NodeName:       "kube-node-2",
 						VirtletPodName: "virtlet-bar42",
-						ContainerId:    "4707196f-1d93-46ba-a138-b6201e13db6d",
+						ContainerID:    "4707196f-1d93-46ba-a138-b6201e13db6d",
 						ContainerName:  "vm",
 					},
 				},
