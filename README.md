@@ -26,7 +26,15 @@ You can watch and listen to Virtlet demo video that was recorded on Kubernetes C
 
 Virtlet comes with a helper tool,
 [virtletctl](docs/virtletctl/virtletctl.md), that helps managing the VM pods. The binaries will be available for Linux and Mac OS X in the [Releases](https://github.com/Mirantis/virtlet/releases) section starting from Virtlet 1.0. For now, you can build it using the [build tool](docs/devel/build-tool.md).
-After `build/cmd.sh copy` you'll get `_output/virtletctl` (for Linux x86_64) and `_output/virtletctl.darwin` (for Mac OS X).
+After `build/cmd.sh copy` you'll get `_output/virtletctl` (for Linux x86_64) and `_output/virtletctl.darwin` (for Mac OS X). If you're using Kubernetes 1.9, you can install virtletctl as a kubectl plugin:
+```
+./virtletctl install
+```
+
+After that you can use `kubectl plugin virt` instead of `virtletctl` (`plugin` subcommand will not be necessary when kubectl plugins become stable):
+```
+kubectl plugin virt ssh cirros@cirros-vm -- -i examples/vmkey
+```
 
 ### Virtlet usage demo
 
