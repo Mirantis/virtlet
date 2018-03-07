@@ -376,6 +376,7 @@ function build_internal {
     mkdir -p "${project_dir}/_output"
     go build -i -o "${project_dir}/_output/virtlet" ./cmd/virtlet
     go build -i -o "${project_dir}/_output/virtletctl" ./cmd/virtletctl
+    GOOS=darwin go build -i -o "${project_dir}/_output/virtletctl.darwin" ./cmd/virtletctl
     go build -i -o "${project_dir}/_output/vmwrapper" ./cmd/vmwrapper
     go build -i -o "${project_dir}/_output/flexvolume_driver" ./cmd/flexvolume_driver
     go test -i -c -o "${project_dir}/_output/virtlet-e2e-tests" ./tests/e2e
