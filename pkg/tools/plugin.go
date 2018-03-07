@@ -29,8 +29,8 @@ import (
 // The Plugin / PluginFlag / Plugins types are based on
 // pkg/kubectl/plugins/plugins.go from Kubernetes.
 
-// Description holds everything needed to register a
-// plugin as a command. Usually comes from a descriptor file.
+// Plugin holds everything needed to register a plugin as a
+// command. Usually comes from a descriptor file.
 type Plugin struct {
 	// Name is the name of the plugin.
 	Name string `yaml:"name"`
@@ -49,7 +49,7 @@ type Plugin struct {
 	Tree []*Plugin `yaml:"tree,omitempty"`
 }
 
-// Flag describes a single flag supported by a given plugin.
+// PluginFlag describes a single flag supported by a given plugin.
 type PluginFlag struct {
 	// Name is the name of the flag
 	Name string `yaml:"name"`
@@ -104,11 +104,15 @@ func pluginYamlFromCobraCommand(cmd *cobra.Command) []byte {
 	return out
 }
 
+// InPlugin returns true if virtletctl is running as a kubectl plugin.
 func InPlugin() bool {
 	_, inPlugin := os.LookupEnv("KUBECTL_PLUGINS_CALLER")
 	return inPlugin
 }
 
+// SetLocalPluginFlags sets command flags from kubectl plugin
+// environment variables in case if virtletctl is running as a kubectl
+// plugin.
 func SetLocalPluginFlags(cmd *cobra.Command) error {
 	if !InPlugin() {
 		return nil

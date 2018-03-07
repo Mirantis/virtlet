@@ -64,6 +64,9 @@ func flagToEnvName(flagName, prefix string) string {
 	return envName
 }
 
+// BindFlags applies go flags to the specified FlagSet and sets global
+// flag values from kubectl plugin environment variables in case if
+// virtletctl is running as a kubectl plugin.
 func BindFlags(flags *pflag.FlagSet) clientcmd.ClientConfig {
 	flags.AddGoFlagSet(flag.CommandLine)
 	flags.SetNormalizeFunc(wordSepNormalizeFunc)

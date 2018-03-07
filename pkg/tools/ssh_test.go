@@ -21,7 +21,7 @@ import (
 	"testing"
 )
 
-func TestSshCommand(t *testing.T) {
+func TestSSHCommand(t *testing.T) {
 	c := &fakeKubeClient{
 		t: t,
 		virtletPods: map[string]string{
@@ -31,7 +31,7 @@ func TestSshCommand(t *testing.T) {
 			"cirros": {
 				NodeName:       "kube-node-1",
 				VirtletPodName: "virtlet-foo42",
-				ContainerId:    "cc349e91-dcf7-4f11-a077-36c3673c3fc4",
+				ContainerID:    "cc349e91-dcf7-4f11-a077-36c3673c3fc4",
 				ContainerName:  "foocontainer",
 			},
 		},
@@ -40,7 +40,7 @@ func TestSshCommand(t *testing.T) {
 		},
 	}
 	var out bytes.Buffer
-	cmd := NewSshCmd(c, &out, "/bin/echo")
+	cmd := NewSSHCmd(c, &out, "/bin/echo")
 	cmd.SetArgs([]string{"user@cirros", "--", "ls", "-l", "/"})
 	cmd.SilenceUsage = true
 	cmd.SilenceErrors = true

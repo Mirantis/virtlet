@@ -42,7 +42,7 @@ import (
 )
 
 const (
-	sampleContainerId   = "docker://virtlet.cloud__2232e3bf-d702-5824-5e3c-f12e60e616b0"
+	sampleContainerID   = "docker://virtlet.cloud__2232e3bf-d702-5824-5e3c-f12e60e616b0"
 	portForwardWaitTime = 1 * time.Minute
 )
 
@@ -57,7 +57,7 @@ type fakeExecutor struct {
 
 var _ remoteExecutor = &fakeExecutor{}
 
-func (e *fakeExecutor) Stream(config *rest.Config, method string, url *url.URL, options remotecommand.StreamOptions) error {
+func (e *fakeExecutor) stream(config *rest.Config, method string, url *url.URL, options remotecommand.StreamOptions) error {
 	if e.called {
 		e.t.Errorf("Stream called twice")
 	}
@@ -114,7 +114,7 @@ type fakePortForwarder struct {
 
 var _ portForwarder = &fakePortForwarder{}
 
-func (pf *fakePortForwarder) ForwardPorts(config *rest.Config, method string, url *url.URL, ports []string, stopChannel, readyChannel chan struct{}, out io.Writer) error {
+func (pf *fakePortForwarder) forwardPorts(config *rest.Config, method string, url *url.URL, ports []string, stopChannel, readyChannel chan struct{}, out io.Writer) error {
 	if pf.called {
 		pf.t.Errorf("ForwardPorts called twice")
 	}
@@ -229,7 +229,7 @@ func TestGetVMPodInfo(t *testing.T) {
 				ContainerStatuses: []v1.ContainerStatus{
 					{
 						Name:        "foocontainer",
-						ContainerID: sampleContainerId,
+						ContainerID: sampleContainerID,
 					},
 				},
 			},
@@ -285,7 +285,7 @@ func TestGetVMPodInfo(t *testing.T) {
 	expectedVMPodInfo := &VMPodInfo{
 		NodeName:       "kube-node-1",
 		VirtletPodName: "virtlet-g9wtz",
-		ContainerId:    sampleContainerId,
+		ContainerID:    sampleContainerID,
 		ContainerName:  "foocontainer",
 	}
 	if !reflect.DeepEqual(expectedVMPodInfo, vmPodInfo) {

@@ -50,22 +50,22 @@ type VMPodInfo struct {
 	NodeName string
 	// VirtletPodName is the name of the virtlet pod that manages this VM pod
 	VirtletPodName string
-	// ContainerId is the id of the container in the VM pod
-	ContainerId string
+	// ContainerID is the id of the container in the VM pod
+	ContainerID string
 	// ContainerName is the name of the container in the VM pod
 	ContainerName string
 }
 
 // LibvirtDomainName returns the name of the libvirt domain for the VMPodInfo.
 func (podInfo VMPodInfo) LibvirtDomainName() string {
-	containerId := podInfo.ContainerId
-	if p := strings.Index(containerId, "__"); p >= 0 {
-		containerId = containerId[p+2:]
+	containerID := podInfo.ContainerID
+	if p := strings.Index(containerID, "__"); p >= 0 {
+		containerID = containerID[p+2:]
 	}
-	if len(containerId) > 13 {
-		containerId = containerId[:13]
+	if len(containerID) > 13 {
+		containerID = containerID[:13]
 	}
-	return fmt.Sprintf("virtlet-%s-%s", containerId, podInfo.ContainerName)
+	return fmt.Sprintf("virtlet-%s-%s", containerID, podInfo.ContainerName)
 }
 
 // ForwardedPort specifies an entry for the PortForward request
@@ -142,14 +142,14 @@ type KubeClient interface {
 }
 
 type remoteExecutor interface {
-	Stream(config *rest.Config, method string, url *url.URL, options remotecommand.StreamOptions) error
+	stream(config *rest.Config, method string, url *url.URL, options remotecommand.StreamOptions) error
 }
 
 type defaultExecutor struct{}
 
 var _ remoteExecutor = defaultExecutor{}
 
-func (e defaultExecutor) Stream(config *rest.Config, method string, url *url.URL, options remotecommand.StreamOptions) error {
+func (e defaultExecutor) stream(config *rest.Config, method string, url *url.URL, options remotecommand.StreamOptions) error {
 	executor, err := remotecommand.NewExecutor(config, method, url)
 	if err != nil {
 		return err
@@ -158,14 +158,14 @@ func (e defaultExecutor) Stream(config *rest.Config, method string, url *url.URL
 }
 
 type portForwarder interface {
-	ForwardPorts(config *rest.Config, method string, url *url.URL, ports []string, stopChannel, readyChannel chan struct{}, out io.Writer) error
+	forwardPorts(config *rest.Config, method string, url *url.URL, ports []string, stopChannel, readyChannel chan struct{}, out io.Writer) error
 }
 
 type defaultPortForwarder struct{}
 
 var _ portForwarder = defaultPortForwarder{}
 
-func (pf defaultPortForwarder) ForwardPorts(config *rest.Config, method string, url *url.URL, ports []string, stopChannel, readyChannel chan struct{}, out io.Writer) error {
+func (pf defaultPortForwarder) forwardPorts(config *rest.Config, method string, url *url.URL, ports []string, stopChannel, readyChannel chan struct{}, out io.Writer) error {
 	dialer, err := remotecommand.NewExecutor(config, method, url)
 	if err != nil {
 		return err
@@ -303,7 +303,7 @@ func (c *RealKubeClient) GetVMPodInfo(podName string) (*VMPodInfo, error) {
 	return &VMPodInfo{
 		NodeName:       pod.Spec.NodeName,
 		VirtletPodName: virtletPodName,
-		ContainerId:    pod.Status.ContainerStatuses[0].ContainerID,
+		ContainerID:    pod.Status.ContainerStatuses[0].ContainerID,
 		ContainerName:  pod.Spec.Containers[0].Name,
 	}, nil
 }
@@ -331,7 +331,7 @@ func (c *RealKubeClient) ExecInContainer(podName, containerName, namespace strin
 		}, api.ParameterCodec)
 
 	exitCode := 0
-	if err := c.executor.Stream(c.config, "POST", req.URL(), remotecommand.StreamOptions{
+	if err := c.executor.stream(c.config, "POST", req.URL(), remotecommand.StreamOptions{
 		SupportedProtocols: remotecommandconsts.SupportedStreamingProtocols,
 		Stdin:              stdin,
 		Stdout:             stdout,
@@ -394,7 +394,7 @@ func (c *RealKubeClient) ForwardPorts(podName, namespace string, ports []*Forwar
 	errCh := make(chan error, 1)
 	readyCh := make(chan struct{})
 	go func() {
-		errCh <- c.portForwarder.ForwardPorts(c.config, "POST", req.URL(), portStrs, stopCh, readyCh, &buf)
+		errCh <- c.portForwarder.forwardPorts(c.config, "POST", req.URL(), portStrs, stopCh, readyCh, &buf)
 	}()
 
 	select {
