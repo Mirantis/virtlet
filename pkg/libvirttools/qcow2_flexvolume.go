@@ -32,7 +32,7 @@ const (
 	defaultVolumeCapacityUnit = "MB"
 )
 
-var capacityUnits []string = []string{
+var capacityUnits = []string{
 	// https://libvirt.org/formatstorage.html#StorageVolFirst
 	"B", "bytes", "KB", "K", "KiB", "MB", "M", "MiB", "GB", "G",
 	"GiB", "TB", "T", "TiB", "PB", "P", "PiB", "EB", "E", "EiB",
@@ -42,7 +42,7 @@ var capacityRx = regexp.MustCompile(`^\s*(\d+)\s*(\S*)\s*$`)
 
 type qcow2VolumeOptions struct {
 	Capacity string `json:"capacity,omitempty"`
-	Uuid     string `json:"uuid"`
+	UUID     string `json:"uuid"`
 }
 
 // qcow2Volume denotes a volume in QCOW2 format
@@ -56,7 +56,7 @@ type qcow2Volume struct {
 
 var _ VMVolume = &qcow2Volume{}
 
-func newQCOW2Volume(volumeName, configPath string, config *VMConfig, owner VolumeOwner) (VMVolume, error) {
+func newQCOW2Volume(volumeName, configPath string, config *VMConfig, owner volumeOwner) (VMVolume, error) {
 	var err error
 	var opts qcow2VolumeOptions
 	if err = utils.ReadJSON(configPath, &opts); err != nil {
@@ -65,7 +65,7 @@ func newQCOW2Volume(volumeName, configPath string, config *VMConfig, owner Volum
 	v := &qcow2Volume{
 		volumeBase: volumeBase{config, owner},
 		name:       volumeName,
-		uuid:       opts.Uuid,
+		uuid:       opts.UUID,
 	}
 
 	v.capacity, v.capacityUnit, err = parseCapacityStr(opts.Capacity)
@@ -79,7 +79,7 @@ func (v *qcow2Volume) volumeName() string {
 	return "virtlet-" + v.config.DomainUUID + "-" + v.name
 }
 
-func (v *qcow2Volume) createQCOW2Volume(capacity uint64, capacityUnit string) (virt.VirtStorageVolume, error) {
+func (v *qcow2Volume) createQCOW2Volume(capacity uint64, capacityUnit string) (virt.StorageVolume, error) {
 	return v.owner.StoragePool().CreateStorageVol(&libvirtxml.StorageVolume{
 		Name:       v.volumeName(),
 		Allocation: &libvirtxml.StorageVolumeSize{Value: 0},
@@ -88,7 +88,7 @@ func (v *qcow2Volume) createQCOW2Volume(capacity uint64, capacityUnit string) (v
 	})
 }
 
-func (v *qcow2Volume) Uuid() string {
+func (v *qcow2Volume) UUID() string {
 	return v.uuid
 }
 
@@ -136,18 +136,17 @@ func parseCapacityStr(capacityStr string) (int, string, error) {
 	capacityUnit := subs[2]
 	if capacityUnit == "" {
 		return capacity, defaultVolumeCapacityUnit, nil
-	} else {
-		for _, item := range capacityUnits {
-			if item == capacityUnit {
-				return capacity, capacityUnit, nil
-			}
+	}
+	for _, item := range capacityUnits {
+		if item == capacityUnit {
+			return capacity, capacityUnit, nil
 		}
 	}
 	return 0, "", fmt.Errorf("invalid capacity unit: %q", capacityUnit)
 }
 
 func init() {
-	AddFlexvolumeSource("qcow2", newQCOW2Volume)
+	addFlexvolumeSource("qcow2", newQCOW2Volume)
 }
 
 // TODO: this file needs a test

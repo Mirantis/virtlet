@@ -56,7 +56,7 @@ func NewFakeStorageConnection(rec Recorder) *FakeStorageConnection {
 	}
 }
 
-func (sc *FakeStorageConnection) CreateStoragePool(def *libvirtxml.StoragePool) (virt.VirtStoragePool, error) {
+func (sc *FakeStorageConnection) CreateStoragePool(def *libvirtxml.StoragePool) (virt.StoragePool, error) {
 	sc.rec.Rec("CreateStoragePool", def)
 	if _, found := sc.pools[def.Name]; found {
 		return nil, fmt.Errorf("storage pool already exists: %v", def.Name)
@@ -70,7 +70,7 @@ func (sc *FakeStorageConnection) CreateStoragePool(def *libvirtxml.StoragePool) 
 	return p, nil
 }
 
-func (sc *FakeStorageConnection) LookupStoragePoolByName(name string) (virt.VirtStoragePool, error) {
+func (sc *FakeStorageConnection) LookupStoragePoolByName(name string) (virt.StoragePool, error) {
 	if p, found := sc.pools[name]; found {
 		return p, nil
 	} else {
@@ -94,7 +94,7 @@ func NewFakeStoragePool(rec Recorder, name, poolPath string) *FakeStoragePool {
 	}
 }
 
-func (p *FakeStoragePool) createStorageVol(def *libvirtxml.StorageVolume) (virt.VirtStorageVolume, error) {
+func (p *FakeStoragePool) createStorageVol(def *libvirtxml.StorageVolume) (virt.StorageVolume, error) {
 	if _, found := p.volumes[def.Name]; found {
 		return nil, fmt.Errorf("storage volume already exists: %v", def.Name)
 	}
@@ -106,13 +106,13 @@ func (p *FakeStoragePool) createStorageVol(def *libvirtxml.StorageVolume) (virt.
 	return v, nil
 }
 
-func (p *FakeStoragePool) CreateStorageVol(def *libvirtxml.StorageVolume) (virt.VirtStorageVolume, error) {
+func (p *FakeStoragePool) CreateStorageVol(def *libvirtxml.StorageVolume) (virt.StorageVolume, error) {
 	p.rec.Rec("CreateStorageVol", def)
 	return p.createStorageVol(def)
 }
 
-func (p *FakeStoragePool) ListAllVolumes() ([]virt.VirtStorageVolume, error) {
-	r := make([]virt.VirtStorageVolume, len(p.volumes))
+func (p *FakeStoragePool) ListAllVolumes() ([]virt.StorageVolume, error) {
+	r := make([]virt.StorageVolume, len(p.volumes))
 	names := make([]string, 0, len(p.volumes))
 	for name := range p.volumes {
 		names = append(names, name)
@@ -124,7 +124,7 @@ func (p *FakeStoragePool) ListAllVolumes() ([]virt.VirtStorageVolume, error) {
 	return r, nil
 }
 
-func (p *FakeStoragePool) LookupVolumeByName(name string) (virt.VirtStorageVolume, error) {
+func (p *FakeStoragePool) LookupVolumeByName(name string) (virt.StorageVolume, error) {
 	if v, found := p.volumes[name]; found {
 		return v, nil
 	}

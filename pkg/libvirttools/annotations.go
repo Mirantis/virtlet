@@ -30,38 +30,43 @@ import (
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
-type DiskDriver string
-type ImageType string
+type diskDriverName string
+
+type imageType string
 
 const (
-	maxVCPUCount                                 = 255
-	VCPUCountAnnotationKeyName                   = "VirtletVCPUCount"
-	CloudInitMetaDataKeyName                     = "VirtletCloudInitMetaData"
-	CloudInitUserDataKeyName                     = "VirtletCloudInitUserData"
-	CloudInitUserDataSourceKeyName               = "VirtletCloudInitUserDataSource"
-	CloudInitUserDataOverwriteKeyName            = "VirtletCloudInitUserDataOverwrite"
-	CloudInitUserDataScriptKeyName               = "VirtletCloudInitUserDataScript"
-	CloudInitImageType                           = "VirtletCloudInitImageType"
-	SSHKeysKeyName                               = "VirtletSSHKeys"
-	SSHKeySourceKeyName                          = "VirtletSSHKeySource"
-	DiskDriverKeyName                            = "VirtletDiskDriver"
-	DiskDriverVirtio                  DiskDriver = "virtio"
-	DiskDriverScsi                    DiskDriver = "scsi"
-	ImageTypeNoCloud                  ImageType  = "nocloud"
-	ImageTypeConfigDrive              ImageType  = "configdrive"
+	maxVCPUCount                                     = 255
+	vcpuCountAnnotationKeyName                       = "VirtletVCPUCount"
+	cloudInitMetaDataKeyName                         = "VirtletCloudInitMetaData"
+	cloudInitUserDataKeyName                         = "VirtletCloudInitUserData"
+	cloudInitUserDataSourceKeyName                   = "VirtletCloudInitUserDataSource"
+	cloudInitUserDataOverwriteKeyName                = "VirtletCloudInitUserDataOverwrite"
+	cloudInitUserDataScriptKeyName                   = "VirtletCloudInitUserDataScript"
+	cloudInitImageType                               = "VirtletCloudInitImageType"
+	sshKeysKeyName                                   = "VirtletSSHKeys"
+	sshKeySourceKeyName                              = "VirtletSSHKeySource"
+	diskDriverKeyName                                = "VirtletDiskDriver"
+	diskDriverVirtio                  diskDriverName = "virtio"
+	diskDriverScsi                    diskDriverName = "scsi"
+	imageTypeNoCloud                  imageType      = "nocloud"
+	imageTypeConfigDrive              imageType      = "configdrive"
 )
 
+// VirtletAnnotations contains parsed values for pod annotations supported
+// by Virtlet.
 type VirtletAnnotations struct {
 	VCPUCount         int
-	ImageType         ImageType
+	ImageType         imageType
 	MetaData          map[string]interface{}
 	UserData          map[string]interface{}
 	UserDataOverwrite bool
 	UserDataScript    string
 	SSHKeys           []string
-	DiskDriver        DiskDriver
+	DiskDriver        diskDriverName
 }
 
+// LoadAnnotations parses map of strings to VirtletAnnotations using provided
+// ns value.
 func LoadAnnotations(ns string, podAnnotations map[string]string) (*VirtletAnnotations, error) {
 	var va VirtletAnnotations
 	if err := va.parsePodAnnotations(ns, podAnnotations); err != nil {
@@ -75,14 +80,14 @@ func LoadAnnotations(ns string, podAnnotations map[string]string) (*VirtletAnnot
 }
 
 func (va *VirtletAnnotations) parsePodAnnotations(ns string, podAnnotations map[string]string) error {
-	if podAnnotations[CloudInitUserDataOverwriteKeyName] == "true" {
+	if podAnnotations[cloudInitUserDataOverwriteKeyName] == "true" {
 		va.UserDataOverwrite = true
 	}
 	if err := va.loadExternalUserData(ns, podAnnotations); err != nil {
 		return err
 	}
 
-	if vcpuCountStr, found := podAnnotations[VCPUCountAnnotationKeyName]; found {
+	if vcpuCountStr, found := podAnnotations[vcpuCountAnnotationKeyName]; found {
 		var err error
 		n, err := strconv.Atoi(vcpuCountStr)
 		if err != nil {
@@ -91,13 +96,13 @@ func (va *VirtletAnnotations) parsePodAnnotations(ns string, podAnnotations map[
 		va.VCPUCount = n
 	}
 
-	if metaDataStr, found := podAnnotations[CloudInitMetaDataKeyName]; found {
+	if metaDataStr, found := podAnnotations[cloudInitMetaDataKeyName]; found {
 		if err := yaml.Unmarshal([]byte(metaDataStr), &va.MetaData); err != nil {
 			return fmt.Errorf("failed to unmarshal cloud-init metadata")
 		}
 	}
 
-	if userDataStr, found := podAnnotations[CloudInitUserDataKeyName]; found {
+	if userDataStr, found := podAnnotations[cloudInitUserDataKeyName]; found {
 		var userData map[string]interface{}
 		if err := yaml.Unmarshal([]byte(userDataStr), &userData); err != nil {
 			return fmt.Errorf("failed to unmarshal cloud-init userdata")
@@ -109,9 +114,9 @@ func (va *VirtletAnnotations) parsePodAnnotations(ns string, podAnnotations map[
 		}
 	}
 
-	va.UserDataScript = podAnnotations[CloudInitUserDataScriptKeyName]
+	va.UserDataScript = podAnnotations[cloudInitUserDataScriptKeyName]
 
-	if sshKeysStr, found := podAnnotations[SSHKeysKeyName]; found {
+	if sshKeysStr, found := podAnnotations[sshKeysKeyName]; found {
 		if va.UserDataOverwrite {
 			va.SSHKeys = nil
 		}
@@ -124,8 +129,8 @@ func (va *VirtletAnnotations) parsePodAnnotations(ns string, podAnnotations map[
 		}
 	}
 
-	va.ImageType = ImageType(strings.ToLower(podAnnotations[CloudInitImageType]))
-	va.DiskDriver = DiskDriver(podAnnotations[DiskDriverKeyName])
+	va.ImageType = imageType(strings.ToLower(podAnnotations[cloudInitImageType]))
+	va.DiskDriver = diskDriverName(podAnnotations[diskDriverKeyName])
 
 	return nil
 }
@@ -136,11 +141,11 @@ func (va *VirtletAnnotations) applyDefaults() {
 	}
 
 	if va.DiskDriver == "" {
-		va.DiskDriver = DiskDriverScsi
+		va.DiskDriver = diskDriverScsi
 	}
 
 	if va.ImageType == "" {
-		va.ImageType = ImageTypeNoCloud
+		va.ImageType = imageTypeNoCloud
 	}
 }
 
@@ -150,12 +155,12 @@ func (va *VirtletAnnotations) validate() error {
 		errs = append(errs, fmt.Sprintf("vcpu count %d too big, max is %d", va.VCPUCount, maxVCPUCount))
 	}
 
-	if va.DiskDriver != DiskDriverVirtio && va.DiskDriver != DiskDriverScsi {
-		errs = append(errs, fmt.Sprintf("bad disk driver %q. Must be either %q or %q", va.DiskDriver, DiskDriverVirtio, DiskDriverScsi))
+	if va.DiskDriver != diskDriverVirtio && va.DiskDriver != diskDriverScsi {
+		errs = append(errs, fmt.Sprintf("bad disk driver %q. Must be either %q or %q", va.DiskDriver, diskDriverVirtio, diskDriverScsi))
 	}
 
-	if va.ImageType != ImageTypeNoCloud && va.ImageType != ImageTypeConfigDrive {
-		errs = append(errs, fmt.Sprintf("unknown config image type %q. Must be either %q or %q", va.ImageType, ImageTypeNoCloud, ImageTypeConfigDrive))
+	if va.ImageType != imageTypeNoCloud && va.ImageType != imageTypeConfigDrive {
+		errs = append(errs, fmt.Sprintf("unknown config image type %q. Must be either %q or %q", va.ImageType, imageTypeNoCloud, imageTypeConfigDrive))
 	}
 
 	if errs != nil {
@@ -170,7 +175,7 @@ func (va *VirtletAnnotations) loadExternalUserData(ns string, podAnnotations map
 		return nil
 	}
 	var clientset *kubernetes.Clientset
-	userDataSourceKey := podAnnotations[CloudInitUserDataSourceKeyName]
+	userDataSourceKey := podAnnotations[cloudInitUserDataSourceKeyName]
 	if userDataSourceKey != "" {
 		var err error
 		if clientset == nil {
@@ -184,7 +189,7 @@ func (va *VirtletAnnotations) loadExternalUserData(ns string, podAnnotations map
 			return err
 		}
 	}
-	sshKeySourceKey := podAnnotations[SSHKeySourceKeyName]
+	sshKeySourceKey := podAnnotations[sshKeySourceKeyName]
 	if sshKeySourceKey != "" {
 		var err error
 		if clientset == nil {
@@ -204,7 +209,7 @@ func (va *VirtletAnnotations) loadExternalUserData(ns string, podAnnotations map
 func (va *VirtletAnnotations) loadUserDataFromDataSource(ns, key string, clientset *kubernetes.Clientset) error {
 	parts := strings.Split(key, "/")
 	if len(parts) != 2 {
-		return fmt.Errorf("invalid %s annotation format. Expected kind/name, but insted got %s", CloudInitUserDataSourceKeyName, key)
+		return fmt.Errorf("invalid %s annotation format. Expected kind/name, but insted got %s", cloudInitUserDataSourceKeyName, key)
 	}
 	ud, err := readK8sKeySource(parts[0], parts[1], ns, "", clientset)
 	if err != nil {
@@ -223,7 +228,7 @@ func (va *VirtletAnnotations) loadUserDataFromDataSource(ns, key string, clients
 func (va *VirtletAnnotations) loadSSHKeysFromDataSource(ns, key string, clientset *kubernetes.Clientset) error {
 	parts := strings.Split(key, "/")
 	if len(parts) != 2 && len(parts) != 3 {
-		return fmt.Errorf("invalid %s annotation format. Expected kind/name[/key], but insted got %s", SSHKeySourceKeyName, key)
+		return fmt.Errorf("invalid %s annotation format. Expected kind/name[/key], but insted got %s", sshKeySourceKeyName, key)
 	}
 	dataKey := "authorized_keys"
 	if len(parts) == 3 {
@@ -254,13 +259,12 @@ func readK8sKeySource(sourceType, sourceName, ns, key string, clientset *kuberne
 		}
 		if key != "" {
 			return map[string]string{key: string(secret.Data[key])}, nil
-		} else {
-			result := map[string]string{}
-			for k, v := range secret.Data {
-				result[k] = string(v)
-			}
-			return result, nil
 		}
+		result := map[string]string{}
+		for k, v := range secret.Data {
+			result[k] = string(v)
+		}
+		return result, nil
 	case "configmap":
 		configmap, err := clientset.ConfigMaps(ns).Get(sourceName, meta_v1.GetOptions{})
 		if err != nil {
@@ -268,13 +272,12 @@ func readK8sKeySource(sourceType, sourceName, ns, key string, clientset *kuberne
 		}
 		if key != "" {
 			return map[string]string{key: configmap.Data[key]}, nil
-		} else {
-			result := map[string]string{}
-			for k, v := range configmap.Data {
-				result[k] = v
-			}
-			return result, nil
 		}
+		result := map[string]string{}
+		for k, v := range configmap.Data {
+			result[k] = v
+		}
+		return result, nil
 	default:
 		return nil, fmt.Errorf("unsupported source kind %s. Must be one of (secret, configmap)", sourceType)
 	}

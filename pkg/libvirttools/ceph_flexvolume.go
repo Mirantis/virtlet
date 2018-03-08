@@ -39,7 +39,7 @@ type cephFlexvolumeOptions struct {
 	Secret   string `json:"secret"`
 	User     string `json:"user"`
 	Protocol string `json:"protocol"`
-	Uuid     string `json:"uuid"`
+	UUID     string `json:"uuid"`
 }
 
 // cephVolume denotes a Ceph RBD volume
@@ -51,7 +51,7 @@ type cephVolume struct {
 
 var _ VMVolume = &cephVolume{}
 
-func newCephVolume(volumeName, configPath string, config *VMConfig, owner VolumeOwner) (VMVolume, error) {
+func newCephVolume(volumeName, configPath string, config *VMConfig, owner volumeOwner) (VMVolume, error) {
 	v := &cephVolume{
 		volumeBase: volumeBase{config, owner},
 	}
@@ -71,7 +71,7 @@ func newCephVolume(volumeName, configPath string, config *VMConfig, owner Volume
 }
 
 func (v *cephVolume) secretUsageName() string {
-	return v.opts.User + "-" + utils.NewUUID5(ContainerNsUuid, v.config.PodSandboxId) + "-" + v.volumeName
+	return v.opts.User + "-" + utils.NewUUID5(ContainerNsUUID, v.config.PodSandboxID) + "-" + v.volumeName
 }
 
 func (v *cephVolume) secretDef() *libvirtxml.Secret {
@@ -88,8 +88,8 @@ func (v *cephVolume) secretDef() *libvirtxml.Secret {
 	}
 }
 
-func (v *cephVolume) Uuid() string {
-	return v.opts.Uuid
+func (v *cephVolume) UUID() string {
+	return v.opts.UUID
 }
 
 func (v *cephVolume) Setup() (*libvirtxml.DomainDisk, error) {
@@ -154,7 +154,7 @@ func (v *cephVolume) Teardown() error {
 }
 
 func init() {
-	AddFlexvolumeSource("ceph", newCephVolume)
+	addFlexvolumeSource("ceph", newCephVolume)
 }
 
 // TODO: this file needs a test

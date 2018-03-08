@@ -37,7 +37,7 @@ type VMMount struct {
 // TODO: use this struct to store VM metadata
 type VMConfig struct {
 	// Id of the containing pod sandbox
-	PodSandboxId string
+	PodSandboxID string
 	// Name of the containing pod sandbox
 	PodName string
 	// Namespace of the containing pod sandbox
@@ -51,11 +51,11 @@ type VMConfig struct {
 	// Memory limit in bytes. Default: 0 (not specified)
 	MemoryLimitInBytes int64
 	// CPU shares (relative weight vs. other containers). Default: 0 (not specified)
-	CpuShares int64
+	CPUShares int64
 	// CPU CFS (Completely Fair Scheduler) period. Default: 0 (not specified)
-	CpuPeriod int64
+	CPUPeriod int64
 	// CPU CFS (Completely Fair Scheduler) quota. Default: 0 (not specified)
-	CpuQuota int64
+	CPUQuota int64
 	// Annotations for the containing pod
 	PodAnnotations map[string]string
 	// Annotations for the container

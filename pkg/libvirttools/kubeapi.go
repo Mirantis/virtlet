@@ -34,7 +34,7 @@ func GetVMConfig(in *kubeapi.CreateContainerRequest, csn *network.ContainerSideN
 	}
 
 	r := &VMConfig{
-		PodSandboxId:         in.PodSandboxId,
+		PodSandboxID:         in.PodSandboxId,
 		PodName:              in.SandboxConfig.Metadata.Name,
 		PodNamespace:         in.SandboxConfig.Metadata.Namespace,
 		Name:                 in.Config.Metadata.Name,
@@ -49,9 +49,9 @@ func GetVMConfig(in *kubeapi.CreateContainerRequest, csn *network.ContainerSideN
 	if linuxCfg := in.Config.Linux; linuxCfg != nil && linuxCfg.Resources != nil {
 		res := linuxCfg.Resources
 		r.MemoryLimitInBytes = res.MemoryLimitInBytes
-		r.CpuShares = res.CpuShares
-		r.CpuPeriod = res.CpuPeriod
-		r.CpuQuota = res.CpuQuota
+		r.CPUShares = res.CpuShares
+		r.CPUPeriod = res.CpuPeriod
+		r.CPUQuota = res.CpuQuota
 	}
 
 	for _, entry := range in.Config.Envs {

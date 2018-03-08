@@ -31,7 +31,8 @@ type rootVolume struct {
 
 var _ VMVolume = &rootVolume{}
 
-func GetRootVolume(config *VMConfig, owner VolumeOwner) ([]VMVolume, error) {
+// GetRootVolume returns volume source for root volume clone.
+func GetRootVolume(config *VMConfig, owner volumeOwner) ([]VMVolume, error) {
 	return []VMVolume{
 		&rootVolume{
 			volumeBase{config, owner},
@@ -43,7 +44,7 @@ func (v *rootVolume) volumeName() string {
 	return "virtlet_root_" + v.config.DomainUUID
 }
 
-func (v *rootVolume) createVolume() (virt.VirtStorageVolume, error) {
+func (v *rootVolume) createVolume() (virt.StorageVolume, error) {
 	imagePath, virtualSize, err := v.owner.ImageManager().GetImagePathAndVirtualSize(v.config.Image)
 	if err != nil {
 		return nil, err
@@ -70,7 +71,7 @@ func (v *rootVolume) createVolume() (virt.VirtStorageVolume, error) {
 	})
 }
 
-func (v *rootVolume) Uuid() string { return "" }
+func (v *rootVolume) UUID() string { return "" }
 
 func (v *rootVolume) Setup() (*libvirtxml.DomainDisk, error) {
 	vol, err := v.createVolume()

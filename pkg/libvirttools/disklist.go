@@ -48,7 +48,7 @@ type diskList struct {
 
 // newDiskList creates a diskList for the specified VMConfig, volume
 // source and volume owner
-func newDiskList(config *VMConfig, source VMVolumeSource, owner VolumeOwner) (*diskList, error) {
+func newDiskList(config *VMConfig, source VMVolumeSource, owner volumeOwner) (*diskList, error) {
 	vmVols, err := source(config, owner)
 	if err != nil {
 		return nil, err
@@ -92,16 +92,16 @@ func (dl *diskList) setup() ([]libvirtxml.DomainDisk, error) {
 
 // writeImages writes images for volumes that are based on generated
 // images (such as cloud-init nocloud datasource).  It must be passed
-// a VirtDomain for which images are being generated.
-func (dl *diskList) writeImages(domain virt.VirtDomain) error {
-	domainDesc, err := domain.Xml()
+// a Domain for which images are being generated.
+func (dl *diskList) writeImages(domain virt.Domain) error {
+	domainDesc, err := domain.XML()
 	if err != nil {
 		return fmt.Errorf("couldn't get domain xml: %v", err)
 	}
 
 	volumeMap := make(diskPathMap)
 	for _, item := range dl.items {
-		uuid := item.volume.Uuid()
+		uuid := item.volume.UUID()
 		if uuid != "" {
 			diskPath, err := item.driver.diskPath(domainDesc)
 			if err != nil {

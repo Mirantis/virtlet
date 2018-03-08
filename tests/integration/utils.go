@@ -46,7 +46,7 @@ func waitForSocket(filepath string) error {
 }
 
 func getDomainUUID(podID string) string {
-	return virtletutils.NewUUID5(libvirttools.ContainerNsUuid, podID)
+	return virtletutils.NewUUID5(libvirttools.ContainerNsUUID, podID)
 }
 
 func defineDummyVolume(poolName, volName string) (func(), error) {

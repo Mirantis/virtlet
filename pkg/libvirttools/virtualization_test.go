@@ -41,7 +41,7 @@ import (
 const (
 	fakeImageName        = "fake/image1"
 	fakeCNIConfig        = `{"noCniForNow":true}`
-	fakeUuid             = "abb67e3c-71b3-4ddd-5505-8c4215d5c4eb"
+	fakeUUID             = "abb67e3c-71b3-4ddd-5505-8c4215d5c4eb"
 	fakeContainerName    = "container1"
 	fakeContainerAttempt = 42
 	stopContainerTimeout = 30 * time.Second
@@ -86,7 +86,7 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 	imageManager := NewFakeImageManager(ct.rec)
 	volSrc := CombineVMVolumeSources(
 		GetRootVolume,
-		ScanFlexvolumes,
+		ScanFlexVolumes,
 		// XXX: GetConfigVolume must go last because it
 		// doesn't produce correct name for cdrom devices
 		GetConfigVolume)
@@ -94,11 +94,11 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 	if err != nil {
 		t.Fatalf("failed to create VirtualizationTool: %v", err)
 	}
-	ct.virtTool.SetClock(ct.clock)
+	ct.virtTool.setClock(ct.clock)
 	// avoid unneeded difs in the golden master data
-	ct.virtTool.SetForceKVM(true)
+	ct.virtTool.setForceKVM(true)
 	ct.kubeletRootDir = filepath.Join(ct.tmpDir, "kubelet-root")
-	ct.virtTool.SetKubeletRootDir(ct.kubeletRootDir)
+	ct.virtTool.setKubeletRootDir(ct.kubeletRootDir)
 
 	return ct
 }
@@ -143,11 +143,12 @@ func (ct *containerTester) createContainer(sandbox *kubeapi.PodSandboxConfig, mo
 	if err != nil {
 		ct.t.Fatalf("GetVMConfig(): %v", err)
 	}
-	containerId, err := ct.virtTool.CreateContainer(vmConfig, "/tmp/fakenetns")
+
+	containerID, err := ct.virtTool.CreateContainer(vmConfig, "/tmp/fakenetns")
 	if err != nil {
 		ct.t.Fatalf("CreateContainer: %v", err)
 	}
-	return containerId
+	return containerID
 }
 
 func (ct *containerTester) listContainers(filter *kubeapi.ContainerFilter) []*kubeapi.Container {
@@ -158,29 +159,29 @@ func (ct *containerTester) listContainers(filter *kubeapi.ContainerFilter) []*ku
 	return containers
 }
 
-func (ct *containerTester) containerStatus(containerId string) *kubeapi.ContainerStatus {
-	status, err := ct.virtTool.ContainerStatus(containerId)
+func (ct *containerTester) containerStatus(containerID string) *kubeapi.ContainerStatus {
+	status, err := ct.virtTool.ContainerStatus(containerID)
 	if err != nil {
 		ct.t.Errorf("ContainerStatus(): %v", err)
 	}
 	return status
 }
 
-func (ct *containerTester) startContainer(containerId string) {
-	if err := ct.virtTool.StartContainer(containerId); err != nil {
-		ct.t.Fatalf("StartContainer failed for container %q: %v", containerId, err)
+func (ct *containerTester) startContainer(containerID string) {
+	if err := ct.virtTool.StartContainer(containerID); err != nil {
+		ct.t.Fatalf("StartContainer failed for container %q: %v", containerID, err)
 	}
 }
 
-func (ct *containerTester) stopContainer(containerId string) {
-	if err := ct.virtTool.StopContainer(containerId, stopContainerTimeout); err != nil {
-		ct.t.Fatalf("StopContainer failed for container %q: %v", containerId, err)
+func (ct *containerTester) stopContainer(containerID string) {
+	if err := ct.virtTool.StopContainer(containerID, stopContainerTimeout); err != nil {
+		ct.t.Fatalf("StopContainer failed for container %q: %v", containerID, err)
 	}
 }
 
-func (ct *containerTester) removeContainer(containerId string) {
-	if err := ct.virtTool.RemoveContainer(containerId); err != nil {
-		ct.t.Fatalf("RemoveContainer failed for container %q: %v", containerId, err)
+func (ct *containerTester) removeContainer(containerID string) {
+	if err := ct.virtTool.RemoveContainer(containerID); err != nil {
+		ct.t.Fatalf("RemoveContainer failed for container %q: %v", containerID, err)
 	}
 }
 
@@ -208,15 +209,15 @@ func TestContainerLifecycle(t *testing.T) {
 		t.Errorf("Unexpected containers when no containers are started: %#v", containers)
 	}
 
-	containerId := ct.createContainer(sandbox, nil)
+	containerID := ct.createContainer(sandbox, nil)
 
 	containers = ct.listContainers(nil)
 	if len(containers) != 1 {
 		t.Errorf("Expected single container to be started, but got: %#v", containers)
 	}
 	container := containers[0]
-	if container.Id != containerId {
-		t.Errorf("Bad container id in response: %q instead of %q", containers[0].Id, containerId)
+	if container.Id != containerID {
+		t.Errorf("Bad container id in response: %q instead of %q", containers[0].Id, containerID)
 	}
 	if container.State != kubeapi.ContainerState_CONTAINER_CREATED {
 		t.Errorf("Bad container state: %v instead of %v", containers[0].State, kubeapi.ContainerState_CONTAINER_CREATED)
@@ -236,17 +237,17 @@ func TestContainerLifecycle(t *testing.T) {
 	ct.rec.Rec("container list after the container is created", containers)
 
 	ct.clock.Advance(1 * time.Second)
-	ct.startContainer(containerId)
+	ct.startContainer(containerID)
 
-	status := ct.containerStatus(containerId)
+	status := ct.containerStatus(containerID)
 	if status.State != kubeapi.ContainerState_CONTAINER_RUNNING {
 		t.Errorf("Bad container state: %v instead of %v", status.State, kubeapi.ContainerState_CONTAINER_RUNNING)
 	}
 	ct.rec.Rec("container status after the container is started", status)
 
-	ct.stopContainer(containerId)
+	ct.stopContainer(containerID)
 
-	status = ct.containerStatus(containerId)
+	status = ct.containerStatus(containerID)
 	if status.State != kubeapi.ContainerState_CONTAINER_EXITED {
 		t.Errorf("Bad container state: %v instead of %v", status.State, kubeapi.ContainerState_CONTAINER_EXITED)
 	}
@@ -264,7 +265,7 @@ func TestContainerLifecycle(t *testing.T) {
 	}
 	ct.rec.Rec("container status after the container is stopped", status)
 
-	ct.removeContainer(containerId)
+	ct.removeContainer(containerID)
 
 	containers = ct.listContainers(nil)
 	if len(containers) != 0 {
@@ -285,9 +286,9 @@ func TestDomainForcedShutdown(t *testing.T) {
 	sandbox := criapi.GetSandboxes(1)[0]
 	ct.setPodSandbox(sandbox)
 
-	containerId := ct.createContainer(sandbox, nil)
+	containerID := ct.createContainer(sandbox, nil)
 	ct.clock.Advance(1 * time.Second)
-	ct.startContainer(containerId)
+	ct.startContainer(containerID)
 
 	ct.domainConn.SetIgnoreShutdown(true)
 	go func() {
@@ -301,15 +302,15 @@ func TestDomainForcedShutdown(t *testing.T) {
 	}()
 
 	ct.rec.Rec("invoking StopContainer()", nil)
-	ct.stopContainer(containerId)
-	status := ct.containerStatus(containerId)
+	ct.stopContainer(containerID)
+	status := ct.containerStatus(containerID)
 	if status.State != kubeapi.ContainerState_CONTAINER_EXITED {
 		t.Errorf("Bad container state: %v instead of %v", status.State, kubeapi.ContainerState_CONTAINER_EXITED)
 	}
 	ct.rec.Rec("container status after the container is stopped", status)
 
 	ct.rec.Rec("invoking RemoveContainer()", nil)
-	ct.removeContainer(containerId)
+	ct.removeContainer(containerID)
 	gm.Verify(t, ct.rec.Content())
 }
 
@@ -320,10 +321,10 @@ func TestDoubleStartError(t *testing.T) {
 	sandbox := criapi.GetSandboxes(1)[0]
 	ct.setPodSandbox(sandbox)
 
-	containerId := ct.createContainer(sandbox, nil)
+	containerID := ct.createContainer(sandbox, nil)
 	ct.clock.Advance(1 * time.Second)
-	ct.startContainer(containerId)
-	if err := ct.virtTool.StartContainer(containerId); err == nil {
+	ct.startContainer(containerID)
+	if err := ct.virtTool.StartContainer(containerID); err == nil {
 		t.Errorf("2nd StartContainer() didn't produce an error")
 	}
 }
@@ -336,7 +337,7 @@ type volMount struct {
 func TestDomainDefinitions(t *testing.T) {
 	flexVolumeDriver := flexvolume.NewFlexVolumeDriver(func() string {
 		// note that this is only good for just one flexvolume
-		return fakeUuid
+		return fakeUUID
 	}, flexvolume.NullMounter)
 	for _, tc := range []struct {
 		name        string
@@ -450,11 +451,11 @@ func TestDomainDefinitions(t *testing.T) {
 					ContainerPath: m.containerPath,
 				})
 			}
-			containerId := ct.createContainer(sandbox, mounts)
-			// startContainer will cause fake VirtDomain
+			containerID := ct.createContainer(sandbox, mounts)
+			// startContainer will cause fake Domain
 			// to dump the cloudinit iso content
-			ct.startContainer(containerId)
-			ct.removeContainer(containerId)
+			ct.startContainer(containerID)
+			ct.removeContainer(containerID)
 			gm.Verify(t, ct.rec.Content())
 		})
 	}

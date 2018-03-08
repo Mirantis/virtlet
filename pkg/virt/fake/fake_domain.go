@@ -42,7 +42,7 @@ type FakeDomainConnection struct {
 	ignoreShutdown     bool
 }
 
-var _ virt.VirtDomainConnection = &FakeDomainConnection{}
+var _ virt.DomainConnection = &FakeDomainConnection{}
 
 func NewFakeDomainConnection(rec Recorder) *FakeDomainConnection {
 	if rec == nil {
@@ -78,7 +78,7 @@ func (dc *FakeDomainConnection) removeSecret(s *FakeSecret) {
 	delete(dc.secretsByUsageName, s.usageName)
 }
 
-func (dc *FakeDomainConnection) DefineDomain(def *libvirtxml.Domain) (virt.VirtDomain, error) {
+func (dc *FakeDomainConnection) DefineDomain(def *libvirtxml.Domain) (virt.Domain, error) {
 	def = copyDomain(def)
 	addPciRoot(def)
 	assignFakePCIAddressesToControllers(def)
@@ -114,8 +114,8 @@ func (dc *FakeDomainConnection) DefineDomain(def *libvirtxml.Domain) (virt.VirtD
 	return d, nil
 }
 
-func (dc *FakeDomainConnection) ListDomains() ([]virt.VirtDomain, error) {
-	r := make([]virt.VirtDomain, len(dc.domains))
+func (dc *FakeDomainConnection) ListDomains() ([]virt.Domain, error) {
+	r := make([]virt.Domain, len(dc.domains))
 	names := make([]string, 0, len(dc.domains))
 	for name := range dc.domains {
 		names = append(names, name)
@@ -128,21 +128,21 @@ func (dc *FakeDomainConnection) ListDomains() ([]virt.VirtDomain, error) {
 	return r, nil
 }
 
-func (dc *FakeDomainConnection) LookupDomainByName(name string) (virt.VirtDomain, error) {
+func (dc *FakeDomainConnection) LookupDomainByName(name string) (virt.Domain, error) {
 	if d, found := dc.domains[name]; found {
 		return d, nil
 	}
 	return nil, virt.ErrDomainNotFound
 }
 
-func (dc *FakeDomainConnection) LookupDomainByUUIDString(uuid string) (virt.VirtDomain, error) {
+func (dc *FakeDomainConnection) LookupDomainByUUIDString(uuid string) (virt.Domain, error) {
 	if d, found := dc.domainsByUuid[uuid]; found {
 		return d, nil
 	}
 	return nil, virt.ErrDomainNotFound
 }
 
-func (dc *FakeDomainConnection) DefineSecret(def *libvirtxml.Secret) (virt.VirtSecret, error) {
+func (dc *FakeDomainConnection) DefineSecret(def *libvirtxml.Secret) (virt.Secret, error) {
 	if def.UUID == "" {
 		return nil, fmt.Errorf("the secret has empty uuid")
 	}
@@ -158,11 +158,11 @@ func (dc *FakeDomainConnection) DefineSecret(def *libvirtxml.Secret) (virt.VirtS
 	return s, nil
 }
 
-func (dc *FakeDomainConnection) LookupSecretByUUIDString(uuid string) (virt.VirtSecret, error) {
+func (dc *FakeDomainConnection) LookupSecretByUUIDString(uuid string) (virt.Secret, error) {
 	return nil, virt.ErrSecretNotFound
 }
 
-func (dc *FakeDomainConnection) LookupSecretByUsageName(usageType string, usageName string) (virt.VirtSecret, error) {
+func (dc *FakeDomainConnection) LookupSecretByUsageName(usageType string, usageName string) (virt.Secret, error) {
 	if d, found := dc.secretsByUsageName[usageName]; found {
 		return d, nil
 	}
@@ -182,7 +182,7 @@ func newFakeDomain(dc *FakeDomainConnection, def *libvirtxml.Domain) *FakeDomain
 	return &FakeDomain{
 		rec:   NewChildRecorder(dc.rec, def.Name),
 		dc:    dc,
-		state: virt.DOMAIN_SHUTOFF,
+		state: virt.DomainStateShutoff,
 		def:   def,
 	}
 }
@@ -210,11 +210,11 @@ func (d *FakeDomain) Create() error {
 	if d.created {
 		return fmt.Errorf("trying to re-create domain %q", d.def.Name)
 	}
-	if d.state != virt.DOMAIN_SHUTOFF {
+	if d.state != virt.DomainStateShutoff {
 		return fmt.Errorf("invalid domain state %d", d.state)
 	}
 	d.created = true
-	d.state = virt.DOMAIN_RUNNING
+	d.state = virt.DomainStateRunning
 	return nil
 }
 
@@ -223,7 +223,7 @@ func (d *FakeDomain) Destroy() error {
 	if d.removed {
 		return fmt.Errorf("Destroy() called on a removed (undefined) domain %q", d.def.Name)
 	}
-	d.state = virt.DOMAIN_SHUTOFF
+	d.state = virt.DomainStateShutoff
 	return nil
 }
 
@@ -247,15 +247,15 @@ func (d *FakeDomain) Shutdown() error {
 		return fmt.Errorf("Shutdown() called on a removed (undefined) domain %q", d.def.Name)
 	}
 	if !d.dc.ignoreShutdown {
-		// TODO: need to test DOMAIN_SHUTDOWN stage too
-		d.state = virt.DOMAIN_SHUTOFF
+		// TODO: need to test DomainStateShutdown stage too
+		d.state = virt.DomainStateShutoff
 	}
 	return nil
 }
 
 func (d *FakeDomain) State() (virt.DomainState, error) {
 	if d.removed {
-		return virt.DOMAIN_NOSTATE, fmt.Errorf("State() called on a removed (undefined) domain %q", d.def.Name)
+		return virt.DomainStateNoState, fmt.Errorf("State() called on a removed (undefined) domain %q", d.def.Name)
 	}
 	return d.state, nil
 }
@@ -271,7 +271,7 @@ func (d *FakeDomain) Name() (string, error) {
 	return d.def.Name, nil
 }
 
-func (d *FakeDomain) Xml() (*libvirtxml.Domain, error) {
+func (d *FakeDomain) XML() (*libvirtxml.Domain, error) {
 	return d.def, nil
 }
 

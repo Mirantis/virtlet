@@ -20,18 +20,22 @@ import (
 	libvirt "github.com/libvirt/libvirt-go"
 )
 
+// Connection combines accessors for methods which operated on libvirt storage
+// and domains.
 type Connection struct {
-	*LibvirtDomainConnection
-	*LibvirtStorageConnection
+	*libvirtDomainConnection
+	*libvirtStorageConnection
 }
 
+// NewConnection uses uri to construct connection to libvirt used later by
+// both storage and domains manipulators.
 func NewConnection(uri string) (*Connection, error) {
 	conn, err := libvirt.NewConnect(uri)
 	if err != nil {
 		return nil, err
 	}
 	return &Connection{
-		LibvirtDomainConnection:  newLibvirtDomainConnection(conn),
-		LibvirtStorageConnection: newLibvirtStorageConnection(conn),
+		libvirtDomainConnection:  newLibvirtDomainConnection(conn),
+		libvirtStorageConnection: newLibvirtStorageConnection(conn),
 	}, nil
 }

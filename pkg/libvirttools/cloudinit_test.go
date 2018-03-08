@@ -64,7 +64,7 @@ func newFakeFlexvolume(t *testing.T, parentDir string, uuid string, part int) *f
 	}
 }
 
-func buildNetworkedPodConfig(cniResult *cnicurrent.Result, imageType string) *VMConfig {
+func buildNetworkedPodConfig(cniResult *cnicurrent.Result, imageTypeName string) *VMConfig {
 	var descs []*network.InterfaceDescription
 	for _, iface := range cniResult.Interfaces {
 		if iface.Sandbox != "" {
@@ -78,7 +78,7 @@ func buildNetworkedPodConfig(cniResult *cnicurrent.Result, imageType string) *VM
 	return &VMConfig{
 		PodName:           "foo",
 		PodNamespace:      "default",
-		ParsedAnnotations: &VirtletAnnotations{ImageType: ImageType(imageType)},
+		ParsedAnnotations: &VirtletAnnotations{ImageType: imageType(imageTypeName)},
 		ContainerSideNetwork: &network.ContainerSideNetwork{
 			Result:     cniResult,
 			Interfaces: descs,

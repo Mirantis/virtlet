@@ -33,7 +33,9 @@ type configVolume struct {
 
 var _ VMVolume = &configVolume{}
 
-func GetConfigVolume(config *VMConfig, owner VolumeOwner) ([]VMVolume, error) {
+// GetConfigVolume returns a config volume source which will produce an ISO
+// image with CloudInit compatible configuration data.
+func GetConfigVolume(config *VMConfig, owner volumeOwner) ([]VMVolume, error) {
 	return []VMVolume{
 		&configVolume{
 			volumeBase{config, owner},
@@ -41,7 +43,7 @@ func GetConfigVolume(config *VMConfig, owner VolumeOwner) ([]VMVolume, error) {
 	}, nil
 }
 
-func (v *configVolume) Uuid() string { return "" }
+func (v *configVolume) UUID() string { return "" }
 
 func (v *configVolume) cloudInitGenerator() *CloudInitGenerator {
 	return NewCloudInitGenerator(v.config, configIsoDir)
