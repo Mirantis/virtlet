@@ -32,8 +32,8 @@ var (
 	sandboxDataBucket = []byte("data")
 )
 
-func sandboxKey(sandboxId string) []byte {
-	return append(sandboxKeyPrefix, []byte(sandboxId)...)
+func sandboxKey(sandboxID string) []byte {
+	return append(sandboxKeyPrefix, []byte(sandboxID)...)
 }
 
 type podSandboxMeta struct {

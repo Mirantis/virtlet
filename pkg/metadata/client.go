@@ -24,8 +24,8 @@ type boltClient struct {
 	db *bolt.DB
 }
 
-// NewMetadataStore is a factory function for MetadataStore interface
-func NewMetadataStore(path string) (MetadataStore, error) {
+// NewStore is a factory function for Store interface
+func NewStore(path string) (Store, error) {
 	db, err := bolt.Open(path, 0600, nil)
 	if err != nil {
 		return nil, err

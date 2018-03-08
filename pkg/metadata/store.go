@@ -86,8 +86,8 @@ type PodSandboxMetadata interface {
 	Save(func(*PodSandboxInfo) (*PodSandboxInfo, error)) error
 }
 
-// SandboxMetadataStore contains methods to operate on Pod sandboxes
-type SandboxMetadataStore interface {
+// SandboxStore contains methods to operate on Pod sandboxes
+type SandboxStore interface {
 	// PodSandbox returns interface instance which manages pod sandbox with given ID
 	PodSandbox(podID string) PodSandboxMetadata
 
@@ -124,8 +124,8 @@ type ContainerMetadata interface {
 	Save(func(*ContainerInfo) (*ContainerInfo, error)) error
 }
 
-// ContainerMetadataStore contains methods to operate on containers (VMs)
-type ContainerMetadataStore interface {
+// ContainerStore contains methods to operate on containers (VMs)
+type ContainerStore interface {
 	// Container returns interface instance which manages container with given ID
 	Container(containerID string) ContainerMetadata
 
@@ -137,10 +137,10 @@ type ContainerMetadataStore interface {
 	ImagesInUse() (map[string]bool, error)
 }
 
-// MetadataStore provides single interface for metadata storage implementation
-type MetadataStore interface {
-	SandboxMetadataStore
-	ContainerMetadataStore
+// Store provides single interface for metadata storage implementation
+type Store interface {
+	SandboxStore
+	ContainerStore
 	io.Closer
 }
 

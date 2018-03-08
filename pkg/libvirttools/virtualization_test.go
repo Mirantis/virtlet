@@ -56,7 +56,7 @@ type containerTester struct {
 	rec            *fake.TopLevelRecorder
 	domainConn     *fake.FakeDomainConnection
 	storageConn    *fake.FakeStorageConnection
-	metadataStore  metadata.MetadataStore
+	metadataStore  metadata.Store
 }
 
 func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTester {
@@ -78,7 +78,7 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 	ct.domainConn = fake.NewFakeDomainConnection(ct.rec.Child("domain conn"))
 	ct.storageConn = fake.NewFakeStorageConnection(ct.rec.Child("storage"))
 
-	ct.metadataStore, err = metadata.NewFakeMetadataStore()
+	ct.metadataStore, err = metadata.NewFakeStore()
 	if err != nil {
 		t.Fatalf("Failed to create fake bolt client: %v", err)
 	}

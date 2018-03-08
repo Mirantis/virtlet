@@ -79,7 +79,7 @@ func runVirtlet() {
 		os.Exit(1)
 	}
 
-	metadataStore, err := metadata.NewMetadataStore(*boltPath)
+	metadataStore, err := metadata.NewStore(*boltPath)
 	if err != nil {
 		glog.Errorf("Failed to create metadata store: %v", err)
 		os.Exit(1)

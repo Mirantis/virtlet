@@ -178,7 +178,7 @@ type VirtualizationTool struct {
 	domainConn     virt.VirtDomainConnection
 	volumePool     virt.VirtStoragePool
 	imageManager   ImageManager
-	metadataStore  metadata.MetadataStore
+	metadataStore  metadata.Store
 	clock          clockwork.Clock
 	forceKVM       bool
 	kubeletRootDir string
@@ -189,7 +189,7 @@ type VirtualizationTool struct {
 var _ VolumeOwner = &VirtualizationTool{}
 
 func NewVirtualizationTool(domainConn virt.VirtDomainConnection, storageConn virt.VirtStorageConnection, imageManager ImageManager,
-	metadataStore metadata.MetadataStore, volumePoolName, rawDevices string, volumeSource VMVolumeSource) (*VirtualizationTool, error) {
+	metadataStore metadata.Store, volumePoolName, rawDevices string, volumeSource VMVolumeSource) (*VirtualizationTool, error) {
 
 	volumePool, err := ensureStoragePool(storageConn, volumePoolName)
 	if err != nil {

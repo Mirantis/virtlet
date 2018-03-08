@@ -40,8 +40,8 @@ func tempfile() (string, error) {
 	return f.Name(), nil
 }
 
-// NewFakeMetadataStore is a factory function for MetadataStore interface that returns fake store
-func NewFakeMetadataStore() (MetadataStore, error) {
+// NewFakeStore is a factory function for Store interface that returns fake store
+func NewFakeStore() (Store, error) {
 	filename, err := tempfile()
 
 	db, err := bolt.Open(filename, 0600, nil)
@@ -52,7 +52,7 @@ func NewFakeMetadataStore() (MetadataStore, error) {
 	return &boltClient{db: db}, nil
 }
 
-func dumpDB(t *testing.T, store MetadataStore, context string) error {
+func dumpDB(t *testing.T, store Store, context string) error {
 	db := store.(*boltClient).db
 	t.Logf("==[ %s ]==> Start DB dump", context)
 	err := db.View(func(tx *bolt.Tx) error {
@@ -87,8 +87,8 @@ func dumpDB(t *testing.T, store MetadataStore, context string) error {
 	return err
 }
 
-func setUpTestStore(t *testing.T, sandboxConfigs []*kubeapi.PodSandboxConfig, containerConfigs []*criapi.ContainerTestConfig, clock clockwork.Clock) MetadataStore {
-	store, err := NewFakeMetadataStore()
+func setUpTestStore(t *testing.T, sandboxConfigs []*kubeapi.PodSandboxConfig, containerConfigs []*criapi.ContainerTestConfig, clock clockwork.Clock) Store {
+	store, err := NewFakeStore()
 	if err != nil {
 		t.Fatal(err)
 	}
