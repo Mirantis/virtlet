@@ -54,8 +54,8 @@ type InterfaceDescription struct {
 // PodNetworkDesc contains the data that are required by TapFDSource
 // to set up a tap device for a VM
 type PodNetworkDesc struct {
-	// PodId specifies the id of the pod
-	PodId string `json:"podId"`
+	// PodID specifies the id of the pod
+	PodID string `json:"podId"`
 	// PodNs specifies the namespace of the pod
 	PodNs string `json:"podNs"`
 	// PodName specifies the name of the pod
@@ -127,15 +127,15 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 		return nil, nil, fmt.Errorf("error unmarshalling GetFD payload: %v", err)
 	}
 	pnd := payload.Description
-	if err := cni.CreateNetNS(pnd.PodId); err != nil {
-		return nil, nil, fmt.Errorf("error creating new netns for pod %s (%s): %v", pnd.PodName, pnd.PodId, err)
+	if err := cni.CreateNetNS(pnd.PodID); err != nil {
+		return nil, nil, fmt.Errorf("error creating new netns for pod %s (%s): %v", pnd.PodName, pnd.PodID, err)
 	}
 
-	netConfig, err := s.cniClient.AddSandboxToNetwork(pnd.PodId, pnd.PodName, pnd.PodNs)
+	netConfig, err := s.cniClient.AddSandboxToNetwork(pnd.PodID, pnd.PodName, pnd.PodNs)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error adding pod %s (%s) to CNI network: %v", pnd.PodName, pnd.PodId, err)
+		return nil, nil, fmt.Errorf("error adding pod %s (%s) to CNI network: %v", pnd.PodName, pnd.PodID, err)
 	}
-	glog.V(3).Infof("CNI configuration for pod %s (%s): %s", pnd.PodName, pnd.PodId, spew.Sdump(netConfig))
+	glog.V(3).Infof("CNI configuration for pod %s (%s): %s", pnd.PodName, pnd.PodID, spew.Sdump(netConfig))
 
 	if netConfig == nil {
 		netConfig = &cnicurrent.Result{}
@@ -184,7 +184,7 @@ func (s *TapFDSource) Release(key string) error {
 		return fmt.Errorf("bad fd key: %q", key)
 	}
 
-	netNSPath := cni.PodNetNSPath(pn.pnd.PodId)
+	netNSPath := cni.PodNetNSPath(pn.pnd.PodID)
 
 	vmNS, err := ns.GetNS(netNSPath)
 	if err != nil {
@@ -208,12 +208,12 @@ func (s *TapFDSource) Release(key string) error {
 		return err
 	}
 
-	if err := s.cniClient.RemoveSandboxFromNetwork(pn.pnd.PodId, pn.pnd.PodName, pn.pnd.PodNs); err != nil {
-		return fmt.Errorf("error removing pod sandbox %q from CNI network: %v", pn.pnd.PodId, err)
+	if err := s.cniClient.RemoveSandboxFromNetwork(pn.pnd.PodID, pn.pnd.PodName, pn.pnd.PodNs); err != nil {
+		return fmt.Errorf("error removing pod sandbox %q from CNI network: %v", pn.pnd.PodID, err)
 	}
 
-	if err := cni.DestroyNetNS(pn.pnd.PodId); err != nil {
-		return fmt.Errorf("error when removing network namespace for pod sandbox %q: %v", pn.pnd.PodId, err)
+	if err := cni.DestroyNetNS(pn.pnd.PodID); err != nil {
+		return fmt.Errorf("error when removing network namespace for pod sandbox %q: %v", pn.pnd.PodID, err)
 	}
 
 	delete(s.fdMap, key)
@@ -292,7 +292,7 @@ func (s *TapFDSource) Recover(key string, data []byte) error {
 }
 
 func (s *TapFDSource) setupNetNS(key string, pnd *PodNetworkDesc, initNet func(netNSPath string, allLinks []netlink.Link) (*network.ContainerSideNetwork, error)) error {
-	netNSPath := cni.PodNetNSPath(pnd.PodId)
+	netNSPath := cni.PodNetNSPath(pnd.PodID)
 	vmNS, err := ns.GetNS(netNSPath)
 	if err != nil {
 		return fmt.Errorf("failed to open network namespace at %q: %v", netNSPath, err)
