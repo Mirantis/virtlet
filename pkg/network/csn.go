@@ -23,41 +23,45 @@ import (
 	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 )
 
-// InterfaceType presents type of network interface instance
+// InterfaceType presents type of network interface instance.
 type InterfaceType int
 
 const (
+	// InterfaceTypeTap is a marker for tap type interface.
 	InterfaceTypeTap InterfaceType = iota
+	// InterfaceTypeVF is a marker for SR-IOV VF type interface.
 	InterfaceTypeVF
 )
 
+// InterfaceDescription holds all data required by tapmanager to identify
+// network interface.
 type InterfaceDescription struct {
-	// Type contains interface type designator
+	// Type contains interface type designator.
 	Type InterfaceType
 	// Fo contains open File object pointing to tap device inside network
 	// namespace or to control file in sysfs for sr-iov VF.
 	// It may be nil if the interface was recovered after restarting Virtlet.
-	// It's only needed during the initial VM startup
+	// It's only needed during the initial VM startup.
 	Fo *os.File
-	// Name contains original interface name for sr-iov interface
+	// Name contains original interface name for sr-iov interface.
 	Name string
 	// HardwareAddr contains original hardware address for CNI-created
-	// veth link
+	// veth link.
 	HardwareAddr net.HardwareAddr
-	// PCIAddress contains a pci address for sr-iov vf interface
+	// PCIAddress contains a pci address for sr-iov vf interface.
 	PCIAddress string
-	// MTU contains max transfer unit value for interface
+	// MTU contains max transfer unit value for interface.
 	MTU uint16
 }
 
 // ContainerSideNetwork struct describes the container (VM) network
-// namespace properties
+// namespace properties.
 type ContainerSideNetwork struct {
-	// Result contains CNI result object describing the network settings
+	// Result contains CNI result object describing the network settings.
 	Result *cnicurrent.Result
-	// NsPath specifies the path to the container network namespace
+	// NsPath specifies the path to the container network namespace.
 	NsPath string
 	// Interfaces contains a list of interfaces with data needed
-	// to configure them
+	// to configure them.
 	Interfaces []*InterfaceDescription
 }
