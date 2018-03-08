@@ -34,7 +34,7 @@ import (
 
 func translate(config ImageTranslation, name string, server *httptest.Server) image.Endpoint {
 	for i, rule := range config.Rules {
-		config.Rules[i].Url = strings.Replace(rule.Url, "%", server.Listener.Addr().String(), 1)
+		config.Rules[i].URL = strings.Replace(rule.URL, "%", server.Listener.Addr().String(), 1)
 	}
 	configs := map[string]ImageTranslation{"config": config}
 
@@ -76,7 +76,7 @@ func TestImageDownload(t *testing.T) {
 		Rules: []TranslationRule{
 			{
 				Name: "image1",
-				Url:  "http://%/base.qcow2",
+				URL:  "http://%/base.qcow2",
 			},
 		},
 	}
@@ -107,22 +107,22 @@ func TestImageDownloadRedirects(t *testing.T) {
 		Rules: []TranslationRule{
 			{
 				Name:      "image1",
-				Url:       "http://%/base.qcow2",
+				URL:       "http://%/base.qcow2",
 				Transport: "profile1",
 			},
 			{
 				Name:      "image2",
-				Url:       "http://%/base.qcow2",
+				URL:       "http://%/base.qcow2",
 				Transport: "profile2",
 			},
 			{
 				Name:      "image3",
-				Url:       "http://%/base.qcow2",
+				URL:       "http://%/base.qcow2",
 				Transport: "profile3",
 			},
 			{
 				Name:      "image4",
-				Url:       "http://%/base.qcow2",
+				URL:       "http://%/base.qcow2",
 				Transport: "profile4",
 			},
 		},
@@ -139,7 +139,7 @@ func TestImageDownloadRedirects(t *testing.T) {
 		name         string
 		image        string
 		mr           int
-		expectedUrls int
+		expectedURLs int
 		mustFail     bool
 		message      string
 	}{
@@ -147,7 +147,7 @@ func TestImageDownloadRedirects(t *testing.T) {
 			name:         "0 redirects, 0 allowed",
 			image:        "image1",
 			mr:           0,
-			expectedUrls: 1,
+			expectedURLs: 1,
 			mustFail:     false,
 			message:      "image download without redirects must succeed even if no redirects allowed",
 		},
@@ -155,7 +155,7 @@ func TestImageDownloadRedirects(t *testing.T) {
 			name:         "1 redirect, 0 allowed",
 			image:        "image1",
 			mr:           1,
-			expectedUrls: 1,
+			expectedURLs: 1,
 			mustFail:     true,
 			message:      "image download with redirects cannot succeed when no redirects allowed",
 		},
@@ -163,7 +163,7 @@ func TestImageDownloadRedirects(t *testing.T) {
 			name:         "1 redirect, 1 allowed",
 			image:        "image2",
 			mr:           1,
-			expectedUrls: 2,
+			expectedURLs: 2,
 			mustFail:     false,
 			message:      "image download must succeed when number of redirects doesn't exceed maximum",
 		},
@@ -171,7 +171,7 @@ func TestImageDownloadRedirects(t *testing.T) {
 			name:         "5 redirect, 5 allowed",
 			image:        "image3",
 			mr:           5,
-			expectedUrls: 6,
+			expectedURLs: 6,
 			mustFail:     false,
 			message:      "image download must succeed when number of redirects doesn't exceed maximum",
 		},
@@ -179,7 +179,7 @@ func TestImageDownloadRedirects(t *testing.T) {
 			name:         "2 redirect, 1 allowed",
 			image:        "image2",
 			mr:           2,
-			expectedUrls: 2,
+			expectedURLs: 2,
 			mustFail:     true,
 			message:      "image download must fail when number of redirects exceeds maximum value",
 		},
@@ -187,7 +187,7 @@ func TestImageDownloadRedirects(t *testing.T) {
 			name:         "10 redirect, 5 allowed",
 			image:        "image3",
 			mr:           10,
-			expectedUrls: 6,
+			expectedURLs: 6,
 			mustFail:     true,
 			message:      "image download must fail when number of redirects exceeds maximum value",
 		},
@@ -195,7 +195,7 @@ func TestImageDownloadRedirects(t *testing.T) {
 			name:         "9 redirect, 9 (default) allowed",
 			image:        "image4",
 			mr:           9,
-			expectedUrls: 10,
+			expectedURLs: 10,
 			mustFail:     false,
 			message:      "image download must not fail when number of redirects doesn't exceed maximum value",
 		},
@@ -203,7 +203,7 @@ func TestImageDownloadRedirects(t *testing.T) {
 			name:         "10 redirect, 9 (default) allowed",
 			image:        "image4",
 			mr:           10,
-			expectedUrls: 10,
+			expectedURLs: 10,
 			mustFail:     true,
 			message:      "image download must fail when number of redirects exceeds maximum value",
 		},
@@ -219,8 +219,8 @@ func TestImageDownloadRedirects(t *testing.T) {
 				t.Error(tst.message)
 			}
 
-			if len(urls) != tst.expectedUrls {
-				t.Errorf("unexpected number of redirects for %q: %d != %d", tst.image, len(urls), tst.expectedUrls)
+			if len(urls) != tst.expectedURLs {
+				t.Errorf("unexpected number of redirects for %q: %d != %d", tst.image, len(urls), tst.expectedURLs)
 			} else {
 				for i, r := range urls {
 					if i == 0 && r != "/base.qcow2" || i > 0 && r != fmt.Sprintf("/file%d", i) {
@@ -247,7 +247,7 @@ func TestImageDownloadWithProxy(t *testing.T) {
 		Rules: []TranslationRule{
 			{
 				Name: "image1",
-				Url:  "example.net/base.qcow2",
+				URL:  "example.net/base.qcow2",
 			},
 		},
 		Transports: map[string]TransportProfile{
@@ -275,7 +275,7 @@ func TestImageDownloadWithTimeout(t *testing.T) {
 		Rules: []TranslationRule{
 			{
 				Name: "image",
-				Url:  "%/base.qcow2",
+				URL:  "%/base.qcow2",
 			},
 		},
 		Transports: map[string]TransportProfile{
@@ -340,7 +340,7 @@ func TestImageDownloadTLS(t *testing.T) {
 		Rules: []TranslationRule{
 			{
 				Name:      "image1",
-				Url:       "%/base.qcow2",
+				URL:       "%/base.qcow2",
 				Transport: "tlsProfile",
 			},
 		},
@@ -393,7 +393,7 @@ func TestImageDownloadTLSWithClientCerts(t *testing.T) {
 		Rules: []TranslationRule{
 			{
 				Name:      "image",
-				Url:       "%/base.qcow2",
+				URL:       "%/base.qcow2",
 				Transport: "tlsProfile",
 			},
 		},
@@ -444,7 +444,7 @@ func TestImageDownloadTLSWithServerName(t *testing.T) {
 		Rules: []TranslationRule{
 			{
 				Name:      "image",
-				Url:       "%/base.qcow2",
+				URL:       "%/base.qcow2",
 				Transport: "tlsProfile",
 			},
 		},
@@ -479,7 +479,7 @@ func TestImageDownloadTLSWithoutCertValidation(t *testing.T) {
 		Rules: []TranslationRule{
 			{
 				Name:      "image",
-				Url:       "%/base.qcow2",
+				URL:       "%/base.qcow2",
 				Transport: "tlsProfile",
 			},
 		},

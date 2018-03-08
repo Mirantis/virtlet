@@ -39,22 +39,23 @@ type Image struct {
 }
 
 func (img *Image) hexDigest() (string, error) {
-	if d, err := digest.ParseDigest(img.Digest); err != nil {
+	var d digest.Digest
+	var err error
+	if d, err = digest.ParseDigest(img.Digest); err != nil {
 		return "", err
-	} else {
-		return d.Hex(), nil
 	}
+	return d.Hex(), nil
 }
 
-// ImageTranslator translates image name to a Endpoint
-type ImageTranslator func(string) Endpoint
+// Translator translates image name to a Endpoint
+type Translator func(string) Endpoint
 
-// ImageRefGetter is a function that returns the list of images
+// RefGetter is a function that returns the list of images
 // that are currently in use
-type ImageRefGetter func() (map[string]bool, error)
+type RefGetter func() (map[string]bool, error)
 
-// ImageStore is an interface for the image store
-type ImageStore interface {
+// Store is an interface for the image store
+type Store interface {
 	// ListImage returns the list of images in the store.
 	// If filter is specified, the list will only contain the
 	// image with the same name as the value of 'filter',
@@ -68,7 +69,7 @@ type ImageStore interface {
 
 	// PullImage pulls the image using specified image name translation
 	// function
-	PullImage(ctx context.Context, name string, translator ImageTranslator) (string, error)
+	PullImage(ctx context.Context, name string, translator Translator) (string, error)
 
 	// RemoveImage removes the specified image
 	RemoveImage(name string) error
@@ -83,45 +84,45 @@ type ImageStore interface {
 
 	// SetRefGetter sets a function that will be used to determine
 	// the set of images that are currently in use.
-	SetRefGetter(imageRefGetter ImageRefGetter)
+	SetRefGetter(imageRefGetter RefGetter)
 }
 
 // VirtualSizeFunc specifies a function that returns the virtual
 // size of the specified QCOW2 image file
 type VirtualSizeFunc func(string) (uint64, error)
 
-// ImageFileStore implements ImageStore. For more info on its
+// FileStore implements Store. For more info on its
 // workings, see docs/images.md
-type ImageFileStore struct {
+type FileStore struct {
 	sync.Mutex
 	dir        string
 	downloader Downloader
 	vsizeFunc  VirtualSizeFunc
-	refGetter  ImageRefGetter
+	refGetter  RefGetter
 }
 
-var _ ImageStore = &ImageFileStore{}
+var _ Store = &FileStore{}
 
-// NewImageFileStore creates a new ImageFileStore that will be using
+// NewFileStore creates a new FileStore that will be using
 // the specified dir to store the images, image downloader and
 // a function for getting virtual size of the image. If vsizeFunc
 // is nil, the default GetImageVirtualSize function will be used
-func NewImageFileStore(dir string, downloader Downloader, vsizeFunc VirtualSizeFunc) *ImageFileStore {
+func NewFileStore(dir string, downloader Downloader, vsizeFunc VirtualSizeFunc) *FileStore {
 	if vsizeFunc == nil {
 		vsizeFunc = GetImageVirtualSize
 	}
-	return &ImageFileStore{
+	return &FileStore{
 		dir:        dir,
 		downloader: downloader,
 		vsizeFunc:  vsizeFunc,
 	}
 }
 
-func (s *ImageFileStore) linkDir() string {
+func (s *FileStore) linkDir() string {
 	return filepath.Join(s.dir, "links")
 }
 
-func (s *ImageFileStore) linkDirExists() (bool, error) {
+func (s *FileStore) linkDirExists() (bool, error) {
 	switch _, err := os.Stat(s.linkDir()); {
 	case err == nil:
 		return true, nil
@@ -132,20 +133,20 @@ func (s *ImageFileStore) linkDirExists() (bool, error) {
 	}
 }
 
-func (s *ImageFileStore) dataDir() string {
+func (s *FileStore) dataDir() string {
 	return filepath.Join(s.dir, "data")
 }
 
-func (s *ImageFileStore) dataFileName(hexDigest string) string {
+func (s *FileStore) dataFileName(hexDigest string) string {
 	return filepath.Join(s.dataDir(), hexDigest)
 }
 
-func (s *ImageFileStore) linkFileName(imageName string) string {
+func (s *FileStore) linkFileName(imageName string) string {
 	imageName = stripTags(imageName)
 	return filepath.Join(s.linkDir(), strings.Replace(imageName, "/", "%", -1))
 }
 
-func (s *ImageFileStore) renameIfNewOrDelete(oldPath string, newPath string) (bool, error) {
+func (s *FileStore) renameIfNewOrDelete(oldPath string, newPath string) (bool, error) {
 	switch _, err := os.Stat(newPath); {
 	case err == nil:
 		if err := os.Remove(oldPath); err != nil {
@@ -159,7 +160,7 @@ func (s *ImageFileStore) renameIfNewOrDelete(oldPath string, newPath string) (bo
 	}
 }
 
-func (s *ImageFileStore) getImageHexDigestsInUse() (map[string]bool, error) {
+func (s *FileStore) getImageHexDigestsInUse() (map[string]bool, error) {
 	imagesInUse := make(map[string]bool)
 	var imgList []string
 	if s.refGetter != nil {
@@ -192,7 +193,7 @@ func (s *ImageFileStore) getImageHexDigestsInUse() (map[string]bool, error) {
 	return imagesInUse, nil
 }
 
-func (s *ImageFileStore) removeIfUnreferenced(hexDigest string) error {
+func (s *FileStore) removeIfUnreferenced(hexDigest string) error {
 	imagesInUse, err := s.getImageHexDigestsInUse()
 	switch {
 	case err != nil:
@@ -208,7 +209,7 @@ func (s *ImageFileStore) removeIfUnreferenced(hexDigest string) error {
 // removeImageUnlocked removes the specified image unless its dataFile name
 // is equal to one passed us keepData. Returns true if the file did not
 // exist or was removed.
-func (s *ImageFileStore) removeImageIfItsNotNeeded(name, keepData string) (bool, error) {
+func (s *FileStore) removeImageIfItsNotNeeded(name, keepData string) (bool, error) {
 	linkFileName := s.linkFileName(name)
 	switch _, err := os.Lstat(linkFileName); {
 	case err == nil:
@@ -231,7 +232,7 @@ func (s *ImageFileStore) removeImageIfItsNotNeeded(name, keepData string) (bool,
 	}
 }
 
-func (s *ImageFileStore) placeImage(tempPath string, dataName string, imageName string) error {
+func (s *FileStore) placeImage(tempPath string, dataName string, imageName string) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -271,7 +272,7 @@ func (s *ImageFileStore) placeImage(tempPath string, dataName string, imageName 
 	return nil
 }
 
-func (s *ImageFileStore) imageInfo(fi os.FileInfo) (*Image, error) {
+func (s *FileStore) imageInfo(fi os.FileInfo) (*Image, error) {
 	fullPath := filepath.Join(s.linkDir(), fi.Name())
 	if fi.Mode()&os.ModeSymlink == 0 {
 		return nil, fmt.Errorf("%q is not a symbolic link", fullPath)
@@ -303,7 +304,7 @@ func (s *ImageFileStore) imageInfo(fi os.FileInfo) (*Image, error) {
 	}, nil
 }
 
-func (s *ImageFileStore) listImagesUnlocked(filter string) ([]*Image, error) {
+func (s *FileStore) listImagesUnlocked(filter string) ([]*Image, error) {
 	if linkDirExists, err := s.linkDirExists(); err != nil {
 		return nil, err
 	} else if !linkDirExists {
@@ -334,13 +335,13 @@ func (s *ImageFileStore) listImagesUnlocked(filter string) ([]*Image, error) {
 }
 
 // ListImages implements ListImages method of ImageStore interface
-func (s *ImageFileStore) ListImages(filter string) ([]*Image, error) {
+func (s *FileStore) ListImages(filter string) ([]*Image, error) {
 	s.Lock()
 	defer s.Unlock()
 	return s.listImagesUnlocked(filter)
 }
 
-func (s *ImageFileStore) imageStatusUnlocked(name string) (*Image, error) {
+func (s *FileStore) imageStatusUnlocked(name string) (*Image, error) {
 	linkFileName := s.linkFileName(name)
 	// get info about the link itself, not its target
 	switch fi, err := os.Lstat(linkFileName); {
@@ -353,18 +354,18 @@ func (s *ImageFileStore) imageStatusUnlocked(name string) (*Image, error) {
 	}
 }
 
-// ImageStatus implements ImageStatus method of ImageStore interface
-func (s *ImageFileStore) ImageStatus(name string) (*Image, error) {
+// ImageStatus implements ImageStatus method of Store interface
+func (s *FileStore) ImageStatus(name string) (*Image, error) {
 	s.Lock()
 	defer s.Unlock()
 	return s.imageStatusUnlocked(name)
 }
 
-// PullImage implements PullImage method of ImageStore interface
-func (s *ImageFileStore) PullImage(ctx context.Context, name string, translator ImageTranslator) (string, error) {
+// PullImage implements PullImage method of Store interface
+func (s *FileStore) PullImage(ctx context.Context, name string, translator Translator) (string, error) {
 	name = stripTags(name)
 	ep := translator(name)
-	glog.V(1).Infof("Image translation: %q -> %q", name, ep.Url)
+	glog.V(1).Infof("Image translation: %q -> %q", name, ep.URL)
 	if err := os.MkdirAll(s.dataDir(), 0777); err != nil {
 		return "", fmt.Errorf("mkdir %q: %v", s.dataDir(), err)
 	}
@@ -377,7 +378,7 @@ func (s *ImageFileStore) PullImage(ctx context.Context, name string, translator 
 		if err := os.Remove(tempFile.Name()); err != nil {
 			glog.Warningf("Error removing %q: %v", tempFile.Name(), err)
 		}
-		return "", fmt.Errorf("error downloading %q: %v", ep.Url, err)
+		return "", fmt.Errorf("error downloading %q: %v", ep.URL, err)
 	}
 
 	if _, err := tempFile.Seek(0, os.SEEK_SET); err != nil {
@@ -405,16 +406,16 @@ func (s *ImageFileStore) PullImage(ctx context.Context, name string, translator 
 	return withDigest.String(), nil
 }
 
-// RemoveImage implements RemoveImage method of ImageStore interface
-func (s *ImageFileStore) RemoveImage(name string) error {
+// RemoveImage implements RemoveImage method of Store interface
+func (s *FileStore) RemoveImage(name string) error {
 	s.Lock()
 	defer s.Unlock()
 	_, err := s.removeImageIfItsNotNeeded(name, "")
 	return err
 }
 
-// GC implements GC method of ImageStore interface
-func (s *ImageFileStore) GC() error {
+// GC implements GC method of Store interface
+func (s *FileStore) GC() error {
 	s.Lock()
 	defer s.Unlock()
 	imagesInUse, err := s.getImageHexDigestsInUse()
@@ -438,8 +439,8 @@ func (s *ImageFileStore) GC() error {
 	return nil
 }
 
-// GetImagePathAndVirtualSize implements GC method of GetImagePathAndVirtualSize interface
-func (s *ImageFileStore) GetImagePathAndVirtualSize(ref string) (string, uint64, error) {
+// GetImagePathAndVirtualSize implements GC method of Store interface
+func (s *FileStore) GetImagePathAndVirtualSize(ref string) (string, uint64, error) {
 	s.Lock()
 	defer s.Unlock()
 	glog.V(3).Infof("GetImagePathAndVirtualSize(): %q", ref)
@@ -501,8 +502,8 @@ func (s *ImageFileStore) GetImagePathAndVirtualSize(ref string) (string, uint64,
 	return path, vsize, nil
 }
 
-// SetRefGetter implements SetRefGetter method of ImageStore interface
-func (s *ImageFileStore) SetRefGetter(imageRefGetter ImageRefGetter) {
+// SetRefGetter implements SetRefGetter method of Store interface
+func (s *FileStore) SetRefGetter(imageRefGetter RefGetter) {
 	s.refGetter = imageRefGetter
 }
 

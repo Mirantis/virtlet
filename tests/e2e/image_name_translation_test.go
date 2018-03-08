@@ -38,7 +38,7 @@ var _ = Describe("Image URL", func() {
 				Rules: []imagetranslation.TranslationRule{
 					{
 						Name: "test-image",
-						Url:  *vmImageLocation,
+						URL:  *vmImageLocation,
 					},
 				},
 			},

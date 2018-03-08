@@ -58,38 +58,41 @@ func newFakeDownloader(t *testing.T) *fakeDownloader {
 
 func (d *fakeDownloader) DownloadFile(ctx context.Context, endpoint Endpoint, w io.Writer) error {
 	d.started <- struct{}{}
-	if strings.Contains(endpoint.Url, "cancelme") {
+	if strings.Contains(endpoint.URL, "cancelme") {
 		<-ctx.Done()
 		d.cancelled = true
 		return ctx.Err()
 	}
 	if f, ok := w.(*os.File); ok {
-		d.t.Logf("fakeDownloader: writing %q to %q", endpoint.Url, f.Name())
+		d.t.Logf("fakeDownloader: writing %q to %q", endpoint.URL, f.Name())
 	}
 	// add "###" prefix to endpoint URL to make the contents
 	// more easily distinguishable from the URLs themselves
 	// in the test code
-	if n, err := w.Write([]byte("###" + endpoint.Url)); err != nil {
+	if n, err := w.Write([]byte("###" + endpoint.URL)); err != nil {
 		return fmt.Errorf("WriteString(): %v", err)
-	} else if n < len(endpoint.Url) {
+	} else if n < len(endpoint.URL) {
 		return fmt.Errorf("WriteString(): short write")
 	}
 	return nil
 }
 
 func fakeVirtualSize(imagePath string) (uint64, error) {
-	if fi, err := os.Stat(imagePath); err != nil {
+	var fi os.FileInfo
+	var err error
+
+	if fi, err = os.Stat(imagePath); err != nil {
 		return 0, err
-	} else {
-		return uint64(fi.Size()) + 1000, nil
 	}
+
+	return uint64(fi.Size()) + 1000, nil
 }
 
 type ifsTester struct {
 	t                *testing.T
 	tmpDir           string
 	downloader       *fakeDownloader
-	store            *ImageFileStore
+	store            *FileStore
 	images           []*Image
 	refs             []string
 	referencedImages []string
@@ -107,7 +110,7 @@ func newIfsTester(t *testing.T) *ifsTester {
 		t:          t,
 		tmpDir:     tmpDir,
 		downloader: downloader,
-		store:      NewImageFileStore(tmpDir, downloader, fakeVirtualSize),
+		store:      NewFileStore(tmpDir, downloader, fakeVirtualSize),
 	}
 	tst.images, tst.refs = tst.sampleImages()
 	tst.store.SetRefGetter(func() (map[string]bool, error) {
@@ -128,7 +131,7 @@ func (tst *ifsTester) translateImageName(name string) Endpoint {
 	if name == "foobar" {
 		name = "baz"
 	}
-	return Endpoint{Url: tst.translatorPrefix + name, MaxRedirects: -1}
+	return Endpoint{URL: tst.translatorPrefix + name, MaxRedirects: -1}
 }
 
 func (tst *ifsTester) subpath(p string) string {
@@ -258,7 +261,7 @@ func (tst *ifsTester) verifyDataFiles(expectedNames ...string) {
 	}
 }
 
-func TestImagePullListStatus(t *testing.T) {
+func TestPullListStatus(t *testing.T) {
 	tst := newIfsTester(t)
 	defer tst.teardown()
 	tst.verifyListImages("")

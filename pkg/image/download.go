@@ -39,9 +39,9 @@ const (
 
 // Endpoint contains all the endpoint parameters needed to download a file
 type Endpoint struct {
-	// Url is the image URL. If protocol is omitted, the
+	// URL is the image URL. If protocol is omitted, the
 	// configured default one is used.
-	Url string
+	URL string
 
 	// MaxRedirects is the maximum number of redirects that downloader is allowed to follow. -1 for stdlib default (fails on request #10)
 	MaxRedirects int
@@ -157,7 +157,7 @@ func createTransport(endpoint Endpoint) (*http.Transport, error) {
 	}, nil
 }
 
-func createHttpClient(endpoint Endpoint) (*http.Client, error) {
+func createHTTPClient(endpoint Endpoint) (*http.Client, error) {
 	transport, err := createTransport(endpoint)
 	if err != nil {
 		return nil, err
@@ -181,12 +181,12 @@ func createHttpClient(endpoint Endpoint) (*http.Client, error) {
 }
 
 func (d *defaultDownloader) DownloadFile(ctx context.Context, endpoint Endpoint, w io.Writer) error {
-	url := endpoint.Url
+	url := endpoint.URL
 	if !strings.Contains(url, "://") {
 		url = fmt.Sprintf("%s://%s", d.protocol, url)
 	}
 
-	client, err := createHttpClient(endpoint)
+	client, err := createHTTPClient(endpoint)
 	if err != nil {
 		return err
 	}

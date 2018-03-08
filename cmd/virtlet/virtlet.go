@@ -86,7 +86,7 @@ func runVirtlet() {
 	}
 
 	downloader := image.NewDownloader(*imageDownloadProtocol)
-	imageStore := image.NewImageFileStore(*imageDir, downloader, nil)
+	imageStore := image.NewFileStore(*imageDir, downloader, nil)
 	imageStore.SetRefGetter(metadataStore.ImagesInUse)
 
 	server, err := manager.NewVirtletManager(*libvirtUri, *rawDevices, *imageTranslationConfigsDir, imageStore, metadataStore, c)
