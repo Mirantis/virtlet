@@ -40,6 +40,10 @@ func TestGitDiff(t *testing.T) {
 		t.Fatalf("TempDir(): %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpDir)
+	defer os.Setenv("HOME", oldHome)
+
 	origWd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("os.Getwd(): %v", err)
