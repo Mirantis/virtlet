@@ -42,9 +42,9 @@ func WriteFiles(targetDir string, content map[string][]byte) error {
 }
 
 // GenIsoImage generates an ISO 9660 filesystem image containing
-// files from srcDir. It uses specified volumeId as the volume id.
-func GenIsoImage(isoPath string, volumeId string, srcDir string) error {
-	out, err := exec.Command("genisoimage", "-o", isoPath, "-V", volumeId, "-r", "-J", srcDir).CombinedOutput()
+// files from srcDir. It uses specified volumeID as the volume id.
+func GenIsoImage(isoPath string, volumeID string, srcDir string) error {
+	out, err := exec.Command("genisoimage", "-o", isoPath, "-V", volumeID, "-r", "-J", srcDir).CombinedOutput()
 	if err != nil {
 		outStr := ""
 		if len(out) != 0 {

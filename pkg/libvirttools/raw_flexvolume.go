@@ -48,7 +48,7 @@ var _ VMVolume = &rawDeviceVolume{}
 
 func newRawDeviceVolume(volumeName, configPath string, config *VMConfig, owner VolumeOwner) (VMVolume, error) {
 	var opts rawVolumeOptions
-	if err := utils.ReadJson(configPath, &opts); err != nil {
+	if err := utils.ReadJSON(configPath, &opts); err != nil {
 		return nil, fmt.Errorf("failed to parse raw volume config %q: %v", configPath, err)
 	}
 	if err := opts.validate(); err != nil {

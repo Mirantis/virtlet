@@ -260,7 +260,7 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netFdKey string) 
 		return "", err
 	}
 
-	domainUUID := utils.NewUuid5(ContainerNsUuid, config.PodSandboxId)
+	domainUUID := utils.NewUUID5(ContainerNsUuid, config.PodSandboxId)
 	// FIXME: this field should be moved to VMStatus struct (to be added)
 	config.DomainUUID = domainUUID
 	settings := domainSettings{

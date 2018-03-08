@@ -156,7 +156,7 @@ var _ cni.CNIClient = &FakeCNIClient{}
 
 func NewFakeCNIClient() *FakeCNIClient {
 	return &FakeCNIClient{
-		DummyPodId: utils.NewUuid(),
+		DummyPodId: utils.NewUUID(),
 		entries:    make(map[string]*fakeCNIEntry),
 	}
 }

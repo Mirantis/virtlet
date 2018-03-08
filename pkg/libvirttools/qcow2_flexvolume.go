@@ -59,7 +59,7 @@ var _ VMVolume = &qcow2Volume{}
 func newQCOW2Volume(volumeName, configPath string, config *VMConfig, owner VolumeOwner) (VMVolume, error) {
 	var err error
 	var opts qcow2VolumeOptions
-	if err = utils.ReadJson(configPath, &opts); err != nil {
+	if err = utils.ReadJSON(configPath, &opts); err != nil {
 		return nil, fmt.Errorf("failed to parse qcow2 volume config %q: %v", configPath, err)
 	}
 	v := &qcow2Volume{

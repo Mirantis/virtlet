@@ -59,7 +59,7 @@ func (c *Client) GetDummyNetwork() (*cnicurrent.Result, string, error) {
 	// the gateway. That's not a big problem usually though
 	// as the IPs are not returned to Calico so both old
 	// IPs on existing VMs and new ones should work.
-	podId := utils.NewUuid()
+	podId := utils.NewUUID()
 	if err := CreateNetNS(podId); err != nil {
 		return nil, "", fmt.Errorf("couldn't create netns for fake pod %q: %v", podId, err)
 	}

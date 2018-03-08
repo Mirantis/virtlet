@@ -46,7 +46,7 @@ func waitForSocket(filepath string) error {
 }
 
 func getDomainUUID(podID string) string {
-	return virtletutils.NewUuid5(libvirttools.ContainerNsUuid, podID)
+	return virtletutils.NewUUID5(libvirttools.ContainerNsUuid, podID)
 }
 
 func defineDummyVolume(poolName, volName string) (func(), error) {
@@ -104,7 +104,7 @@ func defineDummyDomain() error {
 
 func defineDummyDomainWithName(domainName string) error {
 	if domainName == "" {
-		domainName = "dummy-" + virtletutils.NewUuid()
+		domainName = "dummy-" + virtletutils.NewUUID()
 	}
 
 	conn, err := libvirt.NewConnect(libvirtUri)

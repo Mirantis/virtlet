@@ -432,7 +432,7 @@ func TestDomainDefinitions(t *testing.T) {
 
 			for name, def := range tc.flexVolumes {
 				targetDir := filepath.Join(ct.kubeletRootDir, sandbox.Metadata.Uid, "volumes/virtlet~flexvolume_driver", name)
-				resultStr := flexVolumeDriver.Run([]string{"mount", targetDir, utils.MapToJson(def)})
+				resultStr := flexVolumeDriver.Run([]string{"mount", targetDir, utils.MapToJSON(def)})
 				var r map[string]interface{}
 				if err := json.Unmarshal([]byte(resultStr), &r); err != nil {
 					t.Errorf("failed to unmarshal flexvolume definition")

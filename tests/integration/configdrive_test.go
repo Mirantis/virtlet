@@ -62,7 +62,7 @@ func TestCloudInitConfigDrive(t *testing.T) {
 		},
 	}
 	if !reflect.DeepEqual(files, expectedFiles) {
-		t.Errorf("bad config drive iso:\n%s\n-- instead of --\n%s", utils.MapToJson(files), utils.MapToJson(expectedFiles))
+		t.Errorf("bad config drive iso:\n%s\n-- instead of --\n%s", utils.MapToJSON(files), utils.MapToJSON(expectedFiles))
 	}
 
 	ct.stopContainer(container.ContainerId)
