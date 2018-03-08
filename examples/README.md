@@ -45,7 +45,7 @@ $
 ```
 
 Another option to use this script is to install it as a [kubectl plugin](https://kubernetes.io/docs/tasks/extend-kubectl/kubectl-plugins/).
-At the moment, Virtlet only supports Kubernetes 1.7.x and 1.8.x.
+At the moment, Virtlet only supports Kubernetes 1.7.x, 1.8.x and 1.9.x.
 You can use a newer `kubectl` with these Kubernetes versions but this may cause
 problems with some kinds of objects such as `StatefulSets`. So the kubectl
 plugin feature can be considered experimental at the moment.
