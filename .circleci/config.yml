@@ -266,6 +266,9 @@ jobs:
         - virtlet-e2e-tests
         # needed by integration tests
         - vmwrapper
+    - store_artifacts:
+        path: /go/src/github.com/Mirantis/virtlet/_output
+        destination: virtlet
 
   test:
     <<: *defaults
@@ -344,6 +347,8 @@ jobs:
         <<: *setup_env
     - restore_cache:
         <<: *restore_image_cache
+    - attach_workspace:
+        at: _output
     - run:
         <<: *restore_images_and_vendor
     - run:

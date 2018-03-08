@@ -18,27 +18,57 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"os"
+
+	"github.com/renstrom/dedent"
+	"github.com/spf13/cobra"
 
 	"github.com/Mirantis/virtlet/pkg/tools"
 )
 
+func newRootCmd() *cobra.Command {
+	// rootCmd represents the base command when called without any subcommands
+	cmd := &cobra.Command{
+		Use:          "virtletctl",
+		Short:        "Virtlet control tool",
+		SilenceUsage: true,
+		Long: dedent.Dedent(`
+                        virtletctl provides a number of utilities for Virtet-enabled
+                        Kubernetes cluster.`),
+	}
+
+	clientCfg := tools.BindFlags(cmd.PersistentFlags())
+	// Fix unwanted glog warnings, see
+	// https://github.com/kubernetes/kubernetes/issues/17162#issuecomment-225596212
+	flag.CommandLine.Parse([]string{})
+
+	client := tools.NewRealKubeClient(clientCfg)
+	cmd.AddCommand(tools.NewDumpMetadataCmd(client))
+	cmd.AddCommand(tools.NewVirshCmd(client, os.Stdout))
+	cmd.AddCommand(tools.NewSSHCmd(client, os.Stdout, ""))
+	cmd.AddCommand(tools.NewInstallCmd(cmd, "", ""))
+	cmd.AddCommand(tools.NewGenDocCmd(cmd))
+
+	for _, c := range cmd.Commands() {
+		c.PreRunE = func(*cobra.Command, []string) error {
+			return tools.SetLocalPluginFlags(c)
+		}
+	}
+
+	return cmd
+}
+
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "Error: missing subcommand name")
-		os.Exit(1)
+	cmd := newRootCmd()
+	if tools.InPlugin() && len(os.Args) > 1 {
+		// in case of a kubectl plugin, all the options are
+		// already removed from the command line
+		args := []string{os.Args[1]}
+		args = append(args, "--")
+		args = append(args, os.Args[2:]...)
+		cmd.SetArgs(args)
 	}
-
-	if err := tools.ParseFlags(os.Args[1]); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-
-	args := flag.Args()
-
-	if err := tools.RunSubcommand(args[0], args[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+	if err := cmd.Execute(); err != nil {
 		os.Exit(1)
 	}
 }

@@ -1,0 +1,78 @@
+# FILE: topcmd.md
+## topcmd
+
+Topmost command
+
+### Synopsis
+
+
+Lorem ipsum dolor sit amet
+
+### Options
+
+```
+      --anotherflag int   another flag (default 42)
+  -h, --help              help for topcmd
+  -f, --someflag string   a flag (default "someflagvalue")
+```
+
+### SEE ALSO
+* [topcmd bar](topcmd_bar.md)	 - Bar command
+* [topcmd foo](topcmd_foo.md)	 - Foo command
+
+
+# FILE: topcmd_bar.md
+## topcmd bar
+
+Bar command
+
+### Synopsis
+
+
+Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua
+
+```
+topcmd bar [flags]
+```
+
+### Options
+
+```
+  -h, --help   help for bar
+```
+
+### SEE ALSO
+* [topcmd](topcmd.md)	 - Topmost command
+
+
+# FILE: topcmd_foo.md
+## topcmd foo
+
+Foo command
+
+### Synopsis
+
+
+Consectetur adipiscing elit
+
+```
+topcmd foo [flags]
+```
+
+### Examples
+
+```
+kubectl plugin topcmd foo
+```
+
+### Options
+
+```
+      --fooflag int   foo flag (default 4242)
+  -h, --help          help for foo
+```
+
+### SEE ALSO
+* [topcmd](topcmd.md)	 - Topmost command
+
+

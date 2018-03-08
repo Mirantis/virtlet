@@ -1,0 +1,17 @@
+name: topcmd
+shortDesc: Topmost command
+longDesc: Lorem ipsum dolor sit amet
+tree:
+- name: bar
+  shortDesc: Bar command
+  longDesc: Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua
+  command: ./topcmd bar
+- name: foo
+  shortDesc: Foo command
+  longDesc: Consectetur adipiscing elit
+  example: kubectl plugin topcmd foo
+  command: ./topcmd foo
+  flags:
+  - name: fooflag
+    desc: foo flag
+    defValue: "4242"
