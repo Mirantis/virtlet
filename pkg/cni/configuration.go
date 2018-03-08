@@ -41,6 +41,8 @@ import (
 	"github.com/golang/glog"
 )
 
+// ReadConfiguration iterates over CNI config files in a directory
+// and returns first configuration with non empty Plugins list.
 func ReadConfiguration(configDir string) (*libcni.NetworkConfigList, error) {
 	files, err := libcni.ConfFiles(configDir, []string{".conf", ".conflist", ".json"})
 	switch {

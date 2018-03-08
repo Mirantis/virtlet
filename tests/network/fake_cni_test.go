@@ -99,14 +99,14 @@ func (e *fakeCNIEntry) addSandboxToNetwork(ifaceIndex int) error {
 	})
 }
 
-func (c *fakeCNIEntry) captureNetworkConfigAfterTeardown(podId string) error {
-	return c.contNS.Do(func(ns.NetNS) error {
-		for _, ipConfig := range c.info.IPs {
+func (e *fakeCNIEntry) captureNetworkConfigAfterTeardown(podId string) error {
+	return e.contNS.Do(func(ns.NetNS) error {
+		for _, ipConfig := range e.info.IPs {
 			ifaceIndex := ipConfig.Interface
-			if ifaceIndex > len(c.info.Interfaces) {
+			if ifaceIndex > len(e.info.Interfaces) {
 				return fmt.Errorf("bad interface index %d", ifaceIndex)
 			}
-			iface := c.info.Interfaces[ifaceIndex]
+			iface := e.info.Interfaces[ifaceIndex]
 			link, err := netlink.LinkByName(iface.Name)
 			if err != nil {
 				return fmt.Errorf("can't find link %q: %v", iface.Name, err)
@@ -115,8 +115,8 @@ func (c *fakeCNIEntry) captureNetworkConfigAfterTeardown(podId string) error {
 			if err != nil {
 				return fmt.Errorf("error extracting link info: %v", err)
 			}
-			if c.infoAfterTeardown == nil {
-				c.infoAfterTeardown = linkInfo
+			if e.infoAfterTeardown == nil {
+				e.infoAfterTeardown = linkInfo
 			} else {
 				if len(linkInfo.Interfaces) != 1 {
 					return fmt.Errorf("more than one interface extracted")
@@ -124,9 +124,9 @@ func (c *fakeCNIEntry) captureNetworkConfigAfterTeardown(podId string) error {
 				if len(linkInfo.IPs) != 1 {
 					return fmt.Errorf("more than one ip config extracted")
 				}
-				linkInfo.IPs[0].Interface = len(c.infoAfterTeardown.Interfaces)
-				c.infoAfterTeardown.IPs = append(c.infoAfterTeardown.IPs, linkInfo.IPs[0])
-				c.infoAfterTeardown.Interfaces = append(c.infoAfterTeardown.Interfaces, linkInfo.Interfaces[0])
+				linkInfo.IPs[0].Interface = len(e.infoAfterTeardown.Interfaces)
+				e.infoAfterTeardown.IPs = append(e.infoAfterTeardown.IPs, linkInfo.IPs[0])
+				e.infoAfterTeardown.Interfaces = append(e.infoAfterTeardown.Interfaces, linkInfo.Interfaces[0])
 			}
 		}
 		return nil
@@ -152,7 +152,7 @@ type FakeCNIClient struct {
 	entries    map[string]*fakeCNIEntry
 }
 
-var _ cni.CNIClient = &FakeCNIClient{}
+var _ cni.Client = &FakeCNIClient{}
 
 func NewFakeCNIClient() *FakeCNIClient {
 	return &FakeCNIClient{
