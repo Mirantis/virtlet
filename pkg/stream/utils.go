@@ -51,8 +51,8 @@ func getProcessEnvironment(pid int32) (map[string]string, error) {
 	return env, nil
 }
 
-// based on https://github.com/kubernetes-incubator/cri-o/blob/master/utils/utils.go#L90
 // CopyDetachable is similar to io.Copy but support a detach key sequence to break out.
+// based on https://github.com/kubernetes-incubator/cri-o/blob/master/utils/utils.go#L90
 func CopyDetachable(dst io.Writer, src io.Reader, keys []byte) (written int64, err error) {
 	if len(keys) == 0 {
 		// Default key : ^]

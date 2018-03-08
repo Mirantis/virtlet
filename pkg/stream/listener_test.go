@@ -142,7 +142,7 @@ func waitForSocket(path string, timeout int) error {
 			break
 		}
 		time.Sleep(time.Duration(1) * time.Second)
-		passed += 1
+		passed++
 		if passed >= timeout {
 			return fmt.Errorf("Timeout")
 		}

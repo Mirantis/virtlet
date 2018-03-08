@@ -27,14 +27,14 @@ import (
 	"time"
 )
 
-func setupTmpLogFile(sandboxId string) string {
+func setupTmpLogFile() string {
 	baseDir, _ := ioutil.TempDir("", "virtlet-log")
 	outputFile := filepath.Join(baseDir, "output.log")
 	os.Mkdir(baseDir, 0777)
 	return outputFile
 }
 
-func verifyJsonLines(t *testing.T, filePath string, lines []map[string]interface{}) {
+func verifyJSONLines(t *testing.T, filePath string, lines []map[string]interface{}) {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		t.Errorf("output file should exist, but does not")
 	}
@@ -95,7 +95,7 @@ func TestLoggingInNewLogWritter(t *testing.T) {
 	}{
 		{
 			name:       "One line",
-			outputFile: setupTmpLogFile("test1"),
+			outputFile: setupTmpLogFile(),
 			c:          make(chan []byte),
 			lines:      [][]byte{[]byte("test")},
 			jsonLines: []map[string]interface{}{
@@ -107,7 +107,7 @@ func TestLoggingInNewLogWritter(t *testing.T) {
 		},
 		{
 			name:       "Many lines in one message",
-			outputFile: setupTmpLogFile("test1"),
+			outputFile: setupTmpLogFile(),
 			c:          make(chan []byte),
 			lines:      [][]byte{[]byte("test\ntest2\n")},
 			jsonLines: []map[string]interface{}{
@@ -123,7 +123,7 @@ func TestLoggingInNewLogWritter(t *testing.T) {
 		},
 		{
 			name:       "Many messages",
-			outputFile: setupTmpLogFile("test1"),
+			outputFile: setupTmpLogFile(),
 			c:          make(chan []byte),
 			lines:      [][]byte{[]byte("test\n"), []byte("test2\n")},
 			jsonLines: []map[string]interface{}{
@@ -139,7 +139,7 @@ func TestLoggingInNewLogWritter(t *testing.T) {
 		},
 		{
 			name:       "No messages",
-			outputFile: setupTmpLogFile("test1"),
+			outputFile: setupTmpLogFile(),
 			c:          make(chan []byte),
 			lines:      [][]byte{},
 			jsonLines:  []map[string]interface{}{},
@@ -157,6 +157,6 @@ func TestLoggingInNewLogWritter(t *testing.T) {
 		close(test.c)
 		wg.Wait()
 
-		verifyJsonLines(t, test.outputFile, test.jsonLines)
+		verifyJSONLines(t, test.outputFile, test.jsonLines)
 	}
 }

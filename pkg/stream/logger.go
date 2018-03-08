@@ -27,7 +27,7 @@ import (
 	"github.com/golang/glog"
 )
 
-// NewLogWritter writes the lines from stdout channel in logFile in k8s format
+// NewLogWriter writes the lines from stdout channel to logFile in k8s format
 func NewLogWriter(stdout <-chan []byte, logFile string, wg *sync.WaitGroup) {
 	defer wg.Done()
 	glog.V(1).Info("Spawned new log writer. Log file:", logFile)
