@@ -349,7 +349,9 @@ func (c *RealKubeClient) ExecInContainer(podName, containerName, namespace strin
 		Stdout:             stdout,
 		Stderr:             stderr,
 	}); err != nil {
-		if c, ok := err.(exec.CodeExitError); ok {
+		var c exec.CodeExitError
+		var ok bool
+		if c, ok = err.(exec.CodeExitError); ok {
 			exitCode = c.Code
 			err = nil
 		}
