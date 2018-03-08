@@ -343,16 +343,20 @@ func (c *RealKubeClient) ExecInContainer(podName, containerName, namespace strin
 		}, api.ParameterCodec)
 
 	exitCode := 0
-	if err := c.executor.stream(c.config, "POST", req.URL(), remotecommand.StreamOptions{
+	err := c.executor.stream(c.config, "POST", req.URL(), remotecommand.StreamOptions{
 		SupportedProtocols: remotecommandconsts.SupportedStreamingProtocols,
 		Stdin:              stdin,
 		Stdout:             stdout,
 		Stderr:             stderr,
-	}); err != nil {
+	})
+	if err != nil {
 		if c, ok := err.(exec.CodeExitError); ok {
 			exitCode = c.Code
 			err = nil
 		}
+	}
+	if err != nil {
+		return 0, err
 	}
 
 	return exitCode, nil
