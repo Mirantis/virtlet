@@ -80,19 +80,12 @@ Escape character is ^]
 
 ### Verifying ssh access to a VM pod
 
-You can also ssh into the VM.
-There's a scripts vmssh.sh that you can use to access the VM. You can
-download it from Virtlet repository along with test ssh key:
-```
-wget https://raw.githubusercontent.com/Mirantis/virtlet/master/examples/{vmssh.sh,vmkey}
-chmod +x vmssh.sh
-chmod 600 vmkey
-```
-
-vmssh.sh needs `kubectl` to be configured to access your cluster.
+You can also ssh into the VM using
+[virtletctl tool](../docs/virtletctl/virtletctl.md) (available as part
+of each Virtlet release on GitHub starting from Virtlet 1.0).
 
 ```
-./vmssh.sh cirros@cirros-vm
+virtletctl ssh cirros@cirros-vm -- -i examples/vmkey
 ```
 
 ### Verifying accessing services from a VM pod

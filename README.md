@@ -22,6 +22,20 @@ To try out Virtlet follow the instructions from [Running local environment](docs
 
 You can watch and listen to Virtlet demo video that was recorded on Kubernetes Community Meeting [here](https://youtu.be/Sl1Y0N-Tj1A?t=94).
 
+### Command line interface
+
+Virtlet comes with a helper tool,
+[virtletctl](docs/virtletctl/virtletctl.md), that helps managing the VM pods. The binaries will be available for Linux and Mac OS X in the [Releases](https://github.com/Mirantis/virtlet/releases) section starting from Virtlet 1.0. For now, you can build it using the [build tool](docs/devel/build-tool.md).
+After `build/cmd.sh copy` you'll get `_output/virtletctl` (for Linux x86_64) and `_output/virtletctl.darwin` (for Mac OS X). If you're using Kubernetes 1.9, you can install virtletctl as a kubectl plugin:
+```
+./virtletctl install
+```
+
+After that you can use `kubectl plugin virt` instead of `virtletctl` (`plugin` subcommand will not be necessary when kubectl plugins become stable):
+```
+kubectl plugin virt ssh cirros@cirros-vm -- -i examples/vmkey
+```
+
 ### Virtlet usage demo
 
 You can watch sample usage session under [this](https://asciinema.org/a/1a6xp5j4o22rnsx9wpvumd4kt) link.
@@ -34,9 +48,9 @@ chmod +x demo.sh
 ./demo.sh
 ```
 
-The demo will start a test cluster, deploy Virtlet on it and then boot a [CirrOS](https://launchpad.net/cirros) VM there. You may access sample nginx server via `curl http://nginx.default.svc.cluster.local` from inside the VM. To disconnect from VM, press `Ctrl-D`. After the VM has booted, you can also use a helper script to connect to its SSH server:
+The demo will start a test cluster, deploy Virtlet on it and then boot a [CirrOS](https://launchpad.net/cirros) VM there. You may access sample nginx server via `curl http://nginx.default.svc.cluster.local` from inside the VM. To disconnect from VM, press `Ctrl-D`. After the VM has booted, you can also use `virtletctl` tool to connect to its SSH server:
 ```
-examples/vmssh.sh cirros@cirros-vm [command...]
+virtletctl ssh cirros@cirros-vm -- -i examples/vmkey [command...]
 ```
 
 By default, CNI bridge plugin is used for cluster networking. It's also possible to override this with `calico`, `flannel` or `weave` plugin, e.g.:

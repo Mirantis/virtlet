@@ -1,5 +1,5 @@
 /*
-Copyright 2017 Mirantis
+Copyright 2018 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,35 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package metadata
+package tools
 
 import (
-	"io/ioutil"
-	"os"
+	"testing"
 
-	"github.com/boltdb/bolt"
+	"github.com/Mirantis/virtlet/tests/gm"
 )
 
-func tempfile() (string, error) {
-	f, err := ioutil.TempFile("", "virtlet-test-")
-	if err != nil {
-		return "", err
-	}
-
-	f.Close()
-	os.Remove(f.Name())
-
-	return f.Name(), nil
-}
-
-// NewFakeStore is a factory function for Store interface that returns fake store
-func NewFakeStore() (Store, error) {
-	filename, err := tempfile()
-
-	db, err := bolt.Open(filename, 0600, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return &boltClient{db: db}, nil
+func TestPlugin(t *testing.T) {
+	cmd := fakeCobraCommand()
+	pluginYamlContent := pluginYamlFromCobraCommand(cmd)
+	gm.Verify(t, gm.NewYamlVerifier(pluginYamlContent))
 }
