@@ -26,17 +26,17 @@ import (
 	"github.com/Mirantis/virtlet/pkg/virt"
 )
 
-type LibvirtDomainConnection struct {
+type libvirtDomainConnection struct {
 	conn *libvirt.Connect
 }
 
-var _ virt.VirtDomainConnection = &LibvirtDomainConnection{}
+var _ virt.DomainConnection = &libvirtDomainConnection{}
 
-func newLibvirtDomainConnection(conn *libvirt.Connect) *LibvirtDomainConnection {
-	return &LibvirtDomainConnection{conn: conn}
+func newLibvirtDomainConnection(conn *libvirt.Connect) *libvirtDomainConnection {
+	return &libvirtDomainConnection{conn: conn}
 }
 
-func (dc *LibvirtDomainConnection) DefineDomain(def *libvirtxml.Domain) (virt.VirtDomain, error) {
+func (dc *libvirtDomainConnection) DefineDomain(def *libvirtxml.Domain) (virt.Domain, error) {
 	xml, err := def.Marshal()
 	if err != nil {
 		return nil, err
@@ -46,24 +46,24 @@ func (dc *LibvirtDomainConnection) DefineDomain(def *libvirtxml.Domain) (virt.Vi
 	if err != nil {
 		return nil, err
 	}
-	return &LibvirtDomain{d}, nil
+	return &libvirtDomain{d}, nil
 }
 
-func (dc *LibvirtDomainConnection) ListDomains() ([]virt.VirtDomain, error) {
+func (dc *libvirtDomainConnection) ListDomains() ([]virt.Domain, error) {
 	domains, err := dc.conn.ListAllDomains(0)
 	if err != nil {
 		return nil, err
 	}
-	r := make([]virt.VirtDomain, len(domains))
+	r := make([]virt.Domain, len(domains))
 	for n, d := range domains {
 		// need to make a copy here
 		curDomain := d
-		r[n] = &LibvirtDomain{&curDomain}
+		r[n] = &libvirtDomain{&curDomain}
 	}
 	return r, nil
 }
 
-func (dc *LibvirtDomainConnection) LookupDomainByName(name string) (virt.VirtDomain, error) {
+func (dc *libvirtDomainConnection) LookupDomainByName(name string) (virt.Domain, error) {
 	d, err := dc.conn.LookupDomainByName(name)
 	if err != nil {
 		libvirtErr, ok := err.(libvirt.Error)
@@ -72,10 +72,10 @@ func (dc *LibvirtDomainConnection) LookupDomainByName(name string) (virt.VirtDom
 		}
 		return nil, err
 	}
-	return &LibvirtDomain{d}, nil
+	return &libvirtDomain{d}, nil
 }
 
-func (dc *LibvirtDomainConnection) LookupDomainByUUIDString(uuid string) (virt.VirtDomain, error) {
+func (dc *libvirtDomainConnection) LookupDomainByUUIDString(uuid string) (virt.Domain, error) {
 	d, err := dc.conn.LookupDomainByUUIDString(uuid)
 	if err != nil {
 		libvirtErr, ok := err.(libvirt.Error)
@@ -84,10 +84,10 @@ func (dc *LibvirtDomainConnection) LookupDomainByUUIDString(uuid string) (virt.V
 		}
 		return nil, err
 	}
-	return &LibvirtDomain{d}, nil
+	return &libvirtDomain{d}, nil
 }
 
-func (dc *LibvirtDomainConnection) DefineSecret(def *libvirtxml.Secret) (virt.VirtSecret, error) {
+func (dc *libvirtDomainConnection) DefineSecret(def *libvirtxml.Secret) (virt.Secret, error) {
 	xml, err := def.Marshal()
 	if err != nil {
 		return nil, err
@@ -96,10 +96,10 @@ func (dc *LibvirtDomainConnection) DefineSecret(def *libvirtxml.Secret) (virt.Vi
 	if err != nil {
 		return nil, err
 	}
-	return &LibvirtSecret{secret}, nil
+	return &libvirtSecret{secret}, nil
 }
 
-func (dc *LibvirtDomainConnection) LookupSecretByUUIDString(uuid string) (virt.VirtSecret, error) {
+func (dc *libvirtDomainConnection) LookupSecretByUUIDString(uuid string) (virt.Secret, error) {
 	secret, err := dc.conn.LookupSecretByUUIDString(uuid)
 	if err != nil {
 		libvirtErr, ok := err.(libvirt.Error)
@@ -108,10 +108,10 @@ func (dc *LibvirtDomainConnection) LookupSecretByUUIDString(uuid string) (virt.V
 		}
 		return nil, err
 	}
-	return &LibvirtSecret{secret}, nil
+	return &libvirtSecret{secret}, nil
 }
 
-func (dc *LibvirtDomainConnection) LookupSecretByUsageName(usageType string, usageName string) (virt.VirtSecret, error) {
+func (dc *libvirtDomainConnection) LookupSecretByUsageName(usageType string, usageName string) (virt.Secret, error) {
 
 	if usageType != "ceph" {
 		return nil, fmt.Errorf("unsupported type %q for secret with usage name: %q", usageType, usageName)
@@ -125,67 +125,67 @@ func (dc *LibvirtDomainConnection) LookupSecretByUsageName(usageType string, usa
 		}
 		return nil, err
 	}
-	return &LibvirtSecret{secret}, nil
+	return &libvirtSecret{secret}, nil
 }
 
-type LibvirtDomain struct {
+type libvirtDomain struct {
 	d *libvirt.Domain
 }
 
-var _ virt.VirtDomain = &LibvirtDomain{}
+var _ virt.Domain = &libvirtDomain{}
 
-func (domain *LibvirtDomain) Create() error {
+func (domain *libvirtDomain) Create() error {
 	return domain.d.Create()
 }
 
-func (domain *LibvirtDomain) Destroy() error {
+func (domain *libvirtDomain) Destroy() error {
 	return domain.d.Destroy()
 }
 
-func (domain *LibvirtDomain) Undefine() error {
+func (domain *libvirtDomain) Undefine() error {
 	return domain.d.Undefine()
 }
 
-func (domain *LibvirtDomain) Shutdown() error {
+func (domain *libvirtDomain) Shutdown() error {
 	return domain.d.Shutdown()
 }
 
-func (domain *LibvirtDomain) State() (virt.DomainState, error) {
+func (domain *libvirtDomain) State() (virt.DomainState, error) {
 	di, err := domain.d.GetInfo()
 	if err != nil {
-		return virt.DOMAIN_NOSTATE, err
+		return virt.DomainStateNoState, err
 	}
 	switch di.State {
 	case libvirt.DOMAIN_NOSTATE:
-		return virt.DOMAIN_NOSTATE, nil
+		return virt.DomainStateNoState, nil
 	case libvirt.DOMAIN_RUNNING:
-		return virt.DOMAIN_RUNNING, nil
+		return virt.DomainStateRunning, nil
 	case libvirt.DOMAIN_BLOCKED:
-		return virt.DOMAIN_BLOCKED, nil
+		return virt.DomainStateBlocked, nil
 	case libvirt.DOMAIN_PAUSED:
-		return virt.DOMAIN_PAUSED, nil
+		return virt.DomainStatePaused, nil
 	case libvirt.DOMAIN_SHUTDOWN:
-		return virt.DOMAIN_SHUTDOWN, nil
+		return virt.DomainStateShutdown, nil
 	case libvirt.DOMAIN_CRASHED:
-		return virt.DOMAIN_CRASHED, nil
+		return virt.DomainStateCrashed, nil
 	case libvirt.DOMAIN_PMSUSPENDED:
-		return virt.DOMAIN_PMSUSPENDED, nil
+		return virt.DomainStatePMSuspended, nil
 	case libvirt.DOMAIN_SHUTOFF:
-		return virt.DOMAIN_SHUTOFF, nil
+		return virt.DomainStateShutoff, nil
 	default:
-		return virt.DOMAIN_NOSTATE, fmt.Errorf("bad domain state %v", di.State)
+		return virt.DomainStateNoState, fmt.Errorf("bad domain state %v", di.State)
 	}
 }
 
-func (domain *LibvirtDomain) UUIDString() (string, error) {
+func (domain *libvirtDomain) UUIDString() (string, error) {
 	return domain.d.GetUUIDString()
 }
 
-func (domain *LibvirtDomain) Name() (string, error) {
+func (domain *libvirtDomain) Name() (string, error) {
 	return domain.d.GetName()
 }
 
-func (domain *LibvirtDomain) Xml() (*libvirtxml.Domain, error) {
+func (domain *libvirtDomain) XML() (*libvirtxml.Domain, error) {
 	desc, err := domain.d.GetXMLDesc(libvirt.DOMAIN_XML_INACTIVE)
 	if err != nil {
 		return nil, err
@@ -197,14 +197,14 @@ func (domain *LibvirtDomain) Xml() (*libvirtxml.Domain, error) {
 	return &d, nil
 }
 
-type LibvirtSecret struct {
+type libvirtSecret struct {
 	s *libvirt.Secret
 }
 
-func (secret *LibvirtSecret) SetValue(value []byte) error {
+func (secret *libvirtSecret) SetValue(value []byte) error {
 	return secret.s.SetValue(value, 0)
 }
 
-func (secret *LibvirtSecret) Remove() error {
+func (secret *libvirtSecret) Remove() error {
 	return secret.s.Undefine()
 }

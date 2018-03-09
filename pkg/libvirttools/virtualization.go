@@ -50,7 +50,8 @@ const (
 	domainDestroyCheckInterval    = 500 * time.Millisecond
 	domainDestroyTimeout          = 5 * time.Second
 
-	ContainerNsUuid       = "67b7fb47-7735-4b64-86d2-6d062d121966"
+	// ContainerNsUUID template for container ns uuid generation
+	ContainerNsUUID       = "67b7fb47-7735-4b64-86d2-6d062d121966"
 	defaultKubeletRootDir = "/var/lib/kubelet/pods"
 )
 
@@ -151,7 +152,7 @@ func (ds *domainSettings) createDomain(config *VMConfig) *libvirtxml.Domain {
 				{Name: "VIRTLET_NET_KEY", Value: ds.netFdKey},
 				{Name: "VIRTLET_POD_NAME", Value: config.PodName},
 				{Name: "VIRTLET_POD_NAMESPACE", Value: config.PodNamespace},
-				{Name: "VIRTLET_POD_UID", Value: config.PodSandboxId},
+				{Name: "VIRTLET_POD_UID", Value: config.PodSandboxID},
 				{Name: "VIRTLET_CONTAINER_ID", Value: config.DomainUUID},
 				{Name: "VIRTLET_CONTAINER_NAME", Value: config.Name},
 				{Name: "CONTAINER_ATTEMPTS", Value: fmt.Sprint(config.Attempt)},
@@ -174,9 +175,10 @@ func canUseKvm() bool {
 	return true
 }
 
+// VirtualizationTool provides methods to operate on libvirt.
 type VirtualizationTool struct {
-	domainConn     virt.VirtDomainConnection
-	volumePool     virt.VirtStoragePool
+	domainConn     virt.DomainConnection
+	volumePool     virt.StoragePool
 	imageManager   ImageManager
 	metadataStore  metadata.Store
 	clock          clockwork.Clock
@@ -186,9 +188,11 @@ type VirtualizationTool struct {
 	volumeSource   VMVolumeSource
 }
 
-var _ VolumeOwner = &VirtualizationTool{}
+var _ volumeOwner = &VirtualizationTool{}
 
-func NewVirtualizationTool(domainConn virt.VirtDomainConnection, storageConn virt.VirtStorageConnection, imageManager ImageManager,
+// NewVirtualizationTool verifies existence of volumes pool in libvirt store
+// and returns initialized VirtualizationTool.
+func NewVirtualizationTool(domainConn virt.DomainConnection, storageConn virt.StorageConnection, imageManager ImageManager,
 	metadataStore metadata.Store, volumePoolName, rawDevices string, volumeSource VMVolumeSource) (*VirtualizationTool, error) {
 
 	volumePool, err := ensureStoragePool(storageConn, volumePoolName)
@@ -211,15 +215,15 @@ func NewVirtualizationTool(domainConn virt.VirtDomainConnection, storageConn vir
 	}, nil
 }
 
-func (v *VirtualizationTool) SetForceKVM(forceKVM bool) {
+func (v *VirtualizationTool) setForceKVM(forceKVM bool) {
 	v.forceKVM = forceKVM
 }
 
-func (v *VirtualizationTool) SetClock(clock clockwork.Clock) {
+func (v *VirtualizationTool) setClock(clock clockwork.Clock) {
 	v.clock = clock
 }
 
-func (v *VirtualizationTool) SetKubeletRootDir(kubeletRootDir string) {
+func (v *VirtualizationTool) setKubeletRootDir(kubeletRootDir string) {
 	v.kubeletRootDir = kubeletRootDir
 }
 
@@ -228,7 +232,7 @@ func loggingDisabled() bool {
 	return utils.GetBoolFromString(disabled)
 }
 
-func (v *VirtualizationTool) addSerialDevicesToDomain(sandboxId, containerName string, containerAttempt uint32, domain *libvirtxml.Domain, settings domainSettings) error {
+func (v *VirtualizationTool) addSerialDevicesToDomain(domain *libvirtxml.Domain) error {
 	port := uint(0)
 	if !loggingDisabled() {
 		domain.Devices.Serials = []libvirtxml.DomainSerial{
@@ -255,12 +259,15 @@ func (v *VirtualizationTool) addSerialDevicesToDomain(sandboxId, containerName s
 	return nil
 }
 
+// CreateContainer defines libvirt domain for VM, prepares it's disks and stores
+// all info in metadata store.  It returns domain uuid generated basing on pod
+// sandbox id.
 func (v *VirtualizationTool) CreateContainer(config *VMConfig, netFdKey string) (string, error) {
 	if err := config.LoadAnnotations(); err != nil {
 		return "", err
 	}
 
-	domainUUID := utils.NewUUID5(ContainerNsUuid, config.PodSandboxId)
+	domainUUID := utils.NewUUID5(ContainerNsUUID, config.PodSandboxID)
 	// FIXME: this field should be moved to VMStatus struct (to be added)
 	config.DomainUUID = domainUUID
 	settings := domainSettings{
@@ -274,11 +281,11 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netFdKey string) 
 	cloneName := "virtlet_root_" + settings.domainUUID
 	settings.vcpuNum = config.ParsedAnnotations.VCPUCount
 	settings.memory = int(config.MemoryLimitInBytes)
-	settings.cpuShares = uint(config.CpuShares)
-	settings.cpuPeriod = uint64(config.CpuPeriod)
+	settings.cpuShares = uint(config.CPUShares)
+	settings.cpuPeriod = uint64(config.CPUPeriod)
 	// Specified cpu bandwidth limits for domains actually are set equal per each vCPU by libvirt
 	// Thus, to limit overall VM's cpu threads consumption by set value in pod definition need to perform division
-	settings.cpuQuota = config.CpuQuota / int64(settings.vcpuNum)
+	settings.cpuQuota = config.CPUQuota / int64(settings.vcpuNum)
 	settings.memoryUnit = "b"
 	if settings.memory == 0 {
 		settings.memory = defaultMemory
@@ -310,8 +317,7 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netFdKey string) 
 		}
 	}()
 
-	containerAttempt := config.Attempt
-	if err := v.addSerialDevicesToDomain(config.PodSandboxId, config.Name, containerAttempt, domainDef, settings); err != nil {
+	if err := v.addSerialDevicesToDomain(domainDef); err != nil {
 		return "", err
 	}
 
@@ -321,7 +327,7 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netFdKey string) 
 	}
 	labels[kubetypes.KubernetesPodNameLabel] = config.PodName
 	labels[kubetypes.KubernetesPodNamespaceLabel] = config.PodNamespace
-	labels[kubetypes.KubernetesPodUIDLabel] = config.PodSandboxId
+	labels[kubetypes.KubernetesPodUIDLabel] = config.PodSandboxID
 	labels[kubetypes.KubernetesContainerNameLabel] = config.Name
 
 	domain, err := v.domainConn.DefineDomain(domainDef)
@@ -333,7 +339,7 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netFdKey string) 
 		err = v.metadataStore.Container(settings.domainUUID).Save(
 			func(_ *metadata.ContainerInfo) (*metadata.ContainerInfo, error) {
 				return &metadata.ContainerInfo{
-					SandboxID:           config.PodSandboxId,
+					SandboxID:           config.PodSandboxID,
 					Name:                config.Name,
 					CreatedAt:           v.clock.Now().UnixNano(),
 					Image:               config.Image,
@@ -353,22 +359,22 @@ func (v *VirtualizationTool) CreateContainer(config *VMConfig, netFdKey string) 
 	return settings.domainUUID, nil
 }
 
-func (v *VirtualizationTool) startContainer(containerId string) error {
-	domain, err := v.domainConn.LookupDomainByUUIDString(containerId)
+func (v *VirtualizationTool) startContainer(containerID string) error {
+	domain, err := v.domainConn.LookupDomainByUUIDString(containerID)
 	if err != nil {
-		return fmt.Errorf("failed to look up domain %q: %v", containerId, err)
+		return fmt.Errorf("failed to look up domain %q: %v", containerID, err)
 	}
 
 	state, err := domain.State()
 	if err != nil {
-		return fmt.Errorf("failed to get state of the domain %q: %v", containerId, err)
+		return fmt.Errorf("failed to get state of the domain %q: %v", containerID, err)
 	}
-	if state != virt.DOMAIN_SHUTOFF {
-		return fmt.Errorf("domain %q: bad state %v upon StartContainer()", containerId, state)
+	if state != virt.DomainStateShutoff {
+		return fmt.Errorf("domain %q: bad state %v upon StartContainer()", containerID, state)
 	}
 
 	if err = domain.Create(); err != nil {
-		return fmt.Errorf("failed to create domain %q: %v", containerId, err)
+		return fmt.Errorf("failed to create domain %q: %v", containerID, err)
 	}
 
 	// XXX: maybe we don't really have to wait here but I couldn't
@@ -376,15 +382,15 @@ func (v *VirtualizationTool) startContainer(containerId string) error {
 	if err = utils.WaitLoop(func() (bool, error) {
 		state, err := domain.State()
 		if err != nil {
-			return false, fmt.Errorf("failed to get state of the domain %q: %v", containerId, err)
+			return false, fmt.Errorf("failed to get state of the domain %q: %v", containerID, err)
 		}
 		switch state {
-		case virt.DOMAIN_RUNNING:
+		case virt.DomainStateRunning:
 			return true, nil
-		case virt.DOMAIN_SHUTDOWN:
-			return false, fmt.Errorf("unexpected shutdown for new domain %q", containerId)
-		case virt.DOMAIN_CRASHED:
-			return false, fmt.Errorf("domain %q crashed on start", containerId)
+		case virt.DomainStateShutdown:
+			return false, fmt.Errorf("unexpected shutdown for new domain %q", containerID)
+		case virt.DomainStateCrashed:
+			return false, fmt.Errorf("domain %q crashed on start", containerID)
 		default:
 			return false, nil
 		}
@@ -392,7 +398,7 @@ func (v *VirtualizationTool) startContainer(containerId string) error {
 		return err
 	}
 
-	return v.metadataStore.Container(containerId).Save(
+	return v.metadataStore.Container(containerID).Save(
 		func(c *metadata.ContainerInfo) (*metadata.ContainerInfo, error) {
 			// make sure the container is not removed during the call
 			if c != nil {
@@ -403,14 +409,18 @@ func (v *VirtualizationTool) startContainer(containerId string) error {
 		})
 }
 
-func (v *VirtualizationTool) StartContainer(containerId string) error {
-	if err := v.startContainer(containerId); err != nil {
+// StartContainer calls libvirt to start domain, waits up to 10 seconds for
+// DOMAIN_RUNNING state, then updates it's state in metadata store.
+// If there was an error it will be returned to caller after an domain removal
+// attempt.  If also it had an error - both of them will be combined.
+func (v *VirtualizationTool) StartContainer(containerID string) error {
+	if err := v.startContainer(containerID); err != nil {
 		// FIXME: we do this here because kubelet may attempt new `CreateContainer()`
 		// calls for this VM after failed `StartContainer()` without first removing it.
 		// Better solution is perhaps moving domain setup logic to `StartContainer()`
 		// and cleaning it all up upon failure, but for now we just remove the VM
 		// so the next `CreateContainer()` call succeeds.
-		if rmErr := v.RemoveContainer(containerId); rmErr != nil {
+		if rmErr := v.RemoveContainer(containerID); rmErr != nil {
 			return fmt.Errorf("container start error: %v \n+ container removal error: %v", err, rmErr)
 		}
 
@@ -420,8 +430,13 @@ func (v *VirtualizationTool) StartContainer(containerId string) error {
 	return nil
 }
 
-func (v *VirtualizationTool) StopContainer(containerId string, timeout time.Duration) error {
-	domain, err := v.domainConn.LookupDomainByUUIDString(containerId)
+// StopContainer calls gracefull shutdown of domain and if it was non successful
+// it calls libvirt to destroy that domain.
+// Successful shutdown or destroy of domain is followed by removal of
+// VM info from metadata store.
+// Succeeded removal of metadata is followed by volumes cleanup.
+func (v *VirtualizationTool) StopContainer(containerID string, timeout time.Duration) error {
+	domain, err := v.domainConn.LookupDomainByUUIDString(containerID)
 	if err != nil {
 		return err
 	}
@@ -430,12 +445,12 @@ func (v *VirtualizationTool) StopContainer(containerId string, timeout time.Dura
 	// because shutdown requests may be ignored e.g. when the VM boots.
 	// If this fails, we just destroy the domain (i.e. power off the VM).
 	err = utils.WaitLoop(func() (bool, error) {
-		_, err := v.domainConn.LookupDomainByUUIDString(containerId)
+		_, err := v.domainConn.LookupDomainByUUIDString(containerID)
 		if err == virt.ErrDomainNotFound {
 			return true, nil
 		}
 		if err != nil {
-			return false, fmt.Errorf("failed to look up the domain %q: %v", containerId, err)
+			return false, fmt.Errorf("failed to look up the domain %q: %v", containerID, err)
 		}
 
 		// domain.Shutdown() may return 'invalid operation' error if domain is already
@@ -445,24 +460,24 @@ func (v *VirtualizationTool) StopContainer(containerId string, timeout time.Dura
 
 		state, err := domain.State()
 		if err != nil {
-			return false, fmt.Errorf("failed to get state of the domain %q: %v", containerId, err)
+			return false, fmt.Errorf("failed to get state of the domain %q: %v", containerID, err)
 		}
 
-		if state == virt.DOMAIN_SHUTOFF {
+		if state == virt.DomainStateShutoff {
 			return true, nil
 		}
 
 		if domainShutdownErr != nil {
 			// The domain is not in 'DOMAIN_SHUTOFF' state and domain.Shutdown() failed,
 			// so we need to return the error that happened during Shutdown()
-			return false, fmt.Errorf("failed to shut down domain %q: %v", containerId, err)
+			return false, fmt.Errorf("failed to shut down domain %q: %v", containerID, err)
 		}
 
 		return false, nil
 	}, domainShutdownRetryInterval, timeout, v.clock)
 
 	if err != nil {
-		glog.Warningf("Failed to shut down VM %q: %v -- trying to destroy the domain", containerId, err)
+		glog.Warningf("Failed to shut down VM %q: %v -- trying to destroy the domain", containerID, err)
 		// if the domain is destroyed successfully we return no error
 		if err = domain.Destroy(); err != nil {
 			return fmt.Errorf("failed to destroy the domain: %v", err)
@@ -470,7 +485,7 @@ func (v *VirtualizationTool) StopContainer(containerId string, timeout time.Dura
 	}
 
 	if err == nil {
-		err = v.metadataStore.Container(containerId).Save(
+		err = v.metadataStore.Container(containerID).Save(
 			func(c *metadata.ContainerInfo) (*metadata.ContainerInfo, error) {
 				// make sure the container is not removed during the call
 				if c != nil {
@@ -484,16 +499,16 @@ func (v *VirtualizationTool) StopContainer(containerId string, timeout time.Dura
 		// Note: volume cleanup is done right after domain has been stopped
 		// due to by the time the ContainerRemove request all flexvolume
 		// data is already removed by kubelet's VolumeManager
-		return v.cleanupVolumes(containerId)
+		return v.cleanupVolumes(containerID)
 	}
 
 	return err
 }
 
-func (v *VirtualizationTool) getVMConfigFromMetadata(containerId string) (*VMConfig, kubeapi.ContainerState, error) {
-	containerInfo, err := v.metadataStore.Container(containerId).Retrieve()
+func (v *VirtualizationTool) getVMConfigFromMetadata(containerID string) (*VMConfig, kubeapi.ContainerState, error) {
+	containerInfo, err := v.metadataStore.Container(containerID).Retrieve()
 	if err != nil {
-		glog.Errorf("Error when retrieving domain %q info from metadata store: %v", containerId, err)
+		glog.Errorf("Error when retrieving domain %q info from metadata store: %v", containerID, err)
 		return nil, kubeapi.ContainerState_CONTAINER_UNKNOWN, err
 	}
 	if containerInfo == nil {
@@ -516,10 +531,10 @@ func (v *VirtualizationTool) getVMConfigFromMetadata(containerId string) (*VMCon
 	// TODO: here we're using incomplete VMConfig to tear down the volumes
 	// What actually needs to be done is storing VMConfig and VMStatus (to be added)
 	config := &VMConfig{
-		PodSandboxId:         containerInfo.SandboxID,
+		PodSandboxID:         containerInfo.SandboxID,
 		Name:                 containerInfo.Name,
 		Image:                containerInfo.Image,
-		DomainUUID:           containerId,
+		DomainUUID:           containerID,
 		PodAnnotations:       podAnnotations,
 		ContainerAnnotations: containerInfo.Annotations,
 		ContainerLabels:      containerInfo.Labels,
@@ -527,21 +542,21 @@ func (v *VirtualizationTool) getVMConfigFromMetadata(containerId string) (*VMCon
 	}
 
 	if err := config.LoadAnnotations(); err != nil {
-		glog.Errorf("Error when parsing annotations for domain %q : %v", containerId, err)
+		glog.Errorf("Error when parsing annotations for domain %q : %v", containerID, err)
 		return nil, containerInfo.State, err
 	}
 
 	return config, containerInfo.State, nil
 }
 
-func (v *VirtualizationTool) cleanupVolumes(containerId string) error {
-	config, _, err := v.getVMConfigFromMetadata(containerId)
+func (v *VirtualizationTool) cleanupVolumes(containerID string) error {
+	config, _, err := v.getVMConfigFromMetadata(containerID)
 	if err != nil {
 		return err
 	}
 
 	if config == nil {
-		glog.Warningf("No info found for domain %q in metadata store. Volume cleanup skipped.", containerId)
+		glog.Warningf("No info found for domain %q in metadata store. Volume cleanup skipped.", containerID)
 		return nil
 	}
 
@@ -551,7 +566,7 @@ func (v *VirtualizationTool) cleanupVolumes(containerId string) error {
 	}
 
 	if err != nil {
-		glog.Errorf("Volume teardown failed for domain %q: %v", containerId, err)
+		glog.Errorf("Volume teardown failed for domain %q: %v", containerID, err)
 		return err
 
 	}
@@ -559,10 +574,10 @@ func (v *VirtualizationTool) cleanupVolumes(containerId string) error {
 	return nil
 }
 
-func (v *VirtualizationTool) removeDomain(containerId string, config *VMConfig, state kubeapi.ContainerState, failUponVolumeTeardownFailure bool) error {
+func (v *VirtualizationTool) removeDomain(containerID string, config *VMConfig, state kubeapi.ContainerState, failUponVolumeTeardownFailure bool) error {
 	// Give a chance to gracefully stop domain
 	// TODO: handle errors - there could be e.g. lost connection error
-	domain, err := v.domainConn.LookupDomainByUUIDString(containerId)
+	domain, err := v.domainConn.LookupDomainByUUIDString(containerID)
 	if err != nil && err != virt.ErrDomainNotFound {
 		return err
 	}
@@ -575,16 +590,16 @@ func (v *VirtualizationTool) removeDomain(containerId string, config *VMConfig, 
 		}
 
 		if err := domain.Undefine(); err != nil {
-			return fmt.Errorf("error undefining the domain %q: %v", containerId, err)
+			return fmt.Errorf("error undefining the domain %q: %v", containerID, err)
 		}
 
 		// Wait until domain is really removed or timeout after 5 sec.
 		if err := utils.WaitLoop(func() (bool, error) {
-			if _, err := v.domainConn.LookupDomainByUUIDString(containerId); err == virt.ErrDomainNotFound {
+			if _, err := v.domainConn.LookupDomainByUUIDString(containerID); err == virt.ErrDomainNotFound {
 				return true, nil
 			} else if err != nil {
 				// Unexpected error occurred
-				return false, fmt.Errorf("error looking up domain %q: %v", containerId, err)
+				return false, fmt.Errorf("error looking up domain %q: %v", containerID, err)
 			}
 			return false, nil
 		}, domainDestroyCheckInterval, domainDestroyTimeout, v.clock); err != nil {
@@ -603,37 +618,37 @@ func (v *VirtualizationTool) removeDomain(containerId string, config *VMConfig, 
 	case failUponVolumeTeardownFailure:
 		return err
 	default:
-		glog.Warningf("Error during volume teardown for container %s: %v", containerId, err)
+		glog.Warningf("Error during volume teardown for container %s: %v", containerID, err)
 		return nil
 	}
 }
 
 // RemoveContainer tries to gracefully stop domain, then forcibly removes it
-// even if it's still running
-// it waits up to 5 sec for doing the job by libvirt
-func (v *VirtualizationTool) RemoveContainer(containerId string) error {
-	config, state, err := v.getVMConfigFromMetadata(containerId)
+// even if it's still running.
+// It waits up to 5 sec for doing the job by libvirt.
+func (v *VirtualizationTool) RemoveContainer(containerID string) error {
+	config, state, err := v.getVMConfigFromMetadata(containerID)
 
 	if err != nil {
 		return err
 	}
 
 	if config == nil {
-		glog.Warningf("No info found for domain %q in metadata store. Domain cleanup skipped", containerId)
+		glog.Warningf("No info found for domain %q in metadata store. Domain cleanup skipped", containerID)
 		return nil
 	}
 
-	if err := v.removeDomain(containerId, config, state, state == kubeapi.ContainerState_CONTAINER_CREATED ||
+	if err := v.removeDomain(containerID, config, state, state == kubeapi.ContainerState_CONTAINER_CREATED ||
 		state == kubeapi.ContainerState_CONTAINER_RUNNING); err != nil {
 		return err
 	}
 
-	if v.metadataStore.Container(containerId).Save(
+	if v.metadataStore.Container(containerID).Save(
 		func(_ *metadata.ContainerInfo) (*metadata.ContainerInfo, error) {
 			return nil, nil // delete container
 		},
 	); err != nil {
-		glog.Errorf("Error when removing container '%s' from metadata store: %v", containerId, err)
+		glog.Errorf("Error when removing container '%s' from metadata store: %v", containerID, err)
 		return err
 	}
 
@@ -644,26 +659,26 @@ func virtToKubeState(domainState virt.DomainState, lastState kubeapi.ContainerSt
 	var containerState kubeapi.ContainerState
 
 	switch domainState {
-	case virt.DOMAIN_SHUTDOWN:
+	case virt.DomainStateShutdown:
 		// the domain is being shut down, but is still running
 		fallthrough
-	case virt.DOMAIN_RUNNING:
+	case virt.DomainStateRunning:
 		containerState = kubeapi.ContainerState_CONTAINER_RUNNING
-	case virt.DOMAIN_PAUSED:
+	case virt.DomainStatePaused:
 		if lastState == kubeapi.ContainerState_CONTAINER_CREATED {
 			containerState = kubeapi.ContainerState_CONTAINER_CREATED
 		} else {
 			containerState = kubeapi.ContainerState_CONTAINER_EXITED
 		}
-	case virt.DOMAIN_SHUTOFF:
+	case virt.DomainStateShutoff:
 		if lastState == kubeapi.ContainerState_CONTAINER_CREATED {
 			containerState = kubeapi.ContainerState_CONTAINER_CREATED
 		} else {
 			containerState = kubeapi.ContainerState_CONTAINER_EXITED
 		}
-	case virt.DOMAIN_CRASHED:
+	case virt.DomainStateCrashed:
 		containerState = kubeapi.ContainerState_CONTAINER_EXITED
-	case virt.DOMAIN_PMSUSPENDED:
+	case virt.DomainStatePMSuspended:
 		containerState = kubeapi.ContainerState_CONTAINER_EXITED
 	default:
 		containerState = kubeapi.ContainerState_CONTAINER_UNKNOWN
@@ -672,8 +687,8 @@ func virtToKubeState(domainState virt.DomainState, lastState kubeapi.ContainerSt
 	return containerState
 }
 
-func (v *VirtualizationTool) getContainerInfo(domain virt.VirtDomain, containerId string) (*metadata.ContainerInfo, error) {
-	containerInfo, err := v.metadataStore.Container(containerId).Retrieve()
+func (v *VirtualizationTool) getContainerInfo(domain virt.Domain, containerID string) (*metadata.ContainerInfo, error) {
+	containerInfo, err := v.metadataStore.Container(containerID).Retrieve()
 	if err != nil {
 		return nil, err
 	}
@@ -688,7 +703,7 @@ func (v *VirtualizationTool) getContainerInfo(domain virt.VirtDomain, containerI
 
 	containerState := virtToKubeState(state, containerInfo.State)
 	if containerInfo.State != containerState {
-		if err := v.metadataStore.Container(containerId).Save(
+		if err := v.metadataStore.Container(containerID).Save(
 			func(c *metadata.ContainerInfo) (*metadata.ContainerInfo, error) {
 				// make sure the container is not removed during the call
 				if c != nil {
@@ -728,13 +743,13 @@ func filterContainer(container *kubeapi.Container, filter *kubeapi.ContainerFilt
 	return true
 }
 
-func (v *VirtualizationTool) getContainer(domain virt.VirtDomain) (*kubeapi.Container, error) {
-	containerId, err := domain.UUIDString()
+func (v *VirtualizationTool) getContainer(domain virt.Domain) (*kubeapi.Container, error) {
+	containerID, err := domain.UUIDString()
 	if err != nil {
 		return nil, err
 	}
 
-	containerInfo, err := v.getContainerInfo(domain, containerId)
+	containerInfo, err := v.getContainerInfo(domain, containerID)
 	if err != nil {
 		return nil, err
 	}
@@ -743,7 +758,7 @@ func (v *VirtualizationTool) getContainer(domain virt.VirtDomain) (*kubeapi.Cont
 		return nil, nil
 	}
 
-	podSandboxId := containerInfo.SandboxID
+	podSandboxID := containerInfo.SandboxID
 
 	metadata := &kubeapi.ContainerMetadata{
 		Name:    containerInfo.Name,
@@ -753,8 +768,8 @@ func (v *VirtualizationTool) getContainer(domain virt.VirtDomain) (*kubeapi.Cont
 	image := &kubeapi.ImageSpec{Image: containerInfo.Image}
 
 	container := &kubeapi.Container{
-		Id:           containerId,
-		PodSandboxId: podSandboxId,
+		Id:           containerID,
+		PodSandboxId: podSandboxID,
 		Metadata:     metadata,
 		Image:        image,
 		ImageRef:     containerInfo.Image,
@@ -766,6 +781,10 @@ func (v *VirtualizationTool) getContainer(domain virt.VirtDomain) (*kubeapi.Cont
 	return container, nil
 }
 
+// ListContainers queries libvirt for domains denoted by container id or
+// pod standbox id or for all domains and after gathering theirs description
+// from metadata and conversion of status from libvirt to kubeapi compatible
+// returns them as a list of kubeapi Containers.
 func (v *VirtualizationTool) ListContainers(filter *kubeapi.ContainerFilter) ([]*kubeapi.Container, error) {
 	containers := make([]*kubeapi.Container, 0)
 
@@ -848,11 +867,11 @@ func (v *VirtualizationTool) ListContainers(filter *kubeapi.ContainerFilter) ([]
 		}
 
 		if container == nil {
-			containerId, err := domain.UUIDString()
+			containerID, err := domain.UUIDString()
 			if err != nil {
 				return nil, err
 			}
-			glog.V(0).Infof("Failed to find info in bolt for domain with id: %s, so just ignoring as not handled by virtlet.", containerId)
+			glog.V(0).Infof("Failed to find info in bolt for domain with id: %s, so just ignoring as not handled by virtlet.", containerID)
 			continue
 		}
 
@@ -864,25 +883,27 @@ func (v *VirtualizationTool) ListContainers(filter *kubeapi.ContainerFilter) ([]
 	return containers, nil
 }
 
-func (v *VirtualizationTool) ContainerStatus(containerId string) (*kubeapi.ContainerStatus, error) {
-	domain, err := v.domainConn.LookupDomainByUUIDString(containerId)
+// ContainerStatus queries libvirt for domain setatus, converts it to corresponding
+// kubeapi container status including container info retrieved from metadata store.
+func (v *VirtualizationTool) ContainerStatus(containerID string) (*kubeapi.ContainerStatus, error) {
+	domain, err := v.domainConn.LookupDomainByUUIDString(containerID)
 	if err != nil {
 		return nil, err
 	}
 
-	containerInfo, err := v.getContainerInfo(domain, containerId)
+	containerInfo, err := v.getContainerInfo(domain, containerID)
 	if err != nil {
 		return nil, err
 	}
 
 	if containerInfo == nil {
-		return nil, fmt.Errorf("missing containerInfo for containerId: %s", containerId)
+		return nil, fmt.Errorf("missing containerInfo for containerID: %s", containerID)
 	}
 
 	image := &kubeapi.ImageSpec{Image: containerInfo.Image}
 
 	return &kubeapi.ContainerStatus{
-		Id: containerId,
+		Id: containerID,
 		Metadata: &kubeapi.ContainerMetadata{
 			Name:    containerInfo.Name,
 			Attempt: containerInfo.Attempt,
@@ -897,10 +918,19 @@ func (v *VirtualizationTool) ContainerStatus(containerId string) (*kubeapi.Conta
 	}, nil
 }
 
-// VolumeOwner implementation follows
+// volumeOwner implementation follows
 
-func (v *VirtualizationTool) StoragePool() virt.VirtStoragePool           { return v.volumePool }
-func (v *VirtualizationTool) DomainConnection() virt.VirtDomainConnection { return v.domainConn }
-func (v *VirtualizationTool) ImageManager() ImageManager                  { return v.imageManager }
-func (v *VirtualizationTool) RawDevices() []string                        { return v.rawDevices }
-func (v *VirtualizationTool) KubeletRootDir() string                      { return v.kubeletRootDir }
+// StoragePool implements volumeOwner StoragePool method
+func (v *VirtualizationTool) StoragePool() virt.StoragePool { return v.volumePool }
+
+// DomainConnection implements volumeOwner DomainConnection method
+func (v *VirtualizationTool) DomainConnection() virt.DomainConnection { return v.domainConn }
+
+// ImageManager implements volumeOwner ImageManager method
+func (v *VirtualizationTool) ImageManager() ImageManager { return v.imageManager }
+
+// RawDevices implements volumeOwner RawDevices method
+func (v *VirtualizationTool) RawDevices() []string { return v.rawDevices }
+
+// KubeletRootDir implements volumeOwner KubeletRootDir method
+func (v *VirtualizationTool) KubeletRootDir() string { return v.kubeletRootDir }

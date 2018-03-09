@@ -22,23 +22,25 @@ import (
 	"github.com/Mirantis/virtlet/pkg/virt"
 )
 
+// ImageManager describes a images info provider.
 type ImageManager interface {
 	GetImagePathAndVirtualSize(ref string) (string, uint64, error)
 }
 
-type VolumeOwner interface {
-	StoragePool() virt.VirtStoragePool
-	DomainConnection() virt.VirtDomainConnection
+type volumeOwner interface {
+	StoragePool() virt.StoragePool
+	DomainConnection() virt.DomainConnection
 	ImageManager() ImageManager
 	RawDevices() []string
 	KubeletRootDir() string
 }
 
 // VMVolumeSource is a function that provides `VMVolume`s for VMs
-type VMVolumeSource func(config *VMConfig, owner VolumeOwner) ([]VMVolume, error)
+type VMVolumeSource func(config *VMConfig, owner volumeOwner) ([]VMVolume, error)
 
+// VMVolume describes a volume provider.
 type VMVolume interface {
-	Uuid() string
+	UUID() string
 	Setup() (*libvirtxml.DomainDisk, error)
 	WriteImage(diskPathMap) error
 	Teardown() error
@@ -46,14 +48,16 @@ type VMVolume interface {
 
 type volumeBase struct {
 	config *VMConfig
-	owner  VolumeOwner
+	owner  volumeOwner
 }
 
 func (v *volumeBase) WriteImage(diskPathMap) error { return nil }
 func (v *volumeBase) Teardown() error              { return nil }
 
+// CombineVMVolumeSources returns a function which will pass VM configuration
+// to all listed volumes sources combining returned by them `VMVolume`s.
 func CombineVMVolumeSources(srcs ...VMVolumeSource) VMVolumeSource {
-	return func(config *VMConfig, owner VolumeOwner) ([]VMVolume, error) {
+	return func(config *VMConfig, owner volumeOwner) ([]VMVolume, error) {
 		var vols []VMVolume
 		for _, src := range srcs {
 			vs, err := src(config, owner)

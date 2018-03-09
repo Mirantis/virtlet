@@ -41,16 +41,19 @@ import (
 )
 
 const (
-	EnvFileLocation   = "/etc/cloud/environment"
-	MountFileLocation = "/etc/cloud/mount-volumes.sh"
-	MountScriptSubst  = "@virtlet-mount-script@"
+	envFileLocation   = "/etc/cloud/environment"
+	mountFileLocation = "/etc/cloud/mount-volumes.sh"
+	mountScriptSubst  = "@virtlet-mount-script@"
 )
 
+// CloudInitGenerator provides a common part for Cloud Init ISO drive preparation
+// for NoCloud and ConfigDrive volume sources.
 type CloudInitGenerator struct {
 	config *VMConfig
 	isoDir string
 }
 
+// NewCloudInitGenerator returns new CloudInitGenerator.
 func NewCloudInitGenerator(config *VMConfig, isoDir string) *CloudInitGenerator {
 	return &CloudInitGenerator{
 		config: config,
@@ -64,7 +67,7 @@ func (g *CloudInitGenerator) generateMetaData() ([]byte, error) {
 		"local-hostname": g.config.PodName,
 	}
 
-	if g.config.ParsedAnnotations.ImageType == ImageTypeConfigDrive {
+	if g.config.ParsedAnnotations.ImageType == imageTypeConfigDrive {
 		m["uuid"] = m["instance-id"]
 		m["hostname"] = m["local-hostname"]
 	}
@@ -93,7 +96,7 @@ func (g *CloudInitGenerator) generateUserData(volumeMap diskPathMap) ([]byte, er
 	mounts, mountScript := g.generateMounts(volumeMap)
 
 	if userDataScript := g.config.ParsedAnnotations.UserDataScript; userDataScript != "" {
-		return []byte(strings.Replace(userDataScript, MountScriptSubst, mountScript, -1)), nil
+		return []byte(strings.Replace(userDataScript, mountScriptSubst, mountScript, -1)), nil
 	}
 
 	userData := make(map[string]interface{})
@@ -131,9 +134,9 @@ func (g *CloudInitGenerator) generateUserData(volumeMap diskPathMap) ([]byte, er
 
 func (g *CloudInitGenerator) generateNetworkConfiguration() ([]byte, error) {
 	switch g.config.ParsedAnnotations.ImageType {
-	case ImageTypeNoCloud:
+	case imageTypeNoCloud:
 		return g.generateNetworkConfigurationNoCloud()
-	case ImageTypeConfigDrive:
+	case imageTypeConfigDrive:
 		return g.generateNetworkConfigurationConfigDrive()
 	}
 
@@ -205,7 +208,7 @@ func (g *CloudInitGenerator) generateNetworkConfigurationNoCloud() ([]byte, erro
 	}
 
 	// dns
-	dnsData := getDnsData(cniResult.DNS)
+	dnsData := getDNSData(cniResult.DNS)
 	if dnsData != nil {
 		config = append(config, dnsData...)
 	}
@@ -251,15 +254,15 @@ func (g *CloudInitGenerator) getSubnetsAndGatewaysForNthInterface(interfaceNo in
 	return subnets, gateways
 }
 
-func getDnsData(cniDns cnitypes.DNS) []map[string]interface{} {
+func getDNSData(cniDNS cnitypes.DNS) []map[string]interface{} {
 	var dnsData []map[string]interface{}
-	if cniDns.Nameservers != nil {
+	if cniDNS.Nameservers != nil {
 		dnsData = append(dnsData, map[string]interface{}{
 			"type":    "nameserver",
-			"address": cniDns.Nameservers,
+			"address": cniDNS.Nameservers,
 		})
-		if cniDns.Search != nil {
-			dnsData[0]["search"] = cniDns.Search
+		if cniDNS.Search != nil {
+			dnsData[0]["search"] = cniDNS.Search
 		}
 	}
 	return dnsData
@@ -317,7 +320,7 @@ func (g *CloudInitGenerator) generateNetworkConfigurationConfigDrive() ([]byte, 
 	}
 	config["networks"] = networks
 
-	dnsData := getDnsData(cniResult.DNS)
+	dnsData := getDNSData(cniResult.DNS)
 	if dnsData != nil {
 		config["services"] = dnsData
 	}
@@ -358,10 +361,13 @@ func mtuForMacAddress(mac string, ifaces []*network.InterfaceDescription) (uint1
 	return 0, fmt.Errorf("interface with mac address %q not found in ContainerSideNetwork", mac)
 }
 
+// IsoPath returns a full path to iso image with configuration for VM pod.
 func (g *CloudInitGenerator) IsoPath() string {
 	return filepath.Join(g.isoDir, fmt.Sprintf("config-%s.iso", g.config.DomainUUID))
 }
 
+// DiskDef returns a DomainDisk definition for Cloud Init ISO image to be included
+// in VM pod libvirt domain definition.
 func (g *CloudInitGenerator) DiskDef() *libvirtxml.DomainDisk {
 	return &libvirtxml.DomainDisk{
 		Type:     "file",
@@ -372,6 +378,9 @@ func (g *CloudInitGenerator) DiskDef() *libvirtxml.DomainDisk {
 	}
 }
 
+// GenerateImage collects metadata, userdata and network configuration and uses
+// them to prepare an ISO image for NoCloud or ConfigDrive selecting the type
+// using an info from pod annotations.
 func (g *CloudInitGenerator) GenerateImage(volumeMap diskPathMap) error {
 	tmpDir, err := ioutil.TempDir("", "config-")
 	if err != nil {
@@ -395,18 +404,18 @@ func (g *CloudInitGenerator) GenerateImage(volumeMap diskPathMap) error {
 	var volumeName string
 
 	switch g.config.ParsedAnnotations.ImageType {
-	case ImageTypeNoCloud:
+	case imageTypeNoCloud:
 		userDataLocation = "user-data"
 		metaDataLocation = "meta-data"
 		networkConfigLocation = "network-config"
 		volumeName = "cidata"
-	case ImageTypeConfigDrive:
+	case imageTypeConfigDrive:
 		userDataLocation = "openstack/latest/user_data"
 		metaDataLocation = "openstack/latest/meta_data.json"
 		networkConfigLocation = "openstack/latest/network_data.json"
 		volumeName = "config-2"
 	default:
-		// that should newer happen, as ImageType should be validated
+		// that should newer happen, as imageType should be validated
 		// already earlier
 		return fmt.Errorf("unknown cloud-init config image type: %q", g.config.ParsedAnnotations.ImageType)
 	}
@@ -563,11 +572,11 @@ func (u *writeFilesUpdater) addFilesForVolumeType(suffix string) {
 }
 
 func (u *writeFilesUpdater) addMountScript(content string) {
-	u.putPlainText(MountFileLocation, content, 0755)
+	u.putPlainText(mountFileLocation, content, 0755)
 }
 
 func (u *writeFilesUpdater) addEnvironmentFile(content string) {
-	u.putPlainText(EnvFileLocation, content, 0644)
+	u.putPlainText(envFileLocation, content, 0644)
 }
 
 func (u *writeFilesUpdater) addFilesForMount(mount *VMMount) []interface{} {

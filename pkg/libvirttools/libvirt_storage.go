@@ -27,17 +27,17 @@ import (
 	"github.com/Mirantis/virtlet/pkg/virt"
 )
 
-type LibvirtStorageConnection struct {
+type libvirtStorageConnection struct {
 	conn *libvirt.Connect
 }
 
-var _ virt.VirtStorageConnection = &LibvirtStorageConnection{}
+var _ virt.StorageConnection = &libvirtStorageConnection{}
 
-func newLibvirtStorageConnection(conn *libvirt.Connect) *LibvirtStorageConnection {
-	return &LibvirtStorageConnection{conn: conn}
+func newLibvirtStorageConnection(conn *libvirt.Connect) *libvirtStorageConnection {
+	return &libvirtStorageConnection{conn: conn}
 }
 
-func (sc *LibvirtStorageConnection) CreateStoragePool(def *libvirtxml.StoragePool) (virt.VirtStoragePool, error) {
+func (sc *libvirtStorageConnection) CreateStoragePool(def *libvirtxml.StoragePool) (virt.StoragePool, error) {
 	xml, err := def.Marshal()
 	if err != nil {
 		return nil, err
@@ -47,10 +47,10 @@ func (sc *LibvirtStorageConnection) CreateStoragePool(def *libvirtxml.StoragePoo
 	if err != nil {
 		return nil, err
 	}
-	return &LibvirtStoragePool{conn: sc.conn, p: p}, nil
+	return &libvirtStoragePool{conn: sc.conn, p: p}, nil
 }
 
-func (sc *LibvirtStorageConnection) LookupStoragePoolByName(name string) (virt.VirtStoragePool, error) {
+func (sc *libvirtStorageConnection) LookupStoragePoolByName(name string) (virt.StoragePool, error) {
 	p, err := sc.conn.LookupStoragePoolByName(name)
 	if err != nil {
 		libvirtErr, ok := err.(libvirt.Error)
@@ -59,17 +59,17 @@ func (sc *LibvirtStorageConnection) LookupStoragePoolByName(name string) (virt.V
 		}
 		return nil, err
 	}
-	return &LibvirtStoragePool{conn: sc.conn, p: p}, nil
+	return &libvirtStoragePool{conn: sc.conn, p: p}, nil
 }
 
-type LibvirtStoragePool struct {
+type libvirtStoragePool struct {
 	conn *libvirt.Connect
 	p    *libvirt.StoragePool
 }
 
-var _ virt.VirtStoragePool = &LibvirtStoragePool{}
+var _ virt.StoragePool = &libvirtStoragePool{}
 
-func (pool *LibvirtStoragePool) CreateStorageVol(def *libvirtxml.StorageVolume) (virt.VirtStorageVolume, error) {
+func (pool *libvirtStoragePool) CreateStorageVol(def *libvirtxml.StorageVolume) (virt.StorageVolume, error) {
 	xml, err := def.Marshal()
 	if err != nil {
 		return nil, err
@@ -86,15 +86,15 @@ func (pool *LibvirtStoragePool) CreateStorageVol(def *libvirtxml.StorageVolume) 
 	if err := pool.p.Refresh(0); err != nil {
 		return nil, fmt.Errorf("failed to refresh the storage pool: %v", err)
 	}
-	return &LibvirtStorageVolume{name: def.Name, v: v}, nil
+	return &libvirtStorageVolume{name: def.Name, v: v}, nil
 }
 
-func (pool *LibvirtStoragePool) ListAllVolumes() ([]virt.VirtStorageVolume, error) {
+func (pool *libvirtStoragePool) ListAllVolumes() ([]virt.StorageVolume, error) {
 	volumes, err := pool.p.ListAllStorageVolumes(0)
 	if err != nil {
 		return nil, err
 	}
-	r := make([]virt.VirtStorageVolume, len(volumes))
+	r := make([]virt.StorageVolume, len(volumes))
 	for n, v := range volumes {
 		name, err := v.GetName()
 		if err != nil {
@@ -102,12 +102,12 @@ func (pool *LibvirtStoragePool) ListAllVolumes() ([]virt.VirtStorageVolume, erro
 		}
 		// need to make a copy here
 		curVolume := v
-		r[n] = &LibvirtStorageVolume{name: name, v: &curVolume}
+		r[n] = &libvirtStorageVolume{name: name, v: &curVolume}
 	}
 	return r, nil
 }
 
-func (pool *LibvirtStoragePool) LookupVolumeByName(name string) (virt.VirtStorageVolume, error) {
+func (pool *libvirtStoragePool) LookupVolumeByName(name string) (virt.StorageVolume, error) {
 	v, err := pool.p.LookupStorageVolByName(name)
 	if err != nil {
 		libvirtErr, ok := err.(libvirt.Error)
@@ -116,10 +116,10 @@ func (pool *LibvirtStoragePool) LookupVolumeByName(name string) (virt.VirtStorag
 		}
 		return nil, err
 	}
-	return &LibvirtStorageVolume{name: name, v: v}, nil
+	return &libvirtStorageVolume{name: name, v: v}, nil
 }
 
-func (pool *LibvirtStoragePool) RemoveVolumeByName(name string) error {
+func (pool *libvirtStoragePool) RemoveVolumeByName(name string) error {
 	vol, err := pool.LookupVolumeByName(name)
 	switch {
 	case err == virt.ErrStorageVolumeNotFound:
@@ -131,18 +131,18 @@ func (pool *LibvirtStoragePool) RemoveVolumeByName(name string) error {
 	}
 }
 
-type LibvirtStorageVolume struct {
+type libvirtStorageVolume struct {
 	name string
 	v    *libvirt.StorageVol
 }
 
-var _ virt.VirtStorageVolume = &LibvirtStorageVolume{}
+var _ virt.StorageVolume = &libvirtStorageVolume{}
 
-func (volume *LibvirtStorageVolume) Name() string {
+func (volume *libvirtStorageVolume) Name() string {
 	return volume.name
 }
 
-func (volume *LibvirtStorageVolume) Size() (uint64, error) {
+func (volume *libvirtStorageVolume) Size() (uint64, error) {
 	info, err := volume.v.GetInfo()
 	if err != nil {
 		return 0, err
@@ -150,15 +150,15 @@ func (volume *LibvirtStorageVolume) Size() (uint64, error) {
 	return info.Capacity, nil
 }
 
-func (volume *LibvirtStorageVolume) Path() (string, error) {
+func (volume *libvirtStorageVolume) Path() (string, error) {
 	return volume.v.GetPath()
 }
 
-func (volume *LibvirtStorageVolume) Remove() error {
+func (volume *libvirtStorageVolume) Remove() error {
 	return volume.v.Delete(0)
 }
 
-func (volume *LibvirtStorageVolume) Format() error {
+func (volume *libvirtStorageVolume) Format() error {
 	volPath, err := volume.Path()
 	if err != nil {
 		return fmt.Errorf("can't get volume path: %v", err)

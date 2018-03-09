@@ -47,12 +47,12 @@ func prepareOptsFileForQcow2Volume() (string, error) {
 func TestQCOW2VolumeNaming(t *testing.T) {
 	v := qcow2Volume{
 		volumeBase: volumeBase{
-			&VMConfig{DomainUUID: testUuid},
+			&VMConfig{DomainUUID: testUUID},
 			nil,
 		},
 		name: TestVolumeName,
 	}
-	expected := "virtlet-" + testUuid + "-" + TestVolumeName
+	expected := "virtlet-" + testUUID + "-" + TestVolumeName
 	volumeName := v.volumeName()
 	if volumeName != expected {
 		t.Errorf("Incorrect root volume image name. Expected %s, received %s", expected, volumeName)
@@ -63,7 +63,7 @@ func TestQCOW2VolumeLifeCycle(t *testing.T) {
 	rec := fake.NewToplevelRecorder()
 
 	volumesPoolPath := "/fake/volumes/pool"
-	expectedVolumePath := volumesPoolPath + "/virtlet-" + testUuid + "-" + TestVolumeName
+	expectedVolumePath := volumesPoolPath + "/virtlet-" + testUUID + "-" + TestVolumeName
 	spool := fake.NewFakeStoragePool(rec.Child("volumes"), "volumes", volumesPoolPath)
 
 	im := NewFakeImageManager(rec.Child("image"))
@@ -77,7 +77,7 @@ func TestQCOW2VolumeLifeCycle(t *testing.T) {
 	volume, err := newQCOW2Volume(
 		TestVolumeName,
 		optsFilePath,
-		&VMConfig{DomainUUID: testUuid, Image: "rootfs image name"},
+		&VMConfig{DomainUUID: testUUID, Image: "rootfs image name"},
 		newFakeVolumeOwner(spool, im),
 	)
 	if err != nil {

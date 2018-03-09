@@ -28,7 +28,7 @@ import (
 
 type rawVolumeOptions struct {
 	Path string `json:"path"`
-	Uuid string `json:"uuid"`
+	UUID string `json:"uuid"`
 }
 
 func (vo *rawVolumeOptions) validate() error {
@@ -46,7 +46,7 @@ type rawDeviceVolume struct {
 
 var _ VMVolume = &rawDeviceVolume{}
 
-func newRawDeviceVolume(volumeName, configPath string, config *VMConfig, owner VolumeOwner) (VMVolume, error) {
+func newRawDeviceVolume(volumeName, configPath string, config *VMConfig, owner volumeOwner) (VMVolume, error) {
 	var opts rawVolumeOptions
 	if err := utils.ReadJSON(configPath, &opts); err != nil {
 		return nil, fmt.Errorf("failed to parse raw volume config %q: %v", configPath, err)
@@ -73,8 +73,8 @@ func (v *rawDeviceVolume) verifyRawDeviceWhitelisted(path string) error {
 	return fmt.Errorf("device '%s' not whitelisted on this virtlet node", path)
 }
 
-func (v *rawDeviceVolume) Uuid() string {
-	return v.opts.Uuid
+func (v *rawDeviceVolume) UUID() string {
+	return v.opts.UUID
 }
 
 func (v *rawDeviceVolume) Setup() (*libvirtxml.DomainDisk, error) {
@@ -94,7 +94,7 @@ func (v *rawDeviceVolume) Setup() (*libvirtxml.DomainDisk, error) {
 }
 
 func init() {
-	AddFlexvolumeSource("raw", newRawDeviceVolume)
+	addFlexvolumeSource("raw", newRawDeviceVolume)
 }
 
 // TODO: this file needs a test

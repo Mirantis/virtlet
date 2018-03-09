@@ -23,71 +23,71 @@ import (
 )
 
 const (
-	// DOMAIN_NOSTATE means "no state", i.e. that the domain state is undefined
-	DOMAIN_NOSTATE DomainState = iota
-	// DOMAIN_RUNNING means that the domain is running
-	DOMAIN_RUNNING
-	// DOMAIN_BLOCKED means that the domain is blocked on resource
-	DOMAIN_BLOCKED
-	// DOMAIN_PAUSED means that the domain is paused by user
-	DOMAIN_PAUSED
-	// DOMAIN_SHUTDOWN means that the domain is being shut down
-	DOMAIN_SHUTDOWN
-	// DOMAIN_CRASHED means that the domain is crashed
-	DOMAIN_CRASHED
-	// DOMAIN_PMSUSPENDED means that the domain is suspended
-	DOMAIN_PMSUSPENDED
-	// DOMAIN_SHUTOFF means that the domain is shut off
-	DOMAIN_SHUTOFF
+	// DomainStateNoState means "no state", i.e. that the domain state is undefined
+	DomainStateNoState DomainState = iota
+	// DomainStateRunning means that the domain is running
+	DomainStateRunning
+	// DomainStateBlocked means that the domain is blocked on resource
+	DomainStateBlocked
+	// DomainStatePaused means that the domain is paused by user
+	DomainStatePaused
+	// DomainStateShutdown means that the domain is being shut down
+	DomainStateShutdown
+	// DomainStateCrashed means that the domain is crashed
+	DomainStateCrashed
+	// DomainStatePMSuspended means that the domain is suspended
+	DomainStatePMSuspended
+	// DomainStateShutoff means that the domain is shut off
+	DomainStateShutoff
 )
 
 // DomainState represents a state of a domain
 type DomainState int
 
-// ErrDomainNotFound error is returned by VirtDomainConnection's
+// ErrDomainNotFound error is returned by DomainConnection's
 // Lookup*() methods when the domain in question cannot be found
 var ErrDomainNotFound = errors.New("domain not found")
 
-// ErrSecretNotFound error is returned by VirtDomainConnection's
+// ErrSecretNotFound error is returned by DomainConnection's
 // Lookup*() methods when the domain in question cannot be found
 var ErrSecretNotFound = errors.New("secret not found")
 
-// VirtDomainConnection provides operations on domains that correspond to VMs
-type VirtDomainConnection interface {
+// DomainConnection provides operations on domains that correspond to VMs
+type DomainConnection interface {
 	// Define creates and returns a new domain based on the specified definition
-	DefineDomain(def *libvirtxml.Domain) (VirtDomain, error)
+	DefineDomain(def *libvirtxml.Domain) (Domain, error)
 	// ListAll lists all the domains available on the system
-	ListDomains() ([]VirtDomain, error)
+	ListDomains() ([]Domain, error)
 	// LookupByName tries to locate the domain by name. In case if the
 	// domain cannot be found but no other error occurred, it returns
 	// ErrDomainNotFound
-	LookupDomainByName(name string) (VirtDomain, error)
+	LookupDomainByName(name string) (Domain, error)
 	// LookupDomainByUUIDString tries to locate the domain by its UUID. In case if the
 	// domain cannot be found but no other error occurred, it returns
 	// ErrDomainNotFound
-	LookupDomainByUUIDString(uuid string) (VirtDomain, error)
+	LookupDomainByUUIDString(uuid string) (Domain, error)
 	// DefineSecret defines a Secret with the specified value
-	DefineSecret(def *libvirtxml.Secret) (VirtSecret, error)
+	DefineSecret(def *libvirtxml.Secret) (Secret, error)
 	// LookupSecretByUUIDString tries to locate the secret by its UUID. In case if the
 	// secret cannot be found but no other error occurred, it returns
 	// ErrSecretNotFound
-	LookupSecretByUUIDString(uuid string) (VirtSecret, error)
+	LookupSecretByUUIDString(uuid string) (Secret, error)
 	// LookupSecretByUsageName tries to locate the secret by its Usage name. In case if the
 	// secret cannot be found but no other error occurred, it returns
 	// ErrSecretNotFound
-	LookupSecretByUsageName(usageType string, usageName string) (VirtSecret, error)
+	LookupSecretByUsageName(usageType string, usageName string) (Secret, error)
 }
 
 // Secret represents a secret that's used by the domain
-type VirtSecret interface {
+type Secret interface {
 	// SetValue sets the value of the secret
 	SetValue(value []byte) error
 	// Remove removes the secret
 	Remove() error
 }
 
-// VirtDomain represents a domain which corresponds to a VM
-type VirtDomain interface {
+// Domain represents a domain which corresponds to a VM
+type Domain interface {
 	// Create boots the domain
 	Create() error
 	// Destroy destroys the domain
@@ -103,6 +103,6 @@ type VirtDomain interface {
 	UUIDString() (string, error)
 	// Name returns the name of this domain
 	Name() (string, error)
-	// Xml retrieves xml definition of the domain
-	Xml() (*libvirtxml.Domain, error)
+	// XML retrieves xml definition of the domain
+	XML() (*libvirtxml.Domain, error)
 }

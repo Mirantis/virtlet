@@ -31,16 +31,18 @@ const (
 	flexvolumeDataFile = "virtlet-flexvolume.json"
 )
 
-type FlexvolumeSource func(volumeName, configPath string, config *VMConfig, owner VolumeOwner) (VMVolume, error)
+type flexvolumeSource func(volumeName, configPath string, config *VMConfig, owner volumeOwner) (VMVolume, error)
 
-var flexvolumeTypeMap = map[string]FlexvolumeSource{}
+var flexvolumeTypeMap = map[string]flexvolumeSource{}
 
-func AddFlexvolumeSource(fvType string, source FlexvolumeSource) {
+func addFlexvolumeSource(fvType string, source flexvolumeSource) {
 	flexvolumeTypeMap[fvType] = source
 }
 
-func ScanFlexvolumes(config *VMConfig, owner VolumeOwner) ([]VMVolume, error) {
-	dir := filepath.Join(owner.KubeletRootDir(), config.PodSandboxId, flexvolumeSubdir)
+// ScanFlexVolumes using prepared by kubelet volumes and contained in pod sandbox
+// annotations prepares volumes to be passed to libvirt as a DomainDisk definitions.
+func ScanFlexVolumes(config *VMConfig, owner volumeOwner) ([]VMVolume, error) {
+	dir := filepath.Join(owner.KubeletRootDir(), config.PodSandboxID, flexvolumeSubdir)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		glog.V(2).Infof("No flexvolumes to process for %q with uuid %q", config.Name, config.DomainUUID)
 		return nil, nil

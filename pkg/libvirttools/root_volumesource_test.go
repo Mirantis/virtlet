@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	testUuid = "77f29a0e-46af-4188-a6af-9ff8b8a65224"
+	testUUID = "77f29a0e-46af-4188-a6af-9ff8b8a65224"
 )
 
 type FakeImageManager struct {
@@ -48,11 +48,11 @@ func (im *FakeImageManager) GetImagePathAndVirtualSize(imageName string) (string
 func TestRootVolumeNaming(t *testing.T) {
 	v := rootVolume{
 		volumeBase{
-			&VMConfig{DomainUUID: testUuid},
+			&VMConfig{DomainUUID: testUUID},
 			nil,
 		},
 	}
-	expected := "virtlet_root_" + testUuid
+	expected := "virtlet_root_" + testUUID
 	volumeName := v.volumeName()
 	if volumeName != expected {
 		t.Errorf("Incorrect root volume image name. Expected %s, received %s", expected, volumeName)
@@ -63,13 +63,13 @@ func TestRootVolumeLifeCycle(t *testing.T) {
 	rec := fake.NewToplevelRecorder()
 
 	volumesPoolPath := "/fake/volumes/pool"
-	expectedRootVolumePath := volumesPoolPath + "/virtlet_root_" + testUuid
+	expectedRootVolumePath := volumesPoolPath + "/virtlet_root_" + testUUID
 	spool := fake.NewFakeStoragePool(rec.Child("volumes"), "volumes", volumesPoolPath)
 
 	im := NewFakeImageManager(rec.Child("image"))
 
 	volumes, err := GetRootVolume(
-		&VMConfig{DomainUUID: testUuid, Image: "rootfs image name"},
+		&VMConfig{DomainUUID: testUUID, Image: "rootfs image name"},
 		newFakeVolumeOwner(spool, im),
 	)
 	if err != nil {
@@ -113,7 +113,7 @@ type fakeVolumeOwner struct {
 	imageManager *FakeImageManager
 }
 
-var _ VolumeOwner = fakeVolumeOwner{}
+var _ volumeOwner = fakeVolumeOwner{}
 
 func newFakeVolumeOwner(storagePool *fake.FakeStoragePool, imageManager *FakeImageManager) *fakeVolumeOwner {
 	return &fakeVolumeOwner{
@@ -122,11 +122,11 @@ func newFakeVolumeOwner(storagePool *fake.FakeStoragePool, imageManager *FakeIma
 	}
 }
 
-func (vo fakeVolumeOwner) StoragePool() virt.VirtStoragePool {
+func (vo fakeVolumeOwner) StoragePool() virt.StoragePool {
 	return vo.storagePool
 }
 
-func (vo fakeVolumeOwner) DomainConnection() virt.VirtDomainConnection {
+func (vo fakeVolumeOwner) DomainConnection() virt.DomainConnection {
 	return nil
 }
 

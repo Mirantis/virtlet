@@ -41,9 +41,9 @@ type diskDriver interface {
 
 type diskDriverFactory func(n int) (diskDriver, error)
 
-var diskDriverMap = map[DiskDriver]diskDriverFactory{
-	DiskDriverVirtio: virtioBlkDriverFactory,
-	DiskDriverScsi:   scsiDriverFactory,
+var diskDriverMap = map[diskDriverName]diskDriverFactory{
+	diskDriverVirtio: virtioBlkDriverFactory,
+	diskDriverScsi:   scsiDriverFactory,
 }
 
 type virtioBlkDriver struct {
@@ -179,7 +179,7 @@ func (d *scsiDriver) address() *libvirtxml.DomainAddress {
 	}
 }
 
-func getDiskDriverFactory(name DiskDriver) (diskDriverFactory, error) {
+func getDiskDriverFactory(name diskDriverName) (diskDriverFactory, error) {
 	if f, found := diskDriverMap[name]; found {
 		return f, nil
 	}

@@ -52,7 +52,7 @@ var supportedStoragePools = map[string]string{
 	"volumes": "/var/lib/virtlet/volumes",
 }
 
-func ensureStoragePool(conn virt.VirtStorageConnection, name string) (virt.VirtStoragePool, error) {
+func ensureStoragePool(conn virt.StorageConnection, name string) (virt.StoragePool, error) {
 	poolDir, found := supportedStoragePools[name]
 	if !found {
 		return nil, fmt.Errorf("pool with name '%s' is unknown", name)

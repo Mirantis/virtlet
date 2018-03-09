@@ -25,14 +25,14 @@ import (
 func TestDiskPath(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
-		driverName DiskDriver
+		driverName diskDriverName
 		diskCount  int
 		devList    libvirtxml.DomainDeviceList
 		diskPaths  []diskPath
 	}{
 		{
 			name:       "scsi driver",
-			driverName: DiskDriverScsi,
+			driverName: diskDriverScsi,
 			diskCount:  3,
 			devList: libvirtxml.DomainDeviceList{
 				Disks: []libvirtxml.DomainDisk{
@@ -98,7 +98,7 @@ func TestDiskPath(t *testing.T) {
 		},
 		{
 			name:       "virtio driver",
-			driverName: DiskDriverVirtio,
+			driverName: diskDriverVirtio,
 			diskCount:  3,
 			devList: libvirtxml.DomainDeviceList{
 				Disks: []libvirtxml.DomainDisk{

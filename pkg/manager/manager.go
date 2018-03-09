@@ -82,7 +82,7 @@ func NewVirtletManager(libvirtURI, rawDevices, imageTranslationConfigsDir string
 	// TODO: there should be easy-to-use VirtualizationTool (or at least VMVolumeSource) provider
 	volSrc := libvirttools.CombineVMVolumeSources(
 		libvirttools.GetRootVolume,
-		libvirttools.ScanFlexvolumes,
+		libvirttools.ScanFlexVolumes,
 		// XXX: GetConfigVolume must go last because it
 		// doesn't produce correct name for cdrom devices
 		libvirttools.GetConfigVolume)

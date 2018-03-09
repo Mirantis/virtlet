@@ -23,41 +23,42 @@ import (
 
 // TODO: move VolumeInfo here from storage_pool.go
 
-// ErrStoragePoolNotFound error is returned by VirtStorageConnection's
+// ErrStoragePoolNotFound error is returned by StorageConnection's
 // LookupByName() method when the pool in question cannot be found
 var ErrStoragePoolNotFound = errors.New("storage pool not found")
 
-// ErrStorageVolumeNotFound error is returned by VirtStoragePool's
+// ErrStorageVolumeNotFound error is returned by StoragePool's
 // LookupVolumeByName() method when the volume in question cannot
 // be found
 var ErrStorageVolumeNotFound = errors.New("storage volume not found")
 
-// VirtStorageConnection provides operations on the storage pools and storage volumes
-type VirtStorageConnection interface {
+// StorageConnection provides operations on the storage pools and storage volumes
+type StorageConnection interface {
 	// CreateStoragePool creates a storage pool based on the specified definition
-	CreateStoragePool(def *libvirtxml.StoragePool) (VirtStoragePool, error)
+	CreateStoragePool(def *libvirtxml.StoragePool) (StoragePool, error)
 	// LookupByName tries to locate the storage pool by its
 	// UUID. In case if the domain cannot be found but no other
 	// error occurred, it returns ErrStoragePoolNotFound
-	LookupStoragePoolByName(name string) (VirtStoragePool, error)
+	LookupStoragePoolByName(name string) (StoragePool, error)
 }
 
-// VirtStoragePool represents a pool of volumes
-type VirtStoragePool interface {
+// StoragePool represents a pool of volumes
+type StoragePool interface {
 	// CreateStorageVol creates a new storage volume based on the specified definition
-	CreateStorageVol(def *libvirtxml.StorageVolume) (VirtStorageVolume, error)
+	CreateStorageVol(def *libvirtxml.StorageVolume) (StorageVolume, error)
 	// ListAllVolumes lists all storage volumes available in the pool
-	ListAllVolumes() ([]VirtStorageVolume, error)
+	ListAllVolumes() ([]StorageVolume, error)
 	// LookupVolumeByName tries to locate the storage volume by its
 	// UUID. In case if the domain cannot be found but no other
 	// error occurred, it returns ErrStorageVolumeNotFound
-	LookupVolumeByName(name string) (VirtStorageVolume, error)
+	LookupVolumeByName(name string) (StorageVolume, error)
 	// RemoveVolumeByName removes the storage volume with the
 	// specified name
 	RemoveVolumeByName(name string) error
 }
 
-type VirtStorageVolume interface {
+// StorageVolume represents a particular volume in pool
+type StorageVolume interface {
 	// Name returns the name of this storage volume
 	Name() string
 	// Size returns the size of this storage volume
