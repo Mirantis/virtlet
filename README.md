@@ -1,4 +1,4 @@
-# virtlet [![CircleCI](https://circleci.com/gh/Mirantis/virtlet/tree/master.svg?style=svg)](https://circleci.com/gh/Mirantis/virtlet/tree/master)
+# virtlet [![CircleCI](https://circleci.com/gh/Mirantis/virtlet/tree/master.svg?style=svg)](https://circleci.com/gh/Mirantis/virtlet/tree/master) [![Maintainability](https://api.codeclimate.com/v1/badges/7e40b1e1d7cd78c86a50/maintainability)](https://codeclimate.com/github/Mirantis/virtlet/maintainability) [![Go Report Card](https://goreportcard.com/badge/github.com/Mirantis/virtlet)](https://goreportcard.com/report/github.com/Mirantis/virtlet)
 
 Virtlet is a Kubernetes runtime server which allows you to run VM workloads, based on QCOW2 images.
 
