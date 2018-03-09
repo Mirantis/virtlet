@@ -430,7 +430,7 @@ func (v *VirtualizationTool) StartContainer(containerID string) error {
 	return nil
 }
 
-// StopContainer calls gracefull shutdown of domain and if it was non successful
+// StopContainer calls graceful shutdown of domain and if it was non successful
 // it calls libvirt to destroy that domain.
 // Successful shutdown or destroy of domain is followed by removal of
 // VM info from metadata store.
