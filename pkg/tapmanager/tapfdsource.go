@@ -200,10 +200,7 @@ func (s *TapFDSource) Release(key string) error {
 			return fmt.Errorf("failed to stop dhcp server: %v", err)
 		}
 		<-pn.doneCh
-		if err := nettools.Teardown(pn.csn); err != nil {
-			return err
-		}
-		return nil
+		return nettools.Teardown(pn.csn)
 	}); err != nil {
 		return err
 	}
