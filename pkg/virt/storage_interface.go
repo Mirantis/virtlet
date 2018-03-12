@@ -63,7 +63,7 @@ type StorageVolume interface {
 	Name() string
 	// Size returns the size of this storage volume
 	Size() (uint64, error)
-	// Size returns the path to the file representing this storage volume
+	// Path returns the path to the file representing this storage volume
 	Path() (string, error)
 	// Remove removes this storage volume
 	Remove() error
