@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"strconv"
@@ -39,14 +40,16 @@ const (
 
 // vncCommand gives an access to VNC console of VM pod.
 type vncCommand struct {
-	client  KubeClient
-	podName string
-	port    uint16
+	client           KubeClient
+	podName          string
+	port             uint16
+	output           io.Writer
+	waitForInterrupt bool
 }
 
 // NewVNCCmd returns a cobra.Command that gives an access to VNC console of VM pod.
-func NewVNCCmd(client KubeClient) *cobra.Command {
-	vnc := &vncCommand{client: client}
+func NewVNCCmd(client KubeClient, output io.Writer, waitForInterrupt bool) *cobra.Command {
+	vnc := &vncCommand{client: client, output: output, waitForInterrupt: waitForInterrupt}
 	cmd := &cobra.Command{
 		Use:   "vnc pod [port]",
 		Short: "Provide an access to a VM pod VNC console",
@@ -68,6 +71,7 @@ func NewVNCCmd(client KubeClient) *cobra.Command {
 			case len(args) == 2:
 				// port should be unprivileged and below the high ports
 				// range
+				var port int
 				if port, err := strconv.Atoi(args[1]); err != nil || port < 1024 || port > 61000 {
 					return errors.New("port parameter must be an integer number in range 1000-61000")
 				}
@@ -128,13 +132,16 @@ func (v *vncCommand) Run() error {
 	}
 	defer close(stopCh)
 
-	fmt.Printf("VNC console for pod %q is available on local port %d\n", v.podName, pf.LocalPort)
-	fmt.Printf("Press ctrl-c (or send a terminate singal) to finish that.\n")
+	fmt.Fprintf(v.output, "VNC console for pod %q is available on local port %d\n", v.podName, pf.LocalPort)
+	fmt.Fprintf(v.output, "Press ctrl-c (or send a terminate singal) to finish that.\n")
 
-	c := make(chan os.Signal, 2)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	// if waitForInterrupt is set to false do not wait for interrupt (e.x. in tests).
+	if v.waitForInterrupt {
+		c := make(chan os.Signal, 2)
+		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 
-	<-c
+		<-c
+	}
 
 	return nil
 }
