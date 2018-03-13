@@ -524,6 +524,10 @@ func (v *VirtualizationTool) getVMConfigFromMetadata(containerID string) (*VMCon
 			glog.Errorf("Error when retrieving sandbox %q info from metadata store: %v", containerInfo.SandboxID, err)
 			return nil, kubeapi.ContainerState_CONTAINER_UNKNOWN, nil
 		}
+		if sandbox == nil {
+			glog.Errorf("Missing metadata for sandbox %q set in container %q", containerID, containerInfo.SandboxID)
+			return nil, kubeapi.ContainerState_CONTAINER_UNKNOWN, nil
+		}
 		podAnnotations = sandbox.Annotations
 		csn = sandbox.ContainerSideNetwork
 	}

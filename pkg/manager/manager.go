@@ -255,7 +255,7 @@ func (v *VirtletManager) StopPodSandbox(ctx context.Context, in *kubeapi.StopPod
 	}
 	if sandboxInfo == nil {
 		glog.Errorf("Sandbox %q doesn't exist", in.PodSandboxId)
-		return nil, err
+		return nil, fmt.Errorf("sandbox %q not found in Virtlet metadata store", in.PodSandboxId)
 	}
 	status := sandboxInfo.AsPodSandboxStatus()
 
@@ -313,6 +313,10 @@ func (v *VirtletManager) PodSandboxStatus(ctx context.Context, in *kubeapi.PodSa
 	if err != nil {
 		glog.Errorf("Error when getting pod sandbox '%s': %v", podSandboxID, err)
 		return nil, err
+	}
+	if sandboxInfo == nil {
+		glog.Errorf("Sandbox %q doesn't exist", podSandboxID)
+		return nil, fmt.Errorf("sandbox %q not found in Virtlet metadata store", podSandboxID)
 	}
 	status := sandboxInfo.AsPodSandboxStatus()
 
@@ -390,6 +394,10 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 	if err != nil {
 		glog.Errorf("Error when retrieving pod network configuration for sandbox '%s': %v", podSandboxID, err)
 		return nil, err
+	}
+	if sandboxInfo == nil {
+		glog.Errorf("Sandbox %q doesn't exist", podSandboxID)
+		return nil, fmt.Errorf("sandbox %q not in Virtlet metadata store", podSandboxID)
 	}
 
 	fdKey := podSandboxID
