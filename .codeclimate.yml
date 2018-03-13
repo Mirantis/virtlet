@@ -24,7 +24,7 @@ checks:
   return-statements:
     config:
       threshold: 8
-engines:
+plugins:
   gofmt:
     enabled: true
   golint:
@@ -34,6 +34,7 @@ engines:
 ratings:
   paths:
     - "**.go"
-exclude_paths:
+exclude_patterns:
   - "vendor/"
   - "pkg/diskimage/guestfs/guestfs.go"
+  - "tests/"
