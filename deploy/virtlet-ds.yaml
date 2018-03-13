@@ -200,6 +200,8 @@ spec:
           mountPath: /var/log/vms
         - name: dev
           mountPath: /dev
+        - name: modules
+          mountPath: /lib/modules
       volumes:
       # /dev is needed for host raw device access
       - hostPath:
