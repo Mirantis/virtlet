@@ -135,6 +135,8 @@ func dumpMetadata(fname string) error {
 	for _, smeta := range sandboxes {
 		if sinfo, err := smeta.Retrieve(); err != nil {
 			return fmt.Errorf("can't retrieve sandbox: %v", err)
+		} else if sinfo == nil {
+			return fmt.Errorf("sandbox: %s info doesn't exist", smeta.GetID())
 		} else if err := dumpSandbox(smeta.GetID(), sinfo, s); err != nil {
 			return fmt.Errorf("can't dump sandbox: %v", err)
 		}

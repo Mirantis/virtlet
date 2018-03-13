@@ -17,6 +17,7 @@ limitations under the License.
 package metadata
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -100,6 +101,9 @@ func TestRetrieve(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		if actualSandboxInfo == nil {
+			t.Fatal(fmt.Errorf("sandbox %s info doesn't exist", sandbox.GetMetadata().Uid))
+		}
 		if actualSandboxInfo.podID != sandboxManager.GetID() {
 			t.Errorf("invalid podID for retrieved PodSandboxInfo: %s != %s", actualSandboxInfo.podID, sandboxManager.GetID())
 		}
@@ -119,6 +123,9 @@ func TestSetGetPodSandboxStatus(t *testing.T) {
 		sandboxInfo, err := store.PodSandbox(sandbox.GetMetadata().Uid).Retrieve()
 		if err != nil {
 			t.Fatal(err)
+		}
+		if sandboxInfo == nil {
+			t.Fatal(fmt.Errorf("sandbox %s info doesn't exist", sandbox.GetMetadata().Uid))
 		}
 		status := sandboxInfo.AsPodSandboxStatus()
 
