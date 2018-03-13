@@ -145,6 +145,10 @@ func (s *Server) getPodSandboxIP(sandboxID string) (string, error) {
 		glog.Errorf("Error when getting pod sandbox '%s': %v", sandboxID, err)
 		return "", err
 	}
+	if sandboxInfo == nil {
+		glog.Errorf("Sandbox '%s' info doesn't exist", sandboxID)
+		return "", fmt.Errorf("sandbox '%s' info doesn't exist", sandboxID)
+	}
 
 	if sandboxInfo.ContainerSideNetwork == nil {
 		return "", fmt.Errorf("ContainerSideNetwork missing in PodSandboxInfo returned from medatada store")
