@@ -159,6 +159,9 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 		}
 		glog.V(3).Infof("CNI Result after fix:\n%s", spew.Sdump(netConfig))
 		csn, err := nettools.SetupContainerSideNetwork(netConfig, netNSPath, allLinks)
+		if err != nil {
+			return nil, err
+		}
 
 		if respData, err = json.Marshal(csn); err != nil {
 			return nil, fmt.Errorf("error marshalling net config: %v", err)
