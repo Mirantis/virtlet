@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/boltdb/bolt"
 )
@@ -182,6 +183,9 @@ func (b *boltClient) ImagesInUse() (map[string]bool, error) {
 				ci, err := containerMeta.Retrieve()
 				if err != nil {
 					return err
+				}
+				if ci == nil {
+					return fmt.Errorf("containerInfo of container %s is not find in Virtlet metadata store", containerMeta.GetID())
 				}
 				result[ci.Image] = true
 			}

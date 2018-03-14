@@ -17,6 +17,7 @@ limitations under the License.
 package metadata
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -33,6 +34,9 @@ func TestSetGetContainerInfo(t *testing.T) {
 		containerInfo, err := store.Container(container.ContainerId).Retrieve()
 		if err != nil {
 			t.Fatal(err)
+		}
+		if containerInfo == nil {
+			t.Fatal(fmt.Errorf("containerInfo of container %s is not find in Virtlet metadata store", container.ContainerId))
 		}
 
 		if containerInfo.SandboxID != container.SandboxId {
