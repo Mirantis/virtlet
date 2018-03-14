@@ -69,7 +69,7 @@ func TestVNCCommand(t *testing.T) {
 			cmd.SilenceErrors = true
 			switch err := cmd.Execute(); {
 			case err != nil && tc.errSubstring == "":
-				t.Errorf("virsh command returned an unexpected error: %v", err)
+				t.Errorf("vnc command returned an unexpected error: %v", err)
 			case err == nil && tc.errSubstring != "":
 				t.Errorf("Didn't get expected error (substring %q), output: %q", tc.errSubstring, out.String())
 			case err != nil && !strings.Contains(err.Error(), tc.errSubstring):
