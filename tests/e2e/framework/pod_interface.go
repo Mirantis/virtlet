@@ -178,16 +178,15 @@ func (ci *containerInterface) Exec(command []string, stdin io.Reader, stdout, st
 		Stdout:             stdout,
 		Stderr:             stderr,
 	}
-	err = executor.Stream(options)
-	if err != nil {
+
+	if err := executor.Stream(options); err != nil {
 		if c, ok := err.(exec.CodeExitError); ok {
 			exitCode = c.Code
-			err = nil
+		} else {
+			return 0, err
 		}
 	}
-	if err != nil {
-		return 0, err
-	}
+
 	return exitCode, nil
 }
 
