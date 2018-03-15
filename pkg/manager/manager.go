@@ -180,7 +180,7 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 	podNs := config.Metadata.Namespace
 
 	glog.V(2).Infof("RunPodSandbox called for pod %s (%s)", podName, podID)
-	//===================================================
+
 	// Check if sandbox already exists, it may happen when virtlet restarts and kubelet "thinks" that sandbox disappered
 	sandbox := v.metadataStore.PodSandbox(podID)
 	sandboxInfo, err := sandbox.Retrieve()
@@ -190,11 +190,10 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 			return &kubeapi.RunPodSandboxResponse{
 				PodSandboxId: podID,
 			}, err
-		} else {
-			// FIXMEM
 		}
+		glog.Errorf("sandbox exists but it's not ready. Sandbox status: %v", status)
+		return nil, err
 	}
-	//===================================================
 
 	glog.V(3).Infof("RunPodSandbox: %s", spew.Sdump(in))
 	glog.V(2).Infof("Sandbox config annotations: %v", config.GetAnnotations())
@@ -398,10 +397,6 @@ func (v *VirtletManager) CreateContainer(ctx context.Context, in *kubeapi.Create
 			response := &kubeapi.CreateContainerResponse{ContainerId: container.GetID()}
 			return response, nil
 		}
-		//	if err := v.libvirtVirtualizationTool.RemoveContainer(container.GetID()); err != nil {
-		//		glog.Errorf("Error cleaning up the old container with id %s: %v", container.GetID(), err)
-		//		return nil, err
-		//	}
 	}
 
 	sandboxInfo, err := v.metadataStore.PodSandbox(podSandboxID).Retrieve()
@@ -436,22 +431,18 @@ func (v *VirtletManager) StartContainer(ctx context.Context, in *kubeapi.StartCo
 	glog.V(2).Infof("StartContainer called for containerID: %s", in.ContainerId)
 	glog.V(3).Infof("StartContainer: %s", spew.Sdump(in))
 
-	//===========================================
 	status, err := v.libvirtVirtualizationTool.ContainerStatus(in.ContainerId)
-	glog.V(2).Infof("Is running? %v %#v", err, status)
-	if err == nil && status != nil && status.State == 1 {
+	if err == nil && status != nil && status.State == kubeapi.ContainerState_CONTAINER_RUNNING {
+		glog.V(2).Infof("StartContainer: Container %s is already running", in.ContainerId)
 		response := &kubeapi.StartContainerResponse{}
 		return response, nil
 	}
-	//===========================================
-	response := &kubeapi.StartContainerResponse{}
-	//return response, nil
 
 	if err := v.libvirtVirtualizationTool.StartContainer(in.ContainerId); err != nil {
 		glog.Errorf("Error when starting container %s: %v", in.ContainerId, err)
 		return nil, err
 	}
-	response = &kubeapi.StartContainerResponse{}
+	response := &kubeapi.StartContainerResponse{}
 	return response, nil
 }
 

@@ -22,7 +22,9 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/user"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -72,6 +74,12 @@ func (u *UnixServer) Listen() {
 	l, err := net.ListenUnix("unix", &net.UnixAddr{Name: u.SocketPath, Net: "unix"})
 	if err != nil {
 		glog.Error("listen error:", err)
+		return
+	}
+
+	err = fixOwner(u.SocketPath)
+	if err != nil {
+		glog.Error("%v", err)
 		return
 	}
 	defer func() {
@@ -238,4 +246,23 @@ func readerIndex(readers []chan []byte, r chan []byte) int {
 		}
 	}
 	return -1
+}
+
+func fixOwner(path string) error {
+	// Qemu is run as a libvirt-qemu user. It needs acces to a socket file for serial access.
+	// Libvirt sets correct rights for it when vm is started but when virtlet pod restarts the file
+	// is recreated with root/root set as owner/group so changing user manualy
+	// FIXME: Is it better way to do it?
+	user, err := user.Lookup("libvirt-qemu")
+	if err != nil {
+		return fmt.Errorf("Error when looking up libvirt-qemu user: %v", err)
+	}
+	uid, err := strconv.Atoi(user.Uid)
+	if err != nil {
+		return fmt.Errorf("Error when converting Uid to int: %v", err)
+	}
+	if err := os.Chown(path, uid, 0); err != nil {
+		return fmt.Errorf("chown error: %v", err)
+	}
+	return nil
 }
