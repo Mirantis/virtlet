@@ -38,3 +38,5 @@ exclude_patterns:
   - "vendor/"
   - "pkg/diskimage/guestfs/guestfs.go"
   - "tests/"
+  - "**/*_test.go"
+  - "*_test.go"

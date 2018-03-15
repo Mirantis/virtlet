@@ -74,6 +74,15 @@ func (u *UnixServer) Listen() {
 		glog.Error("listen error:", err)
 		return
 	}
+	// Qemu is run as a libvirt-qemu user. It needs acces to socket file for serial access.
+	// Libvirt sets correct rights for it when vm is started but when virtlet pod restarts the file
+	// is recreated with root/root set as owner/group so changing user manualy
+	// FIXME: Is it better way to do it?
+	// 64055 libvirt uid
+	if err := os.Chown(u.SocketPath, 64055, 0); err != nil {
+		glog.Error("chown error:", err)
+		return
+	}
 	defer func() {
 		l.Close()
 		u.cleanup()

@@ -1,7 +1,7 @@
 # TODO: generate this tag. unfortunately can't use ARG:
 # https://docs.docker.com/engine/reference/builder/#understand-how-arg-and-from-interact
 # (but add a note about it here for the future)
-FROM mirantis/virtlet-build:v1-9da9c6dd2ca80cf41bf90e46ea58d142
+FROM mirantis/virtlet-build:v1-cbfe70f0685f781bc04ef28e90ba044c
 MAINTAINER Ivan Shvedunov <ishvedunov@mirantis.com>
 
 LABEL virtlet.image="build"
