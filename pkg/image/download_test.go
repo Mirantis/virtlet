@@ -35,11 +35,14 @@ import (
 
 func downloadHandler(content string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.String() != "/base.qcow2" {
-			http.NotFound(w, r)
-		} else {
+		switch r.URL.String() {
+		case "/base.qcow2":
 			w.Header().Set("Content-Type", "application/octet-stream")
 			w.Write([]byte(content))
+		case "/redir.qcow2":
+			http.Redirect(w, r, "/base.qcow2", http.StatusFound)
+		default:
+			http.NotFound(w, r)
 		}
 	}
 }
@@ -60,6 +63,15 @@ func TestDownload(t *testing.T) {
 	defer ts.Close()
 	verifyDownload(t, "http", "foobar", Endpoint{
 		URL: ts.Listener.Addr().String() + "/base.qcow2",
+	})
+}
+
+func TestDownloadRedirect(t *testing.T) {
+	ts := httptest.NewServer(downloadHandler("foobar"))
+	defer ts.Close()
+	verifyDownload(t, "http", "foobar", Endpoint{
+		URL:          ts.Listener.Addr().String() + "/redir.qcow2",
+		MaxRedirects: -1,
 	})
 }
 
@@ -123,4 +135,20 @@ func TestCancelDownload(t *testing.T) {
 		t.Errorf("DownloadFile() is expected to return Cancelled error but returned %q", err)
 	}
 	<-done
+}
+
+func TestNotFound(t *testing.T) {
+	ts := httptest.NewServer(downloadHandler("foobar"))
+	defer ts.Close()
+	downloader := NewDownloader("http")
+	var buf bytes.Buffer
+	ep := Endpoint{
+		URL: ts.Listener.Addr().String() + "/nosuchimage.qcow2",
+	}
+	switch err := downloader.DownloadFile(context.Background(), ep, &buf); {
+	case err == nil:
+		t.Errorf("no error returned for a nonexistent image")
+	case !strings.Contains(err.Error(), "Not Found"):
+		t.Errorf("bad error message for nonexistent image")
+	}
 }

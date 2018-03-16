@@ -204,6 +204,10 @@ func (d *defaultDownloader) DownloadFile(ctx context.Context, endpoint Endpoint,
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("bad http status %q", resp.Status)
+	}
+
 	if _, err = io.CopyBuffer(w, resp.Body, make([]byte, copyBufferSize)); err != nil {
 		return err
 	}
