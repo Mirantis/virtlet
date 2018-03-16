@@ -43,4 +43,4 @@ fi
 chown root.root /vmwrapper
 chmod ug+s /vmwrapper
 
-/usr/sbin/libvirtd --listen $daemon
+/usr/local/sbin/libvirtd --listen $daemon

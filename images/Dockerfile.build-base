@@ -1,7 +1,7 @@
 # TODO: generate this tag. unfortunately can't use ARG:
 # https://docs.docker.com/engine/reference/builder/#understand-how-arg-and-from-interact
 # (but add a note about it here for the future)
-FROM mirantis/virtlet-base:v1-22de6b4e88a489a2c0b441e3f3d01a3e
+FROM mirantis/virtlet-base:v1-68d76f01eb6b263e98d0ac1532fb635d
 MAINTAINER Ivan Shvedunov <ishvedunov@mirantis.com>
 
 LABEL virtlet.image="build-base"
@@ -30,7 +30,6 @@ RUN apt-get update && \
                 autoconf \
                 automake \
                 libglib2.0-dev \
-                libvirt-dev \
                 libguestfs-dev \
                 libguestfs0-dbg \
                 p7zip-full \
