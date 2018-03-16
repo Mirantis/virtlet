@@ -92,7 +92,7 @@ func (c *client) AddSandboxToNetwork(podID, podName, podNs string) (*cnicurrent.
 
 // RemoveSandboxFromNetwork implements RemoveSandboxFromNetwork method of Client interface.
 func (c *client) RemoveSandboxFromNetwork(podID, podName, podNs string) error {
-	return utils.NewNsFixCall("cniRemoveSandboxToNetwork").
+	return utils.NewNsFixCall("cniRemoveSandboxFromNetwork").
 		Arg(cniRequest{
 			PluginsDir: c.pluginsDir,
 			ConfigsDir: c.configsDir,
