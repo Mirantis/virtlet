@@ -31,6 +31,11 @@ for p in /dind /dev /boot /sys/fs/cgroup; do docker exec kube-node-1 mount --mak
 ```
 kubectl create configmap -n kube-system virtlet-image-translations --from-file images.yaml
 ```
+1. Install CRI proxy on the node:
+```
+CRIPROXY_DEB_URL="https://github.com/Mirantis/criproxy/releases/download/v0.10.0/criproxy-nodeps_0.10.0_amd64.deb"
+docker exec kube-node-1 /bin/bash -c "curl -sSL '${CRIPROXY_DEB_URL}' >/criproxy.deb && dpkg -i /criproxy.deb && rm /criproxy.deb"
+```
 1. Deploy Virtlet DaemonSet (assuming that you have [virtlet-ds.yaml](virtlet-ds.yaml) in the current directory):
 ```
 kubectl create -f virtlet-ds.yaml
