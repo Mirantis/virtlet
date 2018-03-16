@@ -19,19 +19,27 @@ $ export PATH="$HOME/.kubeadm-dind-cluster:$PATH"
 ```
    The cluster script stores appropriate kubectl version in `~/.kubeadm-dind-cluster`.
 
-2. Label a node to accept Virtlet pod:
+1. Label a node to accept Virtlet pod:
 ```
 kubectl label node kube-node-1 extraRuntime=virtlet
 ```
-3. Deploy Virtlet DaemonSet (assuming that you have [virtlet-ds.yaml](virtlet-ds.yaml) in the current directory):
+1. Make several mounts shared inside the dind node that will run Virtlet:
+```
+for p in /dind /dev /boot /sys/fs/cgroup; do docker exec kube-node-1 mount --make-shared $p; done
+```
+1. Add virtlet image translation configmap:
+```
+kubectl create configmap -n kube-system virtlet-image-translations --from-file images.yaml
+```
+1. Deploy Virtlet DaemonSet (assuming that you have [virtlet-ds.yaml](virtlet-ds.yaml) in the current directory):
 ```
 kubectl create -f virtlet-ds.yaml
 ```
-4. Wait for Virtlet pod to activate:
+1. Wait for Virtlet pod to activate:
 ```
 kubectl get pods -w -n kube-system
 ```
-5. Go to `examples/` directory and follow [the instructions](../examples/README.md) from there.
+1. Go to `examples/` directory and follow [the instructions](../examples/README.md) from there.
 
 ## Configuring Virtlet
 
