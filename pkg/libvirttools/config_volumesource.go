@@ -26,7 +26,7 @@ import (
 var configIsoDir = "/var/lib/virtlet/config"
 
 // configVolume denotes an ISO image using config format
-// that contains cloud-init meta-data nad user-data
+// that contains cloud-init meta-data and user-data
 type configVolume struct {
 	volumeBase
 }
