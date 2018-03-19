@@ -197,5 +197,5 @@ func handleRemoveSandboxFromNetwork(arg interface{}) (interface{}, error) {
 
 func init() {
 	utils.RegisterNsFixReexec("cniAddSandboxToNetwork", handleAddSandboxToNetwork, cniRequest{})
-	utils.RegisterNsFixReexec("cniRemoveSandboxFromNetwork", handleAddSandboxToNetwork, cniRequest{})
+	utils.RegisterNsFixReexec("cniRemoveSandboxFromNetwork", handleRemoveSandboxFromNetwork, cniRequest{})
 }
