@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"os/exec"
+	"syscall"
 )
 
 type LocalCmd struct {
@@ -22,10 +23,19 @@ func (l *LocalCmd) Exec(command []string, stdin io.Reader, stdout, stderr io.Wri
 	l.cmd.Stdout = stdout
 	l.cmd.Stderr = stderr
 
-	err := l.cmd.Start()
-	if err != nil {
-		return 1, err
+	if err := l.cmd.Start(); err != nil {
+		return 0, err
 	}
+
+	if err := l.cmd.Wait(); err != nil {
+		if exiterr, ok := err.(*exec.ExitError); ok {
+			if s, ok := exiterr.Sys().(syscall.WaitStatus); ok {
+				return s.ExitStatus(), nil
+			}
+		}
+		return 0, err
+	}
+
 	return 0, nil
 }
 
