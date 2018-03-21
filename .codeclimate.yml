@@ -24,6 +24,10 @@ checks:
   return-statements:
     config:
       threshold: 8
+  similar-code:
+    enabled: false
+  identical-code:
+    enabled: false
 plugins:
   gofmt:
     enabled: true
