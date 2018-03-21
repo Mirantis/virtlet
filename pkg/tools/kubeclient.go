@@ -91,6 +91,8 @@ func (fp ForwardedPort) String() string {
 // NOTE: this regexp ignores ipv6 port forward lines
 var portForwardRx = regexp.MustCompile(`Forwarding from [^[]*:(\d+) -> \d+`)
 
+// ParsePortForwardOutput extracts from returned by api "out" data information
+// about local ports in each of ForwardedPort
 func ParsePortForwardOutput(out string, ports []*ForwardedPort) error {
 	var localPorts []uint16
 	for _, l := range strings.Split(out, "\n") {
