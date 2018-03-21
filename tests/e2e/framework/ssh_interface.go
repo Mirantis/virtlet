@@ -107,8 +107,13 @@ func (si *sshInterface) Start(stdin io.Reader, stdout, stderr io.Writer, command
 }
 
 func (si *sshInterface) Close() error {
-	defer close(si.fwStopCh)
-	return si.client.Close()
+	if si.client != nil {
+		defer close(si.fwStopCh)
+		err := si.client.Close()
+		si.client = nil
+		return err
+	}
+	return nil
 }
 
 type sshCommand struct {
