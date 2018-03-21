@@ -37,13 +37,6 @@ type DockerContainerInterface struct {
 	ID     string
 }
 
-// DockerContainerExecInterface is the receiver object for commands execution in docker container
-type DockerContainerExecInterface struct {
-	dockerInterface *DockerContainerInterface
-	user            string
-	privileged      bool
-}
-
 func newDockerContainerInterface(name string) (*DockerContainerInterface, error) {
 	cli, err := client.NewEnvClient()
 	if err != nil {
@@ -53,32 +46,6 @@ func newDockerContainerInterface(name string) (*DockerContainerInterface, error)
 		client: cli,
 		Name:   name,
 	}, nil
-}
-
-// PullImage pulls docker image from remote registry
-func (d *DockerContainerInterface) PullImage(name string) error {
-	out, err := d.client.ImagePull(context.Background(), name, types.ImagePullOptions{})
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-	_, err = io.Copy(ioutil.Discard, out)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// Delete deletes docker container
-func (d *DockerContainerInterface) Delete() error {
-	id := d.Name
-	if d.ID != "" {
-		id = d.ID
-	}
-	return d.client.ContainerRemove(context.Background(), id, types.ContainerRemoveOptions{
-		RemoveVolumes: true,
-		Force:         true,
-	})
 }
 
 // Run starts new docker container (similar to `docker run`)
@@ -117,6 +84,32 @@ func (d *DockerContainerInterface) Run(image string, env map[string]string, netw
 	return nil
 }
 
+// PullImage pulls docker image from remote registry
+func (d *DockerContainerInterface) PullImage(name string) error {
+	out, err := d.client.ImagePull(context.Background(), name, types.ImagePullOptions{})
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	_, err = io.Copy(ioutil.Discard, out)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Delete deletes docker container
+func (d *DockerContainerInterface) Delete() error {
+	id := d.Name
+	if d.ID != "" {
+		id = d.ID
+	}
+	return d.client.ContainerRemove(context.Background(), id, types.ContainerRemoveOptions{
+		RemoveVolumes: true,
+		Force:         true,
+	})
+}
+
 // Container returns info for the container associated with method receiver
 func (d *DockerContainerInterface) Container() (*types.Container, error) {
 	args := filters.NewArgs()
@@ -152,8 +145,17 @@ func (d *DockerContainerInterface) Executor(privileged bool, user string) Execut
 	}
 }
 
-// Exec executes command in docker container
-func (n *DockerContainerExecInterface) Exec(command []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
+// DockerContainerExecInterface is the receiver object for commands execution in docker container
+type DockerContainerExecInterface struct {
+	dockerInterface *DockerContainerInterface
+	user            string
+	privileged      bool
+}
+
+var _ Executor = &DockerContainerExecInterface{}
+
+// Run executes command in docker container
+func (n *DockerContainerExecInterface) Run(stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
 	ctx := context.Background()
 	cfg := types.ExecConfig{
 		AttachStdout: stdout != nil,
@@ -165,22 +167,28 @@ func (n *DockerContainerExecInterface) Exec(command []string, stdin io.Reader, s
 	}
 	cr, err := n.dockerInterface.client.ContainerExecCreate(ctx, n.dockerInterface.Name, cfg)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	r, err := n.dockerInterface.client.ContainerExecAttach(ctx, cr.ID, cfg)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	err = containerExecPipe(r, stdin, stdout, stderr)
+	err = containerHandleDataPiping(r, stdin, stdout, stderr)
 	if err != nil {
-		return 0, err
+		return err
 	}
+
 	info, err := n.dockerInterface.client.ContainerExecInspect(ctx, cr.ID)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	return info.ExitCode, nil
+
+	if info.ExitCode != 0 {
+		return CommandError{ExitCode: info.ExitCode}
+	}
+
+	return nil
 }
 
 // Close closes the executor
@@ -188,11 +196,18 @@ func (*DockerContainerExecInterface) Close() error {
 	return nil
 }
 
-func containerExecPipe(resp types.HijackedResponse, inStream io.Reader, outStream, errorStream io.Writer) error {
+// Start is a placeholder for fulfilling Executor interface
+func (*DockerContainerExecInterface) Start(stdin io.Reader, stdout, stderr io.Writer, command ...string) (Command, error) {
+	return nil, fmt.Errorf("Not Implemented")
+}
+
+func containerHandleDataPiping(resp types.HijackedResponse, inStream io.Reader, outStream, errorStream io.Writer) error {
 	var err error
 	receiveStdout := make(chan error, 1)
 	if outStream != nil || errorStream != nil {
 		go func() {
+			// Copy data from attached container session to both
+			// out and error streams.
 			_, err = stdcopy.StdCopy(outStream, errorStream, resp.Reader)
 			receiveStdout <- err
 		}()

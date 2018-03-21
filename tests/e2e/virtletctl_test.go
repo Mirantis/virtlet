@@ -40,7 +40,7 @@ var _ = Describe("virtletctl tests", func() {
 		localExecutor := framework.LocalExecutor(ctx)
 
 		By("Calling virtletctl help")
-		_, err := framework.ExecSimple(localExecutor, "_output/virtletctl", "help")
+		_, err := framework.RunSimple(localExecutor, "_output/virtletctl", "help")
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -52,7 +52,7 @@ var _ = Describe("virtletctl tests", func() {
 		localExecutor := framework.LocalExecutor(ctx)
 
 		By("Calling virtletctl dump-metadata")
-		_, err := framework.ExecSimple(localExecutor, "_output/virtletctl", "dump-metadata")
+		_, err := framework.RunSimple(localExecutor, "_output/virtletctl", "dump-metadata")
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -64,7 +64,7 @@ var _ = Describe("virtletctl tests", func() {
 		localExecutor := framework.LocalExecutor(ctx)
 
 		By("Calling virtletctl gendoc")
-		_, err := framework.ExecSimple(localExecutor, "_output/virtletctl", "gendoc", "/tmp")
+		_, err := framework.RunSimple(localExecutor, "_output/virtletctl", "gendoc", "/tmp")
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -77,11 +77,11 @@ var _ = Describe("virtletctl tests", func() {
 			localExecutor := framework.LocalExecutor(ctx)
 
 			By("Calling virtletctl install")
-			_, err := framework.ExecSimple(localExecutor, "_output/virtletctl", "install")
+			_, err := framework.RunSimple(localExecutor, "_output/virtletctl", "install")
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Calling kubectl plugin virt help")
-			_, err = framework.ExecSimple(localExecutor, "kubectl", "plugin", "virt", "help")
+			_, err = framework.RunSimple(localExecutor, "kubectl", "plugin", "virt", "help")
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
@@ -136,10 +136,10 @@ var _ = Describe("virtletctl tests", func() {
 			defer closeFunc()
 			localExecutor := framework.LocalExecutor(ctx)
 
-			output, err := framework.ExecSimple(localExecutor, "_output/virtletctl", "ssh", "cirros@cirros-vm", "--", "-i", tempfileName, "hostname")
+			output, err := framework.RunSimple(localExecutor, "_output/virtletctl", "ssh", "cirros@cirros-vm", "--", "-i", tempfileName, "hostname")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(output).To(Equal("cirros-vm"))
-		})
+		}, 60)
 	})
 
 	It("Should not fail during virsh list", func(done Done) {
@@ -150,7 +150,7 @@ var _ = Describe("virtletctl tests", func() {
 		localExecutor := framework.LocalExecutor(ctx)
 
 		By("Calling virtletctl virsh list")
-		_, err := framework.ExecSimple(localExecutor, "_output/virtletctl", "virsh", "list")
+		_, err := framework.RunSimple(localExecutor, "_output/virtletctl", "virsh", "list")
 		Expect(err).NotTo(HaveOccurred())
 	})
 })

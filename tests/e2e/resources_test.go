@@ -52,7 +52,7 @@ var _ = Describe("VM resources", func() {
 	})
 
 	It("Should have total memory amount close to that set for the domain [Conformance]", func() {
-		meminfo := do(framework.ExecSimple(ssh, "cat", "/proc/meminfo")).(string)
+		meminfo := do(framework.RunSimple(ssh, "cat", "/proc/meminfo")).(string)
 		totals := regexp.MustCompile(`(?:DirectMap4k|DirectMap2M):\s+(\d+)`).FindAllStringSubmatch(meminfo, -1)
 		Expect(totals).To(HaveLen(2))
 		total := 0

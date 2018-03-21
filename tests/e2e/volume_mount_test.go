@@ -44,11 +44,11 @@ var _ = Describe("Container volume mounts", func() {
 			nodeExecutor, err = controller.DinDNodeExecutor(virtletNodeName)
 			Expect(err).NotTo(HaveOccurred())
 
-			_, err = framework.ExecSimple(nodeExecutor, "dd", "if=/dev/zero", "of=/rawdevtest", "bs=1M", "count=10")
+			_, err = framework.RunSimple(nodeExecutor, "dd", "if=/dev/zero", "of=/rawdevtest", "bs=1M", "count=10")
 			Expect(err).NotTo(HaveOccurred())
-			_, err = framework.ExecSimple(nodeExecutor, "mkfs.ext4", "/rawdevtest")
+			_, err = framework.RunSimple(nodeExecutor, "mkfs.ext4", "/rawdevtest")
 			Expect(err).NotTo(HaveOccurred())
-			devPath, err = framework.ExecSimple(nodeExecutor, "losetup", "-f", "/rawdevtest", "--show")
+			devPath, err = framework.RunSimple(nodeExecutor, "losetup", "-f", "/rawdevtest", "--show")
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -65,7 +65,7 @@ var _ = Describe("Container volume mounts", func() {
 			// The loopback device is detached by itself upon
 			// success (TODO: check why it happens), so we
 			// ignore errors here
-			framework.ExecSimple(nodeExecutor, "losetup", "-d", devPath)
+			framework.RunSimple(nodeExecutor, "losetup", "-d", devPath)
 		})
 
 		It("Should be handled inside the VM", func() {
@@ -180,7 +180,7 @@ var _ = Describe("Container volume mounts", func() {
 
 		It("And files must be found on VM [Conformance]", func() {
 			ssh := waitSSH(vm)
-			Expect(framework.ExecSimple(ssh, "cat", "/tmp/vol/test-file1", "/tmp/vol/test-file2")).To(Equal("Hello world!"))
+			Expect(framework.RunSimple(ssh, "cat", "/tmp/vol/test-file1", "/tmp/vol/test-file2")).To(Equal("Hello world!"))
 		})
 	})
 
@@ -239,7 +239,7 @@ var _ = Describe("Container volume mounts", func() {
 
 		It("And files must be found on VM [Conformance]", func() {
 			ssh := waitSSH(vm)
-			Expect(framework.ExecSimple(ssh, "cat", "/tmp/vol/test-file1", "/tmp/vol/test-file2")).To(Equal("Hello world!"))
+			Expect(framework.RunSimple(ssh, "cat", "/tmp/vol/test-file1", "/tmp/vol/test-file2")).To(Equal("Hello world!"))
 		})
 	})
 
@@ -277,6 +277,6 @@ func makeVolumeMountVM(nodeName string, podCustomization func(*framework.PodInte
 
 func shouldBeMounted(ssh framework.Executor, path string) {
 	Eventually(func() (string, error) {
-		return framework.ExecSimple(ssh, "ls -l "+path)
+		return framework.RunSimple(ssh, "ls -l "+path)
 	}, 60).Should(ContainSubstring("lost+found"))
 }

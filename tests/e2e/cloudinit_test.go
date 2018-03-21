@@ -183,7 +183,7 @@ var _ = Describe("Cloud-init related tests", func() {
 
 		It("Must be processed [Conformance]", func() {
 			ssh := waitSSH(vm)
-			Expect(framework.ExecSimple(ssh, "cat", "/tmp/test-file")).To(Equal("Hello world!"))
+			Expect(framework.RunSimple(ssh, "cat", "/tmp/test-file")).To(Equal("Hello world!"))
 		})
 	})
 
@@ -218,7 +218,7 @@ var _ = Describe("Cloud-init related tests", func() {
 
 		It("Must be processed [Conformance]", func() {
 			ssh := waitSSH(vm)
-			Expect(framework.ExecSimple(ssh, "cat", "/tmp/test-file")).To(Equal("Hello world!"))
+			Expect(framework.RunSimple(ssh, "cat", "/tmp/test-file")).To(Equal("Hello world!"))
 		})
 	})
 
@@ -255,7 +255,7 @@ var _ = Describe("Cloud-init related tests", func() {
 
 		It("Must be processed [Conformance]", func() {
 			ssh := waitSSH(vm)
-			Expect(framework.ExecSimple(ssh, "cat", "/tmp/test-file1", "/tmp/test-file2")).To(Equal("Hello world!"))
+			Expect(framework.RunSimple(ssh, "cat", "/tmp/test-file1", "/tmp/test-file2")).To(Equal("Hello world!"))
 		})
 	})
 

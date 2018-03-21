@@ -43,7 +43,7 @@ var _ = Describe("Hung VM", func() {
 
 	It("Must be successfully deleted after it hangs [Conformance]", func() {
 		Eventually(framework.WithTimeout(time.Second*2, func() error {
-			_, err := framework.ExecSimple(ssh, "sudo /sbin/halt -nf")
+			_, err := framework.RunSimple(ssh, "sudo /sbin/halt -nf")
 			return err
 		})).Should(MatchError(framework.ErrTimeout))
 

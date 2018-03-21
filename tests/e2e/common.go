@@ -58,14 +58,14 @@ func waitSSH(vm *framework.VMInterface) framework.Executor {
 			if err != nil {
 				return err
 			}
-			_, err = framework.ExecSimple(ssh)
+			_, err = framework.RunSimple(ssh)
 			return err
 		}, 60*5, 3).Should(Succeed())
 	return ssh
 }
 
 func checkCPUCount(vm *framework.VMInterface, ssh framework.Executor, cpus int) {
-	proc := do(framework.ExecSimple(ssh, "cat", "/proc/cpuinfo")).(string)
+	proc := do(framework.RunSimple(ssh, "cat", "/proc/cpuinfo")).(string)
 	Expect(regexp.MustCompile(`(?m)^processor`).FindAllString(proc, -1)).To(HaveLen(cpus))
 	cpuStats := do(vm.VirshCommand("domstats", "<domain>", "--vcpu")).(string)
 	match := regexp.MustCompile(`vcpu\.maximum=(\d+)`).FindStringSubmatch(cpuStats)

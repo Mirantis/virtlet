@@ -91,7 +91,7 @@ func (fp ForwardedPort) String() string {
 // NOTE: this regexp ignores ipv6 port forward lines
 var portForwardRx = regexp.MustCompile(`Forwarding from [^[]*:(\d+) -> \d+`)
 
-func parsePortForwardOutput(out string, ports []*ForwardedPort) error {
+func ParsePortForwardOutput(out string, ports []*ForwardedPort) error {
 	var localPorts []uint16
 	for _, l := range strings.Split(out, "\n") {
 		m := portForwardRx.FindStringSubmatch(l)
@@ -415,7 +415,7 @@ func (c *RealKubeClient) ForwardPorts(podName, namespace string, ports []*Forwar
 		return nil, err
 	case <-readyCh:
 		// FIXME: there appears to be no better way to get back the local ports as of now
-		if err := parsePortForwardOutput(buf.String(), ports); err != nil {
+		if err := ParsePortForwardOutput(buf.String(), ports); err != nil {
 			return nil, err
 		}
 	}

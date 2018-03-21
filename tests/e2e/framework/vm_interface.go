@@ -268,5 +268,5 @@ func RunVirsh(virtletPod *PodInterface, command ...string) (string, error) {
 		return "", err
 	}
 	cmd := append([]string{"virsh"}, command...)
-	return ExecSimple(container, cmd...)
+	return RunSimple(container, cmd...)
 }
