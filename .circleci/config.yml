@@ -264,6 +264,7 @@ jobs:
         paths:
         - virtlet.tar
         - virtlet-e2e-tests
+        - virtletctl
         # needed by integration tests
         - vmwrapper
     - store_artifacts:
