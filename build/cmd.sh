@@ -150,7 +150,7 @@ function ensure_build_container {
            docker_cert_args=(-e DOCKER_CERT_PATH=/docker-cert)
         fi
         docker run -d --privileged --net=host \
-               -l virtlet_build \
+               -l virtlet_build=1 \
                -v "virtlet_src:${remote_project_dir}" \
                -v "virtlet_pkg:/go/pkg" \
                -v /sys/fs/cgroup:/sys/fs/cgroup \
