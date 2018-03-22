@@ -42,7 +42,7 @@ var _ = Describe("virtletctl", func() {
 		By("Calling virtletctl help")
 		_, err := framework.RunSimple(localExecutor, "_output/virtletctl", "help")
 		Expect(err).NotTo(HaveOccurred())
-	})
+	}, 10)
 
 	It("Should dump Virtlet metadata on dump-metadata subcommand", func(done Done) {
 		defer close(done)
@@ -54,7 +54,7 @@ var _ = Describe("virtletctl", func() {
 		By("Calling virtletctl dump-metadata")
 		_, err := framework.RunSimple(localExecutor, "_output/virtletctl", "dump-metadata")
 		Expect(err).NotTo(HaveOccurred())
-	})
+	}, 60)
 
 	It("Should generate documentation on gendoc subcommand", func(done Done) {
 		defer close(done)
@@ -66,7 +66,7 @@ var _ = Describe("virtletctl", func() {
 		By("Calling virtletctl gendoc")
 		_, err := framework.RunSimple(localExecutor, "_output/virtletctl", "gendoc", "/tmp")
 		Expect(err).NotTo(HaveOccurred())
-	})
+	}, 10)
 
 	Context("SSH subcommand", func() {
 		var (
@@ -134,7 +134,7 @@ var _ = Describe("virtletctl", func() {
 		By("Calling virtletctl virsh list")
 		_, err := framework.RunSimple(localExecutor, "_output/virtletctl", "virsh", "list")
 		Expect(err).NotTo(HaveOccurred())
-	})
+	}, 60)
 })
 
 var _ = Describe("virtletctl unsafe", func() {
@@ -157,6 +157,6 @@ var _ = Describe("virtletctl unsafe", func() {
 			By("Calling kubectl plugin virt help")
 			_, err = framework.RunSimple(localExecutor, "kubectl", "plugin", "virt", "help")
 			Expect(err).NotTo(HaveOccurred())
-		})
+		}, 60)
 	})
 })
