@@ -39,6 +39,10 @@ func recoverNetworkNamespaces(metadataStore metadata.Store, fdManager tapmanager
 			allErrors = append(allErrors, fmt.Errorf("can not retrieve PodSandboxInfo for sandbox id %q: %v", s.GetID(), err))
 			continue
 		}
+		if psi == nil {
+			allErrors = append(allErrors, fmt.Errorf("inconsistent database. Found pod %q sandbox but can not retrive its metadata", s.GetID()))
+			continue
+		}
 
 		if err := fdManager.Recover(
 			s.GetID(),

@@ -142,8 +142,12 @@ func (s *Server) getPodSandboxIP(sandboxID string) (string, error) {
 	sandbox := s.metadataStore.PodSandbox(sandboxID)
 	sandboxInfo, err := sandbox.Retrieve()
 	if err != nil {
-		glog.Errorf("Error when getting pod sandbox '%s': %v", sandboxID, err)
+		glog.Errorf("Error when getting pod sandbox %q: %v", sandboxID, err)
 		return "", err
+	}
+	if sandboxInfo == nil {
+		glog.Errorf("Missing metadata for pod sandbox %q", sandboxID)
+		return "", fmt.Errorf("missing metadata for pod sandbox %q", sandboxID)
 	}
 
 	if sandboxInfo.ContainerSideNetwork == nil {
