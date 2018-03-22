@@ -31,8 +31,8 @@ import (
 	. "github.com/Mirantis/virtlet/tests/e2e/ginkgo-ext"
 )
 
-var _ = Describe("virtletctl tests", func() {
-	It("Should how usage", func(done Done) {
+var _ = Describe("virtletctl", func() {
+	It("Should display usage info on help subcommand", func(done Done) {
 		defer close(done)
 
 		ctx, closeFunc := context.WithCancel(context.Background())
@@ -44,7 +44,7 @@ var _ = Describe("virtletctl tests", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("Should not fail during dump-metadata", func(done Done) {
+	It("Should dump Virtlet metadata on dump-metadata subcommand", func(done Done) {
 		defer close(done)
 
 		ctx, closeFunc := context.WithCancel(context.Background())
@@ -56,7 +56,7 @@ var _ = Describe("virtletctl tests", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("Should not fail during gendoc", func(done Done) {
+	It("Should generate documentation on gendoc subcommand", func(done Done) {
 		defer close(done)
 
 		ctx, closeFunc := context.WithCancel(context.Background())
@@ -66,24 +66,6 @@ var _ = Describe("virtletctl tests", func() {
 		By("Calling virtletctl gendoc")
 		_, err := framework.RunSimple(localExecutor, "_output/virtletctl", "gendoc", "/tmp")
 		Expect(err).NotTo(HaveOccurred())
-	})
-
-	Context("Install subcommand", func() {
-		It("Should not fail during install", func(done Done) {
-			defer close(done)
-
-			ctx, closeFunc := context.WithCancel(context.Background())
-			defer closeFunc()
-			localExecutor := framework.LocalExecutor(ctx)
-
-			By("Calling virtletctl install")
-			_, err := framework.RunSimple(localExecutor, "_output/virtletctl", "install")
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Calling kubectl plugin virt help")
-			_, err = framework.RunSimple(localExecutor, "kubectl", "plugin", "virt", "help")
-			Expect(err).NotTo(HaveOccurred())
-		})
 	})
 
 	Context("SSH subcommand", func() {
@@ -128,7 +110,7 @@ var _ = Describe("virtletctl tests", func() {
 			os.Remove(tempfileName)
 		})
 
-		It("Should can call remote command with virtletctl ssh", func(done Done) {
+		It("Should be able to access the pod via ssh using ssh subcommand", func(done Done) {
 			By("Calling virtletctl ssh cirros@cirros-vm hostname")
 			defer close(done)
 
@@ -142,7 +124,7 @@ var _ = Describe("virtletctl tests", func() {
 		}, 60)
 	})
 
-	It("Should not fail during virsh list", func(done Done) {
+	It("Should list libvirt domains on list subcommand", func(done Done) {
 		defer close(done)
 
 		ctx, closeFunc := context.WithCancel(context.Background())
@@ -152,5 +134,29 @@ var _ = Describe("virtletctl tests", func() {
 		By("Calling virtletctl virsh list")
 		_, err := framework.RunSimple(localExecutor, "_output/virtletctl", "virsh", "list")
 		Expect(err).NotTo(HaveOccurred())
+	})
+})
+
+var _ = Describe("virtletctl unsafe", func() {
+	BeforeAll(func() {
+		includeNonSafe()
+	})
+
+	Context("Should install itself as a kubectl plugin on install subcommand", func() {
+		It("Should not fail during install", func(done Done) {
+			defer close(done)
+
+			ctx, closeFunc := context.WithCancel(context.Background())
+			defer closeFunc()
+			localExecutor := framework.LocalExecutor(ctx)
+
+			By("Calling virtletctl install")
+			_, err := framework.RunSimple(localExecutor, "_output/virtletctl", "install")
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Calling kubectl plugin virt help")
+			_, err = framework.RunSimple(localExecutor, "kubectl", "plugin", "virt", "help")
+			Expect(err).NotTo(HaveOccurred())
+		})
 	})
 })

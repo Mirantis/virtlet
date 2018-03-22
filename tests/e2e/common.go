@@ -34,6 +34,7 @@ var (
 	vmImageLocation       = flag.String("image", defaultVMImageLocation, "VM image URL (*without http(s)://*")
 	sshUser               = flag.String("sshuser", defaultSSHUser, "default SSH user for VMs")
 	includeCloudInitTests = flag.Bool("include-cloud-init-tests", false, "include Cloud-Init tests")
+	includeNonSafeTests   = flag.Bool("include-non-safe-tests", false, "include tests which can modify environment")
 	memoryLimit           = flag.Int("memoryLimit", 160, "default VM memory limit (in MiB)")
 	junitOutput           = flag.String("junitOutput", "", "JUnit XML output file")
 )
@@ -144,5 +145,11 @@ func (o VMOptions) applyDefaults() framework.VMOptions {
 func requireCloudInit() {
 	if !*includeCloudInitTests {
 		Skip("Cloud-Init tests are not enabled")
+	}
+}
+
+func includeNonSafe() {
+	if !*includeNonSafeTests {
+		Skip("Tests modifying cluster environment are not enabled")
 	}
 }
