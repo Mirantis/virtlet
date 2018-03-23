@@ -1,5 +1,5 @@
-hash: d32b41b2541298536045b4bd26003db1eab8eca5419105e7f4a3672909c5e632
-updated: 2018-03-07T16:47:03.146354923+03:00
+hash: e53da7cb68ddba9062131b6f1aa6d42838cbafdce1431097fd4bcd6b84019a4b
+updated: 2018-03-13T15:53:40.967682621+01:00
 imports:
 - name: github.com/boltdb/bolt
   version: 583e8937c61f1af6513608ccc75c97b6abdf4ff9
@@ -132,7 +132,7 @@ imports:
 - name: github.com/libvirt/libvirt-go
   version: c3209e4ba8b8dda65c85ca0ac04302e55895caf7
 - name: github.com/libvirt/libvirt-go-xml
-  version: b80a3ac43b6d354cd28dbf86de016639c0e5cd87
+  version: 661c62056664441ce89e9224e1ce401b67fa0f07
 - name: github.com/mailru/easyjson
   version: d5b7844b561a7bc640052f1b935f7b800330d7e0
   subpackages:
@@ -216,24 +216,26 @@ imports:
   subpackages:
   - doc
 - name: github.com/spf13/pflag
-  version: ee5fd03fd6acfd43e44aea0b4135958546ed8e73
+  version: 4c012f6dcd9546820e378d0bdda4d8fc772cdfea
 - name: github.com/ugorji/go
   version: ded73eae5db7e7a0ef6f55aace87a2873c5d2b74
   subpackages:
   - codec
 - name: github.com/vishvananda/netlink
-  version: 1882fa99fc5adc217f354c6f37a172876877f77d
+  version: fe3b5664d23a11b52ba59bece4ff29c52772a56b
   subpackages:
   - nl
 - name: github.com/vishvananda/netns
   version: 8ba1072b58e0c2a240eb5f6120165c7776c3e7b8
 - name: go.universe.tf/netboot
-  version: b8b3aeb641f62e5ce4ca0a0ff05f1298f24610d6
+  version: da5542b8ac038e6fddd0b4758fbc7bb9535b410c
   subpackages:
   - dhcp4
 - name: golang.org/x/crypto
   version: d172538b2cfce0c13cee31e647d0367aa8cd2486
   subpackages:
+  - bpf
+  - context
   - curve25519
   - ed25519
   - ed25519/internal/edwards25519
@@ -260,7 +262,7 @@ imports:
   subpackages:
   - syncmap
 - name: golang.org/x/sys
-  version: b9cf5f96b68d9eaa53d5db5fef235718767f416a
+  version: 076b546753157f758b316e59bcb51e6807c04057
   subpackages:
   - unix
   - windows
@@ -291,7 +293,7 @@ imports:
 - name: gopkg.in/inf.v0
   version: 3887ee99ecf07df5b447e9b00d9c0b2adaa9f3e4
 - name: gopkg.in/yaml.v2
-  version: eb3733d160e74a9c7e442f435eb3bea458e1d19f
+  version: 7f97868eec74b32b0982dd158a51a446d1da7eb5
 - name: k8s.io/api
   version: 4fe9229aaa9d704f8a2a21cdcd50de2bbb6e1b57
 - name: k8s.io/apiextensions-apiserver

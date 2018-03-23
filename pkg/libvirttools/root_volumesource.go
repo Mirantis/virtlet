@@ -84,10 +84,9 @@ func (v *rootVolume) Setup() (*libvirtxml.DomainDisk, error) {
 	}
 
 	return &libvirtxml.DomainDisk{
-		Type:   "file",
 		Device: "disk",
 		Driver: &libvirtxml.DomainDiskDriver{Name: "qemu", Type: "qcow2"},
-		Source: &libvirtxml.DomainDiskSource{File: volPath},
+		Source: &libvirtxml.DomainDiskSource{File: &libvirtxml.DomainDiskSourceFile{File: volPath}},
 	}, nil
 }
 

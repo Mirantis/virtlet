@@ -140,22 +140,6 @@ func TestContainerCleanup(t *testing.T) {
 		t.Errorf("Failed to undefine dummy domain '%s' to test cleanup: %v", domainName, err)
 	}
 	checkAllCleaned(t, uuid)
-
-	// 3. Failure on domain start.
-	// Call ContainerStart twice to cause error on second call of ContainerStart "Domain is already active".
-	createResp := ct.createContainer(sandbox, container, ct.imageSpecs[0], mounts)
-	ct.startContainer(createResp.ContainerId)
-
-	if err := ct.callStartContainer(createResp.ContainerId); err == nil {
-		ct.removeContainer(uuid)
-		t.Fatalf("Failed to cause failure on ContainerCreate to check cleanup(stage 3, start twice domain: '%s').", domainName)
-	}
-	checkAllCleaned(t, uuid)
-
-	if len(ct.listContainers(nil).Containers) != 0 {
-		t.Errorf("expected 0 containers to be listed")
-	}
-
 }
 
 func TestContainerVolumes(t *testing.T) {

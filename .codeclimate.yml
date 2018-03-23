@@ -24,6 +24,10 @@ checks:
   return-statements:
     config:
       threshold: 8
+  similar-code:
+    enabled: false
+  identical-code:
+    enabled: false
 plugins:
   gofmt:
     enabled: true
@@ -38,3 +42,5 @@ exclude_patterns:
   - "vendor/"
   - "pkg/diskimage/guestfs/guestfs.go"
   - "tests/"
+  - "**/*_test.go"
+  - "*_test.go"

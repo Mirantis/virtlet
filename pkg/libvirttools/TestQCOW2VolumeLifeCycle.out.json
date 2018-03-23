@@ -3,32 +3,32 @@
     "name": "volumes: CreateStorageVol",
     "data": {
       "XMLName": {
-	"Space": "",
-	"Local": ""
+        "Space": "",
+        "Local": ""
       },
       "Type": "",
       "Name": "virtlet-77f29a0e-46af-4188-a6af-9ff8b8a65224-test-volume",
       "Key": "",
       "Allocation": {
-	"Unit": "",
-	"Value": 0
+        "Unit": "",
+        "Value": 0
       },
       "Capacity": {
-	"Unit": "MB",
-	"Value": 424242
+        "Unit": "MB",
+        "Value": 424242
       },
       "Physical": null,
       "Target": {
-	"Path": "",
-	"Format": {
-	  "Type": "qcow2"
-	},
-	"Permissions": null,
-	"Timestamps": null,
-	"Compat": "",
-	"NoCOW": null,
-	"Features": null,
-	"Encryption": null
+        "Path": "",
+        "Format": {
+          "Type": "qcow2"
+        },
+        "Permissions": null,
+        "Timestamps": null,
+        "Compat": "",
+        "NoCOW": null,
+        "Features": null,
+        "Encryption": null
       },
       "BackingStore": null
     }
@@ -40,39 +40,60 @@
     "name": "volume retuned by qcow2_flexvolume",
     "data": {
       "XMLName": {
-	"Space": "",
-	"Local": ""
+        "Space": "",
+        "Local": ""
       },
-      "Type": "file",
       "Device": "disk",
+      "RawIO": "",
+      "SGIO": "",
       "Snapshot": "",
       "Driver": {
-	"Name": "qemu",
-	"Type": "qcow2",
-	"Cache": "",
-	"IO": "",
-	"ErrorPolicy": "",
-	"Discard": ""
+        "Name": "qemu",
+        "Type": "qcow2",
+        "Cache": "",
+        "ErrorPolicy": "",
+        "RErrorPolicy": "",
+        "IO": "",
+        "IOEventFD": "",
+        "EventIDX": "",
+        "CopyOnRead": "",
+        "Discard": "",
+        "IOThread": null,
+        "DetectZeros": "",
+        "Queues": null,
+        "IOMMU": "",
+        "ATS": ""
       },
       "Auth": null,
       "Source": {
-	"File": "/fake/volumes/pool/virtlet-77f29a0e-46af-4188-a6af-9ff8b8a65224-test-volume",
-	"Device": "",
-	"Protocol": "",
-	"Name": "",
-	"Pool": "",
-	"Volume": "",
-	"Hosts": null,
-	"StartupPolicy": ""
+        "File": {
+          "File": "/fake/volumes/pool/virtlet-77f29a0e-46af-4188-a6af-9ff8b8a65224-test-volume",
+          "SecLabel": null
+        },
+        "Block": null,
+        "Dir": null,
+        "Network": null,
+        "Volume": null,
+        "StartupPolicy": "",
+        "Encryption": null
       },
+      "BackingStore": null,
+      "Geometry": null,
+      "BlockIO": null,
+      "Mirror": null,
       "Target": null,
       "IOTune": null,
-      "Serial": "",
       "ReadOnly": null,
       "Shareable": null,
-      "Address": null,
+      "Transient": null,
+      "Serial": "",
+      "WWN": "",
+      "Vendor": "",
+      "Product": "",
+      "Encryption": null,
       "Boot": null,
-      "WWN": ""
+      "Alias": null,
+      "Address": null
     }
   },
   {

@@ -109,9 +109,8 @@ func (v *qcow2Volume) Setup() (*libvirtxml.DomainDisk, error) {
 	}
 
 	return &libvirtxml.DomainDisk{
-		Type:   "file",
 		Device: "disk",
-		Source: &libvirtxml.DomainDiskSource{File: path},
+		Source: &libvirtxml.DomainDiskSource{File: &libvirtxml.DomainDiskSourceFile{File: path}},
 		Driver: &libvirtxml.DomainDiskDriver{Name: "qemu", Type: "qcow2"},
 	}, nil
 }

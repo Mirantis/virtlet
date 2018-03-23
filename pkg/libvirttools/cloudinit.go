@@ -370,10 +370,9 @@ func (g *CloudInitGenerator) IsoPath() string {
 // in VM pod libvirt domain definition.
 func (g *CloudInitGenerator) DiskDef() *libvirtxml.DomainDisk {
 	return &libvirtxml.DomainDisk{
-		Type:     "file",
 		Device:   "cdrom",
 		Driver:   &libvirtxml.DomainDiskDriver{Name: "qemu", Type: "raw"},
-		Source:   &libvirtxml.DomainDiskSource{File: g.IsoPath()},
+		Source:   &libvirtxml.DomainDiskSource{File: &libvirtxml.DomainDiskSourceFile{File: g.IsoPath()}},
 		ReadOnly: &libvirtxml.DomainDiskReadOnly{},
 	}
 }

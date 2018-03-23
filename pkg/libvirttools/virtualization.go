@@ -85,7 +85,7 @@ func (ds *domainSettings) createDomain(config *VMConfig) *libvirtxml.Domain {
 				{Type: "tablet", Bus: "usb"},
 			},
 			Graphics: []libvirtxml.DomainGraphic{
-				{Type: "vnc", Port: -1},
+				{VNC: &libvirtxml.DomainGraphicVNC{Port: -1}},
 			},
 			Videos: []libvirtxml.DomainVideo{
 				{Model: libvirtxml.DomainVideoModel{Type: "cirrus"}},
@@ -234,24 +234,31 @@ func loggingDisabled() bool {
 
 func (v *VirtualizationTool) addSerialDevicesToDomain(domain *libvirtxml.Domain) error {
 	port := uint(0)
+	timeout := uint(1)
 	if !loggingDisabled() {
 		domain.Devices.Serials = []libvirtxml.DomainSerial{
 			{
-				Type:   "unix",
-				Source: &libvirtxml.DomainChardevSource{Mode: "connect", Path: "/var/lib/libvirt/streamer.sock"},
+				Source: &libvirtxml.DomainChardevSource{
+					UNIX: &libvirtxml.DomainChardevSourceUNIX{
+						Mode: "connect",
+						Path: "/var/lib/libvirt/streamer.sock",
+						Reconnect: &libvirtxml.DomainChardevSourceReconnect{
+							Enabled: "yes",
+							Timeout: &timeout,
+						},
+					},
+				},
 				Target: &libvirtxml.DomainSerialTarget{Port: &port},
 			},
 		}
 	} else {
 		domain.Devices.Serials = []libvirtxml.DomainSerial{
 			{
-				Type:   "pty",
 				Target: &libvirtxml.DomainSerialTarget{Port: &port},
 			},
 		}
 		domain.Devices.Consoles = []libvirtxml.DomainConsole{
 			{
-				Type:   "pty",
 				Target: &libvirtxml.DomainConsoleTarget{Type: "serial", Port: &port},
 			},
 		}

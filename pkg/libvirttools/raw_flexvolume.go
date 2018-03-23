@@ -86,9 +86,8 @@ func (v *rawDeviceVolume) Setup() (*libvirtxml.DomainDisk, error) {
 		return nil, err
 	}
 	return &libvirtxml.DomainDisk{
-		Type:   "block",
 		Device: "disk",
-		Source: &libvirtxml.DomainDiskSource{Device: v.opts.Path},
+		Source: &libvirtxml.DomainDiskSource{Block: &libvirtxml.DomainDiskSourceBlock{Dev: v.opts.Path}},
 		Driver: &libvirtxml.DomainDiskDriver{Name: "qemu", Type: "raw"},
 	}, nil
 }
