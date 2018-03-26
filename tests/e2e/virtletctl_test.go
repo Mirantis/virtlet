@@ -131,14 +131,9 @@ var _ = Describe("virtletctl", func() {
 		Expect(output).To(ContainSubstring("Compiled against library:"))
 		Expect(output).To(ContainSubstring("Using library:"))
 	}, 60)
-})
 
-var _ = Describe("virtletctl unsafe", func() {
-	BeforeAll(func() {
+	It("Should install itself as a kubectl plugin on install subcommand [unsafe]", func() {
 		includeUnsafe()
-	})
-
-	It("Should install itself as a kubectl plugin on install subcommand", func() {
 		ctx, closeFunc := context.WithCancel(context.Background())
 		defer closeFunc()
 		localExecutor := framework.LocalExecutor(ctx)
