@@ -34,6 +34,7 @@ var (
 	vmImageLocation       = flag.String("image", defaultVMImageLocation, "VM image URL (*without http(s)://*")
 	sshUser               = flag.String("sshuser", defaultSSHUser, "default SSH user for VMs")
 	includeCloudInitTests = flag.Bool("include-cloud-init-tests", false, "include Cloud-Init tests")
+	includeUnsafeTests    = flag.Bool("include-unsafe-tests", false, "include tests that can be unsafe if they're run outside the build container")
 	memoryLimit           = flag.Int("memoryLimit", 160, "default VM memory limit (in MiB)")
 	junitOutput           = flag.String("junitOutput", "", "JUnit XML output file")
 )
@@ -58,14 +59,14 @@ func waitSSH(vm *framework.VMInterface) framework.Executor {
 			if err != nil {
 				return err
 			}
-			_, err = framework.ExecSimple(ssh)
+			_, err = framework.RunSimple(ssh)
 			return err
 		}, 60*5, 3).Should(Succeed())
 	return ssh
 }
 
 func checkCPUCount(vm *framework.VMInterface, ssh framework.Executor, cpus int) {
-	proc := do(framework.ExecSimple(ssh, "cat", "/proc/cpuinfo")).(string)
+	proc := do(framework.RunSimple(ssh, "cat", "/proc/cpuinfo")).(string)
 	Expect(regexp.MustCompile(`(?m)^processor`).FindAllString(proc, -1)).To(HaveLen(cpus))
 	cpuStats := do(vm.VirshCommand("domstats", "<domain>", "--vcpu")).(string)
 	match := regexp.MustCompile(`vcpu\.maximum=(\d+)`).FindStringSubmatch(cpuStats)
@@ -144,5 +145,11 @@ func (o VMOptions) applyDefaults() framework.VMOptions {
 func requireCloudInit() {
 	if !*includeCloudInitTests {
 		Skip("Cloud-Init tests are not enabled")
+	}
+}
+
+func includeUnsafe() {
+	if !*includeUnsafeTests {
+		Skip("Tests that are unsafe outside the build container are disabled")
 	}
 }

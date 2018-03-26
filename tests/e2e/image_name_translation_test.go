@@ -49,7 +49,7 @@ var _ = Describe("Image URL", func() {
 	})
 
 	AfterAll(func() {
-		Expect(controller.DeleteVirtletImageMapping(vimName)).NotTo(HaveOccurred())
+		Expect(controller.DeleteVirtletImageMapping(vimName)).To(Succeed())
 	})
 
 	It("Can be specified in CRD [Conformance]", func() {

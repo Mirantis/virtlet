@@ -61,11 +61,14 @@ var _ = Describe("QEMU Process", func() {
 
 	It("Must be active while VM is running and gone after it's deleted [Conformance]", func() {
 		qemuRunning := func() bool {
-			_, _, exitCode, err := framework.Exec(vmsContainer, []string{
+			_, _, err := framework.Run(vmsContainer, "",
 				"pgrep", "-f", fmt.Sprintf("qemu-system-x86_64.* %s", containerId),
-			}, "")
+			)
+			if ce, ok := err.(framework.CommandError); ok {
+				return ce.ExitCode == 0
+			}
 			Expect(err).NotTo(HaveOccurred())
-			return exitCode == 0
+			return true
 		}
 		Expect(qemuRunning()).To(BeTrue())
 		deleteVM(vm)

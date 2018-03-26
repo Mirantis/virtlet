@@ -53,7 +53,7 @@ var _ = Describe("Basic cirros tests", func() {
 		scheduleWaitSSH(&vm, &ssh)
 
 		It("Should have default route [Conformance]", func() {
-			Expect(framework.ExecSimple(ssh, "ip r")).To(SatisfyAll(
+			Expect(framework.RunSimple(ssh, "ip r")).To(SatisfyAll(
 				ContainSubstring("default via"),
 				ContainSubstring("src "+vmPod.Pod.Status.PodIP),
 			))
@@ -61,7 +61,7 @@ var _ = Describe("Basic cirros tests", func() {
 
 		It("Should have internet connectivity [Conformance]", func(done Done) {
 			defer close(done)
-			Expect(framework.ExecSimple(ssh, "ping -c1 8.8.8.8")).To(MatchRegexp(
+			Expect(framework.RunSimple(ssh, "ping -c1 8.8.8.8")).To(MatchRegexp(
 				"1 .*transmitted, 1 .*received, 0% .*loss"))
 		}, 5)
 
@@ -83,13 +83,13 @@ var _ = Describe("Basic cirros tests", func() {
 				defer close(done)
 				cmd := fmt.Sprintf("curl -s --connect-timeout 5 http://nginx.%s.svc.cluster.local", controller.Namespace())
 				Eventually(func() (string, error) {
-					return framework.ExecSimple(ssh, cmd)
+					return framework.RunSimple(ssh, cmd)
 				}, 60).Should(ContainSubstring("Thank you for using nginx."))
 			}, 60*5)
 		})
 
 		It("Should have hostname equal to the pod name [Conformance]", func() {
-			Expect(framework.ExecSimple(ssh, "hostname")).To(Equal(vmPod.Pod.Name))
+			Expect(framework.RunSimple(ssh, "hostname")).To(Equal(vmPod.Pod.Name))
 		})
 
 		It("Should have CPU count that was specified for the pod [Conformance]", func() {
@@ -130,7 +130,7 @@ var _ = Describe("Basic cirros tests", func() {
 
 		It("Should contain login string in pod log and each line of that log must be a valid JSON", func() {
 			Eventually(func() error {
-				out, err := framework.ExecSimple(nodeExecutor, "cat",
+				out, err := framework.RunSimple(nodeExecutor, "cat",
 					fmt.Sprintf("/var/log/pods/%s/%s", sandboxID, filename))
 				if err != nil {
 					return err
@@ -165,7 +165,7 @@ var _ = Describe("Basic cirros tests", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By(fmt.Sprintf("Taking VNC display snapshot from %s", display))
-		do(framework.ExecSimple(virtletPodExecutor, "vncsnapshot", "-allowblank", display, "/vm.jpg"))
+		do(framework.RunSimple(virtletPodExecutor, "vncsnapshot", "-allowblank", display, "/vm.jpg"))
 	}, 60)
 
 	It("Should start port forwarding", func(done Done) {
@@ -184,8 +184,10 @@ var _ = Describe("Basic cirros tests", func() {
 		Expect(nginxPod).NotTo(BeNil())
 
 		By(fmt.Sprintf("Running command: kubectl -n %s port-forward %s %s", controller.Namespace(), podName, portMapping))
-		_, err = framework.ExecSimple(localExecutor, "kubectl", "-n", controller.Namespace(), "port-forward", podName, portMapping)
+		cmd, err := localExecutor.Start(nil, nil, nil, "kubectl", "-n", controller.Namespace(), "port-forward", podName, portMapping)
 		Expect(err).NotTo(HaveOccurred())
+		defer cmd.Kill()
+
 		// give it a chance to start
 		time.Sleep(3 * time.Second)
 

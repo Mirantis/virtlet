@@ -168,9 +168,9 @@ var _ = Describe("Ceph volumes tests", func() {
 })
 
 func checkFilesystemAccess(ssh framework.Executor) {
-	do(framework.ExecSimple(ssh, "sudo /usr/sbin/mkfs.ext2 /dev/vdb"))
-	do(framework.ExecSimple(ssh, "sudo mount /dev/vdb /mnt"))
-	out := do(framework.ExecSimple(ssh, "ls -l /mnt")).(string)
+	do(framework.RunSimple(ssh, "sudo /usr/sbin/mkfs.ext2 /dev/vdb"))
+	do(framework.RunSimple(ssh, "sudo mount /dev/vdb /mnt"))
+	out := do(framework.RunSimple(ssh, "ls -l /mnt")).(string)
 	Expect(out).To(ContainSubstring("lost+found"))
 }
 
@@ -178,7 +178,7 @@ func setupCeph() (string, string) {
 	nodeExecutor, err := controller.DinDNodeExecutor("kube-master")
 	Expect(err).NotTo(HaveOccurred())
 
-	route, err := framework.ExecSimple(nodeExecutor, "route")
+	route, err := framework.RunSimple(nodeExecutor, "route")
 	Expect(err).NotTo(HaveOccurred())
 
 	match := regexp.MustCompile(`default\s+([\d.]+)`).FindStringSubmatch(route)
@@ -199,7 +199,7 @@ func setupCeph() (string, string) {
 	cephContainerExecutor := container.Executor(false, "")
 	By("Waiting for ceph cluster")
 	Eventually(func() error {
-		_, err := framework.ExecSimple(cephContainerExecutor, "ceph", "-s")
+		_, err := framework.RunSimple(cephContainerExecutor, "ceph", "-s")
 		return err
 	}).Should(Succeed())
 	By("Ceph cluster started")
@@ -222,7 +222,7 @@ func setupCeph() (string, string) {
 		`ceph auth get-key client.libvirt`,
 	}
 	for _, cmd := range commands {
-		out = do(framework.ExecSimple(cephContainerExecutor, "/bin/bash", "-c", cmd)).(string)
+		out = do(framework.RunSimple(cephContainerExecutor, "/bin/bash", "-c", cmd)).(string)
 	}
 	return monIP, out
 }

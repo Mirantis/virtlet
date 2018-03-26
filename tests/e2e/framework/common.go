@@ -27,32 +27,51 @@ import (
 // ErrTimeout is the timeout error returned from functions wrapped by WithTimeout
 var ErrTimeout = fmt.Errorf("timeout")
 
-// Executor is the interface to execute shell commands in arbitrary places
-type Executor interface {
-	io.Closer
-	Exec(command []string, stdin io.Reader, stdout, stderr io.Writer) (int, error)
+// CommandError holds an exit code for commands finished without any Executor error
+type CommandError struct {
+	ExitCode int
 }
 
-// Exec executes command with the given executor and returns stdout/stderr/exitCode as strings
-func Exec(executor Executor, command []string, input string) (string, string, int, error) {
+func (e CommandError) Error() string {
+	return fmt.Sprintf("command finished with %d exit code", e.ExitCode)
+}
+
+var _ error = CommandError{}
+
+// Command is the interface to control the command started with an Executor
+type Command interface {
+	Kill() error
+	Wait() error
+}
+
+// Executor is the interface to run shell commands in arbitrary places
+type Executor interface {
+	io.Closer
+	Run(stdin io.Reader, stdout, stderr io.Writer, command ...string) error
+	Start(stdin io.Reader, stdout, stderr io.Writer, command ...string) (Command, error)
+}
+
+// Run executes command with the given executor, returns stdout/stderr as strings
+// and exit code in CommandError
+func Run(executor Executor, input string, command ...string) (string, string, error) {
 	outBuf := &bytes.Buffer{}
 	errBuf := &bytes.Buffer{}
 	inBuf := bytes.NewBufferString(input)
-	exitCode, err := executor.Exec(command, inBuf, outBuf, errBuf)
-	if err != nil {
-		return "", "", 0, err
-	}
-	return outBuf.String(), errBuf.String(), exitCode, nil
+	err := executor.Run(inBuf, outBuf, errBuf, command...)
+	return outBuf.String(), errBuf.String(), err
 }
 
-// ExecSimple is a simplified version of Exec that verifies exit code/stderr internally and returns stdout only
-func ExecSimple(executor Executor, command ...string) (string, error) {
-	stdout, stderr, exitcode, err := Exec(executor, command, "")
+// RunSimple is a simplified version of Run that verifies exit code/stderr internally and returns stdout only
+func RunSimple(executor Executor, command ...string) (string, error) {
+	stdout, stderr, err := Run(executor, "", command...)
 	if err != nil {
+		if ce, ok := err.(CommandError); ok {
+			if ce.ExitCode != 0 {
+				return "", fmt.Errorf("command exited with code %d, stderr: %s", ce.ExitCode, strings.TrimSpace(stderr))
+			}
+			return strings.TrimSpace(stdout), nil
+		}
 		return "", err
-	}
-	if exitcode != 0 {
-		return "", fmt.Errorf("command exited with code %d, stderr: %s", exitcode, strings.TrimSpace(stderr))
 	}
 	return strings.TrimSpace(stdout), nil
 }

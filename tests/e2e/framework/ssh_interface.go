@@ -19,16 +19,17 @@ package framework
 import (
 	"fmt"
 	"io"
-	"net"
-	"os"
 	"strings"
 
 	"golang.org/x/crypto/ssh"
+
+	"github.com/Mirantis/virtlet/pkg/tools"
 )
 
 type sshInterface struct {
 	vmInterface *VMInterface
 	client      *ssh.Client
+	fwStopCh    chan struct{}
 }
 
 func newSSHInterface(vmInterface *VMInterface, user, secret string) (*sshInterface, error) {
@@ -51,64 +52,90 @@ func newSSHInterface(vmInterface *VMInterface, user, secret string) (*sshInterfa
 		return nil, err
 	}
 
-	virtletPod, err := vmInterface.VirtletPod()
-	if err != nil {
-		return nil, err
+	ports := []*tools.ForwardedPort{
+		{RemotePort: 22},
 	}
-	container, err := virtletPod.Container("virtlet")
-	if err != nil {
-		return nil, err
-	}
-
-	client, server := net.Pipe()
-	go func() {
-		container.Exec([]string{"nc", "-q0", vmPod.Pod.Status.PodIP, "22"}, server, server, os.Stderr)
-		client.Close()
-	}()
-
-	conn, chans, reqs, err := ssh.NewClientConn(client, fmt.Sprintf("%s.%s", vmPod.Pod.Name, vmPod.Pod.Namespace), config)
+	fwStopCh, err := vmPod.PortForward(ports)
 	if err != nil {
 		return nil, err
 	}
 
-	sshClient := ssh.NewClient(conn, chans, reqs)
+	sshClient, err := ssh.Dial("tcp", fmt.Sprintf("localhost:%d", ports[0].LocalPort), config)
+	if err != nil {
+		defer close(fwStopCh)
+		return nil, err
+	}
+
 	return &sshInterface{
 		vmInterface: vmInterface,
 		client:      sshClient,
+		fwStopCh:    fwStopCh,
 	}, nil
 }
 
-func (si *sshInterface) Exec(command []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
+func (si *sshInterface) Run(stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
+	cmd, err := si.Start(stdin, stdout, stderr, command...)
+	if err != nil {
+		return err
+	}
+
+	return cmd.Wait()
+}
+
+func (si *sshInterface) Start(stdin io.Reader, stdout, stderr io.Writer, command ...string) (Command, error) {
 	session, err := si.client.NewSession()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	defer session.Close()
 
 	session.Stdout = stdout
 	session.Stderr = stderr
 	session.Stdin = stdin
 
-	exitcode := 0
 	for i, arg := range command {
 		if i == 0 {
 			continue
 		}
 		command[i] = fmt.Sprintf("'%s'", strings.Replace(arg, "'", "\\'", -1))
 	}
-	err = session.Run(strings.Join(command, " "))
-	if err != nil {
-		if s, ok := err.(*ssh.ExitError); ok {
-			exitcode = s.ExitStatus()
-			err = nil
-		}
+	if err := session.Start(strings.Join(command, " ")); err != nil {
+		defer session.Close()
+		return nil, err
 	}
-	if err != nil {
-		return 0, err
-	}
-	return exitcode, nil
+
+	return sshCommand{session: session}, err
 }
 
 func (si *sshInterface) Close() error {
-	return si.client.Close()
+	if si.client != nil {
+		defer close(si.fwStopCh)
+		err := si.client.Close()
+		si.client = nil
+		return err
+	}
+	return nil
+}
+
+type sshCommand struct {
+	session *ssh.Session
+}
+
+var _ Command = &sshCommand{}
+
+func (sc sshCommand) Wait() error {
+	err := sc.session.Wait()
+	defer sc.session.Close()
+	if err != nil {
+		if s, ok := err.(*ssh.ExitError); ok {
+			return CommandError{ExitCode: s.ExitStatus()}
+		}
+		return err
+	}
+
+	return nil
+}
+
+func (sc sshCommand) Kill() error {
+	defer sc.session.Close()
+	return sc.session.Signal(ssh.SIGKILL)
 }

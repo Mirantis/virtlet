@@ -17,17 +17,24 @@ limitations under the License.
 package framework
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"io"
+	"os"
+	"os/signal"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/exec"
 	"k8s.io/kubernetes/pkg/api"
+
+	"github.com/Mirantis/virtlet/pkg/tools"
 )
 
 // PodInterface provides API to work with a pod
@@ -110,7 +117,7 @@ func (pi *PodInterface) WaitDestruction(timing ...time.Duration) error {
 	return waitForConsistentState(func() error {
 		_, err := pi.controller.client.Pods(pi.Pod.Namespace).Get(pi.Pod.Name, metav1.GetOptions{})
 		if err != nil {
-			if errors.IsNotFound(err) {
+			if k8serrors.IsNotFound(err) {
 				return nil
 			}
 			return err
@@ -140,6 +147,68 @@ func (pi *PodInterface) Container(name string) (Executor, error) {
 	}, nil
 }
 
+// PortForward starts port forwarding to the specified ports to the specified pod
+// in background. If a port entry has LocalPort = 0, it's updated with the real
+// port number that was selected by the forwarder.
+// Close returned channel to stop the port forwarder.
+func (pi *PodInterface) PortForward(ports []*tools.ForwardedPort) (chan struct{}, error) {
+	if len(ports) == 0 {
+		return nil, errors.New("no ports specified")
+	}
+
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt)
+	defer signal.Stop(signals)
+
+	stopCh := make(chan struct{})
+	go func() {
+		<-signals
+		if stopCh != nil {
+			close(stopCh)
+		}
+	}()
+
+	restClient := pi.controller.client.RESTClient()
+	req := restClient.Post().
+		Resource("pods").
+		Name(pi.Pod.Name).
+		Namespace(pi.Pod.Namespace).
+		SubResource("portforward")
+
+	var buf bytes.Buffer
+	var portsStr []string
+	for _, p := range ports {
+		portsStr = append(portsStr, p.String())
+	}
+	errCh := make(chan error, 1)
+	readyCh := make(chan struct{})
+	go func() {
+		dialer, err := remotecommand.NewExecutor(pi.controller.restConfig, "POST", req.URL())
+		if err != nil {
+			errCh <- err
+			return
+		}
+		fw, err := portforward.New(dialer, portsStr, stopCh, readyCh, &buf, os.Stderr)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		errCh <- fw.ForwardPorts()
+	}()
+
+	select {
+	case err := <-errCh:
+		return nil, err
+	case <-readyCh:
+		// FIXME: there appears to be no better way to get back the local ports as of now
+		if err := tools.ParsePortForwardOutput(buf.String(), ports); err != nil {
+			return nil, err
+		}
+	}
+	return stopCh, nil
+
+}
+
 // DinDNodeExecutor return DinD executor for node, where this pod is located
 func (pi *PodInterface) DinDNodeExecutor() (Executor, error) {
 	return pi.controller.DinDNodeExecutor(pi.Pod.Spec.NodeName)
@@ -150,8 +219,8 @@ type containerInterface struct {
 	name         string
 }
 
-// Exec executes commands in one of containers in the pod
-func (ci *containerInterface) Exec(command []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
+// Run executes commands in one of containers in the pod
+func (ci *containerInterface) Run(stdin io.Reader, stdout, stderr io.Writer, command ...string) error {
 	restClient := ci.podInterface.controller.client.RESTClient()
 	req := restClient.Post().
 		Resource("pods").
@@ -168,10 +237,9 @@ func (ci *containerInterface) Exec(command []string, stdin io.Reader, stdout, st
 
 	executor, err := remotecommand.NewExecutor(ci.podInterface.controller.restConfig, "POST", req.URL())
 	if err != nil {
-		return 0, err
+		return err
 	}
 
-	exitCode := 0
 	options := remotecommand.StreamOptions{
 		SupportedProtocols: remotecommandconsts.SupportedStreamingProtocols,
 		Stdin:              stdin,
@@ -181,16 +249,20 @@ func (ci *containerInterface) Exec(command []string, stdin io.Reader, stdout, st
 
 	if err := executor.Stream(options); err != nil {
 		if c, ok := err.(exec.CodeExitError); ok {
-			exitCode = c.Code
-		} else {
-			return 0, err
+			return CommandError{ExitCode: c.Code}
 		}
+		return err
 	}
 
-	return exitCode, nil
+	return nil
 }
 
 // Close closes the executor
 func (*containerInterface) Close() error {
 	return nil
+}
+
+// Start is a placeholder for fulfilling the Executor interface
+func (*containerInterface) Start(stdin io.Reader, stdout, stderr io.Writer, command ...string) (Command, error) {
+	return nil, errors.New("Not Implemented")
 }
