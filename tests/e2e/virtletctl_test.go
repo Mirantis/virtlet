@@ -48,22 +48,7 @@ var _ = Describe("virtletctl", func() {
 		Expect(err).NotTo(HaveOccurred())
 	}, 10)
 
-	It("Should dump Virtlet metadata on dump-metadata subcommand", func(done Done) {
-		defer close(done)
-
-		ctx, closeFunc := context.WithCancel(context.Background())
-		defer closeFunc()
-		localExecutor := framework.LocalExecutor(ctx)
-
-		By("Calling virtletctl dump-metadata")
-		output, err := framework.RunSimple(localExecutor, "_output/virtletctl", "dump-metadata")
-		Expect(err).NotTo(HaveOccurred())
-		Expect(output).To(ContainSubstring("Virtlet pod name:"))
-		Expect(output).To(ContainSubstring("Sandboxes:"))
-		Expect(output).To(ContainSubstring("Images:"))
-	}, 60)
-
-	Context("SSH subcommand", func() {
+	Context("Tests depending on spawning VM", func() {
 		var (
 			vm           *framework.VMInterface
 			tempfileName string
@@ -81,7 +66,7 @@ var _ = Describe("virtletctl", func() {
 			_, err := controller.ConfigMaps().Create(cm)
 			Expect(err).NotTo(HaveOccurred())
 
-			vm = controller.VM("cirros-vm")
+			vm = controller.VM("virtletctl-cirros-vm")
 			vm.Create(VMOptions{
 				SSHKeySource: "configmap/sshkey",
 			}.applyDefaults(), time.Minute*5, nil)
@@ -113,10 +98,24 @@ var _ = Describe("virtletctl", func() {
 			defer closeFunc()
 			localExecutor := framework.LocalExecutor(ctx)
 
-			output, err := framework.RunSimple(localExecutor, "_output/virtletctl", "ssh", "cirros@cirros-vm", "--", "-i", tempfileName, "hostname")
+			output, err := framework.RunSimple(localExecutor, "_output/virtletctl", "ssh", "--namespace", controller.Namespace(), "cirros@virtletctl-cirros-vm", "--", "-i", tempfileName, "hostname")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(output).To(Equal("cirros-vm"))
+			Expect(output).To(Equal("virtletctl-cirros-vm"))
 		}, 60)
+
+		It("Should dump Virtlet metadata on dump-metadata subcommand", func(done Done) {
+			defer close(done)
+
+			ctx, closeFunc := context.WithCancel(context.Background())
+			defer closeFunc()
+			localExecutor := framework.LocalExecutor(ctx)
+
+			By("Calling virtletctl dump-metadata")
+			output, err := framework.RunSimple(localExecutor, "_output/virtletctl", "dump-metadata")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output).To(ContainSubstring("virtletctl-cirros-vm"))
+		}, 60)
+
 	})
 
 	It("Should return libvirt version on virsh subcommand", func(done Done) {
