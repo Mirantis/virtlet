@@ -114,7 +114,7 @@ var _ = Describe("virtletctl", func() {
 			strippedKey := strings.Replace(sshPrivateKey, "\t", "", -1)
 			_, err = tempfile.Write([]byte(strippedKey))
 			Expect(err).NotTo(HaveOccurred())
-			Expect(os.Chmod(tempfileName, 0600)).NotTo(HaveOccurred())
+			Expect(os.Chmod(tempfileName, 0600)).To(Succeed())
 		})
 
 		AfterAll(func() {
