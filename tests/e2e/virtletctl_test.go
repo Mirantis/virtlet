@@ -139,21 +139,17 @@ var _ = Describe("virtletctl unsafe", func() {
 		includeUnsafe()
 	})
 
-	Context("Should install itself as a kubectl plugin on install subcommand", func() {
-		It("Should not fail during install", func(done Done) {
-			defer close(done)
+	It("Should install itself as a kubectl plugin on install subcommand", func() {
+		ctx, closeFunc := context.WithCancel(context.Background())
+		defer closeFunc()
+		localExecutor := framework.LocalExecutor(ctx)
 
-			ctx, closeFunc := context.WithCancel(context.Background())
-			defer closeFunc()
-			localExecutor := framework.LocalExecutor(ctx)
+		By("Calling virtletctl install")
+		_, err := framework.RunSimple(localExecutor, "_output/virtletctl", "install")
+		Expect(err).NotTo(HaveOccurred())
 
-			By("Calling virtletctl install")
-			_, err := framework.RunSimple(localExecutor, "_output/virtletctl", "install")
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Calling kubectl plugin virt help")
-			_, err = framework.RunSimple(localExecutor, "kubectl", "plugin", "virt", "help")
-			Expect(err).NotTo(HaveOccurred())
-		}, 60)
-	})
+		By("Calling kubectl plugin virt help")
+		_, err = framework.RunSimple(localExecutor, "kubectl", "plugin", "virt", "help")
+		Expect(err).NotTo(HaveOccurred())
+	}, 60)
 })
