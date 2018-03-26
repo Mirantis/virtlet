@@ -20,6 +20,7 @@ import (
 	"context"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -29,6 +30,10 @@ import (
 
 	"github.com/Mirantis/virtlet/tests/e2e/framework"
 	. "github.com/Mirantis/virtlet/tests/e2e/ginkgo-ext"
+)
+
+const (
+	gendocTmpDir = "/tmp"
 )
 
 var _ = Describe("virtletctl", func() {
@@ -52,8 +57,11 @@ var _ = Describe("virtletctl", func() {
 		localExecutor := framework.LocalExecutor(ctx)
 
 		By("Calling virtletctl dump-metadata")
-		_, err := framework.RunSimple(localExecutor, "_output/virtletctl", "dump-metadata")
+		output, err := framework.RunSimple(localExecutor, "_output/virtletctl", "dump-metadata")
 		Expect(err).NotTo(HaveOccurred())
+		Expect(output).To(ContainSubstring("Virtlet pod name:"))
+		Expect(output).To(ContainSubstring("Sandboxes:"))
+		Expect(output).To(ContainSubstring("Images:"))
 	}, 60)
 
 	It("Should generate documentation on gendoc subcommand", func(done Done) {
@@ -64,8 +72,13 @@ var _ = Describe("virtletctl", func() {
 		localExecutor := framework.LocalExecutor(ctx)
 
 		By("Calling virtletctl gendoc")
-		_, err := framework.RunSimple(localExecutor, "_output/virtletctl", "gendoc", "/tmp")
+		_, err := framework.RunSimple(localExecutor, "_output/virtletctl", "gendoc", gendocTmpDir)
 		Expect(err).NotTo(HaveOccurred())
+		content, err := ioutil.ReadFile(filepath.Join(gendocTmpDir, "virtletctl.md"))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(content).To(ContainSubstring("Virtlet control tool"))
+		Expect(content).To(ContainSubstring("Synopsis"))
+		Expect(content).To(ContainSubstring("Options"))
 	}, 10)
 
 	Context("SSH subcommand", func() {
@@ -124,16 +137,18 @@ var _ = Describe("virtletctl", func() {
 		}, 60)
 	})
 
-	It("Should list libvirt domains on list subcommand", func(done Done) {
+	It("Should return libvirt version on virsh subcommand", func(done Done) {
 		defer close(done)
 
 		ctx, closeFunc := context.WithCancel(context.Background())
 		defer closeFunc()
 		localExecutor := framework.LocalExecutor(ctx)
 
-		By("Calling virtletctl virsh list")
-		_, err := framework.RunSimple(localExecutor, "_output/virtletctl", "virsh", "list")
+		By("Calling virtletctl virsh version")
+		output, err := framework.RunSimple(localExecutor, "_output/virtletctl", "virsh", "version")
 		Expect(err).NotTo(HaveOccurred())
+		Expect(output).To(ContainSubstring("Compiled against library:"))
+		Expect(output).To(ContainSubstring("Using library:"))
 	}, 60)
 })
 
