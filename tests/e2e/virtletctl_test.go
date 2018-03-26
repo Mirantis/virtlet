@@ -20,7 +20,6 @@ import (
 	"context"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -63,23 +62,6 @@ var _ = Describe("virtletctl", func() {
 		Expect(output).To(ContainSubstring("Sandboxes:"))
 		Expect(output).To(ContainSubstring("Images:"))
 	}, 60)
-
-	It("Should generate documentation on gendoc subcommand", func(done Done) {
-		defer close(done)
-
-		ctx, closeFunc := context.WithCancel(context.Background())
-		defer closeFunc()
-		localExecutor := framework.LocalExecutor(ctx)
-
-		By("Calling virtletctl gendoc")
-		_, err := framework.RunSimple(localExecutor, "_output/virtletctl", "gendoc", gendocTmpDir)
-		Expect(err).NotTo(HaveOccurred())
-		content, err := ioutil.ReadFile(filepath.Join(gendocTmpDir, "virtletctl.md"))
-		Expect(err).NotTo(HaveOccurred())
-		Expect(content).To(ContainSubstring("Virtlet control tool"))
-		Expect(content).To(ContainSubstring("Synopsis"))
-		Expect(content).To(ContainSubstring("Options"))
-	}, 10)
 
 	Context("SSH subcommand", func() {
 		var (
