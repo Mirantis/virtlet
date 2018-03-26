@@ -439,7 +439,7 @@ function e2e {
     ensure_build_container
     local cluster_url
     cluster_url="$(kubectl config view -o jsonpath='{.clusters[?(@.name=="dind")].cluster.server}')"
-    docker exec virtlet-build _output/virtlet-e2e-tests -cluster-url "${cluster_url}" "$@"
+    docker exec virtlet-build _output/virtlet-e2e-tests -include-unsafe-tests=true -cluster-url "${cluster_url}" "$@"
 }
 
 function usage {

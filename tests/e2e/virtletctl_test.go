@@ -154,7 +154,7 @@ var _ = Describe("virtletctl", func() {
 
 var _ = Describe("virtletctl unsafe", func() {
 	BeforeAll(func() {
-		includeNonSafe()
+		includeUnsafe()
 	})
 
 	Context("Should install itself as a kubectl plugin on install subcommand", func() {

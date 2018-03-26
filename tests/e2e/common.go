@@ -34,7 +34,7 @@ var (
 	vmImageLocation       = flag.String("image", defaultVMImageLocation, "VM image URL (*without http(s)://*")
 	sshUser               = flag.String("sshuser", defaultSSHUser, "default SSH user for VMs")
 	includeCloudInitTests = flag.Bool("include-cloud-init-tests", false, "include Cloud-Init tests")
-	includeNonSafeTests   = flag.Bool("include-non-safe-tests", false, "include tests which can modify environment")
+	includeUnsafeTests    = flag.Bool("include-unsafe-tests", false, "include tests that can be unsafe if they're run outside the build container")
 	memoryLimit           = flag.Int("memoryLimit", 160, "default VM memory limit (in MiB)")
 	junitOutput           = flag.String("junitOutput", "", "JUnit XML output file")
 )
@@ -148,8 +148,8 @@ func requireCloudInit() {
 	}
 }
 
-func includeNonSafe() {
-	if !*includeNonSafeTests {
-		Skip("Tests modifying cluster environment are not enabled")
+func includeUnsafe() {
+	if !*includeUnsafeTests {
+		Skip("Tests that are unsafe outside the build container are disabled")
 	}
 }
