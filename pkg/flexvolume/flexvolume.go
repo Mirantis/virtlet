@@ -106,7 +106,7 @@ func (d *FlexVolumeDriver) isAttached(jsonOptions, nodeName string) (map[string]
 	return map[string]interface{}{"attached": true}, nil
 }
 
-//Invocation: <driver executable> mount <target mount dir> <mount device> <json options>
+//Invocation: <driver executable> mount <target mount dir> <json options>
 func (d *FlexVolumeDriver) mount(targetMountDir, jsonOptions string) (map[string]interface{}, error) {
 	var opts map[string]interface{}
 	if err := json.Unmarshal([]byte(jsonOptions), &opts); err != nil {
