@@ -28,12 +28,12 @@ import (
 )
 
 type libvirtStorageConnection struct {
-	conn *libvirt.Connect
+	conn libvirtConnection
 }
 
 var _ virt.StorageConnection = &libvirtStorageConnection{}
 
-func newLibvirtStorageConnection(conn *libvirt.Connect) *libvirtStorageConnection {
+func newLibvirtStorageConnection(conn libvirtConnection) *libvirtStorageConnection {
 	return &libvirtStorageConnection{conn: conn}
 }
 
@@ -43,15 +43,19 @@ func (sc *libvirtStorageConnection) CreateStoragePool(def *libvirtxml.StoragePoo
 		return nil, err
 	}
 	glog.V(2).Infof("Creating storage pool:\n%s", xml)
-	p, err := sc.conn.StoragePoolCreateXML(xml, 0)
+	p, err := sc.conn.invoke(func(c *libvirt.Connect) (interface{}, error) {
+		return c.StoragePoolCreateXML(xml, 0)
+	})
 	if err != nil {
 		return nil, err
 	}
-	return &libvirtStoragePool{conn: sc.conn, p: p}, nil
+	return &libvirtStoragePool{conn: sc.conn, p: p.(*libvirt.StoragePool)}, nil
 }
 
 func (sc *libvirtStorageConnection) LookupStoragePoolByName(name string) (virt.StoragePool, error) {
-	p, err := sc.conn.LookupStoragePoolByName(name)
+	p, err := sc.conn.invoke(func(c *libvirt.Connect) (interface{}, error) {
+		return c.LookupStoragePoolByName(name)
+	})
 	if err != nil {
 		libvirtErr, ok := err.(libvirt.Error)
 		if ok && libvirtErr.Code == libvirt.ERR_NO_STORAGE_POOL {
@@ -59,11 +63,11 @@ func (sc *libvirtStorageConnection) LookupStoragePoolByName(name string) (virt.S
 		}
 		return nil, err
 	}
-	return &libvirtStoragePool{conn: sc.conn, p: p}, nil
+	return &libvirtStoragePool{conn: sc.conn, p: p.(*libvirt.StoragePool)}, nil
 }
 
 type libvirtStoragePool struct {
-	conn *libvirt.Connect
+	conn libvirtConnection
 	p    *libvirt.StoragePool
 }
 

@@ -43,4 +43,8 @@ fi
 chown root.root /vmwrapper
 chmod ug+s /vmwrapper
 
-/usr/local/sbin/libvirtd --listen $daemon
+# FIXME: try using exec liveness probe instead
+while true; do
+  /usr/local/sbin/libvirtd --listen $daemon
+  sleep 1
+done

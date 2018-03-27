@@ -1,5 +1,13 @@
 [
   {
+    "name": "domain conn: ListDomains",
+    "data": []
+  },
+  {
+    "name": "GetImagePathAndVirtualSize",
+    "data": "fake/image1"
+  },
+  {
     "name": "storage: CreateStoragePool",
     "data": {
       "XMLName": {
@@ -20,14 +28,6 @@
       },
       "Source": null
     }
-  },
-  {
-    "name": "domain conn: ListDomains",
-    "data": []
-  },
-  {
-    "name": "GetImagePathAndVirtualSize",
-    "data": "fake/image1"
   },
   {
     "name": "storage: volumes: CreateStorageVol",

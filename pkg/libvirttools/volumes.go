@@ -28,7 +28,7 @@ type ImageManager interface {
 }
 
 type volumeOwner interface {
-	StoragePool() virt.StoragePool
+	StoragePool() (virt.StoragePool, error)
 	DomainConnection() virt.DomainConnection
 	ImageManager() ImageManager
 	RawDevices() []string

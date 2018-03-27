@@ -122,8 +122,8 @@ func newFakeVolumeOwner(storagePool *fake.FakeStoragePool, imageManager *FakeIma
 	}
 }
 
-func (vo fakeVolumeOwner) StoragePool() virt.StoragePool {
-	return vo.storagePool
+func (vo fakeVolumeOwner) StoragePool() (virt.StoragePool, error) {
+	return vo.storagePool, nil
 }
 
 func (vo fakeVolumeOwner) DomainConnection() virt.DomainConnection {

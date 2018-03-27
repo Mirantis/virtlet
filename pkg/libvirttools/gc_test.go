@@ -77,9 +77,9 @@ func TestRootVolumesCleanup(t *testing.T) {
 	ct := newContainerTester(t, fake.NewToplevelRecorder())
 	defer ct.teardown()
 
-	pool, err := ct.storageConn.LookupStoragePoolByName("volumes")
+	pool, err := ct.virtTool.StoragePool()
 	if err != nil {
-		t.Fatalf("LookupStoragePoolByName did not find 'volumes': %v", err)
+		t.Fatalf("StoragePool(): %v", err)
 	}
 
 	for _, uuid := range randomUUIDs {
@@ -119,9 +119,9 @@ func TestQcow2VolumesCleanup(t *testing.T) {
 	ct := newContainerTester(t, fake.NewToplevelRecorder())
 	defer ct.teardown()
 
-	pool, err := ct.storageConn.LookupStoragePoolByName("volumes")
+	pool, err := ct.virtTool.StoragePool()
 	if err != nil {
-		t.Fatalf("LookupStoragePoolByName did not find 'volumes': %v", err)
+		t.Fatalf("StoragePool(): %v", err)
 	}
 
 	for _, uuid := range randomUUIDs {

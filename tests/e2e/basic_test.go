@@ -199,3 +199,30 @@ var _ = Describe("Virtlet [Basic cirros tests]", func() {
 		Expect(nginxPod.Delete()).To(Succeed())
 	}, 60)
 })
+
+var _ = Describe("Virtlet [Disruptive]", func() {
+	var (
+		vm *framework.VMInterface
+	)
+
+	BeforeAll(func() {
+	})
+
+	AfterAll(func() {
+		if vm != nil {
+			deleteVM(vm)
+		}
+	})
+
+	It("Should survive restarting libvirt container", func() {
+		virtletNodeName, err := controller.VirtletNodeName()
+		Expect(err).NotTo(HaveOccurred())
+		nodeExecutor, err := controller.DinDNodeExecutor(virtletNodeName)
+		Expect(err).NotTo(HaveOccurred())
+		_, err = framework.RunSimple(nodeExecutor, "pkill", "libvirtd")
+		Expect(err).NotTo(HaveOccurred())
+
+		vm = controller.VM("cirros-vm")
+		Expect(vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, nil)).To(Succeed())
+	})
+})

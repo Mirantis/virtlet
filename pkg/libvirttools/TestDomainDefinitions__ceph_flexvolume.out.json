@@ -1,5 +1,9 @@
 [
   {
+    "name": "GetImagePathAndVirtualSize",
+    "data": "fake/image1"
+  },
+  {
     "name": "storage: CreateStoragePool",
     "data": {
       "XMLName": {
@@ -20,10 +24,6 @@
       },
       "Source": null
     }
-  },
-  {
-    "name": "GetImagePathAndVirtualSize",
-    "data": "fake/image1"
   },
   {
     "name": "storage: volumes: CreateStorageVol",

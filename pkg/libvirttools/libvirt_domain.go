@@ -27,12 +27,12 @@ import (
 )
 
 type libvirtDomainConnection struct {
-	conn *libvirt.Connect
+	conn libvirtConnection
 }
 
 var _ virt.DomainConnection = &libvirtDomainConnection{}
 
-func newLibvirtDomainConnection(conn *libvirt.Connect) *libvirtDomainConnection {
+func newLibvirtDomainConnection(conn libvirtConnection) *libvirtDomainConnection {
 	return &libvirtDomainConnection{conn: conn}
 }
 
@@ -42,29 +42,35 @@ func (dc *libvirtDomainConnection) DefineDomain(def *libvirtxml.Domain) (virt.Do
 		return nil, err
 	}
 	glog.V(2).Infof("Defining domain:\n%s", xml)
-	d, err := dc.conn.DomainDefineXML(xml)
+	d, err := dc.conn.invoke(func(c *libvirt.Connect) (interface{}, error) {
+		return c.DomainDefineXML(xml)
+	})
 	if err != nil {
 		return nil, err
 	}
-	return &libvirtDomain{d}, nil
+	return &libvirtDomain{d.(*libvirt.Domain)}, nil
 }
 
 func (dc *libvirtDomainConnection) ListDomains() ([]virt.Domain, error) {
-	domains, err := dc.conn.ListAllDomains(0)
+	domains, err := dc.conn.invoke(func(c *libvirt.Connect) (interface{}, error) {
+		return c.ListAllDomains(0)
+	})
 	if err != nil {
 		return nil, err
 	}
-	r := make([]virt.Domain, len(domains))
-	for n, d := range domains {
+	var r []virt.Domain
+	for _, d := range domains.([]libvirt.Domain) {
 		// need to make a copy here
 		curDomain := d
-		r[n] = &libvirtDomain{&curDomain}
+		r = append(r, &libvirtDomain{&curDomain})
 	}
 	return r, nil
 }
 
 func (dc *libvirtDomainConnection) LookupDomainByName(name string) (virt.Domain, error) {
-	d, err := dc.conn.LookupDomainByName(name)
+	d, err := dc.conn.invoke(func(c *libvirt.Connect) (interface{}, error) {
+		return c.LookupDomainByName(name)
+	})
 	if err != nil {
 		libvirtErr, ok := err.(libvirt.Error)
 		if ok && libvirtErr.Code == libvirt.ERR_NO_DOMAIN {
@@ -72,11 +78,13 @@ func (dc *libvirtDomainConnection) LookupDomainByName(name string) (virt.Domain,
 		}
 		return nil, err
 	}
-	return &libvirtDomain{d}, nil
+	return &libvirtDomain{d.(*libvirt.Domain)}, nil
 }
 
 func (dc *libvirtDomainConnection) LookupDomainByUUIDString(uuid string) (virt.Domain, error) {
-	d, err := dc.conn.LookupDomainByUUIDString(uuid)
+	d, err := dc.conn.invoke(func(c *libvirt.Connect) (interface{}, error) {
+		return c.LookupDomainByUUIDString(uuid)
+	})
 	if err != nil {
 		libvirtErr, ok := err.(libvirt.Error)
 		if ok && libvirtErr.Code == libvirt.ERR_NO_DOMAIN {
@@ -84,7 +92,7 @@ func (dc *libvirtDomainConnection) LookupDomainByUUIDString(uuid string) (virt.D
 		}
 		return nil, err
 	}
-	return &libvirtDomain{d}, nil
+	return &libvirtDomain{d.(*libvirt.Domain)}, nil
 }
 
 func (dc *libvirtDomainConnection) DefineSecret(def *libvirtxml.Secret) (virt.Secret, error) {
@@ -92,15 +100,19 @@ func (dc *libvirtDomainConnection) DefineSecret(def *libvirtxml.Secret) (virt.Se
 	if err != nil {
 		return nil, err
 	}
-	secret, err := dc.conn.SecretDefineXML(xml, 0)
+	secret, err := dc.conn.invoke(func(c *libvirt.Connect) (interface{}, error) {
+		return c.SecretDefineXML(xml, 0)
+	})
 	if err != nil {
 		return nil, err
 	}
-	return &libvirtSecret{secret}, nil
+	return &libvirtSecret{secret.(*libvirt.Secret)}, nil
 }
 
 func (dc *libvirtDomainConnection) LookupSecretByUUIDString(uuid string) (virt.Secret, error) {
-	secret, err := dc.conn.LookupSecretByUUIDString(uuid)
+	secret, err := dc.conn.invoke(func(c *libvirt.Connect) (interface{}, error) {
+		return c.LookupSecretByUUIDString(uuid)
+	})
 	if err != nil {
 		libvirtErr, ok := err.(libvirt.Error)
 		if ok && libvirtErr.Code == libvirt.ERR_NO_SECRET {
@@ -108,7 +120,7 @@ func (dc *libvirtDomainConnection) LookupSecretByUUIDString(uuid string) (virt.S
 		}
 		return nil, err
 	}
-	return &libvirtSecret{secret}, nil
+	return &libvirtSecret{secret.(*libvirt.Secret)}, nil
 }
 
 func (dc *libvirtDomainConnection) LookupSecretByUsageName(usageType string, usageName string) (virt.Secret, error) {
@@ -117,7 +129,9 @@ func (dc *libvirtDomainConnection) LookupSecretByUsageName(usageType string, usa
 		return nil, fmt.Errorf("unsupported type %q for secret with usage name: %q", usageType, usageName)
 	}
 
-	secret, err := dc.conn.LookupSecretByUsage(libvirt.SECRET_USAGE_TYPE_CEPH, usageName)
+	secret, err := dc.conn.invoke(func(c *libvirt.Connect) (interface{}, error) {
+		return c.LookupSecretByUsage(libvirt.SECRET_USAGE_TYPE_CEPH, usageName)
+	})
 	if err != nil {
 		libvirtErr, ok := err.(libvirt.Error)
 		if ok && libvirtErr.Code == libvirt.ERR_NO_SECRET {
@@ -125,7 +139,7 @@ func (dc *libvirtDomainConnection) LookupSecretByUsageName(usageType string, usa
 		}
 		return nil, err
 	}
-	return &libvirtSecret{secret}, nil
+	return &libvirtSecret{secret.(*libvirt.Secret)}, nil
 }
 
 type libvirtDomain struct {

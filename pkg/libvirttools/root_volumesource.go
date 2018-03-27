@@ -50,7 +50,11 @@ func (v *rootVolume) createVolume() (virt.StorageVolume, error) {
 		return nil, err
 	}
 
-	return v.owner.StoragePool().CreateStorageVol(&libvirtxml.StorageVolume{
+	storagePool, err := v.owner.StoragePool()
+	if err != nil {
+		return nil, err
+	}
+	return storagePool.CreateStorageVol(&libvirtxml.StorageVolume{
 		Type: "file",
 		Name: v.volumeName(),
 		Allocation: &libvirtxml.StorageVolumeSize{
@@ -91,5 +95,9 @@ func (v *rootVolume) Setup() (*libvirtxml.DomainDisk, error) {
 }
 
 func (v *rootVolume) Teardown() error {
-	return v.owner.StoragePool().RemoveVolumeByName(v.volumeName())
+	storagePool, err := v.owner.StoragePool()
+	if err != nil {
+		return err
+	}
+	return storagePool.RemoveVolumeByName(v.volumeName())
 }

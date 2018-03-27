@@ -141,7 +141,11 @@ func (v *VirtualizationTool) removeOrphanDomains(ids []string) []error {
 }
 
 func (v *VirtualizationTool) removeOrphanRootVolumes(ids []string) []error {
-	volumes, err := v.volumePool.ListAllVolumes()
+	volumePool, err := v.StoragePool()
+	if err != nil {
+		return []error{fmt.Errorf("cannot get the storage pool: %v", err)}
+	}
+	volumes, err := volumePool.ListAllVolumes()
 	if err != nil {
 		return []error{fmt.Errorf("cannot list libvirt volumes: %v", err)}
 	}
@@ -180,7 +184,11 @@ func (v *VirtualizationTool) removeOrphanRootVolumes(ids []string) []error {
 }
 
 func (v *VirtualizationTool) removeOrphanQcow2Volumes(ids []string) []error {
-	volumes, err := v.volumePool.ListAllVolumes()
+	volumePool, err := v.StoragePool()
+	if err != nil {
+		return []error{fmt.Errorf("cannot get the storage pool: %v", err)}
+	}
+	volumes, err := volumePool.ListAllVolumes()
 	if err != nil {
 		return []error{fmt.Errorf("cannot list domains: %v", err)}
 	}
