@@ -30,7 +30,7 @@ import (
 	. "github.com/Mirantis/virtlet/tests/e2e/ginkgo-ext"
 )
 
-var _ = Describe("Basic cirros tests", func() {
+var _ = Describe("Virtlet [Basic cirros tests]", func() {
 	var (
 		vm    *framework.VMInterface
 		vmPod *framework.PodInterface
@@ -168,7 +168,7 @@ var _ = Describe("Basic cirros tests", func() {
 		do(framework.RunSimple(virtletPodExecutor, "vncsnapshot", "-allowblank", display, "/vm.jpg"))
 	}, 60)
 
-	It("Should start port forwarding", func(done Done) {
+	It("Should support port forwarding", func(done Done) {
 		defer close(done)
 		podName := "nginx-pf"
 		localPort := rand.Intn(899) + 100
