@@ -37,7 +37,7 @@ var _ = Describe("QEMU Process", func() {
 
 	BeforeAll(func() {
 		vm = controller.VM("kill-qemu-vm")
-		vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, nil)
+		Expect(vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, nil)).To(Succeed())
 		var err error
 		vmPod, err := vm.Pod()
 		Expect(err).NotTo(HaveOccurred())
