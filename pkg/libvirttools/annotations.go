@@ -253,7 +253,7 @@ func readK8sKeySource(sourceType, sourceName, ns, key string, clientset *kuberne
 	sourceType = strings.ToLower(sourceType)
 	switch sourceType {
 	case "secret":
-		secret, err := clientset.Secrets(ns).Get(sourceName, meta_v1.GetOptions{})
+		secret, err := clientset.CoreV1().Secrets(ns).Get(sourceName, meta_v1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -266,7 +266,7 @@ func readK8sKeySource(sourceType, sourceName, ns, key string, clientset *kuberne
 		}
 		return result, nil
 	case "configmap":
-		configmap, err := clientset.ConfigMaps(ns).Get(sourceName, meta_v1.GetOptions{})
+		configmap, err := clientset.CoreV1().ConfigMaps(ns).Get(sourceName, meta_v1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}

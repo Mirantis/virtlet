@@ -24,9 +24,9 @@ import (
 	"time"
 
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/api/v1"
 )
 
 // VMInterface provides API to work with virtlet VM pods

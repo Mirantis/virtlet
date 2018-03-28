@@ -21,15 +21,12 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/pkg/api/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-
-	// register standard k8s types
-	_ "k8s.io/kubernetes/pkg/api/install"
 
 	"github.com/Mirantis/virtlet/pkg/imagetranslation"
 )
