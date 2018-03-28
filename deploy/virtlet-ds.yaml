@@ -188,6 +188,12 @@ spec:
           value: /etc/virtlet/images
         - name: KUBERNETES_POD_LOGS
           value: "/kubernetes-log"
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - socat - UNIX:/run/virtlet.sock </dev/null
       - name: vms
         image: mirantis/virtlet
         imagePullPolicy: IfNotPresent
