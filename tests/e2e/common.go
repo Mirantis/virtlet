@@ -26,6 +26,8 @@ import (
 
 	. "github.com/onsi/gomega"
 
+	"k8s.io/api/core/v1"
+
 	"github.com/Mirantis/virtlet/tests/e2e/framework"
 	. "github.com/Mirantis/virtlet/tests/e2e/ginkgo-ext"
 )
@@ -63,6 +65,25 @@ func waitSSH(vm *framework.VMInterface) framework.Executor {
 			return err
 		}, 60*5, 3).Should(Succeed())
 	return ssh
+}
+
+func waitVirtletPod(vm *framework.VMInterface) *framework.PodInterface {
+	var virtletPod *framework.PodInterface
+	Eventually(
+		func() error {
+			var err error
+			virtletPod, err = vm.VirtletPod()
+			if err != nil {
+				return err
+			}
+			for _, c := range virtletPod.Pod.Status.Conditions {
+				if c.Type == v1.PodReady && c.Status == v1.ConditionTrue {
+					return nil
+				}
+			}
+			return fmt.Errorf("Pod not ready yet: %+v", virtletPod.Pod.Status)
+		}, 60*5, 3).Should(Succeed())
+	return virtletPod
 }
 
 func checkCPUCount(vm *framework.VMInterface, ssh framework.Executor, cpus int) {
