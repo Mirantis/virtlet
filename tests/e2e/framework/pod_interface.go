@@ -21,18 +21,19 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/signal"
 	"time"
 
+	"k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
-	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/client-go/transport/spdy"
 	"k8s.io/client-go/util/exec"
-	"k8s.io/kubernetes/pkg/api"
 
 	"github.com/Mirantis/virtlet/pkg/tools"
 )
@@ -183,7 +184,12 @@ func (pi *PodInterface) PortForward(ports []*tools.ForwardedPort) (chan struct{}
 	errCh := make(chan error, 1)
 	readyCh := make(chan struct{})
 	go func() {
-		dialer, err := remotecommand.NewExecutor(pi.controller.restConfig, "POST", req.URL())
+		transport, upgrader, err := spdy.RoundTripperFor(pi.controller.restConfig)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", req.URL())
 		if err != nil {
 			errCh <- err
 			return
@@ -227,24 +233,23 @@ func (ci *containerInterface) Run(stdin io.Reader, stdout, stderr io.Writer, com
 		Name(ci.podInterface.Pod.Name).
 		Namespace(ci.podInterface.Pod.Namespace).
 		SubResource("exec")
-	req.VersionedParams(&api.PodExecOptions{
+	req.VersionedParams(&v1.PodExecOptions{
 		Container: ci.name,
 		Command:   command,
 		Stdin:     stdin != nil,
 		Stdout:    stdout != nil,
 		Stderr:    stderr != nil,
-	}, api.ParameterCodec)
+	}, scheme.ParameterCodec)
 
-	executor, err := remotecommand.NewExecutor(ci.podInterface.controller.restConfig, "POST", req.URL())
+	executor, err := remotecommand.NewSPDYExecutor(ci.podInterface.controller.restConfig, "POST", req.URL())
 	if err != nil {
 		return err
 	}
 
 	options := remotecommand.StreamOptions{
-		SupportedProtocols: remotecommandconsts.SupportedStreamingProtocols,
-		Stdin:              stdin,
-		Stdout:             stdout,
-		Stderr:             stderr,
+		Stdin:  stdin,
+		Stdout: stdout,
+		Stderr: stderr,
 	}
 
 	if err := executor.Stream(options); err != nil {

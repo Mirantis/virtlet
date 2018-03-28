@@ -47,6 +47,30 @@ type VirtletImageMapping struct {
 	Spec               ImageTranslation `json:"spec"`
 }
 
+func (m *VirtletImageMapping) DeepCopyObject() runtime.Object {
+	if m == nil {
+		return nil
+	}
+	r := *m
+	if m.Spec.Transports == nil {
+		return &r
+	}
+
+	transportMap := make(map[string]TransportProfile)
+	for k, tr := range m.Spec.Transports {
+		if tr.MaxRedirects != nil {
+			redirs := *tr.MaxRedirects
+			tr.MaxRedirects = &redirs
+		}
+		if tr.TLS != nil {
+			tls := *tr.TLS
+			tr.TLS = &tls
+		}
+		transportMap[k] = tr
+	}
+	return &r
+}
+
 var _ TranslationConfig = VirtletImageMapping{}
 
 // VirtletImageMappingList is a k8s representation of list of translation configs
@@ -54,6 +78,20 @@ type VirtletImageMappingList struct {
 	meta_v1.TypeMeta `json:",inline"`
 	meta_v1.ListMeta `json:"metadata"`
 	Items            []VirtletImageMapping `json:"items"`
+}
+
+func (l *VirtletImageMappingList) DeepCopyObject() runtime.Object {
+	if l == nil {
+		return l
+	}
+	r := &VirtletImageMappingList{
+		TypeMeta: l.TypeMeta,
+		ListMeta: l.ListMeta,
+	}
+	for _, m := range l.Items {
+		r.Items = append(r.Items, *m.DeepCopyObject().(*VirtletImageMapping))
+	}
+	return r
 }
 
 func addKnownTypes(scheme *runtime.Scheme) error {
@@ -98,8 +136,7 @@ func RegisterCustomResourceType() error {
 		panic(err)
 	}
 
-	_, err = extensionsClientSet.CustomResourceDefinitions().Create(&crd)
-
+	_, err = extensionsClientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(&crd)
 	if err == nil || errors.IsAlreadyExists(err) {
 		return nil
 	}

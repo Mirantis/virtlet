@@ -31,20 +31,10 @@ import:
   version: c3209e4ba8b8dda65c85ca0ac04302e55895caf7
 - package: github.com/libvirt/libvirt-go-xml
   version: 661c62056664441ce89e9224e1ce401b67fa0f07
-- package: k8s.io/kubernetes
-  version: v1.7.0
-- package: k8s.io/client-go
-  version: 4cbb4d746a6a36cf99d6cd4f1b69a6907f49318a
 - package: github.com/jonboulle/clockwork
   version: bcac9884e7502bb2b474c0339d889cb981a2f27f
 - package: github.com/onsi/ginkgo
-- package: k8s.io/apiextensions-apiserver
-  version: fcd622fe88a4a6efcb5aea9e94ee87324ac1b036
 - package: github.com/onsi/gomega
-- package: k8s.io/metrics
-  version: 8efbc8e22d00b9c600afec5f1c14073fd2412fce
-- package: k8s.io/api
-  version: 4fe9229aaa9d704f8a2a21cdcd50de2bbb6e1b57
 - package: golang.org/x/sync
   subpackages:
   - syncmap
@@ -62,9 +52,22 @@ import:
 - package: github.com/russross/blackfriday
   version: v2.0.0
 - package: github.com/docker/distribution
-  version: cd27f179f2c10c5d300e6d09025b538c475b0d51
+  version: edc3ab29cdff8694dd6feb85cfeb4b5f1b38ed9c
   subpackages:
-  - digest
   - reference
+- package: github.com/opencontainers/go-digest
+  version: a6d0ee40d4207ea02364bd3b9e8e77b9159ba1eb  
 - package: github.com/spf13/pflag
   version: 4c012f6dcd9546820e378d0bdda4d8fc772cdfea
+- package: k8s.io/client-go
+  version: ~6.0.0
+- package: k8s.io/api
+  version: kubernetes-1.9.6
+- package: k8s.io/apimachinery
+  version: kubernetes-1.9.6
+- package: k8s.io/metrics
+  version: kubernetes-1.9.6
+- package: k8s.io/apiextensions-apiserver
+  version: kubernetes-1.9.6
+- package: k8s.io/kubernetes
+  version: v1.9.6
