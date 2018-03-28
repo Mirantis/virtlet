@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"k8s.io/apimachinery/pkg/api/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -68,9 +67,9 @@ func (pi *PodInterface) Create() error {
 // Delete deletes the pod and associated service, which was earlier created by `controller.Run()`
 func (pi *PodInterface) Delete() error {
 	if pi.hasService {
-		pi.controller.client.Services(pi.controller.Namespace()).Delete(pi.Pod.Name, nil)
+		pi.controller.client.Services(pi.Pod.Namespace).Delete(pi.Pod.Name, nil)
 	}
-	return pi.controller.client.Pods(pi.controller.Namespace()).Delete(pi.Pod.Name, nil)
+	return pi.controller.client.Pods(pi.Pod.Namespace).Delete(pi.Pod.Name, nil)
 }
 
 // Wait waits for pod to start and checks that it doesn't fail immediately after that

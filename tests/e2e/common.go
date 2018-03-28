@@ -28,15 +28,18 @@ import (
 
 	"github.com/Mirantis/virtlet/tests/e2e/framework"
 	. "github.com/Mirantis/virtlet/tests/e2e/ginkgo-ext"
+
+	"k8s.io/client-go/pkg/api/v1"
 )
 
 var (
-	vmImageLocation       = flag.String("image", defaultVMImageLocation, "VM image URL (*without http(s)://*")
-	sshUser               = flag.String("sshuser", defaultSSHUser, "default SSH user for VMs")
-	includeCloudInitTests = flag.Bool("include-cloud-init-tests", false, "include Cloud-Init tests")
-	includeUnsafeTests    = flag.Bool("include-unsafe-tests", false, "include tests that can be unsafe if they're run outside the build container")
-	memoryLimit           = flag.Int("memoryLimit", 160, "default VM memory limit (in MiB)")
-	junitOutput           = flag.String("junitOutput", "", "JUnit XML output file")
+	vmImageLocation        = flag.String("image", defaultVMImageLocation, "VM image URL (*without http(s)://*")
+	sshUser                = flag.String("sshuser", defaultSSHUser, "default SSH user for VMs")
+	includeCloudInitTests  = flag.Bool("include-cloud-init-tests", false, "include Cloud-Init tests")
+	includeUnsafeTests     = flag.Bool("include-unsafe-tests", false, "include tests that can be unsafe if they're run outside the build container")
+	includeDisruptiveTests = flag.Bool("include-disruptive", false, "include tests that can disrupt other tests")
+	memoryLimit            = flag.Int("memoryLimit", 160, "default VM memory limit (in MiB)")
+	junitOutput            = flag.String("junitOutput", "", "JUnit XML output file")
 )
 
 // scheduleWaitSSH schedules SSH interface initialization before the test context starts
@@ -63,6 +66,25 @@ func waitSSH(vm *framework.VMInterface) framework.Executor {
 			return err
 		}, 60*5, 3).Should(Succeed())
 	return ssh
+}
+
+func waitVirtletPod(vm *framework.VMInterface) *framework.PodInterface {
+	var virtletPod *framework.PodInterface
+	Eventually(
+		func() error {
+			var err error
+			virtletPod, err = vm.VirtletPod()
+			if err != nil {
+				return err
+			}
+			for _, c := range virtletPod.Pod.Status.Conditions {
+				if c.Type == v1.PodReady && c.Status == v1.ConditionTrue {
+					return nil
+				}
+			}
+			return fmt.Errorf("Pod not ready yet: %+v", virtletPod.Pod.Status)
+		}, 60*5, 3).Should(Succeed())
+	return virtletPod
 }
 
 func checkCPUCount(vm *framework.VMInterface, ssh framework.Executor, cpus int) {
@@ -151,5 +173,11 @@ func requireCloudInit() {
 func includeUnsafe() {
 	if !*includeUnsafeTests {
 		Skip("Tests that are unsafe outside the build container are disabled")
+	}
+}
+
+func includeDisruptive() {
+	if !*includeDisruptiveTests {
+		Skip("Tests that may disrupt another tests are disabled")
 	}
 }
