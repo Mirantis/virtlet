@@ -40,6 +40,9 @@ dind_mounts='.items[0].spec.template.spec.volumes|=.+[{"name":"dind",hostPath:{"
 containers_run='.items[0].spec.template.spec.containers|=map(.volumeMounts|=map(select(.name!="run"))+[{"mountPath": "/run:shared", "name": "run"}])'
 initContainers_run='.items[0].spec.template.spec.initContainers|=map(.volumeMounts|=map(select(.name!="run"))+[{"mountPath": "/run:shared", "name": "run"}])'
 containers_k8s_dir='.items[0].spec.template.spec.containers[1].volumeMounts|=map(select(.name!="k8s-pods-dir"))+[{"mountPath": "/var/lib/kubelet/pods:shared", "name": "k8s-pods-dir"}]'
+bindata_out="pkg/tools/bindata.go"
+bindata_dir="deploy/data"
+bindata_pkg="tools"
 
 function image_tags_filter {
     local tag="${1}"
@@ -372,6 +375,13 @@ function run_integration_internal {
 }
 
 function build_internal {
+    # we don't just always generate the bindata right there because we
+    # want to keep the source buildable outside this build container.
+    go-bindata -o /tmp/bindata.go -pkg "${bindata_pkg}" "${bindata_dir}"
+    if ! cmp /tmp/bindata.go "${bindata_out}"; then
+        echo >&2 "${bindata_dir} changed, please re-run ${0} update-bindata"
+        exit 1
+    fi
     install_vendor_internal
     mkdir -p "${project_dir}/_output"
     go build -i -o "${project_dir}/_output/virtlet" ./cmd/virtlet
@@ -442,6 +452,10 @@ function e2e {
     docker exec virtlet-build _output/virtlet-e2e-tests -include-unsafe-tests=true -cluster-url "${cluster_url}" "$@"
 }
 
+function update_bindata_internal {
+    go-bindata -o "${bindata_out}" -pkg "${bindata_pkg}" "${bindata_dir}"
+}
+
 function usage {
     echo >&2 "Usage:"
     echo >&2 "  $0 build"
@@ -474,20 +488,20 @@ case "${cmd}" in
         gobuild "$@"
         ;;
     prepare-vendor)
-        ( vcmd "build/cmd.sh install-vendor-internal" )
+        vcmd "build/cmd.sh install-vendor-internal"
         ;;
     build)
-        ( vcmd "build/cmd.sh build-image-internal" )
+        vcmd "build/cmd.sh build-image-internal"
         ;;
     build-image-internal)
         # this is executed inside the container
         build_image_internal "$@"
         ;;
     test)
-        ( vcmd 'build/cmd.sh run-tests-internal' )
+        vcmd 'build/cmd.sh run-tests-internal'
         ;;
     integration)
-        ( vcmd 'build/cmd.sh run-integration-internal' )
+        vcmd 'build/cmd.sh run-integration-internal'
         ;;
     install-vendor-internal)
         install_vendor_internal
@@ -497,6 +511,13 @@ case "${cmd}" in
         ;;
     run-integration-internal)
         run_integration_internal
+        ;;
+    update-bindata)
+        vcmd "build/cmd.sh update-bindata-internal"
+        docker cp "virtlet-build:${remote_project_dir}/pkg/tools/bindata.go" pkg/tools/bindata.go
+        ;;
+    update-bindata-internal)
+        update_bindata_internal
         ;;
     run)
         vcmd "$*"
