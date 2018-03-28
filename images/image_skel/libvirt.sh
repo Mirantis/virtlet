@@ -4,9 +4,9 @@ set -o nounset
 set -o pipefail
 set -o errtrace
 
-novirtlet=
-if [[ ${1:-} == -novirtlet ]]; then
-  novirtlet=1
+testmode=
+if [[ ${1:-} == -testmode ]]; then
+  testmode=1
 fi
 
 if [[ -f /dind/vmwrapper ]]; then
@@ -29,13 +29,6 @@ if [[ -e /var/lib/libvirt/qemu ]]; then
   mv /var/lib/libvirt/qemu.ok /var/lib/libvirt/qemu
 fi
 
-daemon=
-if [[ ${novirtlet} ]]; then
-  # leftover socket prevents libvirt from initializing correctly
-  rm -f /var/lib/libvirt/qemu/capabilities.monitor.sock
-  daemon="--daemon"
-fi
-
 # export LIBVIRT_LOG_FILTERS="1:qemu.qemu_process 1:qemu.qemu_command 1:qemu.qemu_domain"
 # export LIBVIRT_DEBUG=1
 
@@ -43,8 +36,14 @@ fi
 chown root.root /vmwrapper
 chmod ug+s /vmwrapper
 
-# FIXME: try using exec liveness probe instead
-while true; do
-  /usr/local/sbin/libvirtd --listen $daemon
-  sleep 1
-done
+if [[ ${testmode} ]]; then
+  # leftover socket prevents libvirt from initializing correctly
+  rm -f /var/lib/libvirt/qemu/capabilities.monitor.sock
+  /usr/local/sbin/libvirtd --listen --daemon
+else
+  # FIXME: try using exec liveness probe instead
+  while true; do
+    /usr/local/sbin/libvirtd --listen
+    sleep 1
+  done
+fi
