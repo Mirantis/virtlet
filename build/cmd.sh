@@ -35,11 +35,6 @@ virtlet_node=kube-node-1
 if [[ ${VIRTLET_ON_MASTER} ]]; then
   virtlet_node=kube-master
 fi
-
-dind_mounts='.items[0].spec.template.spec.volumes|=.+[{"name":"dind",hostPath:{"path":"/dind"}}]|.items[0].spec.template.spec.containers[].volumeMounts|=.+[{"name":"dind", "mountPath":"/dind"}]|.items[0].spec.template.spec.initContainers[].volumeMounts|=.+[{"name":"dind", "mountPath":"/dind"}]'
-containers_run='.items[0].spec.template.spec.containers|=map(.volumeMounts|=map(select(.name!="run"))+[{"mountPath": "/run:shared", "name": "run"}])'
-initContainers_run='.items[0].spec.template.spec.initContainers|=map(.volumeMounts|=map(select(.name!="run"))+[{"mountPath": "/run:shared", "name": "run"}])'
-containers_k8s_dir='.items[0].spec.template.spec.containers[1].volumeMounts|=map(select(.name!="k8s-pods-dir"))+[{"mountPath": "/var/lib/kubelet/pods:shared", "name": "k8s-pods-dir"}]'
 bindata_out="pkg/tools/bindata.go"
 bindata_dir="deploy/data"
 bindata_pkg="tools"
@@ -267,6 +262,7 @@ function kvm_ok {
 }
 
 function start_dind {
+    ensure_build_container
     if ! docker exec "${virtlet_node}" dpkg-query -W criproxy-nodeps >&/dev/null; then
         echo >&2 "Installing CRI proxy package the node container..."
         docker exec "${virtlet_node}" /bin/bash -c "curl -sSL '${CRIPROXY_DEB_URL}' >/criproxy.deb && dpkg -i /criproxy.deb && rm /criproxy.deb"
@@ -297,18 +293,13 @@ function start_dind {
 }
 
 function start_virtlet {
-    # For k8s 1.7 removing MountPropagation option and restoring old hack with
-    # adding :shared to mountPath
-    if ! kubectl version | tail -n1 | grep -q 'v1\.7\.'; then
-        kubectl convert --local -o json -f "${project_dir}/deploy/virtlet-ds.yaml" |
-           jq "${dind_mounts}" |
-           kubectl apply -f -
-    else
-        filters="${dind_mounts}|${containers_run}|${initContainers_run}|${containers_k8s_dir}"
-        kubectl convert --local -o json -f "${project_dir}/deploy/virtlet-ds.yaml" |
-           jq "${filters}" |
-           kubectl apply -f -
+    local -a opts=(--dev)
+    if kubectl version | tail -n1 | grep -q 'v1\.7\.'; then
+        # apply mount propagation hacks for 1.7
+        opts+=(--compat)
     fi
+    docker exec virtlet-build "${remote_project_dir}/_output/virtletctl" gen "${opts[@]}" |
+        kubectl apply -f -
 }
 
 function virtlet_subdir {
@@ -392,14 +383,6 @@ function build_internal {
     go test -i -c -o "${project_dir}/_output/virtlet-e2e-tests" ./tests/e2e
 }
 
-function patch_yaml {
-    local kubectl="${1}"
-    local filter="${2}"
-    "${kubectl}" convert --local -o json -f deploy/virtlet-ds.yaml |
-        jq "${filter}" |
-        "${kubectl}" convert --local -o yaml -f -
-}
-
 function release_description {
     local -a tag="${1}"
     shift
@@ -414,7 +397,7 @@ function release_description {
 function release_internal {
     local tag="${1}"
     local -a opts=(--user Mirantis --repo virtlet --tag "${tag}")
-    local -a files=(virtlet-ds.yaml virtlet-ds-1.7.yaml virtletctl virtletctl.darwin)
+    local -a files=(virtletctl virtletctl.darwin)
     local description="$(release_description "${tag}" "${files[@]}")"
     local pre_release=
     # TODO: uncomment this 'if/fi' once we start making 'non-pre' releases
@@ -428,14 +411,6 @@ function release_internal {
                    --name "$(git tag -l --format='%(contents:subject)' "${tag}")" \
                    --description "${description}" \
                    ${pre_release}
-    # piping the patched yaml directly to
-    # 'github-release upload ... --file -' causes GH API error:
-    # "error: could not upload, status code (400 Bad Request), msg: Bad Content-Length: , errors:"
-    mkdir -p _output
-    patch_yaml kubectl "$(image_tags_filter "${tag}")" >_output/virtlet-ds.yaml
-    # use older kubectl for 1.7 to avoid making yaml
-    # that can't be consumed by k8s 1.7
-    patch_yaml kubectl.old "$(image_tags_filter "${tag}")|${containers_run}|${initContainers_run}|${containers_k8s_dir}" >_output/virtlet-ds-1.7.yaml
     for filename in "${files[@]}"; do
         echo >&2 "Uploading: ${filename}"
         github-release upload "${opts[@]}" \
