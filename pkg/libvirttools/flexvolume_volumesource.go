@@ -69,7 +69,7 @@ func ScanFlexVolumes(config *VMConfig, owner volumeOwner) ([]VMVolume, error) {
 		}
 		var msi map[string]interface{}
 		if err = json.Unmarshal(content, &msi); err != nil {
-			return nil, fmt.Errorf("error reading flexvolume config %q: %v", dataFilePath, err)
+			return nil, fmt.Errorf("error unmarshal flexvolume config %q: %v", dataFilePath, err)
 		}
 		fvType, _ := msi["type"].(string)
 		if fvType == "" {
