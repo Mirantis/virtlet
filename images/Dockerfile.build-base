@@ -82,5 +82,5 @@ RUN mkdir -p /images && \
 
 # Install Go tooling
 RUN go get github.com/aktau/github-release && \
-    go get github.com/Masterminds/glide
-
+    go get github.com/Masterminds/glide && \
+    go get github.com/go-bindata/go-bindata/...
