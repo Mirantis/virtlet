@@ -35,6 +35,7 @@ virtlet_node=kube-node-1
 if [[ ${VIRTLET_ON_MASTER} ]]; then
   virtlet_node=kube-master
 fi
+bindata_modtime=1522279343
 bindata_out="pkg/tools/bindata.go"
 bindata_dir="deploy/data"
 bindata_pkg="tools"
@@ -368,7 +369,7 @@ function run_integration_internal {
 function build_internal {
     # we don't just always generate the bindata right there because we
     # want to keep the source buildable outside this build container.
-    go-bindata -o /tmp/bindata.go -pkg "${bindata_pkg}" "${bindata_dir}"
+    go-bindata -o /tmp/bindata.go -modtime "${bindata_modtime}" -pkg "${bindata_pkg}" "${bindata_dir}"
     if ! cmp /tmp/bindata.go "${bindata_out}"; then
         echo >&2 "${bindata_dir} changed, please re-run ${0} update-bindata"
         exit 1
@@ -428,7 +429,9 @@ function e2e {
 }
 
 function update_bindata_internal {
-    go-bindata -o "${bindata_out}" -pkg "${bindata_pkg}" "${bindata_dir}"
+    # set fixed modtime to avoid unwanted differences during the checks
+    # that are done by build/cmd.sh build
+    go-bindata -modtime "${bindata_modtime}" -o "${bindata_out}" -pkg "${bindata_pkg}" "${bindata_dir}"
 }
 
 function usage {
