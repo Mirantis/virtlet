@@ -204,12 +204,12 @@ spec:
       flexVolume:
         driver: kubernetes.io/flexvolume_driver
         options:
-          Type: ceph
-          Monitor: 10.192.0.1:6789
-          User: libvirt
-          Secret: AQDTwuVY8rA8HxAAthwOKaQPr0hRc7kCmR/9Qg==
-          Volume: rbd-test-image
-          Pool: libvirt-pool
+          type: ceph
+          monitor: 10.192.0.1:6789
+          user: libvirt
+          secret: AQDTwuVY8rA8HxAAthwOKaQPr0hRc7kCmR/9Qg==
+          volume: rbd-test-image
+          pool: libvirt-pool
 ```
 
 ### Example of VM-pod definition with a ceph volume using [PVs and PVCs](https://kubernetes.io/docs/concepts/storage/persistent-volumes/).
