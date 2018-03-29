@@ -253,7 +253,7 @@ jobs:
         name: Build virtlet
         command: |
           build/portforward.sh 18730&
-          build/cmd.sh build
+          SET_VIRTLET_IMAGE_TAG="${CIRCLE_TAG:-}" build/cmd.sh build
           build/cmd.sh copy
     - run:
         name: Save image
