@@ -44,8 +44,7 @@ var _ = Describe("virtletctl", func() {
 		localExecutor := framework.LocalExecutor(ctx)
 
 		By("Calling virtletctl help")
-		_, err := framework.RunSimple(localExecutor, "_output/virtletctl", "help")
-		Expect(err).NotTo(HaveOccurred())
+		callVirtletctl(localExecutor, "help")
 	}, 10)
 
 	Context("Tests depending on spawning VM", func() {
@@ -98,8 +97,7 @@ var _ = Describe("virtletctl", func() {
 			defer closeFunc()
 			localExecutor := framework.LocalExecutor(ctx)
 
-			output, err := framework.RunSimple(localExecutor, "_output/virtletctl", "ssh", "--namespace", controller.Namespace(), "cirros@virtletctl-cirros-vm", "--", "-i", tempfileName, "hostname")
-			Expect(err).NotTo(HaveOccurred())
+			output := callVirtletctl(localExecutor, "ssh", "--namespace", controller.Namespace(), "cirros@virtletctl-cirros-vm", "--", "-i", tempfileName, "hostname")
 			Expect(output).To(Equal("virtletctl-cirros-vm"))
 		}, 60)
 
@@ -111,8 +109,7 @@ var _ = Describe("virtletctl", func() {
 			localExecutor := framework.LocalExecutor(ctx)
 
 			By("Calling virtletctl dump-metadata")
-			output, err := framework.RunSimple(localExecutor, "_output/virtletctl", "dump-metadata")
-			Expect(err).NotTo(HaveOccurred())
+			output := callVirtletctl(localExecutor, "dump-metadata")
 			Expect(output).To(ContainSubstring("virtletctl-cirros-vm"))
 		}, 60)
 
@@ -126,8 +123,7 @@ var _ = Describe("virtletctl", func() {
 		localExecutor := framework.LocalExecutor(ctx)
 
 		By("Calling virtletctl virsh version")
-		output, err := framework.RunSimple(localExecutor, "_output/virtletctl", "virsh", "version")
-		Expect(err).NotTo(HaveOccurred())
+		output := callVirtletctl(localExecutor, "virsh", "version")
 		Expect(output).To(ContainSubstring("Compiled against library:"))
 		Expect(output).To(ContainSubstring("Using library:"))
 	}, 60)
@@ -139,11 +135,17 @@ var _ = Describe("virtletctl", func() {
 		localExecutor := framework.LocalExecutor(ctx)
 
 		By("Calling virtletctl install")
-		_, err := framework.RunSimple(localExecutor, "_output/virtletctl", "install")
-		Expect(err).NotTo(HaveOccurred())
+		callVirtletctl(localExecutor, "install")
 
 		By("Calling kubectl plugin virt help")
-		_, err = framework.RunSimple(localExecutor, "kubectl", "plugin", "virt", "help")
+		_, err := framework.RunSimple(localExecutor, "kubectl", "plugin", "virt", "help")
 		Expect(err).NotTo(HaveOccurred())
 	}, 60)
 })
+
+func callVirtletctl(executor framework.Executor, args ...string) string {
+	args = append([]string{"_output/virtletctl", "-s", *framework.ClusterURL}, args...)
+	output, err := framework.RunSimple(executor, args...)
+	Expect(err).NotTo(HaveOccurred())
+	return output
+}

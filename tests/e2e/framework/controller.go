@@ -34,7 +34,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/imagetranslation"
 )
 
-var url = flag.String("cluster-url", "http://127.0.0.1:8080", "apiserver URL")
+var ClusterURL = flag.String("cluster-url", "http://127.0.0.1:8080", "apiserver URL")
 
 // Controller is the entry point for various operations on k8s+virtlet entities
 type Controller struct {
@@ -48,7 +48,7 @@ type Controller struct {
 // NewController creates instance of controller for specified k8s namespace.
 // If namespace is empty string then namespace with random name is going to be created
 func NewController(namespace string) (*Controller, error) {
-	config, err := clientcmd.BuildConfigFromFlags(*url, "")
+	config, err := clientcmd.BuildConfigFromFlags(*ClusterURL, "")
 	if err != nil {
 		return nil, err
 	}
