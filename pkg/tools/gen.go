@@ -23,6 +23,8 @@ import (
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
 	ext "k8s.io/api/extensions/v1beta1"
+
+	"github.com/Mirantis/virtlet/pkg/version"
 )
 
 const (
@@ -55,7 +57,7 @@ func NewGenCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&g.dev, "dev", false, "Development mode for use with kubeadm-dind-cluster")
 	cmd.Flags().BoolVar(&g.compat, "compat", false, "Produce YAML that's compatible with older Kubernetes versions")
-	cmd.Flags().StringVar(&g.tag, "tag", "", "Set virtlet image tag")
+	cmd.Flags().StringVar(&g.tag, "tag", version.VirtletImageTag, "Set virtlet image tag")
 	return cmd
 }
 

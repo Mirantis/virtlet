@@ -366,6 +366,20 @@ function run_integration_internal {
     ( cd tests/integration && ./go.test )
 }
 
+function set_version {
+    # TODO: always generate & set version in addition to the tag
+    if [[ ! ${SET_VIRTLET_IMAGE_TAG:-} ]]; then
+        return
+    fi
+    cat >"${project_dir}/pkg/version/version.go" <<EOF
+package version
+
+func init () {
+    VirtletImageTag = "${SET_VIRTLET_IMAGE_TAG:-}"
+}
+EOF
+}
+
 function build_internal {
     # we don't just always generate the bindata right there because we
     # want to keep the source buildable outside this build container.
@@ -376,6 +390,7 @@ function build_internal {
     fi
     install_vendor_internal
     mkdir -p "${project_dir}/_output"
+    set_version
     go build -i -o "${project_dir}/_output/virtlet" ./cmd/virtlet
     go build -i -o "${project_dir}/_output/virtletctl" ./cmd/virtletctl
     GOOS=darwin go build -i -o "${project_dir}/_output/virtletctl.darwin" ./cmd/virtletctl
@@ -469,7 +484,7 @@ case "${cmd}" in
         vcmd "build/cmd.sh install-vendor-internal"
         ;;
     build)
-        vcmd "build/cmd.sh build-image-internal"
+        vcmd "SET_VIRTLET_IMAGE_TAG='${SET_VIRTLET_IMAGE_TAG:-}' build/cmd.sh build-image-internal"
         ;;
     build-image-internal)
         # this is executed inside the container
