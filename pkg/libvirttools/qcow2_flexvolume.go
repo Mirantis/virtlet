@@ -80,7 +80,11 @@ func (v *qcow2Volume) volumeName() string {
 }
 
 func (v *qcow2Volume) createQCOW2Volume(capacity uint64, capacityUnit string) (virt.StorageVolume, error) {
-	return v.owner.StoragePool().CreateStorageVol(&libvirtxml.StorageVolume{
+	storagePool, err := v.owner.StoragePool()
+	if err != nil {
+		return nil, err
+	}
+	return storagePool.CreateStorageVol(&libvirtxml.StorageVolume{
 		Name:       v.volumeName(),
 		Allocation: &libvirtxml.StorageVolumeSize{Value: 0},
 		Capacity:   &libvirtxml.StorageVolumeSize{Unit: capacityUnit, Value: capacity},
@@ -116,7 +120,11 @@ func (v *qcow2Volume) Setup() (*libvirtxml.DomainDisk, error) {
 }
 
 func (v *qcow2Volume) Teardown() error {
-	return v.owner.StoragePool().RemoveVolumeByName(v.volumeName())
+	storagePool, err := v.owner.StoragePool()
+	if err != nil {
+		return err
+	}
+	return storagePool.RemoveVolumeByName(v.volumeName())
 }
 
 func parseCapacityStr(capacityStr string) (int, string, error) {

@@ -17,12 +17,28 @@ limitations under the License.
 package libvirttools
 
 import (
+	"time"
+
+	"github.com/golang/glog"
 	libvirt "github.com/libvirt/libvirt-go"
 )
+
+const (
+	libvirtReconnectInterval = 1 * time.Second
+	libvirtReconnectAttempts = 120
+)
+
+type libvirtCall func(c *libvirt.Connect) (interface{}, error)
+
+type libvirtConnection interface {
+	invoke(call libvirtCall) (interface{}, error)
+}
 
 // Connection combines accessors for methods which operated on libvirt storage
 // and domains.
 type Connection struct {
+	uri  string
+	conn *libvirt.Connect
 	*libvirtDomainConnection
 	*libvirtStorageConnection
 }
@@ -34,8 +50,52 @@ func NewConnection(uri string) (*Connection, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Connection{
-		libvirtDomainConnection:  newLibvirtDomainConnection(conn),
-		libvirtStorageConnection: newLibvirtStorageConnection(conn),
-	}, nil
+	r := &Connection{
+		uri:  uri,
+		conn: conn,
+	}
+	r.libvirtDomainConnection = newLibvirtDomainConnection(r)
+	r.libvirtStorageConnection = newLibvirtStorageConnection(r)
+	return r, nil
+}
+
+func (c *Connection) connect() error {
+	var err error
+	for i := 0; i < libvirtReconnectAttempts; i++ {
+		if i > 0 {
+			time.Sleep(libvirtReconnectInterval)
+		}
+		glog.V(1).Infof("Connecting to libvirt at %s", c.uri)
+		c.conn, err = libvirt.NewConnect(c.uri)
+		if err == nil {
+			return nil
+		}
+		glog.Warningf("Error connecting to libvirt at %s: %v", c.uri, err)
+	}
+	glog.Warningf("Failed to connect to libvirt at %s after %d attempts", c.uri, libvirtReconnectAttempts)
+	return err
+}
+
+func (c *Connection) invoke(call libvirtCall) (interface{}, error) {
+	for {
+		if c.conn == nil {
+			if err := c.connect(); err != nil {
+				return nil, err
+			}
+		}
+
+		r, err := call(c.conn)
+		switch err := err.(type) {
+		case nil:
+			return r, nil
+		case libvirt.Error:
+			if err.Domain == libvirt.FROM_RPC && err.Code == libvirt.ERR_INTERNAL_ERROR {
+				c.conn = nil
+				continue
+			}
+			return nil, err
+		default:
+			return nil, err
+		}
+	}
 }

@@ -170,7 +170,7 @@ var _ = Describe("Container volume mounts", func() {
 				})
 			}
 
-			vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, podCustomization)
+			Expect(vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, podCustomization)).To(Succeed())
 		})
 
 		AfterAll(func() {
@@ -229,7 +229,7 @@ var _ = Describe("Container volume mounts", func() {
 				})
 			}
 
-			vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, podCustomization)
+			Expect(vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, podCustomization)).To(Succeed())
 		})
 
 		AfterAll(func() {
@@ -263,13 +263,13 @@ func addFlexvolMount(pod *framework.PodInterface, name string, mountPath string,
 
 func makeVolumeMountVM(nodeName string, podCustomization func(*framework.PodInterface)) *framework.VMInterface {
 	vm := controller.VM("mount-vm")
-	vm.Create(VMOptions{
+	Expect(vm.Create(VMOptions{
 		NodeName: nodeName,
 		// TODO: should also have an option to test using
 		// ubuntu image with volumes mounted using cloud-init
 		// userdata 'mounts' section
 		UserDataScript: "@virtlet-mount-script@",
-	}.applyDefaults(), time.Minute*5, podCustomization)
+	}.applyDefaults(), time.Minute*5, podCustomization)).To(Succeed())
 	_, err := vm.Pod()
 	Expect(err).NotTo(HaveOccurred())
 	return vm

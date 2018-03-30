@@ -30,7 +30,7 @@ import (
 	. "github.com/Mirantis/virtlet/tests/e2e/ginkgo-ext"
 )
 
-var _ = Describe("Basic cirros tests", func() {
+var _ = Describe("Virtlet [Basic cirros tests]", func() {
 	var (
 		vm    *framework.VMInterface
 		vmPod *framework.PodInterface
@@ -38,7 +38,7 @@ var _ = Describe("Basic cirros tests", func() {
 
 	BeforeAll(func() {
 		vm = controller.VM("cirros-vm")
-		vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, nil)
+		Expect(vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, nil)).To(Succeed())
 		var err error
 		vmPod, err = vm.Pod()
 		Expect(err).NotTo(HaveOccurred())
@@ -168,7 +168,7 @@ var _ = Describe("Basic cirros tests", func() {
 		do(framework.RunSimple(virtletPodExecutor, "vncsnapshot", "-allowblank", display, "/vm.jpg"))
 	}, 60)
 
-	It("Should start port forwarding", func(done Done) {
+	It("Should support port forwarding", func(done Done) {
 		defer close(done)
 		podName := "nginx-pf"
 		localPort := rand.Intn(899) + 100
@@ -198,4 +198,31 @@ var _ = Describe("Basic cirros tests", func() {
 
 		Expect(nginxPod.Delete()).To(Succeed())
 	}, 60)
+})
+
+var _ = Describe("Virtlet [Disruptive]", func() {
+	var (
+		vm *framework.VMInterface
+	)
+
+	BeforeAll(func() {
+	})
+
+	AfterAll(func() {
+		if vm != nil {
+			deleteVM(vm)
+		}
+	})
+
+	It("Should survive restarting libvirt container", func() {
+		virtletNodeName, err := controller.VirtletNodeName()
+		Expect(err).NotTo(HaveOccurred())
+		nodeExecutor, err := controller.DinDNodeExecutor(virtletNodeName)
+		Expect(err).NotTo(HaveOccurred())
+		_, err = framework.RunSimple(nodeExecutor, "pkill", "libvirtd")
+		Expect(err).NotTo(HaveOccurred())
+
+		vm = controller.VM("cirros-vm")
+		Expect(vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, nil)).To(Succeed())
+	})
 })

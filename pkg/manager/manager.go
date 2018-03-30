@@ -86,11 +86,7 @@ func NewVirtletManager(libvirtURI, rawDevices, imageTranslationConfigsDir string
 		// XXX: GetConfigVolume must go last because it
 		// doesn't produce correct name for cdrom devices
 		libvirttools.GetConfigVolume)
-	// TODO: pool name should be passed like for imageTool
-	libvirtVirtualizationTool, err := libvirttools.NewVirtualizationTool(conn, conn, imageStore, metadataStore, "volumes", rawDevices, volSrc)
-	if err != nil {
-		return nil, err
-	}
+	libvirtVirtualizationTool := libvirttools.NewVirtualizationTool(conn, conn, imageStore, metadataStore, "volumes", rawDevices, volSrc)
 
 	if errors := recoverNetworkNamespaces(metadataStore, fdManager); errors != nil {
 		glog.Warning("The following errors were encountered while recovering the VM network namespaces:")

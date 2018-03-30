@@ -178,7 +178,8 @@ func canUseKvm() bool {
 // VirtualizationTool provides methods to operate on libvirt.
 type VirtualizationTool struct {
 	domainConn     virt.DomainConnection
-	volumePool     virt.StoragePool
+	storageConn    virt.StorageConnection
+	volumePoolName string
 	imageManager   ImageManager
 	metadataStore  metadata.Store
 	clock          clockwork.Clock
@@ -193,18 +194,14 @@ var _ volumeOwner = &VirtualizationTool{}
 // NewVirtualizationTool verifies existence of volumes pool in libvirt store
 // and returns initialized VirtualizationTool.
 func NewVirtualizationTool(domainConn virt.DomainConnection, storageConn virt.StorageConnection, imageManager ImageManager,
-	metadataStore metadata.Store, volumePoolName, rawDevices string, volumeSource VMVolumeSource) (*VirtualizationTool, error) {
-
-	volumePool, err := ensureStoragePool(storageConn, volumePoolName)
-	if err != nil {
-		return nil, err
-	}
+	metadataStore metadata.Store, volumePoolName, rawDevices string, volumeSource VMVolumeSource) *VirtualizationTool {
 	return &VirtualizationTool{
-		domainConn:    domainConn,
-		volumePool:    volumePool,
-		imageManager:  imageManager,
-		metadataStore: metadataStore,
-		clock:         clockwork.NewRealClock(),
+		domainConn:     domainConn,
+		storageConn:    storageConn,
+		volumePoolName: volumePoolName,
+		imageManager:   imageManager,
+		metadataStore:  metadataStore,
+		clock:          clockwork.NewRealClock(),
 		// FIXME: kubelet's --root-dir may be something other than /var/lib/kubelet
 		// Need to remove it from daemonset mounts (both dev and non-dev)
 		// Use 'nsenter -t 1 -m -- tar ...' or something to grab the path
@@ -212,7 +209,7 @@ func NewVirtualizationTool(domainConn virt.DomainConnection, storageConn virt.St
 		kubeletRootDir: defaultKubeletRootDir,
 		rawDevices:     strings.Split(rawDevices, ","),
 		volumeSource:   volumeSource,
-	}, nil
+	}
 }
 
 func (v *VirtualizationTool) setForceKVM(forceKVM bool) {
@@ -932,7 +929,9 @@ func (v *VirtualizationTool) ContainerStatus(containerID string) (*kubeapi.Conta
 // volumeOwner implementation follows
 
 // StoragePool implements volumeOwner StoragePool method
-func (v *VirtualizationTool) StoragePool() virt.StoragePool { return v.volumePool }
+func (v *VirtualizationTool) StoragePool() (virt.StoragePool, error) {
+	return ensureStoragePool(v.storageConn, v.volumePoolName)
+}
 
 // DomainConnection implements volumeOwner DomainConnection method
 func (v *VirtualizationTool) DomainConnection() virt.DomainConnection { return v.domainConn }

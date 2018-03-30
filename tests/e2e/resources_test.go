@@ -35,9 +35,9 @@ var _ = Describe("VM resources", func() {
 
 	BeforeAll(func() {
 		vm = controller.VM("vm-resources")
-		vm.Create(VMOptions{
+		Expect(vm.Create(VMOptions{
 			VCPUCount: 2,
-		}.applyDefaults(), time.Minute*5, nil)
+		}.applyDefaults(), time.Minute*5, nil)).To(Succeed())
 		do(vm.Pod())
 	})
 

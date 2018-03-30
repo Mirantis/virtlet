@@ -90,10 +90,7 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 		// XXX: GetConfigVolume must go last because it
 		// doesn't produce correct name for cdrom devices
 		GetConfigVolume)
-	ct.virtTool, err = NewVirtualizationTool(ct.domainConn, ct.storageConn, imageManager, ct.metadataStore, "volumes", "loop*", volSrc)
-	if err != nil {
-		t.Fatalf("failed to create VirtualizationTool: %v", err)
-	}
+	ct.virtTool = NewVirtualizationTool(ct.domainConn, ct.storageConn, imageManager, ct.metadataStore, "volumes", "loop*", volSrc)
 	ct.virtTool.setClock(ct.clock)
 	// avoid unneeded difs in the golden master data
 	ct.virtTool.setForceKVM(true)

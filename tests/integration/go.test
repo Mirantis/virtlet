@@ -7,7 +7,7 @@ set -o errtrace
 export VIRTLET_DISABLE_KVM=1
 
 if [[ ! -f /var/run/libvirtd.pid ]]; then
-    /libvirt.sh -novirtlet
+    /libvirt.sh -testmode
 fi
 
 success=1

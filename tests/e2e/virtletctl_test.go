@@ -67,9 +67,9 @@ var _ = Describe("virtletctl", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			vm = controller.VM("virtletctl-cirros-vm")
-			vm.Create(VMOptions{
+			Expect(vm.Create(VMOptions{
 				SSHKeySource: "configmap/sshkey",
-			}.applyDefaults(), time.Minute*5, nil)
+			}.applyDefaults(), time.Minute*5, nil)).To(Succeed())
 
 			waitSSH(vm)
 

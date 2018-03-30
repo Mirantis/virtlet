@@ -1,27 +1,5 @@
 [
   {
-    "name": "storage: CreateStoragePool",
-    "data": {
-      "XMLName": {
-        "Space": "",
-        "Local": ""
-      },
-      "Type": "dir",
-      "Name": "volumes",
-      "UUID": "",
-      "Allocation": null,
-      "Capacity": null,
-      "Available": null,
-      "Target": {
-        "Path": "/var/lib/virtlet/volumes",
-        "Permissions": null,
-        "Timestamps": null,
-        "Encryption": null
-      },
-      "Source": null
-    }
-  },
-  {
     "name": "domain conn: DefineDomain",
     "data": {
       "XMLName": {
