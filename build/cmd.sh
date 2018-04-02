@@ -13,6 +13,7 @@ VIRTLET_ON_MASTER="${VIRTLET_ON_MASTER:-}"
 DOCKER_SOCKET_PATH="${DOCKER_SOCKET_PATH:-/var/run/docker.sock}"
 FORCE_UPDATE_IMAGE="${FORCE_UPDATE_IMAGE:-}"
 IMAGE_REGEXP_TRANSLATION="${IMAGE_REGEXP_TRANSLATION:-1}"
+GH_RELEASE_TEST_USER="ivan4th"
 
 # Note that project_dir must not end with slash
 project_dir="$(cd "$(dirname "${BASH_SOURCE}")/.." && pwd)"
@@ -284,7 +285,7 @@ function start_dind {
         vcmd "docker save '${virtlet_image}' | docker exec -i '${virtlet_node}' docker load"
     fi
     local -a virtlet_config=(--from-literal=image_regexp_translation="${IMAGE_REGEXP_TRANSLATION}")
-    if ! kvm_ok; then
+    if ! kvm_ok || [[ ! ${VIRTLET_DISABLE_KVM} ]]; then
         virtlet_config+=(--from-literal=disable_kvm=y)
     fi
     kubectl label node --overwrite "${virtlet_node}" extraRuntime=virtlet
@@ -412,7 +413,11 @@ function release_description {
 
 function release_internal {
     local tag="${1}"
-    local -a opts=(--user Mirantis --repo virtlet --tag "${tag}")
+    local gh_user="Mirantis"
+    if [[ ${tag} =~ test ]]; then
+        gh_user="${GH_RELEASE_TEST_USER}"
+    fi
+    local -a opts=(--user "${gh_user}" --repo virtlet --tag "${tag}")
     local -a files=(virtletctl virtletctl.darwin)
     local description="$(release_description "${tag}" "${files[@]}")"
     local pre_release=
