@@ -32,9 +32,18 @@ curl https://raw.githubusercontent.com/Mirantis/virtlet/master/deploy/images.yam
 kubectl create configmap -n kube-system virtlet-image-translations --from-file images.yaml
 ```
 
-Then you can deploy Virtlet DaemonSet:
+After that, you need to get `virtletctl` command line tool (replace `N.N.N` in the command below accordingly):
+```
+curl -SL -o virtletctl https://github.com/Mirantis/virtlet/releases/download/vN.N.N/virtletctl
+```
+In case if you're using Mac OS X, you need to use this command instead:
+```
+curl -SL -o virtletctl https://github.com/Mirantis/virtlet/releases/download/vN.N.N/virtletctl.darwin
+```
+
+Then you can deploy Virtlet:
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/Mirantis/virtlet/master/deploy/virtlet-ds.yaml
+./virtletctl gen | kubectl apply -f -
 ```
 
 By default it has KVM enabled, but you can configure Virtlet to

@@ -7,7 +7,7 @@ Virtlet supports QCOW2 format for VM images.
 - protocol to use to download the image. By default `https` is
   used. In order to use `http` set `VIRTLET_DOWNLOAD_PROTOCOL` env var
   to `http` for the virtlet container. With the standard deployment
-  method (using [virtlet-ds.yaml](../deploy/virtlet-ds.yaml)) this can
+  method (using `virtletctl gen`) this can
   be done by setting `download_protocol` key to `http` in the
   `virtlet-config` ConfigMap.
   `<scheme>://` below denotes the selected protocol.
