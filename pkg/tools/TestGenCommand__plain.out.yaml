@@ -184,6 +184,12 @@ spec:
               name: virtlet-config
               key: sriov_support
               optional: true
+        - name: VIRTLET_RAW_DEVICES
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: raw_devices
+              optional: true
         - name: IMAGE_TRANSLATIONS_DIR
           value: /etc/virtlet/images
         - name: KUBERNETES_POD_LOGS
