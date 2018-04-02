@@ -548,6 +548,7 @@ case "${cmd}" in
     release)
         if [[ ! ${1:-} ]]; then
             echo >&2 "must specify the tag"
+            exit 1
         fi
         ( vcmd "build/cmd.sh release-internal '${1}'" )
         ;;
