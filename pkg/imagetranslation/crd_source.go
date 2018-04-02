@@ -47,17 +47,18 @@ type VirtletImageMapping struct {
 	Spec               ImageTranslation `json:"spec"`
 }
 
-func (m *VirtletImageMapping) DeepCopyObject() runtime.Object {
-	if m == nil {
+// DeepCopyObject implements DeepCopyObject method of runtime.Object interface
+func (vim *VirtletImageMapping) DeepCopyObject() runtime.Object {
+	if vim == nil {
 		return nil
 	}
-	r := *m
-	if m.Spec.Transports == nil {
+	r := *vim
+	if vim.Spec.Transports == nil {
 		return &r
 	}
 
 	transportMap := make(map[string]TransportProfile)
-	for k, tr := range m.Spec.Transports {
+	for k, tr := range vim.Spec.Transports {
 		if tr.MaxRedirects != nil {
 			redirs := *tr.MaxRedirects
 			tr.MaxRedirects = &redirs
@@ -80,6 +81,7 @@ type VirtletImageMappingList struct {
 	Items            []VirtletImageMapping `json:"items"`
 }
 
+// DeepCopyObject implements DeepCopyObject method of runtime.Object interface
 func (l *VirtletImageMappingList) DeepCopyObject() runtime.Object {
 	if l == nil {
 		return l
@@ -88,8 +90,8 @@ func (l *VirtletImageMappingList) DeepCopyObject() runtime.Object {
 		TypeMeta: l.TypeMeta,
 		ListMeta: l.ListMeta,
 	}
-	for _, m := range l.Items {
-		r.Items = append(r.Items, *m.DeepCopyObject().(*VirtletImageMapping))
+	for _, vim := range l.Items {
+		r.Items = append(r.Items, *vim.DeepCopyObject().(*VirtletImageMapping))
 	}
 	return r
 }

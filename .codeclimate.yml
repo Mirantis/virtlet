@@ -44,3 +44,4 @@ exclude_patterns:
   - "tests/"
   - "**/*_test.go"
   - "*_test.go"
+  - "pkg/tools/bindata.go"
