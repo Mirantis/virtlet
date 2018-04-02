@@ -29,15 +29,12 @@ RUN apt-get update && \
                 make \
                 autoconf \
                 automake \
-                libglib2.0-dev \
-                libguestfs-dev \
-                libguestfs0-dbg \
                 p7zip-full \
                 dhcpcd5 \
                 tcpdump \
                 iputils-ping \
                 mercurial \
-                jq && \
+                pkg-config && \
     apt-get clean
 
 # Install docker client
