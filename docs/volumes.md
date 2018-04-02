@@ -325,26 +325,9 @@ As devices/volumes are exposed in the alphabet order starting from `b`, `vol1` w
 
 #### Raw device whitelist
 
-Virtlet only allows exposing to VM only those raw devices that are whitelisted. This list is controlled by `-raw-devices` parameter for `virtlet` binary. Its value is passed to `virtlet` daemonset using `VIRTLET_RAW_DEVICES` environment variable.
-This `-raw-devices` parameter should contain comma separated patterns of paths relative to `/dev` directory, which are [globbed](https://en.wikipedia.org/wiki/Glob_(programming)) to get the list of paths of raw devices that can be used by virtual machines.
+Virtlet only allows exposing to VM only those raw devices that are whitelisted. This list is controlled by `-raw-devices` parameter for `virtlet` binary. Its value is passed to `virtlet` daemonset using `VIRTLET_RAW_DEVICES` environment variable that can be set using `raw_devices` key in Virtlet configmap.
+The parameter should contain comma separated patterns of paths relative to `/dev` directory, which are [globbed](https://en.wikipedia.org/wiki/Glob_(programming)) to get the list of paths of raw devices that can be used by virtual machines.
 When not set, it defaults to `loop*`.
-
-One way to pass this parameter to `virtlet` is to use [configmap](https://kubernetes.io/docs/tasks/configure-pod-container/configmap) to contain a key/value pair (e.x. `devices.raw=loop*,mapper/vm_pool-*`), which then can be used by modifying `deploy/virtlet-ds.yaml` in the following manner:
-```yaml
-...
-spec:
-  ...
-  containers:
-  - name: virtlet
-    ...
-    env:
-      ...
-      - name: VIRTLET_RAW_DEVICES
-        valueFrom:
-          configMapKeyRef:
-            name: name-of-configmap-for-this-node
-            key: devices.raw
-```
 
 ### Mounting the volumes into the VMs
 

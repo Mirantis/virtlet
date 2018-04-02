@@ -100,7 +100,10 @@ the netmask) and defaults to `24`.
 qemu emulator with full root privileges, so that needs to be manually enabled
 during Virtlet deployment by setting `VIRTLET_SRIOV_SUPPORT` environment
 variable to a non-empty value for the `virtlet` container.
-In case if standard deploy/virtlet-ds.yaml is used, this can be done by settingsriov_support=true in virtlet-config ConfigMap.
+
+In case if standard Virtlet deployment yaml is used (generated using
+`virtletctl gen`), this can be done by `settingsriov_support=true` in
+`virtlet-config` ConfigMap.
 
 **NOTE:** Virtlet doesn't support `hostNetwork` pod setting because it
 cannot be implemented for VM in a meaningful way.
