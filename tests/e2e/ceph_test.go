@@ -21,9 +21,9 @@ import (
 	"time"
 
 	. "github.com/onsi/gomega"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/api/v1"
 
 	"github.com/Mirantis/virtlet/tests/e2e/framework"
 	. "github.com/Mirantis/virtlet/tests/e2e/ginkgo-ext"
@@ -191,8 +191,8 @@ func setupCeph() (string, string) {
 	Expect(err).NotTo(HaveOccurred())
 
 	container.Delete()
-	Expect(container.PullImage("ceph/demo:tag-stable-3.0-jewel-ubuntu-16.04")).To(Succeed())
-	Expect(container.Run("ceph/demo:tag-stable-3.0-jewel-ubuntu-16.04",
+	Expect(container.PullImage("docker.io/ceph/demo:tag-stable-3.0-jewel-ubuntu-16.04")).To(Succeed())
+	Expect(container.Run("docker.io/ceph/demo:tag-stable-3.0-jewel-ubuntu-16.04",
 		map[string]string{"MON_IP": monIP, "CEPH_PUBLIC_NETWORK": cephPublicNetwork},
 		"host", nil, false)).To(Succeed())
 

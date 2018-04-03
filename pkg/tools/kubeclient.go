@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
@@ -28,19 +29,16 @@ import (
 	"strconv"
 	"strings"
 
+	v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api"
-	v1 "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/client-go/transport/spdy"
 	"k8s.io/client-go/util/exec"
-
-	// register standard k8s types
-	_ "k8s.io/client-go/pkg/api/install"
 )
 
 const (
@@ -157,7 +155,7 @@ type defaultExecutor struct{}
 var _ remoteExecutor = defaultExecutor{}
 
 func (e defaultExecutor) stream(config *rest.Config, method string, url *url.URL, options remotecommand.StreamOptions) error {
-	executor, err := remotecommand.NewExecutor(config, method, url)
+	executor, err := remotecommand.NewSPDYExecutor(config, method, url)
 	if err != nil {
 		return err
 	}
@@ -173,7 +171,11 @@ type defaultPortForwarder struct{}
 var _ portForwarder = defaultPortForwarder{}
 
 func (pf defaultPortForwarder) forwardPorts(config *rest.Config, method string, url *url.URL, ports []string, stopChannel, readyChannel chan struct{}, out io.Writer) error {
-	dialer, err := remotecommand.NewExecutor(config, method, url)
+	transport, upgrader, err := spdy.RoundTripperFor(config)
+	if err != nil {
+		return err
+	}
+	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, method, url)
 	if err != nil {
 		return err
 	}
@@ -335,21 +337,20 @@ func (c *RealKubeClient) ExecInContainer(podName, containerName, namespace strin
 		Name(podName).
 		Namespace(namespace).
 		SubResource("exec").
-		VersionedParams(&api.PodExecOptions{
+		VersionedParams(&v1.PodExecOptions{
 			Container: containerName,
 			Command:   command,
 			Stdin:     stdin != nil,
 			Stdout:    stdout != nil,
 			Stderr:    stderr != nil,
 			TTY:       false,
-		}, api.ParameterCodec)
+		}, scheme.ParameterCodec)
 
 	exitCode := 0
 	if err := c.executor.stream(c.config, "POST", req.URL(), remotecommand.StreamOptions{
-		SupportedProtocols: remotecommandconsts.SupportedStreamingProtocols,
-		Stdin:              stdin,
-		Stdout:             stdout,
-		Stderr:             stderr,
+		Stdin:  stdin,
+		Stdout: stdout,
+		Stderr: stderr,
 	}); err != nil {
 		if c, ok := err.(exec.CodeExitError); ok {
 			exitCode = c.Code

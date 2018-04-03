@@ -512,13 +512,13 @@ func (v *VirtletManager) ContainerStatus(ctx context.Context, in *kubeapi.Contai
 	return response, nil
 }
 
-// ExecSync is a place holder for non implemented functionality from CRI.
+// ExecSync is a placeholder for an unimplemented CRI method.
 func (v *VirtletManager) ExecSync(context.Context, *kubeapi.ExecSyncRequest) (*kubeapi.ExecSyncResponse, error) {
 	glog.Errorf("ExecSync() not implemented")
 	return nil, errors.New("not implemented")
 }
 
-// Exec is a place holder for non implemented functionality from CRI.
+// Exec is a placeholder for an unimplemented CRI method.
 func (v *VirtletManager) Exec(context.Context, *kubeapi.ExecRequest) (*kubeapi.ExecResponse, error) {
 	glog.Errorf("Exec() not implemented")
 	return nil, errors.New("not implemented")
@@ -536,10 +536,15 @@ func (v *VirtletManager) PortForward(ctx context.Context, req *kubeapi.PortForwa
 	return v.StreamServer.GetPortForward(req)
 }
 
-// UpdateRuntimeConfig is a place holder for non implemented functionality from CRI.
+// UpdateRuntimeConfig is a placeholder for an unimplemented CRI method.
 func (v *VirtletManager) UpdateRuntimeConfig(context.Context, *kubeapi.UpdateRuntimeConfigRequest) (*kubeapi.UpdateRuntimeConfigResponse, error) {
 	// we don't need to do anything here for now
 	return &kubeapi.UpdateRuntimeConfigResponse{}, nil
+}
+
+// UpdateContainerResources is a placeholder for an unimplemented CRI method.
+func (v *VirtletManager) UpdateContainerResources(context.Context, *kubeapi.UpdateContainerResourcesRequest) (*kubeapi.UpdateContainerResourcesResponse, error) {
+	return &kubeapi.UpdateContainerResourcesResponse{}, nil
 }
 
 // Status method implements Status from CRI for both types of service, Image and Runtime.
@@ -563,13 +568,13 @@ func (v *VirtletManager) Status(context.Context, *kubeapi.StatusRequest) (*kubea
 	}, nil
 }
 
-// ContainerStats is a place holder for non implemented functionality from CRI.
+// ContainerStats is a placeholder for an unimplemented CRI method.
 func (v *VirtletManager) ContainerStats(ctx context.Context, in *kubeapi.ContainerStatsRequest) (*kubeapi.ContainerStatsResponse, error) {
 	glog.V(2).Infof("ContainerStats: %s", spew.Sdump(in))
 	return nil, errors.New("ContainerStats() not implemented")
 }
 
-// ListContainerStats is a place holder for non implemented functionality from CRI.
+// ListContainerStats is a placeholder for an unimplemented CRI method.
 func (v *VirtletManager) ListContainerStats(ctx context.Context, in *kubeapi.ListContainerStatsRequest) (*kubeapi.ListContainerStatsResponse, error) {
 	glog.V(2).Infof("ListContainerStats: %s", spew.Sdump(in))
 	return nil, errors.New("ListContainerStats() not implemented")
@@ -647,7 +652,7 @@ func (v *VirtletManager) RemoveImage(ctx context.Context, in *kubeapi.RemoveImag
 	return &kubeapi.RemoveImageResponse{}, nil
 }
 
-// ImageFsInfo is a place holder for non implemented functionality from CRI.
+// ImageFsInfo is a placeholder an unimplemented CRI method.
 func (v *VirtletManager) ImageFsInfo(ctx context.Context, in *kubeapi.ImageFsInfoRequest) (*kubeapi.ImageFsInfoResponse, error) {
 	glog.V(2).Infof("ImageFsInfo: %s", spew.Sdump(in))
 	return nil, errors.New("ImageFsInfo() not implemented")

@@ -29,12 +29,12 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	fakekube "k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/pkg/api"
-	v1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	fakerest "k8s.io/client-go/rest/fake"
 	testcore "k8s.io/client-go/testing"
@@ -369,8 +369,7 @@ func TestCheckForVMPod(t *testing.T) {
 
 func TestExecInContainer(t *testing.T) {
 	restClient := &fakerest.RESTClient{
-		// NOTE: APIRegistry will no longer be necessary in newer client-go
-		APIRegistry: api.Registry,
+		GroupVersion: schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer://testapi.Default.NegotiatedSerializer(),
 		dynamic.ContentConfig().NegotiatedSerializer,
 		Client: fakerest.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -458,8 +457,7 @@ func TestPortForward(t *testing.T) {
 		}, nil
 	})
 	restClient := &fakerest.RESTClient{
-		// NOTE: APIRegistry will no longer be necessary in newer client-go
-		APIRegistry: api.Registry,
+		GroupVersion: schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer://testapi.Default.NegotiatedSerializer(),
 		dynamic.ContentConfig().NegotiatedSerializer,
 		Client: fakerest.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {

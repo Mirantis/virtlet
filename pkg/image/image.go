@@ -25,9 +25,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/docker/distribution/digest"
 	"github.com/docker/distribution/reference"
 	"github.com/golang/glog"
+	digest "github.com/opencontainers/go-digest"
 )
 
 // Image describes an image
@@ -41,7 +41,7 @@ type Image struct {
 func (img *Image) hexDigest() (string, error) {
 	var d digest.Digest
 	var err error
-	if d, err = digest.ParseDigest(img.Digest); err != nil {
+	if d, err = digest.Parse(img.Digest); err != nil {
 		return "", err
 	}
 	return d.Hex(), nil
@@ -447,7 +447,7 @@ func (s *FileStore) GetImagePathAndVirtualSize(ref string) (string, uint64, erro
 
 	var pathViaDigest, pathViaName string
 	// parsing digest as ref gives bad results
-	if d, err := digest.ParseDigest(ref); err == nil {
+	if d, err := digest.Parse(ref); err == nil {
 		if d.Algorithm() != digest.SHA256 {
 			return "", 0, fmt.Errorf("bad image digest (need sha256): %q", d)
 		}
@@ -520,7 +520,7 @@ func stripTags(imageName string) string {
 }
 
 func getHexDigest(imageSpec string) string {
-	if d, err := digest.ParseDigest(imageSpec); err == nil {
+	if d, err := digest.Parse(imageSpec); err == nil {
 		if d.Algorithm() != digest.SHA256 {
 			return ""
 		}

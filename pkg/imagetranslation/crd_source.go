@@ -47,6 +47,31 @@ type VirtletImageMapping struct {
 	Spec               ImageTranslation `json:"spec"`
 }
 
+// DeepCopyObject implements DeepCopyObject method of runtime.Object interface
+func (vim *VirtletImageMapping) DeepCopyObject() runtime.Object {
+	if vim == nil {
+		return nil
+	}
+	r := *vim
+	if vim.Spec.Transports == nil {
+		return &r
+	}
+
+	transportMap := make(map[string]TransportProfile)
+	for k, tr := range vim.Spec.Transports {
+		if tr.MaxRedirects != nil {
+			redirs := *tr.MaxRedirects
+			tr.MaxRedirects = &redirs
+		}
+		if tr.TLS != nil {
+			tls := *tr.TLS
+			tr.TLS = &tls
+		}
+		transportMap[k] = tr
+	}
+	return &r
+}
+
 var _ TranslationConfig = VirtletImageMapping{}
 
 // VirtletImageMappingList is a k8s representation of list of translation configs
@@ -54,6 +79,21 @@ type VirtletImageMappingList struct {
 	meta_v1.TypeMeta `json:",inline"`
 	meta_v1.ListMeta `json:"metadata"`
 	Items            []VirtletImageMapping `json:"items"`
+}
+
+// DeepCopyObject implements DeepCopyObject method of runtime.Object interface
+func (l *VirtletImageMappingList) DeepCopyObject() runtime.Object {
+	if l == nil {
+		return l
+	}
+	r := &VirtletImageMappingList{
+		TypeMeta: l.TypeMeta,
+		ListMeta: l.ListMeta,
+	}
+	for _, vim := range l.Items {
+		r.Items = append(r.Items, *vim.DeepCopyObject().(*VirtletImageMapping))
+	}
+	return r
 }
 
 func addKnownTypes(scheme *runtime.Scheme) error {
@@ -98,8 +138,7 @@ func RegisterCustomResourceType() error {
 		panic(err)
 	}
 
-	_, err = extensionsClientSet.CustomResourceDefinitions().Create(&crd)
-
+	_, err = extensionsClientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(&crd)
 	if err == nil || errors.IsAlreadyExists(err) {
 		return nil
 	}
