@@ -527,6 +527,12 @@ func (v *VirtletManager) Exec(context.Context, *kubeapi.ExecRequest) (*kubeapi.E
 // Attach calls streamer server to implement Attach functionality from CRI.
 func (v *VirtletManager) Attach(ctx context.Context, req *kubeapi.AttachRequest) (*kubeapi.AttachResponse, error) {
 	glog.V(3).Infof("Attach called: %s", spew.Sdump(req))
+	if !req.Stdout && !req.Stderr {
+		// Support k8s 1.8 or earlier.
+		// We don't care about Stderr because it's not used
+		// by the Virtlet stream server.
+		req.Stdout = true
+	}
 	return v.StreamServer.GetAttach(req)
 }
 
