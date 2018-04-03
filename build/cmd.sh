@@ -285,7 +285,7 @@ function start_dind {
         vcmd "docker save '${virtlet_image}' | docker exec -i '${virtlet_node}' docker load"
     fi
     local -a virtlet_config=(--from-literal=image_regexp_translation="${IMAGE_REGEXP_TRANSLATION}")
-    if ! kvm_ok || [[ ! ${VIRTLET_DISABLE_KVM} ]]; then
+    if ! kvm_ok || [[ ${VIRTLET_DISABLE_KVM:-} ]]; then
         virtlet_config+=(--from-literal=disable_kvm=y)
     fi
     kubectl label node --overwrite "${virtlet_node}" extraRuntime=virtlet
