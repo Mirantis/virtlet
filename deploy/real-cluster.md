@@ -41,10 +41,27 @@ In case if you're using Mac OS X, you need to use this command instead:
 curl -SL -o virtletctl https://github.com/Mirantis/virtlet/releases/download/vN.N.N/virtletctl.darwin
 ```
 
+If you want to use the latest image, you can build virtletctl yourself from the source:
+```
+git clone https://github.com/Mirantis/virtlet.git
+cd virtlet
+build/cmd.sh build && build/cmd.sh copy
+# Replace _ou_output/virtletctl with _output/virtletctl.darwin for Mac OS X below
+cp _output/virtletctl /usr/local/bin
+```
+Another way is to use the latest released virtletctl with `--tag latest`, see below.
+
 Then you can deploy Virtlet:
 ```bash
 ./virtletctl gen | kubectl apply -f -
 ```
+
+If you want to override the image tag to use:
+```
+./virtletctl gen --tag latest | kubectl apply -f -
+```
+Note thought that it'll only work if the generated yaml didn't change between
+virtletctl version and the image tag you specified, so your mileage may vary.
 
 By default it has KVM enabled, but you can configure Virtlet to
 disable it.  In order to do so, create a configmap named
