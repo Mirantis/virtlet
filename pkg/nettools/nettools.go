@@ -43,6 +43,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -365,9 +366,22 @@ func ValidateAndFixCNIResult(netConfig *cnicurrent.Result, nsPath string, allLin
 
 // GetContainerLinks finds links that correspond to interfaces in the current
 // network namespace
-func GetContainerLinks(interfaces []*cnicurrent.Interface) ([]netlink.Link, error) {
+func GetContainerLinks(info *cnicurrent.Result) ([]netlink.Link, error) {
+	// info.Interfaces is omitted by some CNI implementations and
+	// the order may not be correct there after Virtlet adds the
+	// missing ones, so we use interface indexes from info.IPs for
+	// ordering.
 	var links []netlink.Link
-	for _, iface := range interfaces {
+	order := make([]int, len(info.Interfaces))
+	for n, ip := range info.IPs {
+		if ip.Interface >= 0 && ip.Interface < len(order) {
+			order[ip.Interface] = n + 1
+		}
+	}
+	ifaces := make([]*cnicurrent.Interface, len(info.Interfaces))
+	copy(ifaces, info.Interfaces)
+	sort.SliceStable(ifaces, func(i, j int) bool { return order[i] < order[j] })
+	for _, iface := range ifaces {
 		// empty Sandbox means this interface belongs to the host
 		// network namespace, so we skip it
 		if iface.Sandbox == "" {
@@ -615,7 +629,7 @@ func rebindDriverToDevice(devName string) error {
 // The function should be called from within container namespace.
 // Returns container network struct and an error, if any.
 func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks []netlink.Link) (*network.ContainerSideNetwork, error) {
-	contLinks, err := GetContainerLinks(info.Interfaces)
+	contLinks, err := GetContainerLinks(info)
 	if err != nil {
 		return nil, err
 	}
@@ -728,7 +742,7 @@ func RecoverContainerSideNetwork(csn *network.ContainerSideNetwork, nsPath strin
 	}
 
 	// FIXME: this will not work with sr-iov device passed to VM
-	contLinks, err := GetContainerLinks(csn.Result.Interfaces)
+	contLinks, err := GetContainerLinks(csn.Result)
 	if err != nil {
 		return err
 	}
@@ -845,7 +859,7 @@ func Teardown(csn *network.ContainerSideNetwork) error {
 		i.Fo.Close()
 	}
 
-	contLinks, err := GetContainerLinks(csn.Result.Interfaces)
+	contLinks, err := GetContainerLinks(csn.Result)
 	if err != nil {
 		return err
 	}
