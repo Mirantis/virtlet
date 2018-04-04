@@ -46,10 +46,17 @@ In case if you're using Mac OS X, you need to use this command instead:
 curl -SL -o virtletctl https://github.com/Mirantis/virtlet/releases/download/vN.N.N/virtletctl.darwin
 chmod +x virtletctl
 ```
+You can also use `virtletctl` from Virtlet image, see below.
 1. Deploy Virtlet DaemonSet and related objects:
 ```
 ./virtletctl gen | kubectl apply -f -
 ```
+If you want to use the latest image, you can use `virtletctl` from that image:
+```
+docker run --rm mirantis/virtlet:latest virtletctl gen --tag latest | kubectl apply -f -
+```
+You can also use other image tag instead of `latest`, just replace it in both places
+in the above command.
 1. Wait for Virtlet pod to activate:
 ```
 kubectl get pods -w -n kube-system
