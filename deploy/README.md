@@ -36,10 +36,27 @@ kubectl create configmap -n kube-system virtlet-image-translations --from-file i
 CRIPROXY_DEB_URL="https://github.com/Mirantis/criproxy/releases/download/v0.10.0/criproxy-nodeps_0.10.0_amd64.deb"
 docker exec kube-node-1 /bin/bash -c "curl -sSL '${CRIPROXY_DEB_URL}' >/criproxy.deb && dpkg -i /criproxy.deb && rm /criproxy.deb"
 ```
-1. Deploy Virtlet DaemonSet (assuming that you have [virtlet-ds.yaml](virtlet-ds.yaml) in the current directory):
+1. Download `virtletctl` binary for `virtlet` release you need (replace `N.N.N` in the command below accordingly):
 ```
-kubectl create -f virtlet-ds.yaml
+curl -SL -o virtletctl https://github.com/Mirantis/virtlet/releases/download/vN.N.N/virtletctl
+chmod +x virtletctl
 ```
+In case if you're using Mac OS X, you need to use this command instead:
+```
+curl -SL -o virtletctl https://github.com/Mirantis/virtlet/releases/download/vN.N.N/virtletctl.darwin
+chmod +x virtletctl
+```
+You can also use `virtletctl` from Virtlet image, see below.
+1. Deploy Virtlet DaemonSet and related objects:
+```
+./virtletctl gen | kubectl apply -f -
+```
+If you want to use the latest image, you can use `virtletctl` from that image:
+```
+docker run --rm mirantis/virtlet:latest virtletctl gen --tag latest | kubectl apply -f -
+```
+You can also use other image tag instead of `latest`, just replace it in both places
+in the above command.
 1. Wait for Virtlet pod to activate:
 ```
 kubectl get pods -w -n kube-system
@@ -48,8 +65,9 @@ kubectl get pods -w -n kube-system
 
 ## Configuring Virtlet
 
-Virtlet can be customized through the `virtlet-config` ConfigMap Kuberenetes object.
-The following keys in the config map are honored by the `virtlet-ds.yaml`:
+Virtlet can be customized through the `virtlet-config` ConfigMap
+Kuberenetes object.  The following keys in the config map are honored
+by Virtlet when it's deployed using k8s yaml produced by `virtletctl gen`:
 
   * `disable_kvm` - disables KVM support and forces QEMU instead. Use "1" as a value.
   * `download_protocol` - default image download protocol - either `http` or `https`. The default is https.

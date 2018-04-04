@@ -1,24 +1,23 @@
-## virtletctl install
+## virtletctl gen
 
-Install virtletctl as a kubectl plugin
+Generate Kubernetes YAML for Virtlet deployment
 
 ### Synopsis
 
 
-
-This command install virtletctl as a kubectl plugin.
-
-After running this command, it becomes possible to run virtletctl
-via 'kubectl plugin virt'.
+This command produces YAML suitable for use with kubectl apply -f -
 
 ```
-virtletctl install [flags]
+virtletctl gen [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for install
+      --compat       Produce YAML that's compatible with older Kubernetes versions
+      --dev          Development mode for use with kubeadm-dind-cluster
+  -h, --help         help for gen
+      --tag string   Set virtlet image tag
 ```
 
 ### Options inherited from parent commands

@@ -13,6 +13,7 @@ VIRTLET_ON_MASTER="${VIRTLET_ON_MASTER:-}"
 DOCKER_SOCKET_PATH="${DOCKER_SOCKET_PATH:-/var/run/docker.sock}"
 FORCE_UPDATE_IMAGE="${FORCE_UPDATE_IMAGE:-}"
 IMAGE_REGEXP_TRANSLATION="${IMAGE_REGEXP_TRANSLATION:-1}"
+GH_RELEASE_TEST_USER="ivan4th"
 
 # Note that project_dir must not end with slash
 project_dir="$(cd "$(dirname "${BASH_SOURCE}")/.." && pwd)"
@@ -35,11 +36,10 @@ virtlet_node=kube-node-1
 if [[ ${VIRTLET_ON_MASTER} ]]; then
   virtlet_node=kube-master
 fi
-
-dind_mounts='.items[0].spec.template.spec.volumes|=.+[{"name":"dind",hostPath:{"path":"/dind"}}]|.items[0].spec.template.spec.containers[].volumeMounts|=.+[{"name":"dind", "mountPath":"/dind"}]|.items[0].spec.template.spec.initContainers[].volumeMounts|=.+[{"name":"dind", "mountPath":"/dind"}]'
-containers_run='.items[0].spec.template.spec.containers|=map(.volumeMounts|=map(select(.name!="run"))+[{"mountPath": "/run:shared", "name": "run"}])'
-initContainers_run='.items[0].spec.template.spec.initContainers|=map(.volumeMounts|=map(select(.name!="run"))+[{"mountPath": "/run:shared", "name": "run"}])'
-containers_k8s_dir='.items[0].spec.template.spec.containers[1].volumeMounts|=map(select(.name!="k8s-pods-dir"))+[{"mountPath": "/var/lib/kubelet/pods:shared", "name": "k8s-pods-dir"}]'
+bindata_modtime=1522279343
+bindata_out="pkg/tools/bindata.go"
+bindata_dir="deploy/data"
+bindata_pkg="tools"
 
 function image_tags_filter {
     local tag="${1}"
@@ -264,6 +264,7 @@ function kvm_ok {
 }
 
 function start_dind {
+    ensure_build_container
     if ! docker exec "${virtlet_node}" dpkg-query -W criproxy-nodeps >&/dev/null; then
         echo >&2 "Installing CRI proxy package the node container..."
         docker exec "${virtlet_node}" /bin/bash -c "curl -sSL '${CRIPROXY_DEB_URL}' >/criproxy.deb && dpkg -i /criproxy.deb && rm /criproxy.deb"
@@ -284,7 +285,7 @@ function start_dind {
         vcmd "docker save '${virtlet_image}' | docker exec -i '${virtlet_node}' docker load"
     fi
     local -a virtlet_config=(--from-literal=image_regexp_translation="${IMAGE_REGEXP_TRANSLATION}")
-    if ! kvm_ok; then
+    if ! kvm_ok || [[ ${VIRTLET_DISABLE_KVM:-} ]]; then
         virtlet_config+=(--from-literal=disable_kvm=y)
     fi
     kubectl label node --overwrite "${virtlet_node}" extraRuntime=virtlet
@@ -294,18 +295,13 @@ function start_dind {
 }
 
 function start_virtlet {
-    # For k8s 1.7 removing MountPropagation option and restoring old hack with
-    # adding :shared to mountPath
-    if ! kubectl version | tail -n1 | grep -q 'v1\.7\.'; then
-        kubectl convert --local -o json -f "${project_dir}/deploy/virtlet-ds.yaml" |
-           jq "${dind_mounts}" |
-           kubectl apply -f -
-    else
-        filters="${dind_mounts}|${containers_run}|${initContainers_run}|${containers_k8s_dir}"
-        kubectl convert --local -o json -f "${project_dir}/deploy/virtlet-ds.yaml" |
-           jq "${filters}" |
-           kubectl apply -f -
+    local -a opts=(--dev)
+    if kubectl version | tail -n1 | grep -q 'v1\.7\.'; then
+        # apply mount propagation hacks for 1.7
+        opts+=(--compat)
     fi
+    docker exec virtlet-build "${remote_project_dir}/_output/virtletctl" gen "${opts[@]}" |
+        kubectl apply -f -
 }
 
 function virtlet_subdir {
@@ -371,23 +367,37 @@ function run_integration_internal {
     ( cd tests/integration && ./go.test )
 }
 
+function set_version {
+    # TODO: always generate & set version in addition to the tag
+    if [[ ! ${SET_VIRTLET_IMAGE_TAG:-} ]]; then
+        return
+    fi
+    cat >"${project_dir}/pkg/version/version.go" <<EOF
+package version
+
+func init () {
+    VirtletImageTag = "${SET_VIRTLET_IMAGE_TAG:-}"
+}
+EOF
+}
+
 function build_internal {
+    # we don't just always generate the bindata right there because we
+    # want to keep the source buildable outside this build container.
+    go-bindata -o /tmp/bindata.go -modtime "${bindata_modtime}" -pkg "${bindata_pkg}" "${bindata_dir}"
+    if ! cmp /tmp/bindata.go "${bindata_out}"; then
+        echo >&2 "${bindata_dir} changed, please re-run ${0} update-bindata"
+        exit 1
+    fi
     install_vendor_internal
     mkdir -p "${project_dir}/_output"
+    set_version
     go build -i -o "${project_dir}/_output/virtlet" ./cmd/virtlet
     go build -i -o "${project_dir}/_output/virtletctl" ./cmd/virtletctl
     GOOS=darwin go build -i -o "${project_dir}/_output/virtletctl.darwin" ./cmd/virtletctl
     go build -i -o "${project_dir}/_output/vmwrapper" ./cmd/vmwrapper
     go build -i -o "${project_dir}/_output/flexvolume_driver" ./cmd/flexvolume_driver
     go test -i -c -o "${project_dir}/_output/virtlet-e2e-tests" ./tests/e2e
-}
-
-function patch_yaml {
-    local kubectl="${1}"
-    local filter="${2}"
-    "${kubectl}" convert --local -o json -f deploy/virtlet-ds.yaml |
-        jq "${filter}" |
-        "${kubectl}" convert --local -o yaml -f -
 }
 
 function release_description {
@@ -403,8 +413,12 @@ function release_description {
 
 function release_internal {
     local tag="${1}"
-    local -a opts=(--user Mirantis --repo virtlet --tag "${tag}")
-    local -a files=(virtlet-ds.yaml virtlet-ds-1.7.yaml virtletctl virtletctl.darwin)
+    local gh_user="Mirantis"
+    if [[ ${tag} =~ test ]]; then
+        gh_user="${GH_RELEASE_TEST_USER}"
+    fi
+    local -a opts=(--user "${gh_user}" --repo virtlet --tag "${tag}")
+    local -a files=(virtletctl virtletctl.darwin)
     local description="$(release_description "${tag}" "${files[@]}")"
     local pre_release=
     # TODO: uncomment this 'if/fi' once we start making 'non-pre' releases
@@ -418,14 +432,6 @@ function release_internal {
                    --name "$(git tag -l --format='%(contents:subject)' "${tag}")" \
                    --description "${description}" \
                    ${pre_release}
-    # piping the patched yaml directly to
-    # 'github-release upload ... --file -' causes GH API error:
-    # "error: could not upload, status code (400 Bad Request), msg: Bad Content-Length: , errors:"
-    mkdir -p _output
-    patch_yaml kubectl "$(image_tags_filter "${tag}")" >_output/virtlet-ds.yaml
-    # use older kubectl for 1.7 to avoid making yaml
-    # that can't be consumed by k8s 1.7
-    patch_yaml kubectl.old "$(image_tags_filter "${tag}")|${containers_run}|${initContainers_run}|${containers_k8s_dir}" >_output/virtlet-ds-1.7.yaml
     for filename in "${files[@]}"; do
         echo >&2 "Uploading: ${filename}"
         github-release upload "${opts[@]}" \
@@ -440,6 +446,12 @@ function e2e {
     local cluster_url
     cluster_url="$(kubectl config view -o jsonpath='{.clusters[?(@.name=="dind")].cluster.server}')"
     docker exec virtlet-build _output/virtlet-e2e-tests -include-unsafe-tests=true -cluster-url "${cluster_url}" "$@"
+}
+
+function update_bindata_internal {
+    # set fixed modtime to avoid unwanted differences during the checks
+    # that are done by build/cmd.sh build
+    go-bindata -modtime "${bindata_modtime}" -o "${bindata_out}" -pkg "${bindata_pkg}" "${bindata_dir}"
 }
 
 function usage {
@@ -474,20 +486,20 @@ case "${cmd}" in
         gobuild "$@"
         ;;
     prepare-vendor)
-        ( vcmd "build/cmd.sh install-vendor-internal" )
+        vcmd "build/cmd.sh install-vendor-internal"
         ;;
     build)
-        ( vcmd "build/cmd.sh build-image-internal" )
+        vcmd "SET_VIRTLET_IMAGE_TAG='${SET_VIRTLET_IMAGE_TAG:-}' build/cmd.sh build-image-internal"
         ;;
     build-image-internal)
         # this is executed inside the container
         build_image_internal "$@"
         ;;
     test)
-        ( vcmd 'build/cmd.sh run-tests-internal' )
+        vcmd 'build/cmd.sh run-tests-internal'
         ;;
     integration)
-        ( vcmd 'build/cmd.sh run-integration-internal' )
+        vcmd 'build/cmd.sh run-integration-internal'
         ;;
     install-vendor-internal)
         install_vendor_internal
@@ -497,6 +509,13 @@ case "${cmd}" in
         ;;
     run-integration-internal)
         run_integration_internal
+        ;;
+    update-bindata)
+        vcmd "build/cmd.sh update-bindata-internal"
+        docker cp "virtlet-build:${remote_project_dir}/pkg/tools/bindata.go" pkg/tools/bindata.go
+        ;;
+    update-bindata-internal)
+        update_bindata_internal
         ;;
     run)
         vcmd "$*"
@@ -534,6 +553,7 @@ case "${cmd}" in
     release)
         if [[ ! ${1:-} ]]; then
             echo >&2 "must specify the tag"
+            exit 1
         fi
         ( vcmd "build/cmd.sh release-internal '${1}'" )
         ;;

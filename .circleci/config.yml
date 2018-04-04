@@ -253,7 +253,7 @@ jobs:
         name: Build virtlet
         command: |
           build/portforward.sh 18730&
-          build/cmd.sh build
+          SET_VIRTLET_IMAGE_TAG="${CIRCLE_TAG:-}" build/cmd.sh build
           build/cmd.sh copy
     - run:
         name: Save image
@@ -265,6 +265,7 @@ jobs:
         - virtlet.tar
         - virtlet-e2e-tests
         - virtletctl
+        - virtletctl.darwin
         # needed by integration tests
         - vmwrapper
     - store_artifacts:
@@ -356,6 +357,8 @@ jobs:
         name: Make a release
         command: |
           build/portforward.sh 18730&
+          build/cmd.sh start-build-container
+          docker cp _output virtlet-build:/go/src/github.com/Mirantis/virtlet/
           build/cmd.sh release "${CIRCLE_TAG}"
 
 workflows:
