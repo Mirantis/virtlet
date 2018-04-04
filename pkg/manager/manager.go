@@ -187,8 +187,6 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 				PodSandboxId: podID,
 			}, err
 		}
-		glog.Errorf("sandbox exists but it's not ready. Sandbox status: %v", status)
-		return nil, err
 	}
 
 	glog.V(3).Infof("RunPodSandbox: %s", spew.Sdump(in))
