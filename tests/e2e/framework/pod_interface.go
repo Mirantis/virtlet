@@ -26,8 +26,10 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/portforward"
@@ -66,9 +68,9 @@ func (pi *PodInterface) Create() error {
 // Delete deletes the pod and associated service, which was earlier created by `controller.Run()`
 func (pi *PodInterface) Delete() error {
 	if pi.hasService {
-		pi.controller.client.Services(pi.controller.Namespace()).Delete(pi.Pod.Name, nil)
+		pi.controller.client.Services(pi.Pod.Namespace).Delete(pi.Pod.Name, nil)
 	}
-	return pi.controller.client.Pods(pi.controller.Namespace()).Delete(pi.Pod.Name, nil)
+	return pi.controller.client.Pods(pi.Pod.Namespace).Delete(pi.Pod.Name, nil)
 }
 
 // Wait waits for pod to start and checks that it doesn't fail immediately after that
@@ -92,9 +94,16 @@ func (pi *PodInterface) Wait(timing ...time.Duration) error {
 			return err
 		}
 		pi.Pod = podUpdated
+
 		phase := v1.PodRunning
 		if podUpdated.Status.Phase != phase {
 			return fmt.Errorf("pod %s is not %s phase: %s", podUpdated.Name, phase, podUpdated.Status.Phase)
+		}
+
+		for _, cs := range podUpdated.Status.ContainerStatuses {
+			if cs.State.Running == nil {
+				return fmt.Errorf("container %s in pod %s is not running: %s", cs.Name, podUpdated.Name, spew.Sdump(cs.State))
+			}
 		}
 		return nil
 	}, timeout, pollPeriond, consistencyPeriod)
