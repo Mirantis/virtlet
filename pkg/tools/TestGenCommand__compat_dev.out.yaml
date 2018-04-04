@@ -35,6 +35,12 @@ spec:
         image: mirantis/virtlet
         imagePullPolicy: IfNotPresent
         name: libvirt
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - socat - UNIX:/var/run/libvirt/libvirt-sock-ro </dev/null
         resources: {}
         securityContext:
           privileged: true
@@ -119,6 +125,12 @@ spec:
         image: mirantis/virtlet
         imagePullPolicy: IfNotPresent
         name: virtlet
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - socat - UNIX:/run/virtlet.sock </dev/null
         resources: {}
         securityContext:
           privileged: true
