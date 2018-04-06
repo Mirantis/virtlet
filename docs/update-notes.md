@@ -4,6 +4,7 @@ This section contains quick updates on new functionality and improvements
 of the product. The update notes are released on a biweekly basis starting
 from October, 18 2017.
 
+* [Q1-18-04-04](update-notes/Q1-18-04-04.md)
 * [Q1-18-03-22](update-notes/Q1-18-03-21.md)
 * [Q1-18-03-07](update-notes/Q1-18-03-07.md)
 * [Q1-18-02-21](update-notes/Q1-18-02-21.md)
