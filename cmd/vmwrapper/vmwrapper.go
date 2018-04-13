@@ -111,7 +111,7 @@ func main() {
 				case network.InterfaceTypeVF:
 					netArgs = append(netArgs,
 						"-device",
-						fmt.Sprintf("pci-assign,host=%s,id=hostdev%d",
+						fmt.Sprintf("vfio-pci,host=%s,id=hostdev%d",
 							desc.PCIAddress[5:],
 							nextToUseHostdevNo,
 						),
