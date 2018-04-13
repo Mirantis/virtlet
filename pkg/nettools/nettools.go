@@ -601,18 +601,50 @@ func getDevNameByPCIAddress(address string) (string, error) {
 	return "", fmt.Errorf("can't find network device with pci address %q", address)
 }
 
-func unbindDriverFromDevice(devName string) error {
+func unbindDriverFromDevice(pciAddress string) error {
 	return ioutil.WriteFile(
-		devName,
-		[]byte(filepath.Join("/sys/bus/pci/devices", devName, "driver/unbind")),
+		filepath.Join("/sys/bus/pci/devices", pciAddress, "driver/unbind"),
+		[]byte(pciAddress),
 		0200,
 	)
 }
 
-func rebindDriverToDevice(devName string) error {
+func getDeviceIdentifier(pciAddress string) (string, error) {
+	devDir := filepath.Join("/sys/bus/pci/devices", pciAddress)
+
+	vendor, err := ioutil.ReadFile(filepath.Join(devDir, "vendor"))
+	if err != nil {
+		return "", err
+	}
+
+	devID, err := ioutil.ReadFile(filepath.Join(devDir, "device"))
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s %s", vendor, devID), nil
+}
+
+func rebindDriverToDevice(pciAddress string) error {
 	return ioutil.WriteFile(
-		devName,
-		[]byte("/sys/bus/pci/drivers_probe"),
+		"/sys/bus/pci/drivers_probe",
+		[]byte(pciAddress),
+		0200,
+	)
+}
+
+func bindDeviceToVFIO(devIdentifier string) error {
+	return ioutil.WriteFile(
+		"/sys/bus/pci/drivers/vfio-pci/new_id",
+		[]byte(devIdentifier),
+		0200,
+	)
+}
+
+func unbindDeviceFromVFIO(pciAddress string) error {
+	return ioutil.WriteFile(
+		"/sys/bus/pci/drivers/vfio-pci/unbind",
+		[]byte(pciAddress),
 		0200,
 	)
 }
@@ -666,6 +698,15 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 			}
 
 			if err := unbindDriverFromDevice(pciAddress); err != nil {
+				return nil, err
+			}
+
+			devIdentifier, err := getDeviceIdentifier(pciAddress)
+			if err != nil {
+				return nil, err
+			}
+
+			if err := bindDeviceToVFIO(devIdentifier); err != nil {
 				return nil, err
 			}
 
@@ -775,6 +816,19 @@ func RecoverContainerSideNetwork(csn *network.ContainerSideNetwork, nsPath strin
 
 			// device should be already unbound, but after machine reboot that can be necessary
 			unbindDriverFromDevice(pciAddress)
+
+			devIdentifier, err := getDeviceIdentifier(pciAddress)
+			if err != nil {
+				return err
+			}
+
+			// this can be problematic in case of machine reboot - we are trying to use the same
+			// devices as was used before reboot, but in meantime there is small chance that they
+			// were used already by sriov cni plugin (for which reboot means it's starting everything
+			// from clean situation) to other containers, before even virtlet was started
+			// also in case of virtlet pod restart - device can be already bound to vfio-pci, so we
+			// are ignoring any error there)
+			bindDeviceToVFIO(devIdentifier)
 		} else {
 			ifaceType = network.InterfaceTypeTap
 		}
@@ -927,6 +981,9 @@ func ReconstructVFs(csn *network.ContainerSideNetwork, netns ns.NetNS) error {
 	for _, iface := range csn.Interfaces {
 		if iface.Type != network.InterfaceTypeVF {
 			continue
+		}
+		if err := unbindDeviceFromVFIO(iface.PCIAddress); err != nil {
+			return err
 		}
 		if err := rebindDriverToDevice(iface.PCIAddress); err != nil {
 			return err
