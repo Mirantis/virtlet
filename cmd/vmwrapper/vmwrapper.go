@@ -21,8 +21,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strconv"
-	"strings"
 	"syscall"
 
 	"github.com/golang/glog"
@@ -39,19 +37,6 @@ const (
 	netKeyEnvVar    = "VIRTLET_NET_KEY"
 	vmsProcFile     = "/var/lib/virtlet/vms.procfile"
 )
-
-func extractLastUsedPCIAddress(args []string) int {
-	var lastUsed int
-	for _, arg := range args {
-		i := strings.LastIndex(arg, "addr=0x")
-		if i < 0 {
-			continue
-		}
-		parsed, _ := strconv.ParseInt(arg[i+7:], 16, 32)
-		lastUsed = int(parsed)
-	}
-	return lastUsed
-}
 
 type reexecArg struct {
 	Args []string
@@ -94,7 +79,6 @@ func main() {
 		emulator = defaultEmulator
 	} else {
 		netFdKey := os.Getenv(netKeyEnvVar)
-		nextToUsePCIAddress := extractLastUsedPCIAddress(os.Args[1:]) + 1
 		nextToUseHostdevNo := 0
 
 		if netFdKey != "" {
@@ -127,18 +111,14 @@ func main() {
 				case network.InterfaceTypeVF:
 					netArgs = append(netArgs,
 						"-device",
-						// fmt.Sprintf("pci-assign,configfd=%d,host=%s,id=hostdev%d,bus=pci.0,addr=0x%x",
-						fmt.Sprintf("pci-assign,host=%s,id=hostdev%d,bus=pci.0,addr=0x%x",
-							// desc.FdIndex,
+						fmt.Sprintf("pci-assign,host=%s,id=hostdev%d",
 							desc.PCIAddress[5:],
 							nextToUseHostdevNo,
-							nextToUsePCIAddress,
 						),
 					)
 					nextToUseHostdevNo += 1
-					nextToUsePCIAddress += 1
 				default:
-					// Impssible situation when tapmanager is built from other sources than vmwrapper
+					// Impossible situation when tapmanager is built from other sources than vmwrapper
 					glog.Errorf("Received unknown interface type: %d", int(desc.Type))
 					os.Exit(1)
 				}
