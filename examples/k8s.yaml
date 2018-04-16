@@ -46,24 +46,17 @@ spec:
               #!/bin/bash
               set -u -e
               set -o pipefail
-              apt-get update
-              apt-get install -y --force-yes apt-transport-https
               curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
-
               apt-get update
-              apt-get install -y --force-yes docker.io
-              apt-get install -y --force-yes kubelet kubeadm kubectl kubernetes-cni jq
-              # TODO: client-ca-file -- /etc/kubernetes/pki/ca.crt
-              # XXX: misplaced --feature-gates=... option, but will do for now
-              sed -i 's/--authorization-mode=Webhook /--feature-gates=DynamicKubeletConfig=true /' /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+              apt-get install -y docker.io kubelet kubeadm kubectl kubernetes-cni
+              sed -i 's/--cluster-dns=10\.96\.0\.10/--cluster-dns=10.97.0.10/' /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
               systemctl daemon-reload
-              # make k8s-NNN names resolvable
-              sed -i 's/^search /search k8s.default.svc.cluster.local default.svc.cluster.local svc.cluster.local cluster.local/' /etc/resolv.conf
               if [[ $(hostname) =~ -0$ ]]; then
-                kubeadm init --token adcb82.4eae29627dc4c5a6 --pod-network-cidr=10.200.0.0/16 --service-cidr=10.97.0.0/16 --apiserver-cert-extra-sans=127.0.0.1,localhost
                 # master node
+                kubeadm init --token adcb82.4eae29627dc4c5a6 --pod-network-cidr=10.200.0.0/16 --service-cidr=10.97.0.0/16 --apiserver-cert-extra-sans=127.0.0.1,localhost
                 export KUBECONFIG=/etc/kubernetes/admin.conf
-                kubectl apply -f "https://git.io/weave-kube-1.6"
+                export kubever=$(kubectl version | base64 | tr -d '\n')
+                kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$kubever"
                 while ! kubectl get pods -n kube-system -l k8s-app=kube-dns|grep ' 3/3'; do
                   sleep 1
                 done
@@ -73,9 +66,7 @@ spec:
                 echo "Master setup complete." >&2
               else
                 # worker node
-                # FIXME: it should work without --node-name, but it doesn't
-                # (complains about empty node name)
-                kubeadm join --token adcb82.4eae29627dc4c5a6 --node-name=$(hostname) k8s-0:6443
+                kubeadm join --token adcb82.4eae29627dc4c5a6 --discovery-token-unsafe-skip-ca-verification k8s-0.k8s:6443
                 echo "Node setup complete." >&2
               fi
           users:
