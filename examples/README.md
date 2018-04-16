@@ -42,13 +42,13 @@ kubectl create -f k8s.yaml
 
 Watch progress of the cluster setup via the VM console:
 ```
-kubectl attach k8s-0
+kubectl attach -it k8s-0
 ```
 
 After it's complete you can log into the master node:
 
 ```
-virtletctl ssh ubuntu@k8s-0 -- -i examples/vmkey
+virtletctl ssh root@k8s-0 -- -i examples/vmkey
 ```
 
 There you can wait a bit for k8s nodes and pods to become ready.
@@ -56,10 +56,21 @@ You can list them using the following commands inside the VM:
 
 ```
 kubectl get nodes -w
+# Press Ctrl-C when all 3 nodes are present and Ready
 kubectl get pods --all-namespaces -o wide -w
+# Press Ctrl-C when all the pods are ready
+```
+
+You can then deploy and test nginx on the inner cluster:
+
+```
+kubectl run nginx --image=nginx --expose --port 80
+kubectl get pods -w
+# Press Ctrl-C when the pod is ready
+kubectl run bbtest --rm --attach --image=docker.io/busybox --restart=Never -- wget -O - http://nginx
 ```
 
 After that you can follow
 [the instructions](../deploy/real-cluster.md) to install Virtlet on
-the cluster, but note that you'll have to disable KVM because nested
-virtualization is not yet supported by Virtlet.
+the cluster if you want, but note that you'll have to disable KVM
+because nested virtualization is not yet supported by Virtlet.
