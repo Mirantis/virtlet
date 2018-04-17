@@ -6,14 +6,18 @@ container using [Dockerfile.build](../../Dockerfile.build).
 ## Script usage
 
 Currently the script supports the following commands:
- * `./build/cmd.sh build`
- * `./build/cmd.sh test`
- * `./build/cmd.sh copy`
- * `./build/cmd.sh stop`
- * `./build/cmd.sh clean`
- * `./build/cmd.sh gotest [TEST_ARGS...]`
- * `./build/cmd.sh gobuild [BUILD_ARGS...]`
- * `./build/cmd.sh run CMD...`
+ * ` ./build/cmd.sh build`
+ * ` ./build/cmd.sh test`
+ * ` ./build/cmd.sh copy`
+ * ` ./build/cmd.sh copy-dind`
+ * ` ./build/cmd.sh start-dind`
+ * ` ./build/cmd.sh vsh`
+ * ` ./build/cmd.sh stop`
+ * ` ./build/cmd.sh clean`
+ * ` ./build/cmd.sh gotest [TEST_ARGS...]`
+ * ` ./build/cmd.sh gobuild [BUILD_ARGS...]`
+ * ` ./build/cmd.sh run CMD...`
+ * ` ./build/cmd.sh release TAG`
 
 `build`, `test`, `integration`, `run`, `gobuild`, `gotest`, `copy`,
 `copy-back` and `prepare-vendor` commands check whether the build
@@ -68,6 +72,7 @@ non-empty value). You need to do `dind-cluster...sh up` and
 This command copies locally-built `mirantis/virtlet` image to
 the DIND node that will run Virtlet if it doesn't exist there
 or if `FORCE_UPDATE_IMAGE` is set to a non-empty value.
+This command requires `kubectl`.
 
 ### vsh
 
@@ -120,6 +125,7 @@ have `Should have default route` in their description:
 ```
 build/cmd.sh e2e -test.v -ginkgo.focus="Should have default route"
 ```
+This command requires `kubectl`.
 
 Virtlet e2e tests can produce JUnit-style XML output if asked to do so:
 ```
