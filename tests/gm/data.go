@@ -66,17 +66,21 @@ func (v textVerifier) Marshal() ([]byte, error) {
 	return []byte(v), nil
 }
 
-type jsonVerifier struct {
+type JSONVerifier struct {
 	data interface{}
 }
 
-var _ Verifier = jsonVerifier{}
+var _ Verifier = JSONVerifier{}
 
-func (v jsonVerifier) Suffix() string {
+func NewJSONVerifier(data interface{}) JSONVerifier {
+	return JSONVerifier{data}
+}
+
+func (v JSONVerifier) Suffix() string {
 	return ".json"
 }
 
-func (v jsonVerifier) Verify(content []byte) (bool, error) {
+func (v JSONVerifier) Verify(content []byte) (bool, error) {
 	var curData interface{}
 	if err := json.Unmarshal(content, &curData); err != nil {
 		glog.Warningf("Failed to unmarshal to JSON: %v:\n%s", err, content)
@@ -98,13 +102,20 @@ func (v jsonVerifier) Verify(content []byte) (bool, error) {
 	return reflect.DeepEqual(curData, newData), nil
 }
 
-func (v jsonVerifier) Marshal() ([]byte, error) {
-	out, err := json.MarshalIndent(v.data, "", jsonDataIndent)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal json data: %v. Input:\n%s",
-			err, spew.Sdump(v.data))
+func (v JSONVerifier) Marshal() ([]byte, error) {
+	switch d := v.data.(type) {
+	case []byte:
+		return d, nil
+	case string:
+		return []byte(d), nil
+	default:
+		out, err := json.MarshalIndent(v.data, "", jsonDataIndent)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal json data: %v. Input:\n%s",
+				err, spew.Sdump(v.data))
+		}
+		return out, nil
 	}
-	return out, nil
 }
 
 // YamlVerifier verifies the data using YAML representation.
@@ -172,7 +183,7 @@ func getVerifier(data interface{}) Verifier {
 	case []byte:
 		return textVerifier(string(v))
 	default:
-		return jsonVerifier{v}
+		return NewJSONVerifier(v)
 	}
 }
 
