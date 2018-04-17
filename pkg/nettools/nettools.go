@@ -649,6 +649,44 @@ func unbindDeviceFromVFIO(pciAddress string) error {
 	)
 }
 
+func getVirtFNNo(pciAddress string) (int, error) {
+	for i := 0; ; i++ {
+		dest, err := os.Readlink(
+			filepath.Join("/sys/bus/pci/devices", pciAddress, "physfn",
+				fmt.Sprintf("virtfn%d", i),
+			),
+		)
+		if err != nil {
+			return 0, err
+		}
+		if dest[3:] == pciAddress {
+			return i, nil
+		}
+	}
+}
+
+// SetMacOnVf uses VF pci address to locate its parent device and uses
+// it to set mac address on VF.  It needs to be called from host netns.
+func SetMacOnVf(pciAddress string, mac net.HardwareAddr) error {
+	dest, err := os.Readlink(filepath.Join("/sys/bus/pci/devices", pciAddress, "physfn"))
+	if err != nil {
+		return err
+	}
+	masterDev, err := getDevNameByPCIAddress(dest[3:])
+	if err != nil {
+		return err
+	}
+	virtFNNo, err := getVirtFNNo(pciAddress)
+	if err != nil {
+		return err
+	}
+	masterLink, err := netlink.LinkByName(masterDev)
+	if err != nil {
+		return err
+	}
+	return netlink.LinkSetVfHardwareAddr(masterLink, virtFNNo, mac)
+}
+
 // SetupContainerSideNetwork sets up networking in container
 // namespace.  It does so by preparing the following
 // network interfaces in container ns:
