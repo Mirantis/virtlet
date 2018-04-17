@@ -999,14 +999,22 @@ func ReconstructVFs(csn *network.ContainerSideNetwork, netns ns.NetNS) error {
 		if err := netlink.LinkSetHardwareAddr(link, iface.HardwareAddr); err != nil {
 			return fmt.Errorf("can't set hwaddr %q on device %q: %v", iface.HardwareAddr, devName, err)
 		}
+		tmpName, err := RandomVethName()
+		if err != nil {
+			return err
+		}
+		if err := netlink.LinkSetName(link, tmpName); err != nil {
+			return fmt.Errorf("can't set random name %q on interface %q: %v", tmpName, iface.Name, err)
+		}
+		if link, err = netlink.LinkByName(tmpName); err != nil {
+			return fmt.Errorf("can't reread link info: %v", err)
+		}
 		if err := netlink.LinkSetNsFd(link, int(netns.Fd())); err != nil {
 			return fmt.Errorf("can't move link %q to netns %q: %v", iface.Name, netns.Path(), err)
 		}
 		if err := netns.Do(func(ns.NetNS) error {
-			if link.Attrs().Name != iface.Name {
-				if err := netlink.LinkSetName(link, iface.Name); err != nil {
-					return fmt.Errorf("can't rename device %q to %q: %v", devName, iface.Name, err)
-				}
+			if err := netlink.LinkSetName(link, iface.Name); err != nil {
+				return fmt.Errorf("can't rename device %q to %q: %v", devName, iface.Name, err)
 			}
 			return nil
 		}); err != nil {
