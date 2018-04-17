@@ -17,7 +17,11 @@ limitations under the License.
 package version
 
 var (
-	// VirtletImageTag specifies the docker image tag to be added
-	// by 'virtletctl gen' to the docker image name
-	VirtletImageTag string
+	gitVersion   string
+	gitCommit    string
+	gitTreeState string
+	buildDate    string
+	gitMajor     string
+	gitMinor     string
+	imageTag     string
 )

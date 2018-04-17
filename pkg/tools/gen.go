@@ -57,7 +57,7 @@ func NewGenCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&g.dev, "dev", false, "Development mode for use with kubeadm-dind-cluster")
 	cmd.Flags().BoolVar(&g.compat, "compat", false, "Produce YAML that's compatible with older Kubernetes versions")
-	cmd.Flags().StringVar(&g.tag, "tag", version.VirtletImageTag, "Set virtlet image tag")
+	cmd.Flags().StringVar(&g.tag, "tag", version.Get().ImageTag, "Set virtlet image tag")
 	return cmd
 }
 
