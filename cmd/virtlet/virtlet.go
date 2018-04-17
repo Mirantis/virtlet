@@ -33,6 +33,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/stream"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
 	"github.com/Mirantis/virtlet/pkg/utils"
+	"github.com/Mirantis/virtlet/pkg/version"
 )
 
 var (
@@ -56,6 +57,8 @@ var (
 		"Path to fd server socket")
 	imageTranslationConfigsDir = flag.String("image-translations-dir", "",
 		"Image name translation configs directory")
+	displayVersion = flag.Bool("version", false, "Display version and exit")
+	versionFormat  = flag.String("version-format", "text", "Version format to use (text, short, json, yaml)")
 )
 
 const (
@@ -136,7 +139,7 @@ func runTapManager() {
 		os.Exit(1)
 	}
 	if err := libvirttools.ChownForEmulator(*fdServerSocketPath); err != nil {
-		glog.Warningf("couldn't set tapmanager socket permissions: %v", err)
+		glog.Warningf("Couldn't set tapmanager socket permissions: %v", err)
 	}
 	for {
 		time.Sleep(1000 * time.Hour)
@@ -153,14 +156,30 @@ func startTapManagerProcess() {
 	// https://github.com/golang/go/issues/9263
 	setPdeathsig(cmd)
 	if err := cmd.Start(); err != nil {
-		glog.Errorf("error starting tapmanager process: %v", err)
+		glog.Errorf("Error starting tapmanager process: %v", err)
 		os.Exit(1)
 	}
+}
+
+func printVersion() {
+	out, err := version.Get().ToBytes(*versionFormat)
+	if err == nil {
+		_, err = os.Stdout.Write(out)
+	}
+	if err != nil {
+		glog.Errorf("Error printing version info: %v", err)
+		os.Exit(1)
+	}
+	os.Exit(0)
 }
 
 func main() {
 	utils.HandleNsFixReexec()
 	flag.Parse()
+	if *displayVersion {
+		printVersion()
+	}
+
 	rand.Seed(time.Now().UnixNano())
 	if os.Getenv(WantTapManagerEnv) == "" {
 		startTapManagerProcess()
