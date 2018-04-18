@@ -1,0 +1,22 @@
+Client:
+  Version:    v1.0.0-6+318faff6ad0609-dirty
+  Commit:     318faff6ad060954387c1ff594bcbb4bb128577a
+  Build Date: 2018-04-16T21:02:05Z
+  Go Version: go1.8.3
+  Compiler:   gc
+  Platform:   darwin/amd64
+  ImageTag:   ivan4th_version
+Node kube-node-1:
+  Version:    v1.0.0-6+318faff6ad0609
+  Commit:     318faff6ad060954387c1ff594bcbb4bb128577a
+  Build Date: 2018-04-16T21:02:05Z
+  Go Version: go1.8.3
+  Compiler:   gc
+  Platform:   linux/amd64
+Node kube-node-2:
+  Version:    v1.0.0-6+318faff6ad0609
+  Commit:     318faff6ad060954387c1ff594bcbb4bb128577a
+  Build Date: 2018-04-17T07:16:01Z
+  Go Version: go1.8.3
+  Compiler:   gc
+  Platform:   linux/amd64

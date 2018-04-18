@@ -40,6 +40,8 @@ bindata_modtime=1522279343
 bindata_out="pkg/tools/bindata.go"
 bindata_dir="deploy/data"
 bindata_pkg="tools"
+ldflags=()
+go_package=github.com/Mirantis/virtlet
 
 function image_tags_filter {
     local tag="${1}"
@@ -367,18 +369,37 @@ function run_integration_internal {
     ( cd tests/integration && ./go.test )
 }
 
-function set_version {
-    # TODO: always generate & set version in addition to the tag
-    if [[ ! ${SET_VIRTLET_IMAGE_TAG:-} ]]; then
-        return
+function get_ldflags {
+    # XXX: use kube::version::ldflag (-ldflags -X package.Var=...)
+    # see also versioning.mk in helm
+    # https://stackoverflow.com/questions/11354518/golang-application-auto-build-versioning
+    # see pkg/version/version.go in k8s
+    # for GoVersion / Compiler / Platform
+    local vfile="${project_dir}/pkg/version/version.go"
+    local git_version="$(git describe --tags --abbrev=14 'HEAD^{commit}' | sed "s/-g\([0-9a-f]\{14\}\)$/+\1/")"
+    local git_commit="$(git rev-parse "HEAD^{commit}")"
+    local git_tree_state=$([[ $(git status --porcelain) ]] && echo "dirty" || echo "clean")
+    if [[ ${git_tree_state} == dirty ]]; then
+        git_version+="-dirty"
     fi
-    cat >"${project_dir}/pkg/version/version.go" <<EOF
-package version
-
-func init () {
-    VirtletImageTag = "${SET_VIRTLET_IMAGE_TAG:-}"
-}
-EOF
+    local build_date="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+    local git_major=""
+    local git_minor=""
+    local version_pkg="${go_package}/pkg/version"
+    local ldflags=(-X "${version_pkg}.gitVersion=${git_version}"
+                   -X "${version_pkg}.gitCommit=${git_commit}"
+                   -X "${version_pkg}.gitTreeState=${git_tree_state}"
+                   -X "${version_pkg}.buildDate=${build_date}")
+    if [[ ${git_version} =~ ^v([0-9]+)\.([0-9]+)(\.[0-9]+)?([-].*)?([+].*)?$ ]]; then
+        git_major=${BASH_REMATCH[1]}
+        git_minor=${BASH_REMATCH[2]}
+        ldflags+=(-X "${version_pkg}.gitMajor=${git_major}"
+                  -X "${version_pkg}.gitMinor=${git_minor}")
+    fi
+    if [[ ${SET_VIRTLET_IMAGE_TAG:-} ]]; then
+        ldflags+=(-X "${version_pkg}.imageTag=${SET_VIRTLET_IMAGE_TAG}")
+    fi
+    echo "${ldflags[*]}"
 }
 
 function build_internal {
@@ -390,11 +411,11 @@ function build_internal {
         exit 1
     fi
     install_vendor_internal
+    ldflags="$(get_ldflags)"
     mkdir -p "${project_dir}/_output"
-    set_version
-    go build -i -o "${project_dir}/_output/virtlet" ./cmd/virtlet
-    go build -i -o "${project_dir}/_output/virtletctl" ./cmd/virtletctl
-    GOOS=darwin go build -i -o "${project_dir}/_output/virtletctl.darwin" ./cmd/virtletctl
+    go build -i -o "${project_dir}/_output/virtlet" -ldflags "${ldflags}" ./cmd/virtlet
+    go build -i -o "${project_dir}/_output/virtletctl" -ldflags "${ldflags}" ./cmd/virtletctl
+    GOOS=darwin go build -i -o "${project_dir}/_output/virtletctl.darwin" -ldflags "${ldflags}" ./cmd/virtletctl
     go build -i -o "${project_dir}/_output/vmwrapper" ./cmd/vmwrapper
     go build -i -o "${project_dir}/_output/flexvolume_driver" ./cmd/flexvolume_driver
     go test -i -c -o "${project_dir}/_output/virtlet-e2e-tests" ./tests/e2e

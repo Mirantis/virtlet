@@ -1,0 +1,8 @@
+Client:
+  Version:    v1.0.0-6+318faff6ad0609-dirty
+  Commit:     318faff6ad060954387c1ff594bcbb4bb128577a
+  Build Date: 2018-04-16T21:02:05Z
+  Go Version: go1.8.3
+  Compiler:   gc
+  Platform:   darwin/amd64
+  ImageTag:   ivan4th_version

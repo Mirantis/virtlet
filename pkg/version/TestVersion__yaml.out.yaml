@@ -1,0 +1,10 @@
+buildDate: "2018-04-16T21:02:05Z"
+compiler: gc
+gitCommit: 318faff6ad060954387c1ff594bcbb4bb128577a
+gitTreeState: dirty
+gitVersion: v1.0.0-6+318faff6ad0609-dirty
+goVersion: go1.8.3
+imageTag: ivan4th_version
+major: "1"
+minor: "0"
+platform: darwin/amd64

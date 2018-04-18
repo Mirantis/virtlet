@@ -50,6 +50,7 @@ func newRootCmd() *cobra.Command {
 	cmd.AddCommand(tools.NewInstallCmd(cmd, "", ""))
 	cmd.AddCommand(tools.NewGenDocCmd(cmd))
 	cmd.AddCommand(tools.NewGenCmd(os.Stdout))
+	cmd.AddCommand(tools.NewVersionCommand(client, os.Stdout, nil))
 
 	for _, c := range cmd.Commands() {
 		c.PreRunE = func(*cobra.Command, []string) error {
