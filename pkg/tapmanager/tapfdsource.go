@@ -149,6 +149,7 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 
 	var fds []int
 	var respData []byte
+	var csn *network.ContainerSideNetwork
 	if err := s.setupNetNS(key, pnd, func(netNSPath string, allLinks []netlink.Link) (*network.ContainerSideNetwork, error) {
 		if netConfig, err = nettools.ValidateAndFixCNIResult(netConfig, netNSPath, allLinks); err != nil {
 			return nil, fmt.Errorf("error fixing cni configuration: %v", err)
@@ -158,8 +159,9 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 			glog.Warningf("Calico detection/fix didn't work: %v", err)
 		}
 		glog.V(3).Infof("CNI Result after fix:\n%s", spew.Sdump(netConfig))
-		csn, err := nettools.SetupContainerSideNetwork(netConfig, netNSPath, allLinks)
-		if err != nil {
+
+		var err error
+		if csn, err = nettools.SetupContainerSideNetwork(netConfig, netNSPath, allLinks); err != nil {
 			return nil, err
 		}
 
@@ -172,7 +174,17 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 		}
 		return csn, nil
 	}); err != nil {
+		// TODO: do some cleanup on configured interfaces if there is an error
 		return nil, nil, err
+	}
+
+	for _, iface := range csn.Interfaces {
+		if iface.Type == network.InterfaceTypeVF {
+			if err := nettools.SetMacOnVf(iface.PCIAddress, iface.HardwareAddr); err != nil {
+				// TODO: do some cleanup on configured interfaces if there is an error
+				return nil, nil, err
+			}
+		}
 	}
 
 	return fds, respData, nil

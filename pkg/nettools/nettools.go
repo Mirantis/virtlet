@@ -601,20 +601,90 @@ func getDevNameByPCIAddress(address string) (string, error) {
 	return "", fmt.Errorf("can't find network device with pci address %q", address)
 }
 
-func unbindDriverFromDevice(devName string) error {
+func unbindDriverFromDevice(pciAddress string) error {
 	return ioutil.WriteFile(
-		devName,
-		[]byte(filepath.Join("/sys/bus/pci/devices", devName, "driver/unbind")),
+		filepath.Join("/sys/bus/pci/devices", pciAddress, "driver/unbind"),
+		[]byte(pciAddress),
 		0200,
 	)
 }
 
-func rebindDriverToDevice(devName string) error {
+func getDeviceIdentifier(pciAddress string) (string, error) {
+	devDir := filepath.Join("/sys/bus/pci/devices", pciAddress)
+
+	vendor, err := ioutil.ReadFile(filepath.Join(devDir, "vendor"))
+	if err != nil {
+		return "", err
+	}
+
+	devID, err := ioutil.ReadFile(filepath.Join(devDir, "device"))
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s %s", vendor, devID), nil
+}
+
+func rebindDriverToDevice(pciAddress string) error {
 	return ioutil.WriteFile(
-		devName,
-		[]byte("/sys/bus/pci/drivers_probe"),
+		"/sys/bus/pci/drivers_probe",
+		[]byte(pciAddress),
 		0200,
 	)
+}
+
+func bindDeviceToVFIO(devIdentifier string) error {
+	return ioutil.WriteFile(
+		"/sys/bus/pci/drivers/vfio-pci/new_id",
+		[]byte(devIdentifier),
+		0200,
+	)
+}
+
+func unbindDeviceFromVFIO(pciAddress string) error {
+	return ioutil.WriteFile(
+		"/sys/bus/pci/drivers/vfio-pci/unbind",
+		[]byte(pciAddress),
+		0200,
+	)
+}
+
+func getVirtFNNo(pciAddress string) (int, error) {
+	for i := 0; ; i++ {
+		dest, err := os.Readlink(
+			filepath.Join("/sys/bus/pci/devices", pciAddress, "physfn",
+				fmt.Sprintf("virtfn%d", i),
+			),
+		)
+		if err != nil {
+			return 0, err
+		}
+		if dest[3:] == pciAddress {
+			return i, nil
+		}
+	}
+}
+
+// SetMacOnVf uses VF pci address to locate its parent device and uses
+// it to set mac address on VF.  It needs to be called from host netns.
+func SetMacOnVf(pciAddress string, mac net.HardwareAddr) error {
+	dest, err := os.Readlink(filepath.Join("/sys/bus/pci/devices", pciAddress, "physfn"))
+	if err != nil {
+		return err
+	}
+	masterDev, err := getDevNameByPCIAddress(dest[3:])
+	if err != nil {
+		return err
+	}
+	virtFNNo, err := getVirtFNNo(pciAddress)
+	if err != nil {
+		return err
+	}
+	masterLink, err := netlink.LinkByName(masterDev)
+	if err != nil {
+		return err
+	}
+	return netlink.LinkSetVfHardwareAddr(masterLink, virtFNNo, mac)
 }
 
 // SetupContainerSideNetwork sets up networking in container
@@ -666,6 +736,15 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 			}
 
 			if err := unbindDriverFromDevice(pciAddress); err != nil {
+				return nil, err
+			}
+
+			devIdentifier, err := getDeviceIdentifier(pciAddress)
+			if err != nil {
+				return nil, err
+			}
+
+			if err := bindDeviceToVFIO(devIdentifier); err != nil {
 				return nil, err
 			}
 
@@ -775,6 +854,19 @@ func RecoverContainerSideNetwork(csn *network.ContainerSideNetwork, nsPath strin
 
 			// device should be already unbound, but after machine reboot that can be necessary
 			unbindDriverFromDevice(pciAddress)
+
+			devIdentifier, err := getDeviceIdentifier(pciAddress)
+			if err != nil {
+				return err
+			}
+
+			// this can be problematic in case of machine reboot - we are trying to use the same
+			// devices as was used before reboot, but in meantime there is small chance that they
+			// were used already by sriov cni plugin (for which reboot means it's starting everything
+			// from clean situation) to other containers, before even virtlet was started
+			// also in case of virtlet pod restart - device can be already bound to vfio-pci, so we
+			// are ignoring any error there)
+			bindDeviceToVFIO(devIdentifier)
 		} else {
 			ifaceType = network.InterfaceTypeTap
 		}
@@ -928,6 +1020,9 @@ func ReconstructVFs(csn *network.ContainerSideNetwork, netns ns.NetNS) error {
 		if iface.Type != network.InterfaceTypeVF {
 			continue
 		}
+		if err := unbindDeviceFromVFIO(iface.PCIAddress); err != nil {
+			return err
+		}
 		if err := rebindDriverToDevice(iface.PCIAddress); err != nil {
 			return err
 		}
@@ -942,14 +1037,22 @@ func ReconstructVFs(csn *network.ContainerSideNetwork, netns ns.NetNS) error {
 		if err := netlink.LinkSetHardwareAddr(link, iface.HardwareAddr); err != nil {
 			return fmt.Errorf("can't set hwaddr %q on device %q: %v", iface.HardwareAddr, devName, err)
 		}
+		tmpName, err := RandomVethName()
+		if err != nil {
+			return err
+		}
+		if err := netlink.LinkSetName(link, tmpName); err != nil {
+			return fmt.Errorf("can't set random name %q on interface %q: %v", tmpName, iface.Name, err)
+		}
+		if link, err = netlink.LinkByName(tmpName); err != nil {
+			return fmt.Errorf("can't reread link info: %v", err)
+		}
 		if err := netlink.LinkSetNsFd(link, int(netns.Fd())); err != nil {
 			return fmt.Errorf("can't move link %q to netns %q: %v", iface.Name, netns.Path(), err)
 		}
 		if err := netns.Do(func(ns.NetNS) error {
-			if link.Attrs().Name != iface.Name {
-				if err := netlink.LinkSetName(link, iface.Name); err != nil {
-					return fmt.Errorf("can't rename device %q to %q: %v", devName, iface.Name, err)
-				}
+			if err := netlink.LinkSetName(link, iface.Name); err != nil {
+				return fmt.Errorf("can't rename device %q to %q: %v", devName, iface.Name, err)
 			}
 			return nil
 		}); err != nil {

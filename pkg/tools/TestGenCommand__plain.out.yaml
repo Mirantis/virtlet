@@ -101,6 +101,12 @@ spec:
         securityContext:
           privileged: true
         env:
+        - name: VIRTLET_SRIOV_SUPPORT
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: sriov_support
+              optional: true
         - name: VIRTLET_DISABLE_KVM
           valueFrom:
             configMapKeyRef:

@@ -13,6 +13,17 @@ if [[ -f /dind/vmwrapper ]]; then
   ln -fs /dind/vmwrapper /vmwrapper
 fi
 
+function regenerate_qemu_conf() {
+  set $(ls -l /sys/class/net/*/device/iommu_group | sed 's@.*/\(.*\)@"/dev/vfio/\1",@')
+  sed -i "s|# @DEVS@|$*|" /etc/libvirt/qemu.conf
+}
+
+VIRTLET_SRIOV_SUPPORT="${VIRTLET_SRIOV_SUPPORT:-}"
+if [[ ${VIRTLET_SRIOV_SUPPORT} ]] ; then
+  regenerate_qemu_conf
+else
+  sed -i "/# @DEVS@/d" /etc/libvirt/qemu.conf
+fi
 
 chown root:root /etc/libvirt/libvirtd.conf
 chown root:root /etc/libvirt/qemu.conf
