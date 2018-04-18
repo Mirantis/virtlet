@@ -21,6 +21,8 @@ function regenerate_qemu_conf() {
 VIRTLET_SRIOV_SUPPORT="${VIRTLET_SRIOV_SUPPORT:-}"
 if [[ ${VIRTLET_SRIOV_SUPPORT} ]] ; then
   regenerate_qemu_conf
+else
+  sed -i "/# @DEVS@/d" /etc/libvirt/qemu.conf
 fi
 
 chown root:root /etc/libvirt/libvirtd.conf
