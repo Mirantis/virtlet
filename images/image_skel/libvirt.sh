@@ -14,12 +14,8 @@ if [[ -f /dind/vmwrapper ]]; then
 fi
 
 function regenerate_qemu_conf() {
-  marker_line=$(grep -n MARKER /etc/libvirt/qemu.conf.tmpl | cut -d ":" -f 1)
-  {
-    head -n $((marker_line-1)) /etc/libvirt/qemu.conf.tmpl
-    ls -l /sys/class/net/*/device/iommu_group | sed -e "s/.*\//    \"\/dev\/vfio\//" -e "s/\$/\",/"
-    tail -n +$((marker_line+1)) /etc/libvirt/qemu.conf.tmpl
-  } >/etc/libvirt/qemu.conf
+  set $(ls -l /sys/class/net/*/device/iommu_group | sed 's@.*/\(.*\)@"/dev/vfio/\1",@')
+  sed -i "s|# @DEVS@|$*|" /etc/libvirt/qemu.conf
 }
 
 VIRTLET_SRIOV_SUPPORT="${VIRTLET_SRIOV_SUPPORT:-}"
