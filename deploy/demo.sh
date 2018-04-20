@@ -29,6 +29,17 @@ if [[ ${VIRTLET_ON_MASTER} ]]; then
   virtlet_node=kube-master
 fi
 
+
+# In case of linuxkit / moby linux, -v will not work so we can't
+# mount /lib/modules and /boot.
+using_linuxkit=
+if ! docker info|grep -s '^Operating System: .*Docker for Windows' > /dev/null 2>&1 ; then
+    if docker info|grep -s '^Kernel Version: .*-moby$' >/dev/null 2>&1 ||
+         docker info|grep -s '^Kernel Version: .*-linuxkit-' > /dev/null 2>&1 ; then
+        using_linuxkit=1
+    fi
+fi
+
 function demo::step {
   local OPTS=""
   if [ "$1" = "-n" ]; then
@@ -127,7 +138,9 @@ function demo::fix-mounts {
   demo::step "Marking mounts used by virtlet as shared in ${virtlet_node} container"
   docker exec "${virtlet_node}" mount --make-shared /dind
   docker exec "${virtlet_node}" mount --make-shared /dev
-  docker exec "${virtlet_node}" mount --make-shared /boot
+  if [[ ! ${using_linuxkit} ]]; then
+    docker exec "${virtlet_node}" mount --make-shared /boot
+  fi
   docker exec "${virtlet_node}" mount --make-shared /sys/fs/cgroup
 }
 
@@ -249,6 +262,9 @@ function demo::kvm-ok {
   # The check is done inside the node container because it has proper /lib/modules
   # from the docker host. Also, it'll have to use mirantis/virtlet image
   # later anyway.
+  if [[ ${using_linuxkit} ]]; then
+    return 1
+  fi
   if ! docker exec "${virtlet_node}" docker run --privileged --rm -v /lib/modules:/lib/modules "mirantis/virtlet:${virtlet_docker_tag}" kvm-ok; then
     return 1
   fi
