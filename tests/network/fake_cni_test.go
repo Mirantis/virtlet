@@ -202,12 +202,11 @@ func (c *FakeCNIClient) AddSandboxToNetwork(podId, podName, podNS string) (*cnic
 	}
 
 	replaceSandboxPlaceholders(entry.info, podId)
-	for n, iface := range entry.info.Interfaces {
-		if iface.Sandbox == "" {
+	for _, ip := range entry.info.IPs {
+		if entry.info.Interfaces[ip.Interface].Sandbox == "" {
 			continue
 		}
-
-		if err := entry.addSandboxToNetwork(n); err != nil {
+		if err := entry.addSandboxToNetwork(ip.Interface); err != nil {
 			return nil, err
 		}
 	}

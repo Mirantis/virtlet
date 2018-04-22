@@ -400,8 +400,13 @@ func TestTapFDSource(t *testing.T) {
 		info *cnicurrent.Result
 		// dummyInfo specifies CNI result to use for the dummy Calico gateway
 		dummyInfo *cnicurrent.Result
-		// expectedResult specifies the expected CNI result
+		// expectedResult specifies the expected CNI result. Defaults to the same
+		// as info
 		expectedResult *cnicurrent.Result
+		// expectedInfoAfterTeardown specifies the expected state of the
+		// network namespace after the teardown as a CNI result.
+		// Defaults to the same as expectedResult
+		expectedInfoAfterTeardown *cnicurrent.Result
 		// tcpdumpStopOn specifies a string after which tcpdump is stopped
 		tcpdumpStopOn string
 		// dhcpExpectedSubstrings specifies the substrings to expect in tcpdump output
@@ -448,6 +453,141 @@ func TestTapFDSource(t *testing.T) {
 			name:           "multiple cnis",
 			interfaceCount: 2,
 			info: &cnicurrent.Result{
+				Interfaces: []*cnicurrent.Interface{
+					{
+						Name:    "eth0",
+						Mac:     clientMacAddrs[0],
+						Sandbox: "placeholder",
+					},
+					{
+						Name:    "eth1",
+						Mac:     clientMacAddrs[1],
+						Sandbox: "placeholder",
+					},
+				},
+				IPs: []*cnicurrent.IPConfig{
+					{
+						Version:   "4",
+						Interface: 0,
+						Address: net.IPNet{
+							IP:   net.IP{10, 1, 90, 5},
+							Mask: net.IPMask{255, 255, 255, 0},
+						},
+						Gateway: net.IP{10, 1, 90, 1},
+					},
+					{
+						Version:   "4",
+						Interface: 1,
+						Address: net.IPNet{
+							IP:   net.IP{10, 2, 90, 5},
+							Mask: net.IPMask{255, 255, 255, 0},
+						},
+					},
+				},
+				Routes: []*cnitypes.Route{
+					{
+						Dst: net.IPNet{
+							IP:   net.IP{0, 0, 0, 0},
+							Mask: net.IPMask{0, 0, 0, 0},
+						},
+						GW: net.IP{10, 1, 90, 1},
+					},
+					{
+						Dst: net.IPNet{
+							IP:   net.IP{10, 10, 42, 0},
+							Mask: net.IPMask{255, 255, 255, 0},
+						},
+						GW: net.IP{10, 1, 90, 90},
+					},
+				},
+			},
+			tcpdumpStopOn: "10.1.90.1.4243 > 10.1.90.5.4242: UDP",
+			dhcpExpectedSubstrings: [][]string{
+				{
+					"new_classless_static_routes='10.10.42.0/24 10.1.90.90'",
+					"new_ip_address='10.1.90.5'",
+					"new_network_number='10.1.90.0'",
+					"new_routers='10.1.90.1'",
+					"new_subnet_mask='255.255.255.0'",
+					"tap0: offered 10.1.90.5 from 169.254.254.2",
+				},
+				{
+					"new_ip_address='10.2.90.5'",
+					"new_network_number='10.2.90.0'",
+					"new_subnet_mask='255.255.255.0'",
+					"tap1: offered 10.2.90.5 from 169.254.254.2",
+				},
+			},
+			interfaceDesc: []tapmanager.InterfaceDescription{
+				{
+					Type:         network.InterfaceTypeTap,
+					HardwareAddr: mustParseMAC(clientMacAddrs[0]),
+					FdIndex:      0,
+					PCIAddress:   "",
+				},
+				{
+					Type:         network.InterfaceTypeTap,
+					HardwareAddr: mustParseMAC(clientMacAddrs[1]),
+					FdIndex:      1,
+					PCIAddress:   "",
+				},
+			},
+			outerAddrs:  outerAddrs,
+			clientAddrs: clientAddrs,
+		},
+		{
+			name:           "multiple cnis (reordered interfaces)",
+			interfaceCount: 2,
+			info: &cnicurrent.Result{
+				Interfaces: []*cnicurrent.Interface{
+					{
+						Name:    "eth1",
+						Mac:     clientMacAddrs[1],
+						Sandbox: "placeholder",
+					},
+					{
+						Name:    "eth0",
+						Mac:     clientMacAddrs[0],
+						Sandbox: "placeholder",
+					},
+				},
+				IPs: []*cnicurrent.IPConfig{
+					{
+						Version:   "4",
+						Interface: 1,
+						Address: net.IPNet{
+							IP:   net.IP{10, 1, 90, 5},
+							Mask: net.IPMask{255, 255, 255, 0},
+						},
+						Gateway: net.IP{10, 1, 90, 1},
+					},
+					{
+						Version:   "4",
+						Interface: 0,
+						Address: net.IPNet{
+							IP:   net.IP{10, 2, 90, 5},
+							Mask: net.IPMask{255, 255, 255, 0},
+						},
+					},
+				},
+				Routes: []*cnitypes.Route{
+					{
+						Dst: net.IPNet{
+							IP:   net.IP{0, 0, 0, 0},
+							Mask: net.IPMask{0, 0, 0, 0},
+						},
+						GW: net.IP{10, 1, 90, 1},
+					},
+					{
+						Dst: net.IPNet{
+							IP:   net.IP{10, 10, 42, 0},
+							Mask: net.IPMask{255, 255, 255, 0},
+						},
+						GW: net.IP{10, 1, 90, 90},
+					},
+				},
+			},
+			expectedInfoAfterTeardown: &cnicurrent.Result{
 				Interfaces: []*cnicurrent.Interface{
 					{
 						Name:    "eth0",
@@ -857,6 +997,13 @@ func TestTapFDSource(t *testing.T) {
 					replaceSandboxPlaceholders(expectedResult, tst.podId)
 					verifyNoDiff(t, "cni result", expectedResult, csn.Result)
 				}
+				var expectedInfoAfterTeardown *cnicurrent.Result
+				if tc.expectedInfoAfterTeardown != nil {
+					expectedInfoAfterTeardown = copyCNIResult(tc.expectedInfoAfterTeardown)
+					replaceSandboxPlaceholders(expectedInfoAfterTeardown, tst.podId)
+				} else {
+					expectedInfoAfterTeardown = expectedResult
+				}
 
 				tst.cniClient.VerifyAdded(tst.podId, samplePodName, samplePodNS)
 				veths := tst.cniClient.Veths(tst.podId, samplePodName, samplePodNS)
@@ -934,7 +1081,7 @@ func TestTapFDSource(t *testing.T) {
 				tst.cniClient.VerifyRemoved(tst.podId, samplePodName, samplePodNS)
 
 				infoAfterTeardown := tst.cniClient.NetworkInfoAfterTeardown(tst.podId, samplePodName, samplePodNS)
-				verifyNoDiff(t, "network info after teardown", expectedResult, infoAfterTeardown)
+				verifyNoDiff(t, "network info after teardown", expectedInfoAfterTeardown, infoAfterTeardown)
 			})
 		}
 	}
