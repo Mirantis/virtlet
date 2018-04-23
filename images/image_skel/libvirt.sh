@@ -14,8 +14,13 @@ if [[ -f /dind/vmwrapper ]]; then
 fi
 
 function regenerate_qemu_conf() {
-  set $(ls -l /sys/class/net/*/device/iommu_group | sed 's@.*/\(.*\)@"/dev/vfio/\1",@')
-  sed -i "s|# @DEVS@|$*|" /etc/libvirt/qemu.conf
+  if ls /sys/class/net/*/device/iommu_group >/dev/null 2>&1 ; then
+    set $(ls -l /sys/class/net/*/device/iommu_group | sed 's@.*/\(.*\)@"/dev/vfio/\1",@')
+    sed -i "s|# @DEVS@|$*|" /etc/libvirt/qemu.conf
+  else
+    echo WARNING - Virtlet is configured to use SR-IOV but no such resources are available on this host
+    sed -i "/# @DEVS@/d" /etc/libvirt/qemu.conf
+  fi
 }
 
 VIRTLET_SRIOV_SUPPORT="${VIRTLET_SRIOV_SUPPORT:-}"
