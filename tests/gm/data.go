@@ -27,8 +27,8 @@ import (
 	"strings"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
-	yaml "gopkg.in/yaml.v2"
 )
 
 const (

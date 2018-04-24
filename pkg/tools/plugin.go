@@ -21,9 +21,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	yaml "gopkg.in/yaml.v2"
 )
 
 // The Plugin / PluginFlag / Plugins types are based on
@@ -33,32 +33,32 @@ import (
 // command. Usually comes from a descriptor file.
 type Plugin struct {
 	// Name is the name of the plugin.
-	Name string `yaml:"name"`
+	Name string `json:"name"`
 	// ShortDesc is the short description of the plugin.
-	ShortDesc string `yaml:"shortDesc"`
+	ShortDesc string `json:"shortDesc"`
 	// LongDesc is the detailed description of the plugin.
-	LongDesc string `yaml:"longDesc,omitempty"`
+	LongDesc string `json:"longDesc,omitempty"`
 	// Example is an example of plugin usage.
-	Example string `yaml:"example,omitempty"`
+	Example string `json:"example,omitempty"`
 	// Command is the command that needs to be run by kubectl
 	// to execute the plugin.
-	Command string `yaml:"command,omitempty"`
+	Command string `json:"command,omitempty"`
 	// Flags describes the flags for this plugin.
-	Flags []PluginFlag `yaml:"flags,omitempty"`
+	Flags []PluginFlag `json:"flags,omitempty"`
 	// Tree lists the subcommands of this plugin.
-	Tree []*Plugin `yaml:"tree,omitempty"`
+	Tree []*Plugin `json:"tree,omitempty"`
 }
 
 // PluginFlag describes a single flag supported by a given plugin.
 type PluginFlag struct {
 	// Name is the name of the flag
-	Name string `yaml:"name"`
+	Name string `json:"name"`
 	// Shorthand is the shorthand for the flag, e.g. -o
-	Shorthand string `yaml:"shorthand,omitempty"`
+	Shorthand string `json:"shorthand,omitempty"`
 	// Desc is the description of the flag
-	Desc string `yaml:"desc"`
+	Desc string `json:"desc"`
 	// DefValue is the default value of the flag.
-	DefValue string `yaml:"defValue,omitempty"`
+	DefValue string `json:"defValue,omitempty"`
 }
 
 func pluginFromCobraCommand(cmd *cobra.Command) Plugin {
