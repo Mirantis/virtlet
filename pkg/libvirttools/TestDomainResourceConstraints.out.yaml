@@ -1,4 +1,5 @@
-- data: |-
+- name: 'domain conn: DefineDomain'
+  value: |-
     <domain type="kvm">
       <name>virtlet-231700d5-c9a6-container1</name>
       <uuid>231700d5-c9a6-5a49-738d-99a954c51550</uuid>
@@ -61,4 +62,3 @@
         <env name="CONTAINER_ATTEMPTS" value="42"></env>
       </commandline>
     </domain>
-  name: 'domain conn: DefineDomain'

@@ -1,14 +1,15 @@
-- data: fake/image1
-  name: GetImagePathAndVirtualSize
-- data: |-
+- name: GetImagePathAndVirtualSize
+  value: fake/image1
+- name: 'storage: CreateStoragePool'
+  value: |-
     <pool type="dir">
       <name>volumes</name>
       <target>
         <path>/var/lib/virtlet/volumes</path>
       </target>
     </pool>
-  name: 'storage: CreateStoragePool'
-- data: |-
+- name: 'storage: volumes: CreateStorageVol'
+  value: |-
     <volume type="file">
       <name>virtlet_root_231700d5-c9a6-5a49-738d-99a954c51550</name>
       <allocation unit="b">0</allocation>
@@ -21,8 +22,8 @@
         <format type="qcow2"></format>
       </backingStore>
     </volume>
-  name: 'storage: volumes: CreateStorageVol'
-- data: |-
+- name: 'domain conn: DefineDomain'
+  value: |-
     <domain type="kvm">
       <name>virtlet-231700d5-c9a6-container1</name>
       <uuid>231700d5-c9a6-5a49-738d-99a954c51550</uuid>
@@ -85,9 +86,9 @@
         <env name="CONTAINER_ATTEMPTS" value="42"></env>
       </commandline>
     </domain>
-  name: 'domain conn: DefineDomain'
 - name: 'domain conn: virtlet-231700d5-c9a6-container1: Create'
-- data:
+- name: 'domain conn: virtlet-231700d5-c9a6-container1: iso image'
+  value:
     meta-data: '{"instance-id":"testName_0.default","local-hostname":"testName_0","public-keys":["key1","key2"]}'
     network-config: |
       version: 1
@@ -95,8 +96,7 @@
       #cloud-config
       users:
       - name: cloudy
-  name: 'domain conn: virtlet-231700d5-c9a6-container1: iso image'
 - name: 'domain conn: virtlet-231700d5-c9a6-container1: Destroy'
 - name: 'domain conn: virtlet-231700d5-c9a6-container1: Undefine'
-- data: virtlet_root_231700d5-c9a6-5a49-738d-99a954c51550
-  name: 'storage: volumes: RemoveVolumeByName'
+- name: 'storage: volumes: RemoveVolumeByName'
+  value: virtlet_root_231700d5-c9a6-5a49-738d-99a954c51550

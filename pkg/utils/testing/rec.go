@@ -19,8 +19,8 @@ package testing
 import "strings"
 
 type Record struct {
-	Name string      `json:"name"`
-	Data interface{} `json:"data,omitempty"`
+	Name  string      `json:"name"`
+	Value interface{} `json:"value,omitempty"`
 }
 
 type Recorder interface {
@@ -42,9 +42,9 @@ func NewToplevelRecorder() *TopLevelRecorder {
 	return &TopLevelRecorder{}
 }
 
-func (r *TopLevelRecorder) Rec(name string, data interface{}) {
+func (r *TopLevelRecorder) Rec(name string, value interface{}) {
 	if r.nameMatches(name) {
-		r.recs = append(r.recs, &Record{Name: name, Data: data})
+		r.recs = append(r.recs, &Record{Name: name, Value: value})
 	}
 }
 
