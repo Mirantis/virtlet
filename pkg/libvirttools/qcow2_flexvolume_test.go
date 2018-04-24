@@ -21,6 +21,7 @@ import (
 	"os"
 	"testing"
 
+	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 	"github.com/Mirantis/virtlet/pkg/virt/fake"
 	"github.com/Mirantis/virtlet/tests/gm"
 )
@@ -60,7 +61,7 @@ func TestQCOW2VolumeNaming(t *testing.T) {
 }
 
 func TestQCOW2VolumeLifeCycle(t *testing.T) {
-	rec := fake.NewToplevelRecorder()
+	rec := testutils.NewToplevelRecorder()
 
 	volumesPoolPath := "/fake/volumes/pool"
 	expectedVolumePath := volumesPoolPath + "/virtlet-" + testUUID + "-" + TestVolumeName

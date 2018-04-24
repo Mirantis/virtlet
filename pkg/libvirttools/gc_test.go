@@ -24,7 +24,7 @@ import (
 
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
-	"github.com/Mirantis/virtlet/pkg/virt/fake"
+	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 	"github.com/Mirantis/virtlet/tests/gm"
 )
 
@@ -37,7 +37,7 @@ var (
 )
 
 func TestDomainCleanup(t *testing.T) {
-	ct := newContainerTester(t, fake.NewToplevelRecorder())
+	ct := newContainerTester(t, testutils.NewToplevelRecorder())
 	defer ct.teardown()
 
 	for _, uuid := range randomUUIDs {
@@ -74,7 +74,7 @@ func TestDomainCleanup(t *testing.T) {
 }
 
 func TestRootVolumesCleanup(t *testing.T) {
-	ct := newContainerTester(t, fake.NewToplevelRecorder())
+	ct := newContainerTester(t, testutils.NewToplevelRecorder())
 	defer ct.teardown()
 
 	pool, err := ct.virtTool.StoragePool()
@@ -116,7 +116,7 @@ func TestRootVolumesCleanup(t *testing.T) {
 }
 
 func TestQcow2VolumesCleanup(t *testing.T) {
-	ct := newContainerTester(t, fake.NewToplevelRecorder())
+	ct := newContainerTester(t, testutils.NewToplevelRecorder())
 	defer ct.teardown()
 
 	pool, err := ct.virtTool.StoragePool()
@@ -158,7 +158,7 @@ func TestQcow2VolumesCleanup(t *testing.T) {
 }
 
 func TestConfigISOsCleanup(t *testing.T) {
-	ct := newContainerTester(t, fake.NewToplevelRecorder())
+	ct := newContainerTester(t, testutils.NewToplevelRecorder())
 	defer ct.teardown()
 
 	directory, err := ioutil.TempDir("", "virtlet-tests-")

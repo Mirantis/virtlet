@@ -23,6 +23,7 @@ import (
 
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
+	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 	"github.com/Mirantis/virtlet/pkg/virt"
 )
 
@@ -45,11 +46,11 @@ var capacityUnits = map[string]uint64{
 }
 
 type FakeStorageConnection struct {
-	rec   Recorder
+	rec   testutils.Recorder
 	pools map[string]*FakeStoragePool
 }
 
-func NewFakeStorageConnection(rec Recorder) *FakeStorageConnection {
+func NewFakeStorageConnection(rec testutils.Recorder) *FakeStorageConnection {
 	return &FakeStorageConnection{
 		rec:   rec,
 		pools: make(map[string]*FakeStoragePool),
@@ -65,7 +66,7 @@ func (sc *FakeStorageConnection) CreateStoragePool(def *libvirtxml.StoragePool) 
 	if def.Target != nil {
 		poolPath = def.Target.Path
 	}
-	p := NewFakeStoragePool(NewChildRecorder(sc.rec, def.Name), def.Name, poolPath)
+	p := NewFakeStoragePool(testutils.NewChildRecorder(sc.rec, def.Name), def.Name, poolPath)
 	sc.pools[def.Name] = p
 	return p, nil
 }
@@ -79,13 +80,13 @@ func (sc *FakeStorageConnection) LookupStoragePoolByName(name string) (virt.Stor
 }
 
 type FakeStoragePool struct {
-	rec     Recorder
+	rec     testutils.Recorder
 	name    string
 	path    string
 	volumes map[string]*FakeStorageVolume
 }
 
-func NewFakeStoragePool(rec Recorder, name, poolPath string) *FakeStoragePool {
+func NewFakeStoragePool(rec testutils.Recorder, name, poolPath string) *FakeStoragePool {
 	return &FakeStoragePool{
 		rec:     rec,
 		name:    name,
@@ -98,7 +99,7 @@ func (p *FakeStoragePool) createStorageVol(def *libvirtxml.StorageVolume) (virt.
 	if _, found := p.volumes[def.Name]; found {
 		return nil, fmt.Errorf("storage volume already exists: %v", def.Name)
 	}
-	v, err := newFakeStorageVolume(NewChildRecorder(p.rec, def.Name), p, def)
+	v, err := newFakeStorageVolume(testutils.NewChildRecorder(p.rec, def.Name), p, def)
 	if err != nil {
 		return nil, err
 	}
@@ -145,14 +146,14 @@ func (p *FakeStoragePool) RemoveVolumeByName(name string) error {
 }
 
 type FakeStorageVolume struct {
-	rec  Recorder
+	rec  testutils.Recorder
 	pool *FakeStoragePool
 	name string
 	path string
 	size uint64
 }
 
-func newFakeStorageVolume(rec Recorder, pool *FakeStoragePool, def *libvirtxml.StorageVolume) (*FakeStorageVolume, error) {
+func newFakeStorageVolume(rec testutils.Recorder, pool *FakeStoragePool, def *libvirtxml.StorageVolume) (*FakeStorageVolume, error) {
 	volPath := ""
 	if def.Target != nil {
 		volPath = def.Target.Path

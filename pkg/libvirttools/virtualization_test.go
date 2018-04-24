@@ -33,6 +33,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/flexvolume"
 	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/utils"
+	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 	"github.com/Mirantis/virtlet/pkg/virt/fake"
 	"github.com/Mirantis/virtlet/tests/criapi"
 	"github.com/Mirantis/virtlet/tests/gm"
@@ -53,13 +54,13 @@ type containerTester struct {
 	tmpDir         string
 	kubeletRootDir string
 	virtTool       *VirtualizationTool
-	rec            *fake.TopLevelRecorder
+	rec            *testutils.TopLevelRecorder
 	domainConn     *fake.FakeDomainConnection
 	storageConn    *fake.FakeStorageConnection
 	metadataStore  metadata.Store
 }
 
-func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTester {
+func newContainerTester(t *testing.T, rec *testutils.TopLevelRecorder) *containerTester {
 	ct := &containerTester{
 		t:     t,
 		clock: clockwork.NewFakeClockAt(time.Date(2017, 5, 30, 20, 19, 0, 0, time.UTC)),
@@ -195,7 +196,7 @@ func (ct *containerTester) verifyContainerRootfsExists(container *kubeapi.Contai
 }
 
 func TestContainerLifecycle(t *testing.T) {
-	ct := newContainerTester(t, fake.NewToplevelRecorder())
+	ct := newContainerTester(t, testutils.NewToplevelRecorder())
 	defer ct.teardown()
 
 	sandbox := criapi.GetSandboxes(1)[0]
@@ -277,7 +278,7 @@ func TestContainerLifecycle(t *testing.T) {
 }
 
 func TestDomainForcedShutdown(t *testing.T) {
-	ct := newContainerTester(t, fake.NewToplevelRecorder())
+	ct := newContainerTester(t, testutils.NewToplevelRecorder())
 	defer ct.teardown()
 
 	sandbox := criapi.GetSandboxes(1)[0]
@@ -312,7 +313,7 @@ func TestDomainForcedShutdown(t *testing.T) {
 }
 
 func TestDoubleStartError(t *testing.T) {
-	ct := newContainerTester(t, fake.NewToplevelRecorder())
+	ct := newContainerTester(t, testutils.NewToplevelRecorder())
 	defer ct.teardown()
 
 	sandbox := criapi.GetSandboxes(1)[0]
@@ -419,7 +420,7 @@ func TestDomainDefinitions(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			rec := fake.NewToplevelRecorder()
+			rec := testutils.NewToplevelRecorder()
 
 			ct := newContainerTester(t, rec)
 			defer ct.teardown()
@@ -465,7 +466,7 @@ func TestDomainResourceConstraints(t *testing.T) {
 	memoryLimit := 1234567
 	cpuCount := 2
 
-	rec := fake.NewToplevelRecorder()
+	rec := testutils.NewToplevelRecorder()
 	rec.AddFilter("DefineDomain")
 	ct := newContainerTester(t, rec)
 	defer ct.teardown()

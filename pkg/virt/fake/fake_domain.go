@@ -35,7 +35,7 @@ const (
 )
 
 type FakeDomainConnection struct {
-	rec                Recorder
+	rec                testutils.Recorder
 	domains            map[string]*FakeDomain
 	domainsByUuid      map[string]*FakeDomain
 	secretsByUsageName map[string]*FakeSecret
@@ -44,9 +44,9 @@ type FakeDomainConnection struct {
 
 var _ virt.DomainConnection = &FakeDomainConnection{}
 
-func NewFakeDomainConnection(rec Recorder) *FakeDomainConnection {
+func NewFakeDomainConnection(rec testutils.Recorder) *FakeDomainConnection {
 	if rec == nil {
-		rec = NullRecorder
+		rec = testutils.NullRecorder
 	}
 	return &FakeDomainConnection{
 		rec:                rec,
@@ -170,7 +170,7 @@ func (dc *FakeDomainConnection) LookupSecretByUsageName(usageType string, usageN
 }
 
 type FakeDomain struct {
-	rec     Recorder
+	rec     testutils.Recorder
 	dc      *FakeDomainConnection
 	removed bool
 	created bool
@@ -180,7 +180,7 @@ type FakeDomain struct {
 
 func newFakeDomain(dc *FakeDomainConnection, def *libvirtxml.Domain) *FakeDomain {
 	return &FakeDomain{
-		rec:   NewChildRecorder(dc.rec, def.Name),
+		rec:   testutils.NewChildRecorder(dc.rec, def.Name),
 		dc:    dc,
 		state: virt.DomainStateShutoff,
 		def:   def,
@@ -276,14 +276,14 @@ func (d *FakeDomain) XML() (*libvirtxml.Domain, error) {
 }
 
 type FakeSecret struct {
-	rec       Recorder
+	rec       testutils.Recorder
 	dc        *FakeDomainConnection
 	usageName string
 }
 
 func newFakeSecret(dc *FakeDomainConnection, usageName string) *FakeSecret {
 	return &FakeSecret{
-		rec:       NewChildRecorder(dc.rec, "secret "+usageName),
+		rec:       testutils.NewChildRecorder(dc.rec, "secret "+usageName),
 		dc:        dc,
 		usageName: usageName,
 	}
