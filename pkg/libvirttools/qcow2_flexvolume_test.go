@@ -102,11 +102,15 @@ func TestQCOW2VolumeLifeCycle(t *testing.T) {
 		t.Errorf("Expected '%s' as volume path, received: %s", expectedVolumePath, vol.Source.File.File)
 	}
 
-	rec.Rec("volume retuned by qcow2_flexvolume", vol)
+	out, err := vol.Marshal()
+	if err != nil {
+		t.Fatalf("error marshalling the volume: %v", err)
+	}
+	rec.Rec("volume retuned by qcow2_flexvolume", out)
 
 	if err := volume.Teardown(); err != nil {
 		t.Errorf("Teardown returned an error: %v", err)
 	}
 
-	gm.Verify(t, rec.Content())
+	gm.Verify(t, gm.NewYamlVerifier(rec.Content()))
 }

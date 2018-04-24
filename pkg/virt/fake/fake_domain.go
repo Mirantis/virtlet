@@ -34,6 +34,14 @@ const (
 	configPathReplacement = "/var/lib/virtlet/config/"
 )
 
+func mustMarshal(d libvirtxml.Document) string {
+	s, err := d.Marshal()
+	if err != nil {
+		log.Panicf("Error marshaling libvirt doc: %v", err)
+	}
+	return s
+}
+
 type FakeDomainConnection struct {
 	rec                testutils.Recorder
 	domains            map[string]*FakeDomain
@@ -110,7 +118,7 @@ func (dc *FakeDomainConnection) DefineDomain(def *libvirtxml.Domain) (virt.Domai
 		}
 	}
 
-	dc.rec.Rec("DefineDomain", updatedDef)
+	dc.rec.Rec("DefineDomain", mustMarshal(updatedDef))
 	return d, nil
 }
 
@@ -151,7 +159,7 @@ func (dc *FakeDomainConnection) DefineSecret(def *libvirtxml.Secret) (virt.Secre
 	}
 	// clear secret uuid as it's generated randomly
 	def.UUID = ""
-	dc.rec.Rec("DefineSecret", def)
+	dc.rec.Rec("DefineSecret", mustMarshal(def))
 
 	s := newFakeSecret(dc, def.Usage.Name)
 	dc.secretsByUsageName[def.Usage.Name] = s

@@ -100,13 +100,17 @@ func TestRootVolumeLifeCycle(t *testing.T) {
 		t.Errorf("Expected '%s' as root volume path, received: %s", expectedRootVolumePath, vol.Source.File)
 	}
 
-	rec.Rec("root disk retuned by virtlet_root_volumesource", vol)
+	out, err := vol.Marshal()
+	if err != nil {
+		t.Fatalf("error marshalling the volume: %v", err)
+	}
+	rec.Rec("root disk retuned by virtlet_root_volumesource", out)
 
 	if err := rootVol.Teardown(); err != nil {
 		t.Errorf("Teardown returned an error: %v", err)
 	}
 
-	gm.Verify(t, rec.Content())
+	gm.Verify(t, gm.NewYamlVerifier(rec.Content()))
 }
 
 type fakeVolumeOwner struct {

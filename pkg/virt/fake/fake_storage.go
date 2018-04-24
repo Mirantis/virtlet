@@ -58,7 +58,7 @@ func NewFakeStorageConnection(rec testutils.Recorder) *FakeStorageConnection {
 }
 
 func (sc *FakeStorageConnection) CreateStoragePool(def *libvirtxml.StoragePool) (virt.StoragePool, error) {
-	sc.rec.Rec("CreateStoragePool", def)
+	sc.rec.Rec("CreateStoragePool", mustMarshal(def))
 	if _, found := sc.pools[def.Name]; found {
 		return nil, fmt.Errorf("storage pool already exists: %v", def.Name)
 	}
@@ -108,7 +108,7 @@ func (p *FakeStoragePool) createStorageVol(def *libvirtxml.StorageVolume) (virt.
 }
 
 func (p *FakeStoragePool) CreateStorageVol(def *libvirtxml.StorageVolume) (virt.StorageVolume, error) {
-	p.rec.Rec("CreateStorageVol", def)
+	p.rec.Rec("CreateStorageVol", mustMarshal(def))
 	return p.createStorageVol(def)
 }
 

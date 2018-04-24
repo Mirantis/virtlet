@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
-	"github.com/libvirt/libvirt-go-xml"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 
@@ -274,7 +273,7 @@ func TestContainerLifecycle(t *testing.T) {
 		t.Errorf("Rootfs volume was not deleted for the container: %#v", container)
 	}
 
-	gm.Verify(t, ct.rec.Content())
+	gm.Verify(t, gm.NewYamlVerifier(ct.rec.Content()))
 }
 
 func TestDomainForcedShutdown(t *testing.T) {
@@ -309,7 +308,7 @@ func TestDomainForcedShutdown(t *testing.T) {
 
 	ct.rec.Rec("invoking RemoveContainer()", nil)
 	ct.removeContainer(containerID)
-	gm.Verify(t, ct.rec.Content())
+	gm.Verify(t, gm.NewYamlVerifier(ct.rec.Content()))
 }
 
 func TestDoubleStartError(t *testing.T) {
@@ -454,7 +453,7 @@ func TestDomainDefinitions(t *testing.T) {
 			// to dump the cloudinit iso content
 			ct.startContainer(containerID)
 			ct.removeContainer(containerID)
-			gm.Verify(t, ct.rec.Content())
+			gm.Verify(t, gm.NewYamlVerifier(ct.rec.Content()))
 		})
 	}
 }
@@ -496,49 +495,15 @@ func TestDomainResourceConstraints(t *testing.T) {
 		},
 		SandboxConfig: sandbox,
 	}
+
 	vmConfig, err := GetVMConfig(req, nil)
 	if err != nil {
 		t.Fatalf("GetVMConfig(): %v", err)
 	}
-	_, err = ct.virtTool.CreateContainer(vmConfig, "/tmp/fakenetns")
-	if err != nil {
+
+	if _, err = ct.virtTool.CreateContainer(vmConfig, "/tmp/fakenetns"); err != nil {
 		t.Fatalf("CreateContainer: %v", err)
 	}
 
-	domain := rec.Content()[0].Data.(*libvirtxml.Domain)
-
-	if domain.VCPU == nil {
-		t.Error("vCPU is not set")
-	} else if domain.VCPU.Value != cpuCount {
-		t.Errorf("unexpected vCPU count value: expected %v, got %v", cpuCount, domain.VCPU.Value)
-	}
-
-	if domain.CPUTune == nil {
-		t.Error("CPUTune is not set")
-	} else {
-		expectedQuota := int64(cpuQuota / cpuCount)
-		if domain.CPUTune.Quota == nil {
-			t.Error("CPU quota is not set")
-		} else if domain.CPUTune.Quota.Value != expectedQuota {
-			t.Errorf("unexpected CPU quota value: expected %v, got %v", expectedQuota, domain.CPUTune.Quota.Value)
-		}
-
-		if domain.CPUTune.Shares == nil {
-			t.Error("CPU shares is not set")
-		} else if domain.CPUTune.Shares.Value != uint(cpuShares) {
-			t.Errorf("unexpected CPU shares value: expected %v, got %v", cpuShares, domain.CPUTune.Shares.Value)
-		}
-
-		if domain.CPUTune.Period == nil {
-			t.Error("CPU period is not set")
-		} else if domain.CPUTune.Period.Value != uint64(cpuPeriod) {
-			t.Errorf("unexpected CPU period value: expected %v, got %v", cpuShares, domain.CPUTune.Period.Value)
-		}
-	}
-
-	if domain.Memory == nil {
-		t.Error("Memory is not set")
-	} else if domain.Memory.Value != uint(memoryLimit) || domain.Memory.Unit != "b" {
-		t.Errorf("unexpected memory limitvalue: expected %vb, got %v%s", memoryLimit, domain.Memory.Value, domain.Memory.Unit)
-	}
+	gm.Verify(t, gm.NewYamlVerifier(ct.rec.Content()))
 }

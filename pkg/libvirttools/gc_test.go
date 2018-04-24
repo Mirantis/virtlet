@@ -70,7 +70,7 @@ func TestDomainCleanup(t *testing.T) {
 		t.Errorf("Expected a single remaining domain, ListDomains() returned %d of them", len(domains))
 	}
 
-	gm.Verify(t, ct.rec.Content())
+	gm.Verify(t, gm.NewYamlVerifier(ct.rec.Content()))
 }
 
 func TestRootVolumesCleanup(t *testing.T) {
@@ -112,7 +112,7 @@ func TestRootVolumesCleanup(t *testing.T) {
 		t.Errorf("Expected 2 volumes to remain, but ListAllVolumes() returned %d of them", len(volumes))
 	}
 
-	gm.Verify(t, ct.rec.Content())
+	gm.Verify(t, gm.NewYamlVerifier(ct.rec.Content()))
 }
 
 func TestQcow2VolumesCleanup(t *testing.T) {
@@ -154,7 +154,7 @@ func TestQcow2VolumesCleanup(t *testing.T) {
 		t.Errorf("Expected two remaining volumes, ListAllVolumes() returned %d of them", len(volumes))
 	}
 
-	gm.Verify(t, ct.rec.Content())
+	gm.Verify(t, gm.NewYamlVerifier(ct.rec.Content()))
 }
 
 func TestConfigISOsCleanup(t *testing.T) {
