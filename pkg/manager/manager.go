@@ -192,7 +192,7 @@ func (v *VirtletManager) Stop() {
 // garbage collection for both libvirt and the image store.
 func (v *VirtletManager) recoverAndGC() error {
 	var errors []string
-	for _, err := range recoverNetworkNamespaces(v.metadataStore, v.fdManager) {
+	for _, err := range v.recoverNetworkNamespaces() {
 		errors = append(errors, fmt.Sprintf("* error recovering VM network namespaces: %v", err))
 	}
 
@@ -209,4 +209,42 @@ func (v *VirtletManager) recoverAndGC() error {
 	}
 
 	return fmt.Errorf("errors encountered during recover / GC:\n%s", strings.Join(errors, "\n"))
+}
+
+// recoverNetworkNamespaces recovers all the active VM network namespaces
+// from previous Virtlet run by scanning the metadata store and starting
+// dhcp server for each namespace that's still active
+func (v *VirtletManager) recoverNetworkNamespaces() (allErrors []error) {
+	sandboxes, err := v.metadataStore.ListPodSandboxes(nil)
+	if err != nil {
+		allErrors = append(allErrors, err)
+		return
+	}
+
+	for _, s := range sandboxes {
+		psi, err := s.Retrieve()
+		if err != nil {
+			allErrors = append(allErrors, fmt.Errorf("can't retrieve PodSandboxInfo for sandbox id %q: %v", s.GetID(), err))
+			continue
+		}
+		if psi == nil {
+			allErrors = append(allErrors, fmt.Errorf("inconsistent database. Found pod %q sandbox but can not retrive its metadata", s.GetID()))
+			continue
+		}
+
+		if err := v.fdManager.Recover(
+			s.GetID(),
+			tapmanager.GetFDPayload{
+				ContainerSideNetwork: psi.ContainerSideNetwork,
+				Description: &tapmanager.PodNetworkDesc{
+					PodID:   s.GetID(),
+					PodNs:   psi.Metadata.GetNamespace(),
+					PodName: psi.Metadata.GetName(),
+				},
+			},
+		); err != nil {
+			allErrors = append(allErrors, fmt.Errorf("error recovering netns for %q pod: %v", s.GetID(), err))
+		}
+	}
+	return
 }
