@@ -36,12 +36,14 @@ import (
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
 	"github.com/Mirantis/virtlet/pkg/cni"
+	"github.com/Mirantis/virtlet/pkg/flexvolume"
 	"github.com/Mirantis/virtlet/pkg/image"
 	fakeimage "github.com/Mirantis/virtlet/pkg/image/fake"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
 	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/network"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
+	"github.com/Mirantis/virtlet/pkg/utils"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 	fakevirt "github.com/Mirantis/virtlet/pkg/virt/fake"
 	"github.com/Mirantis/virtlet/tests/criapi"
@@ -169,10 +171,11 @@ func translateImageName(ctx context.Context, name string) image.Endpoint {
 }
 
 type virtletManagerTester struct {
-	t       *testing.T
-	rec     *testutils.TopLevelRecorder
-	manager *VirtletManager
-	tmpDir  string
+	t              *testing.T
+	rec            *testutils.TopLevelRecorder
+	manager        *VirtletManager
+	tmpDir         string
+	kubeletRootDir string
 }
 
 func makeVirtletManagerTester(t *testing.T) *virtletManagerTester {
@@ -196,14 +199,16 @@ func makeVirtletManagerTester(t *testing.T) *virtletManagerTester {
 	virtTool.SetClock(clock)
 	// avoid unneeded diffs in the golden master data
 	virtTool.SetForceKVM(true)
-	virtTool.SetKubeletRootDir(filepath.Join(tmpDir, "kubelet-root"))
+	kubeletRootDir := filepath.Join(tmpDir, "kubelet-root")
+	virtTool.SetKubeletRootDir(kubeletRootDir)
 	manager := NewVirtletManager(virtTool, imageStore, metadataStore, fdManager, translateImageName)
 	manager.clock = clock
 	return &virtletManagerTester{
-		t:       t,
-		rec:     rec,
-		manager: manager,
-		tmpDir:  tmpDir,
+		t:              t,
+		rec:            rec,
+		manager:        manager,
+		tmpDir:         tmpDir,
+		kubeletRootDir: kubeletRootDir,
 	}
 }
 
@@ -242,8 +247,106 @@ func (tst *virtletManagerTester) invoke(name string, req interface{}) interface{
 	}
 }
 
+func (tst *virtletManagerTester) getSampleFlexvolMounts(podSandboxID string) []*kubeapi.Mount {
+	flexVolumeDriver := flexvolume.NewFlexVolumeDriver(func() string {
+		return "abb67e3c-71b3-4ddd-5505-8c4215d5c4eb"
+	}, flexvolume.NullMounter)
+	flexVolDir := filepath.Join(tst.kubeletRootDir, podSandboxID, "volumes/virtlet~flexvolume_driver", "vol1")
+	flexVolDef := map[string]interface{}{
+		"type":     "qcow2",
+		"capacity": "2MB",
+	}
+	resultStr := flexVolumeDriver.Run([]string{"mount", flexVolDir, utils.MapToJSON(flexVolDef)})
+	var r map[string]interface{}
+	if err := json.Unmarshal([]byte(resultStr), &r); err != nil {
+		tst.t.Fatalf("failed to unmarshal flexvolume definition")
+	}
+	if r["status"] != "Success" {
+		tst.t.Fatalf("mounting flexvolume vol1 failed: %s", r["message"])
+	}
+	return []*kubeapi.Mount{
+		{
+			ContainerPath: "/mnt",
+			HostPath:      flexVolDir,
+		},
+	}
+}
+
 func (tst *virtletManagerTester) verify() {
-	gm.Verify(tst.t, gm.NewYamlVerifier(tst.rec.Content()))
+	verifier := gm.NewYamlVerifier(tst.rec.Content())
+	gm.Verify(tst.t, gm.NewSubstVerifier(verifier, []gm.Replacement{
+		{
+			Old: tst.tmpDir,
+			New: "__top__",
+		},
+	}))
+}
+
+func (tst *virtletManagerTester) listImages(filter *kubeapi.ImageFilter) {
+	tst.invoke("ListImages", &kubeapi.ListImagesRequest{Filter: filter})
+}
+
+func (tst *virtletManagerTester) pullImage(image *kubeapi.ImageSpec) {
+	tst.invoke("PullImage", &kubeapi.PullImageRequest{Image: image})
+}
+
+func (tst *virtletManagerTester) imageStatus(image *kubeapi.ImageSpec) {
+	tst.invoke("ImageStatus", &kubeapi.ImageStatusRequest{Image: image})
+}
+
+func (tst *virtletManagerTester) removeImage(image *kubeapi.ImageSpec) {
+	tst.invoke("RemoveImage", &kubeapi.RemoveImageRequest{Image: image})
+}
+
+func (tst *virtletManagerTester) listPodSandbox(filter *kubeapi.PodSandboxFilter) {
+	tst.invoke("ListPodSandbox", &kubeapi.ListPodSandboxRequest{Filter: filter})
+}
+
+func (tst *virtletManagerTester) runPodSandbox(config *kubeapi.PodSandboxConfig) {
+	tst.invoke("RunPodSandbox", &kubeapi.RunPodSandboxRequest{Config: config})
+}
+
+func (tst *virtletManagerTester) podSandboxStatus(podSandboxID string) {
+	tst.invoke("PodSandboxStatus", &kubeapi.PodSandboxStatusRequest{PodSandboxId: podSandboxID})
+}
+
+func (tst *virtletManagerTester) stopPodSandox(podSandboxID string) {
+	tst.invoke("StopPodSandbox", &kubeapi.StopPodSandboxRequest{PodSandboxId: podSandboxID})
+}
+
+func (tst *virtletManagerTester) removePodSandox(podSandboxID string) {
+	tst.invoke("RemovePodSandbox", &kubeapi.RemovePodSandboxRequest{PodSandboxId: podSandboxID})
+}
+
+func (tst *virtletManagerTester) listContainers(filter *kubeapi.ContainerFilter) {
+	tst.invoke("ListContainers", &kubeapi.ListContainersRequest{Filter: filter})
+}
+
+func (tst *virtletManagerTester) createContainer(sandbox *kubeapi.PodSandboxConfig, container *criapi.ContainerTestConfig, imageSpec *kubeapi.ImageSpec, mounts []*kubeapi.Mount) string {
+	req := createContainerRequest(sandbox, container, imageSpec, mounts)
+	resp := tst.invoke("CreateContainer", req)
+	if r, ok := resp.(*kubeapi.CreateContainerResponse); ok {
+		return r.ContainerId
+	} else {
+		tst.t.Fatalf("bad value returned by CreateContainer: %#v", resp)
+		return "" // unreachable
+	}
+}
+
+func (tst *virtletManagerTester) containerStatus(containerID string) {
+	tst.invoke("ContainerStatus", &kubeapi.ContainerStatusRequest{ContainerId: containerID})
+}
+
+func (tst *virtletManagerTester) startContainer(containerID string) {
+	tst.invoke("StartContainer", &kubeapi.StartContainerRequest{ContainerId: containerID})
+}
+
+func (tst *virtletManagerTester) stopContainer(containerID string) {
+	tst.invoke("StopContainer", &kubeapi.StopContainerRequest{ContainerId: containerID})
+}
+
+func (tst *virtletManagerTester) removeContainer(containerID string) {
+	tst.invoke("RemoveContainer", &kubeapi.RemoveContainerRequest{ContainerId: containerID})
 }
 
 func cirrosImg() *kubeapi.ImageSpec {
@@ -261,19 +364,17 @@ func ubuntuImg() *kubeapi.ImageSpec {
 func TestManagerImages(t *testing.T) {
 	tst := makeVirtletManagerTester(t)
 	defer tst.teardown()
-	tst.invoke("ListImages", &kubeapi.ListImagesRequest{})
-	tst.invoke("PullImage", &kubeapi.PullImageRequest{Image: cirrosImg()})
-	tst.invoke("PullImage", &kubeapi.PullImageRequest{Image: ubuntuImg()})
-	tst.invoke("ListImages", &kubeapi.ListImagesRequest{})
-	tst.invoke("ListImages", &kubeapi.ListImagesRequest{
-		Filter: &kubeapi.ImageFilter{Image: cirrosImg()},
-	})
-	tst.invoke("ImageStatus", &kubeapi.ImageStatusRequest{Image: cirrosImg()})
-	tst.invoke("RemoveImage", &kubeapi.RemoveImageRequest{Image: cirrosImg()})
-	tst.invoke("ImageStatus", &kubeapi.ImageStatusRequest{Image: cirrosImg()})
-	tst.invoke("ListImages", &kubeapi.ListImagesRequest{})
+	tst.listImages(nil)
+	tst.pullImage(cirrosImg())
+	tst.pullImage(ubuntuImg())
+	tst.listImages(nil)
+	tst.listImages(&kubeapi.ImageFilter{Image: cirrosImg()})
+	tst.imageStatus(cirrosImg())
+	tst.removeImage(cirrosImg())
+	tst.imageStatus(cirrosImg())
+	tst.listImages(nil)
 	// second RemoveImage() should not cause an error
-	tst.invoke("RemoveImage", &kubeapi.RemoveImageRequest{Image: cirrosImg()})
+	tst.removeImage(cirrosImg())
 	tst.verify()
 }
 
@@ -295,68 +396,84 @@ func createContainerRequest(sandbox *kubeapi.PodSandboxConfig, container *criapi
 func TestManagerPods(t *testing.T) {
 	tst := makeVirtletManagerTester(t)
 	defer tst.teardown()
-	tst.invoke("ListPodSandbox", &kubeapi.ListPodSandboxRequest{})
-	tst.invoke("ListContainers", &kubeapi.ListContainersRequest{})
+	tst.listPodSandbox(nil)
+	tst.listContainers(nil)
 
 	sandboxes := criapi.GetSandboxes(2)
 	containers := criapi.GetContainersConfig(sandboxes)
-	tst.invoke("PullImage", &kubeapi.PullImageRequest{Image: cirrosImg()})
-	tst.invoke("RunPodSandbox", &kubeapi.RunPodSandboxRequest{Config: sandboxes[0]})
-	tst.invoke("ListPodSandbox", &kubeapi.ListPodSandboxRequest{})
-	tst.invoke("PodSandboxStatus", &kubeapi.PodSandboxStatusRequest{PodSandboxId: sandboxes[0].Metadata.Uid})
-	containerId1 := tst.invoke(
-		"CreateContainer",
-		createContainerRequest(sandboxes[0], containers[0], cirrosImg(), nil),
-	).(*kubeapi.CreateContainerResponse).ContainerId
-	tst.invoke("ListContainers", &kubeapi.ListContainersRequest{})
-	tst.invoke("ContainerStatus", &kubeapi.ContainerStatusRequest{ContainerId: containerId1})
-	tst.invoke("StartContainer", &kubeapi.StartContainerRequest{ContainerId: containerId1})
-	tst.invoke("ContainerStatus", &kubeapi.ContainerStatusRequest{ContainerId: containerId1})
+	tst.pullImage(cirrosImg())
+	tst.runPodSandbox(sandboxes[0])
+	tst.listPodSandbox(nil)
+	tst.podSandboxStatus(sandboxes[0].Metadata.Uid)
+	containerId1 := tst.createContainer(sandboxes[0], containers[0], cirrosImg(), nil)
+	tst.listContainers(nil)
+	tst.containerStatus(containerId1)
+	tst.startContainer(containerId1)
+	tst.containerStatus(containerId1)
 
-	tst.invoke("PullImage", &kubeapi.PullImageRequest{Image: ubuntuImg()})
-	tst.invoke("RunPodSandbox", &kubeapi.RunPodSandboxRequest{Config: sandboxes[1]})
-	containerId2 := tst.invoke(
-		"CreateContainer",
-		createContainerRequest(sandboxes[1], containers[1], ubuntuImg(), nil),
-	).(*kubeapi.CreateContainerResponse).ContainerId
-	tst.invoke("ListPodSandbox", &kubeapi.ListPodSandboxRequest{})
-	tst.invoke("ListContainers", &kubeapi.ListContainersRequest{})
-	tst.invoke("ContainerStatus", &kubeapi.ContainerStatusRequest{ContainerId: containerId2})
-	tst.invoke("StartContainer", &kubeapi.StartContainerRequest{ContainerId: containerId2})
-	tst.invoke("ContainerStatus", &kubeapi.ContainerStatusRequest{ContainerId: containerId2})
+	tst.pullImage(ubuntuImg())
+	tst.runPodSandbox(sandboxes[1])
+	containerId2 := tst.createContainer(sandboxes[1], containers[1], ubuntuImg(), nil)
+	tst.listPodSandbox(nil)
+	tst.listContainers(nil)
+	tst.containerStatus(containerId2)
+	tst.startContainer(containerId2)
+	tst.containerStatus(containerId2)
 
-	tst.invoke("StopContainer", &kubeapi.StopContainerRequest{ContainerId: containerId1})
-	tst.invoke("StopContainer", &kubeapi.StopContainerRequest{ContainerId: containerId2})
+	tst.stopContainer(containerId1)
+	tst.stopContainer(containerId2)
 	// this should not cause an error
-	tst.invoke("StopContainer", &kubeapi.StopContainerRequest{ContainerId: containerId2})
+	tst.stopContainer(containerId2)
 
-	tst.invoke("ListContainers", &kubeapi.ListContainersRequest{})
-	tst.invoke("ContainerStatus", &kubeapi.ContainerStatusRequest{ContainerId: containerId1})
+	tst.listContainers(nil)
+	tst.containerStatus(containerId1)
 
-	tst.invoke("RemoveContainer", &kubeapi.RemoveContainerRequest{ContainerId: containerId1})
-	tst.invoke("RemoveContainer", &kubeapi.RemoveContainerRequest{ContainerId: containerId2})
+	tst.removeContainer(containerId1)
+	tst.removeContainer(containerId2)
 	// this should not cause an error
-	tst.invoke("RemoveContainer", &kubeapi.RemoveContainerRequest{ContainerId: containerId2})
-	tst.invoke("StopPodSandbox", &kubeapi.StopPodSandboxRequest{PodSandboxId: sandboxes[0].Metadata.Uid})
-	tst.invoke("StopPodSandbox", &kubeapi.StopPodSandboxRequest{PodSandboxId: sandboxes[1].Metadata.Uid})
+	tst.removeContainer(containerId2)
+
+	tst.stopPodSandox(sandboxes[0].Metadata.Uid)
+	tst.stopPodSandox(sandboxes[1].Metadata.Uid)
 	// this should not cause an error
-	tst.invoke("StopPodSandbox", &kubeapi.StopPodSandboxRequest{PodSandboxId: sandboxes[1].Metadata.Uid})
+	tst.stopPodSandox(sandboxes[1].Metadata.Uid)
 
-	tst.invoke("ListPodSandbox", &kubeapi.ListPodSandboxRequest{})
-	tst.invoke("PodSandboxStatus", &kubeapi.PodSandboxStatusRequest{PodSandboxId: sandboxes[0].Metadata.Uid})
+	tst.listPodSandbox(nil)
+	tst.podSandboxStatus(sandboxes[0].Metadata.Uid)
 
-	tst.invoke("RemovePodSandbox", &kubeapi.RemovePodSandboxRequest{PodSandboxId: sandboxes[0].Metadata.Uid})
-	tst.invoke("RemovePodSandbox", &kubeapi.RemovePodSandboxRequest{PodSandboxId: sandboxes[1].Metadata.Uid})
+	tst.removePodSandox(sandboxes[0].Metadata.Uid)
+	tst.removePodSandox(sandboxes[1].Metadata.Uid)
 	// this should not cause an error
-	tst.invoke("RemovePodSandbox", &kubeapi.RemovePodSandboxRequest{PodSandboxId: sandboxes[1].Metadata.Uid})
+	tst.removePodSandox(sandboxes[1].Metadata.Uid)
 
-	tst.invoke("ListPodSandbox", &kubeapi.ListPodSandboxRequest{})
-	tst.invoke("ListContainers", &kubeapi.ListContainersRequest{})
+	tst.listPodSandbox(nil)
+	tst.listContainers(nil)
 
 	tst.verify()
 }
 
-// TODO: test mounts
+func TestManagerMounts(t *testing.T) {
+	tst := makeVirtletManagerTester(t)
+	defer tst.teardown()
+
+	sandboxes := criapi.GetSandboxes(1)
+	containers := criapi.GetContainersConfig(sandboxes)
+
+	tst.pullImage(cirrosImg())
+	tst.runPodSandbox(sandboxes[0])
+	tst.podSandboxStatus(sandboxes[0].Metadata.Uid)
+
+	mounts := tst.getSampleFlexvolMounts(sandboxes[0].Metadata.Uid)
+	containerId1 := tst.createContainer(sandboxes[0], containers[0], cirrosImg(), mounts)
+	tst.containerStatus(containerId1)
+	tst.startContainer(containerId1)
+	tst.stopContainer(containerId1)
+	tst.removeContainer(containerId1)
+	tst.stopPodSandox(sandboxes[0].Metadata.Uid)
+	tst.removePodSandox(sandboxes[0].Metadata.Uid)
+	tst.verify()
+}
+
 // TODO: test filtering pods/containers by their id
 // TODO: test filtering pods/containers by status
 // TODO: test filtering pods/containers by labels
