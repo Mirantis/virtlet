@@ -26,12 +26,8 @@ import (
 	"github.com/golang/glog"
 
 	"github.com/Mirantis/virtlet/pkg/cni"
-	"github.com/Mirantis/virtlet/pkg/image"
-	"github.com/Mirantis/virtlet/pkg/imagetranslation"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
 	"github.com/Mirantis/virtlet/pkg/manager"
-	"github.com/Mirantis/virtlet/pkg/metadata"
-	"github.com/Mirantis/virtlet/pkg/stream"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/Mirantis/virtlet/pkg/version"
@@ -63,76 +59,28 @@ var (
 )
 
 const (
-	WantTapManagerEnv         = "WANT_TAP_MANAGER"
-	TapManagerConnectInterval = 200 * time.Millisecond
-	TapManagerAttemptCount    = 50
+	WantTapManagerEnv = "WANT_TAP_MANAGER"
 )
 
 func runVirtlet() {
-	c := tapmanager.NewFDClient(*fdServerSocketPath)
-	var err error
-	for i := 0; i < TapManagerAttemptCount; i++ {
-		time.Sleep(TapManagerConnectInterval)
-
-		if err = c.Connect(); err == nil {
-			break
-		}
-	}
-	if err != nil {
-		glog.Errorf("Failed to connect to tapmanager: %v", err)
-		os.Exit(1)
-	}
-
-	metadataStore, err := metadata.NewStore(*boltPath)
-	if err != nil {
-		glog.Errorf("Failed to create metadata store: %v", err)
-		os.Exit(1)
-	}
-
-	downloader := image.NewDownloader(*imageDownloadProtocol)
-	imageStore := image.NewFileStore(*imageDir, downloader, nil)
-	imageStore.SetRefGetter(metadataStore.ImagesInUse)
-
-	if err = imagetranslation.RegisterCustomResourceType(); err != nil {
-		glog.Errorf("Failed to register image translation CRD: %v", err)
-		os.Exit(1)
-	}
-	translator := imagetranslation.GetDefaultImageTranslator(*imageTranslationConfigsDir)
-
-	conn, err := libvirttools.NewConnection(*libvirtUri)
-	if err != nil {
-		glog.Errorf("Error establishing libvirt connection: %v", err)
-		os.Exit(1)
-	}
-
 	kubernetesDir := os.Getenv("KUBERNETES_POD_LOGS")
 	if kubernetesDir == "" {
 		glog.Infoln("KUBERNETES_POD_LOGS environment variables must be set")
 		os.Exit(1)
 	}
-
-	streamServer, err := stream.NewServer(kubernetesDir, "/var/lib/libvirt/streamer.sock", metadataStore)
-	if err != nil {
-		glog.V(1).Infoln("Could not create stream server:", err)
-		os.Exit(2)
-	}
-	err = streamServer.Start()
-	if err != nil {
-		glog.V(1).Infoln("Could not start stream server: %s", err)
-
-	}
-
-	virtTool := libvirttools.NewVirtualizationTool(conn, conn, imageStore, metadataStore, "volumes", *rawDevices, libvirttools.GetDefaultVolumeSource())
-	server := manager.NewVirtletManager(virtTool, imageStore, metadataStore, c, translator, streamServer)
-	server.Register()
-	if err := server.RecoverAndGC(); err != nil {
-		// we consider recover / gc errors non-fatal
-		glog.Warning(err)
-	}
-
-	glog.V(1).Infof("Starting server on socket %s", *listen)
-	if err = server.Serve(*listen); err != nil {
-		glog.Errorf("Serving failed: %v", err)
+	manager := manager.NewVirtletManager(&manager.VirtletConfig{
+		FDServerSocketPath:         *fdServerSocketPath,
+		DatabasePath:               *boltPath,
+		DownloadProtocol:           *imageDownloadProtocol,
+		ImageDir:                   *imageDir,
+		ImageTranslationConfigsDir: *imageTranslationConfigsDir,
+		LibvirtUri:                 *libvirtUri,
+		PodLogDir:                  kubernetesDir,
+		RawDevices:                 *rawDevices,
+		CRISocketPath:              *listen,
+	})
+	if err := manager.Run(); err != nil {
+		glog.Errorf("Error: %v", err)
 		os.Exit(1)
 	}
 }

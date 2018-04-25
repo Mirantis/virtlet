@@ -194,15 +194,20 @@ func translateImageName(ctx context.Context, name string) image.Endpoint {
 	return image.Endpoint{URL: name, MaxRedirects: -1}
 }
 
-type virtletManagerTester struct {
+type criHandler struct {
+	*VirtletRuntimeService
+	*VirtletImageService
+}
+
+type virtletCRITester struct {
 	t              *testing.T
 	rec            *testutils.TopLevelRecorder
-	manager        *VirtletManager
+	handler        *criHandler
 	tmpDir         string
 	kubeletRootDir string
 }
 
-func makeVirtletManagerTester(t *testing.T) *virtletManagerTester {
+func makeVirtletCRITester(t *testing.T) *virtletCRITester {
 	rec := testutils.NewToplevelRecorder()
 	tmpDir, err := ioutil.TempDir("", "virtualization-test-")
 	if err != nil {
@@ -226,27 +231,29 @@ func makeVirtletManagerTester(t *testing.T) *virtletManagerTester {
 	kubeletRootDir := filepath.Join(tmpDir, "kubelet-root")
 	virtTool.SetKubeletRootDir(kubeletRootDir)
 	streamServer := newFakeStreamServer(rec.Child("streamServer"))
-	manager := NewVirtletManager(virtTool, imageStore, metadataStore, fdManager, translateImageName, streamServer)
-	manager.clock = clock
-	return &virtletManagerTester{
+	criHandler := &criHandler{
+		VirtletRuntimeService: NewVirtletRuntimeService(virtTool, metadataStore, fdManager, streamServer, imageStore, clock),
+		VirtletImageService:   NewVirtletImageService(imageStore, translateImageName),
+	}
+	return &virtletCRITester{
 		t:              t,
 		rec:            rec,
-		manager:        manager,
+		handler:        criHandler,
 		tmpDir:         tmpDir,
 		kubeletRootDir: kubeletRootDir,
 	}
 }
 
-func (tst *virtletManagerTester) teardown() {
+func (tst *virtletCRITester) teardown() {
 	os.RemoveAll(tst.tmpDir)
 }
 
-func (tst *virtletManagerTester) invoke(name string, req interface{}) interface{} {
+func (tst *virtletCRITester) invoke(name string, req interface{}) interface{} {
 	tst.rec.Rec("enter: "+name, req)
-	v := reflect.ValueOf(tst.manager)
+	v := reflect.ValueOf(tst.handler)
 	method := v.MethodByName(name)
 	if method.Kind() == reflect.Invalid {
-		tst.t.Fatalf("bad manager method %q", name)
+		tst.t.Fatalf("bad method %q", name)
 	}
 	ctx := context.Background()
 	vals := method.Call([]reflect.Value{
@@ -254,7 +261,7 @@ func (tst *virtletManagerTester) invoke(name string, req interface{}) interface{
 		reflect.ValueOf(req),
 	})
 	if len(vals) != 2 {
-		tst.t.Fatalf("expected manager method %q to return 2 values but it returned %#v", name, vals)
+		tst.t.Fatalf("expected method %q to return 2 values but it returned %#v", name, vals)
 	}
 	if !vals[1].IsNil() {
 		err, ok := vals[1].Interface().(error)
@@ -262,7 +269,7 @@ func (tst *virtletManagerTester) invoke(name string, req interface{}) interface{
 			tst.t.Fatalf("2nd returned value is %#v instead of error", vals[1].Interface())
 		}
 		if err != nil {
-			tst.t.Errorf("manager method %q returned error: %v", name, err)
+			tst.t.Errorf("method %q returned error: %v", name, err)
 		}
 		return nil
 	} else {
@@ -272,7 +279,7 @@ func (tst *virtletManagerTester) invoke(name string, req interface{}) interface{
 	}
 }
 
-func (tst *virtletManagerTester) getSampleFlexvolMounts(podSandboxID string) []*kubeapi.Mount {
+func (tst *virtletCRITester) getSampleFlexvolMounts(podSandboxID string) []*kubeapi.Mount {
 	flexVolumeDriver := flexvolume.NewFlexVolumeDriver(func() string {
 		return "abb67e3c-71b3-4ddd-5505-8c4215d5c4eb"
 	}, flexvolume.NullMounter)
@@ -297,7 +304,7 @@ func (tst *virtletManagerTester) getSampleFlexvolMounts(podSandboxID string) []*
 	}
 }
 
-func (tst *virtletManagerTester) verify() {
+func (tst *virtletCRITester) verify() {
 	verifier := gm.NewYamlVerifier(tst.rec.Content())
 	gm.Verify(tst.t, gm.NewSubstVerifier(verifier, []gm.Replacement{
 		{
@@ -307,47 +314,47 @@ func (tst *virtletManagerTester) verify() {
 	}))
 }
 
-func (tst *virtletManagerTester) listImages(filter *kubeapi.ImageFilter) {
+func (tst *virtletCRITester) listImages(filter *kubeapi.ImageFilter) {
 	tst.invoke("ListImages", &kubeapi.ListImagesRequest{Filter: filter})
 }
 
-func (tst *virtletManagerTester) pullImage(image *kubeapi.ImageSpec) {
+func (tst *virtletCRITester) pullImage(image *kubeapi.ImageSpec) {
 	tst.invoke("PullImage", &kubeapi.PullImageRequest{Image: image})
 }
 
-func (tst *virtletManagerTester) imageStatus(image *kubeapi.ImageSpec) {
+func (tst *virtletCRITester) imageStatus(image *kubeapi.ImageSpec) {
 	tst.invoke("ImageStatus", &kubeapi.ImageStatusRequest{Image: image})
 }
 
-func (tst *virtletManagerTester) removeImage(image *kubeapi.ImageSpec) {
+func (tst *virtletCRITester) removeImage(image *kubeapi.ImageSpec) {
 	tst.invoke("RemoveImage", &kubeapi.RemoveImageRequest{Image: image})
 }
 
-func (tst *virtletManagerTester) listPodSandbox(filter *kubeapi.PodSandboxFilter) {
+func (tst *virtletCRITester) listPodSandbox(filter *kubeapi.PodSandboxFilter) {
 	tst.invoke("ListPodSandbox", &kubeapi.ListPodSandboxRequest{Filter: filter})
 }
 
-func (tst *virtletManagerTester) runPodSandbox(config *kubeapi.PodSandboxConfig) {
+func (tst *virtletCRITester) runPodSandbox(config *kubeapi.PodSandboxConfig) {
 	tst.invoke("RunPodSandbox", &kubeapi.RunPodSandboxRequest{Config: config})
 }
 
-func (tst *virtletManagerTester) podSandboxStatus(podSandboxID string) {
+func (tst *virtletCRITester) podSandboxStatus(podSandboxID string) {
 	tst.invoke("PodSandboxStatus", &kubeapi.PodSandboxStatusRequest{PodSandboxId: podSandboxID})
 }
 
-func (tst *virtletManagerTester) stopPodSandox(podSandboxID string) {
+func (tst *virtletCRITester) stopPodSandox(podSandboxID string) {
 	tst.invoke("StopPodSandbox", &kubeapi.StopPodSandboxRequest{PodSandboxId: podSandboxID})
 }
 
-func (tst *virtletManagerTester) removePodSandox(podSandboxID string) {
+func (tst *virtletCRITester) removePodSandox(podSandboxID string) {
 	tst.invoke("RemovePodSandbox", &kubeapi.RemovePodSandboxRequest{PodSandboxId: podSandboxID})
 }
 
-func (tst *virtletManagerTester) listContainers(filter *kubeapi.ContainerFilter) {
+func (tst *virtletCRITester) listContainers(filter *kubeapi.ContainerFilter) {
 	tst.invoke("ListContainers", &kubeapi.ListContainersRequest{Filter: filter})
 }
 
-func (tst *virtletManagerTester) createContainer(sandbox *kubeapi.PodSandboxConfig, container *criapi.ContainerTestConfig, imageSpec *kubeapi.ImageSpec, mounts []*kubeapi.Mount) string {
+func (tst *virtletCRITester) createContainer(sandbox *kubeapi.PodSandboxConfig, container *criapi.ContainerTestConfig, imageSpec *kubeapi.ImageSpec, mounts []*kubeapi.Mount) string {
 	req := createContainerRequest(sandbox, container, imageSpec, mounts)
 	resp := tst.invoke("CreateContainer", req)
 	if r, ok := resp.(*kubeapi.CreateContainerResponse); ok {
@@ -358,27 +365,27 @@ func (tst *virtletManagerTester) createContainer(sandbox *kubeapi.PodSandboxConf
 	}
 }
 
-func (tst *virtletManagerTester) containerStatus(containerID string) {
+func (tst *virtletCRITester) containerStatus(containerID string) {
 	tst.invoke("ContainerStatus", &kubeapi.ContainerStatusRequest{ContainerId: containerID})
 }
 
-func (tst *virtletManagerTester) startContainer(containerID string) {
+func (tst *virtletCRITester) startContainer(containerID string) {
 	tst.invoke("StartContainer", &kubeapi.StartContainerRequest{ContainerId: containerID})
 }
 
-func (tst *virtletManagerTester) stopContainer(containerID string) {
+func (tst *virtletCRITester) stopContainer(containerID string) {
 	tst.invoke("StopContainer", &kubeapi.StopContainerRequest{ContainerId: containerID})
 }
 
-func (tst *virtletManagerTester) removeContainer(containerID string) {
+func (tst *virtletCRITester) removeContainer(containerID string) {
 	tst.invoke("RemoveContainer", &kubeapi.RemoveContainerRequest{ContainerId: containerID})
 }
 
-func (tst *virtletManagerTester) attach(req *kubeapi.AttachRequest) {
+func (tst *virtletCRITester) attach(req *kubeapi.AttachRequest) {
 	tst.invoke("Attach", req)
 }
 
-func (tst *virtletManagerTester) portForward(req *kubeapi.PortForwardRequest) {
+func (tst *virtletCRITester) portForward(req *kubeapi.PortForwardRequest) {
 	tst.invoke("PortForward", req)
 }
 
@@ -392,23 +399,6 @@ func ubuntuImg() *kubeapi.ImageSpec {
 	// return new object each time b/c in theory it can be
 	// modified by the handler
 	return &kubeapi.ImageSpec{Image: "localhost/ubuntu.img"}
-}
-
-func TestManagerImages(t *testing.T) {
-	tst := makeVirtletManagerTester(t)
-	defer tst.teardown()
-	tst.listImages(nil)
-	tst.pullImage(cirrosImg())
-	tst.pullImage(ubuntuImg())
-	tst.listImages(nil)
-	tst.listImages(&kubeapi.ImageFilter{Image: cirrosImg()})
-	tst.imageStatus(cirrosImg())
-	tst.removeImage(cirrosImg())
-	tst.imageStatus(cirrosImg())
-	tst.listImages(nil)
-	// second RemoveImage() should not cause an error
-	tst.removeImage(cirrosImg())
-	tst.verify()
 }
 
 func createContainerRequest(sandbox *kubeapi.PodSandboxConfig, container *criapi.ContainerTestConfig, imageSpec *kubeapi.ImageSpec, mounts []*kubeapi.Mount) *kubeapi.CreateContainerRequest {
@@ -426,8 +416,8 @@ func createContainerRequest(sandbox *kubeapi.PodSandboxConfig, container *criapi
 	}
 }
 
-func TestManagerPods(t *testing.T) {
-	tst := makeVirtletManagerTester(t)
+func TestCRIPods(t *testing.T) {
+	tst := makeVirtletCRITester(t)
 	defer tst.teardown()
 	tst.listPodSandbox(nil)
 	tst.listContainers(nil)
@@ -485,8 +475,8 @@ func TestManagerPods(t *testing.T) {
 	tst.verify()
 }
 
-func TestManagerMounts(t *testing.T) {
-	tst := makeVirtletManagerTester(t)
+func TestCRIMounts(t *testing.T) {
+	tst := makeVirtletCRITester(t)
 	defer tst.teardown()
 
 	sandboxes := criapi.GetSandboxes(1)
@@ -507,8 +497,8 @@ func TestManagerMounts(t *testing.T) {
 	tst.verify()
 }
 
-func TestManagerPodFilters(t *testing.T) {
-	tst := makeVirtletManagerTester(t)
+func TestCRIPodFilters(t *testing.T) {
+	tst := makeVirtletCRITester(t)
 	tst.rec.AddFilter("ListPodSandbox")
 	defer tst.teardown()
 
@@ -550,8 +540,8 @@ func TestManagerPodFilters(t *testing.T) {
 	tst.verify()
 }
 
-func TestManagerContainerFilters(t *testing.T) {
-	tst := makeVirtletManagerTester(t)
+func TestCRIContainerFilters(t *testing.T) {
+	tst := makeVirtletCRITester(t)
 	tst.rec.AddFilter("ListContainers")
 	defer tst.teardown()
 
@@ -602,8 +592,8 @@ func TestManagerContainerFilters(t *testing.T) {
 	tst.verify()
 }
 
-func TestManagerAttachPortForward(t *testing.T) {
-	tst := makeVirtletManagerTester(t)
+func TestCRIAttachPortForward(t *testing.T) {
+	tst := makeVirtletCRITester(t)
 	tst.rec.AddFilter("Attach")
 	tst.rec.AddFilter("PortForward")
 	defer tst.teardown()
@@ -637,7 +627,5 @@ func TestManagerAttachPortForward(t *testing.T) {
 	tst.verify()
 }
 
-// TODO: split grpc-related bits (register, serve) and ImageManager from VirtletManager.
-//       Also, remove RecoverAndGC() from it and do image gc via a hook in RemoveContainer()
 // TODO: use interceptor for logging in the manager
 //       (apply it only if glog level is high enough)
