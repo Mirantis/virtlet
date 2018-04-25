@@ -19,10 +19,21 @@ package manager
 import (
 	"net"
 	"os"
+	"strings"
 	"syscall"
 
+	"github.com/ghodss/yaml"
+	"github.com/golang/glog"
+	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+)
+
+const (
+	criErrorLogLevel   = 2
+	criRequestLogLevel = 3
+	criNoisyLogLevel   = 4
+	criListLogLevel    = 5
 )
 
 type Server struct {
@@ -31,7 +42,9 @@ type Server struct {
 
 func NewServer() *Server {
 	return &Server{
-		server: grpc.NewServer(),
+		server: grpc.NewServer(grpc.UnaryInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+			return intercept(ctx, req, info, handler)
+		})),
 	}
 }
 
@@ -58,4 +71,47 @@ func (s *Server) Stop() {
 func (s *Server) Register(runtimeService kubeapi.RuntimeServiceServer, imageService kubeapi.ImageServiceServer) {
 	kubeapi.RegisterRuntimeServiceServer(s.server, runtimeService)
 	kubeapi.RegisterImageServiceServer(s.server, imageService)
+}
+
+func logLevelForMethod(fullMethod string) glog.Level {
+	idx := strings.LastIndex(fullMethod, "/")
+	if idx < 0 {
+		return criNoisyLogLevel
+	}
+	methodName := fullMethod[idx+1:]
+	switch {
+	case strings.Contains(methodName, "Status"):
+		return criNoisyLogLevel
+	case strings.Contains(methodName, "Version"):
+		return criNoisyLogLevel
+	case strings.Contains(methodName, "List"):
+		return criListLogLevel
+	default:
+		return criRequestLogLevel
+	}
+}
+
+func dump(v interface{}) string {
+	out, err := yaml.Marshal(v)
+	if err != nil {
+		return "<marshalling error>"
+	}
+	return string(out)
+}
+
+func intercept(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	logLevel := logLevelForMethod(info.FullMethod)
+	if glog.V(logLevel) {
+		glog.Infof("ENTER: %s():\n%s", info.FullMethod, dump(req))
+	}
+	resp, err := handler(ctx, req)
+	switch {
+	case err != nil && !bool(glog.V(criErrorLogLevel)):
+		// do nothing
+	case err != nil:
+		glog.Infof("FAIL: %s(): %v", info.FullMethod, err)
+	case bool(glog.V(logLevel)):
+		glog.Infof("LEAVE: %s()\n%s", info.FullMethod, dump(resp))
+	}
+	return resp, err
 }
