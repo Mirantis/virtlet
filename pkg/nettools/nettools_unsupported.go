@@ -18,6 +18,10 @@ limitations under the License.
 
 package nettools
 
+import (
+	"github.com/vishvananda/netlink"
+)
+
 // Some missing constants that break syntax check
 // on non-Linux systems
 const (
@@ -27,3 +31,9 @@ const (
 	SCOPE_LINK     = 0
 	SCOPE_UNIVERSE = 0
 )
+
+// there's bug in netlink_unspecified.go in netlink version we use
+// that breaks non-Linux builds
+func linkSetMaster(link netlink.Link, master *netlink.Bridge) error {
+	return netlink.ErrNotImplemented
+}

@@ -31,3 +31,9 @@ const (
 	SCOPE_LINK     = netlink.SCOPE_LINK
 	SCOPE_UNIVERSE = netlink.SCOPE_UNIVERSE
 )
+
+// there's bug in netlink_unspecified.go in netlink version we use
+// that breaks non-Linux builds
+func linkSetMaster(link netlink.Link, master *netlink.Bridge) error {
+	return netlink.LinkSetMaster(link, master)
+}
