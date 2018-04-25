@@ -131,10 +131,27 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 		return nil, nil, fmt.Errorf("error creating new netns for pod %s (%s): %v", pnd.PodName, pnd.PodID, err)
 	}
 
+	weHadAnError := false
+	podAddedToNetwork := false
+	defer func() {
+		if weHadAnError {
+			if podAddedToNetwork {
+				if err := s.cniClient.RemoveSandboxFromNetwork(pnd.PodID, pnd.PodName, pnd.PodNs); err != nil {
+					glog.Errorf("Error while emergency removal of pod from cni network due to previous other error: %v", err)
+				}
+			}
+			if err := cni.DestroyNetNS(pnd.PodID); err != nil {
+				glog.Errorf("Error while emergency removal of netns: %v", err)
+			}
+		}
+	}()
+
 	netConfig, err := s.cniClient.AddSandboxToNetwork(pnd.PodID, pnd.PodName, pnd.PodNs)
 	if err != nil {
+		weHadAnError = true
 		return nil, nil, fmt.Errorf("error adding pod %s (%s) to CNI network: %v", pnd.PodName, pnd.PodID, err)
 	}
+	podAddedToNetwork = true
 	glog.V(3).Infof("CNI configuration for pod %s (%s): %s", pnd.PodName, pnd.PodID, spew.Sdump(netConfig))
 
 	if netConfig == nil {
@@ -152,6 +169,7 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 	var csn *network.ContainerSideNetwork
 	if err := s.setupNetNS(key, pnd, func(netNSPath string, allLinks []netlink.Link) (*network.ContainerSideNetwork, error) {
 		if netConfig, err = nettools.ValidateAndFixCNIResult(netConfig, netNSPath, allLinks); err != nil {
+			weHadAnError = true
 			return nil, fmt.Errorf("error fixing cni configuration: %v", err)
 		}
 		if err := nettools.FixCalicoNetworking(netConfig, s.getDummyNetwork); err != nil {
@@ -174,14 +192,14 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 		}
 		return csn, nil
 	}); err != nil {
-		// TODO: do some cleanup on configured interfaces if there is an error
+		weHadAnError = true
 		return nil, nil, err
 	}
 
 	for _, iface := range csn.Interfaces {
 		if iface.Type == network.InterfaceTypeVF {
 			if err := nettools.SetMacOnVf(iface.PCIAddress, iface.HardwareAddr); err != nil {
-				// TODO: do some cleanup on configured interfaces if there is an error
+				weHadAnError = true
 				return nil, nil, err
 			}
 		}
@@ -206,6 +224,16 @@ func (s *TapFDSource) Release(key string) error {
 		return fmt.Errorf("failed to open network namespace at %q: %v", netNSPath, err)
 	}
 
+	// Try to be idempotent even if there will be any other error during next functions calls.
+	// This can lead to lead to leaking resources in multiple cni plugins case, but unblocks
+	// a possibility to RunPodSandbox once again, after failed attempt. Without that - next
+	// attempt will fail with info about alredy existing netns so it can not be created.
+	defer func() {
+		if err := cni.DestroyNetNS(pn.pnd.PodID); err != nil {
+			glog.Errorf("Error when removing network namespace for pod sandbox %q: %v", pn.pnd.PodID, err)
+		}
+	}()
+
 	if err := nettools.ReconstructVFs(pn.csn, vmNS); err != nil {
 		return fmt.Errorf("failed to reconstruct SR-IOV devices: %v", err)
 	}
@@ -222,10 +250,6 @@ func (s *TapFDSource) Release(key string) error {
 
 	if err := s.cniClient.RemoveSandboxFromNetwork(pn.pnd.PodID, pn.pnd.PodName, pn.pnd.PodNs); err != nil {
 		return fmt.Errorf("error removing pod sandbox %q from CNI network: %v", pn.pnd.PodID, err)
-	}
-
-	if err := cni.DestroyNetNS(pn.pnd.PodID); err != nil {
-		return fmt.Errorf("error when removing network namespace for pod sandbox %q: %v", pn.pnd.PodID, err)
 	}
 
 	delete(s.fdMap, key)
