@@ -1,0 +1,122 @@
+- name: 'enter: ListPodSandbox'
+  value: {}
+- name: 'leave: ListPodSandbox'
+  value:
+    items:
+    - created_at: 1524648266720331175
+      id: 69eec606-0493-5825-73a4-c5e0c0236155
+      labels:
+        fizz: buzz
+        foo: bar
+      metadata:
+        name: testName_0
+        namespace: default
+        uid: 69eec606-0493-5825-73a4-c5e0c0236155
+    - created_at: 1524648266720331175
+      id: d25ded14-d35d-510b-5749-f83cc165794e
+      labels:
+        fizz: buzz
+        foo: bar2
+      metadata:
+        name: testName_1
+        namespace: default
+        uid: d25ded14-d35d-510b-5749-f83cc165794e
+- name: 'enter: ListPodSandbox'
+  value:
+    filter:
+      id: 69eec606-0493-5825-73a4-c5e0c0236155
+- name: 'leave: ListPodSandbox'
+  value:
+    items:
+    - created_at: 1524648266720331175
+      id: 69eec606-0493-5825-73a4-c5e0c0236155
+      labels:
+        fizz: buzz
+        foo: bar
+      metadata:
+        name: testName_0
+        namespace: default
+        uid: 69eec606-0493-5825-73a4-c5e0c0236155
+- name: 'enter: ListPodSandbox'
+  value:
+    filter:
+      state: {}
+- name: 'leave: ListPodSandbox'
+  value:
+    items:
+    - created_at: 1524648266720331175
+      id: 69eec606-0493-5825-73a4-c5e0c0236155
+      labels:
+        fizz: buzz
+        foo: bar
+      metadata:
+        name: testName_0
+        namespace: default
+        uid: 69eec606-0493-5825-73a4-c5e0c0236155
+    - created_at: 1524648266720331175
+      id: d25ded14-d35d-510b-5749-f83cc165794e
+      labels:
+        fizz: buzz
+        foo: bar2
+      metadata:
+        name: testName_1
+        namespace: default
+        uid: d25ded14-d35d-510b-5749-f83cc165794e
+- name: 'enter: ListPodSandbox'
+  value:
+    filter:
+      state:
+        state: 1
+- name: 'leave: ListPodSandbox'
+  value: {}
+- name: 'enter: ListPodSandbox'
+  value:
+    filter:
+      label_selector:
+        foo: bar2
+- name: 'leave: ListPodSandbox'
+  value:
+    items:
+    - created_at: 1524648266720331175
+      id: d25ded14-d35d-510b-5749-f83cc165794e
+      labels:
+        fizz: buzz
+        foo: bar2
+      metadata:
+        name: testName_1
+        namespace: default
+        uid: d25ded14-d35d-510b-5749-f83cc165794e
+- name: 'enter: ListPodSandbox'
+  value:
+    filter:
+      state: {}
+- name: 'leave: ListPodSandbox'
+  value:
+    items:
+    - created_at: 1524648266720331175
+      id: 69eec606-0493-5825-73a4-c5e0c0236155
+      labels:
+        fizz: buzz
+        foo: bar
+      metadata:
+        name: testName_0
+        namespace: default
+        uid: 69eec606-0493-5825-73a4-c5e0c0236155
+- name: 'enter: ListPodSandbox'
+  value:
+    filter:
+      state:
+        state: 1
+- name: 'leave: ListPodSandbox'
+  value:
+    items:
+    - created_at: 1524648266720331175
+      id: d25ded14-d35d-510b-5749-f83cc165794e
+      labels:
+        fizz: buzz
+        foo: bar2
+      metadata:
+        name: testName_1
+        namespace: default
+        uid: d25ded14-d35d-510b-5749-f83cc165794e
+      state: 1

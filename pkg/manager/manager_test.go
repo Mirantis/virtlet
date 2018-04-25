@@ -474,10 +474,101 @@ func TestManagerMounts(t *testing.T) {
 	tst.verify()
 }
 
-// TODO: test filtering pods/containers by their id
-// TODO: test filtering pods/containers by status
-// TODO: test filtering pods/containers by labels
-// TODO: test filtering containers by pod id
+func TestManagerPodFilters(t *testing.T) {
+	tst := makeVirtletManagerTester(t)
+	tst.rec.AddFilter("ListPodSandbox")
+	defer tst.teardown()
+
+	sandboxes := criapi.GetSandboxes(2)
+	sandboxes[1].Labels["foo"] = "bar2"
+	tst.runPodSandbox(sandboxes[0])
+	tst.runPodSandbox(sandboxes[1])
+
+	tst.listPodSandbox(nil)
+	tst.listPodSandbox(&kubeapi.PodSandboxFilter{Id: sandboxes[0].Metadata.Uid})
+	tst.listPodSandbox(&kubeapi.PodSandboxFilter{
+		State: &kubeapi.PodSandboxStateValue{
+			State: kubeapi.PodSandboxState_SANDBOX_READY,
+		},
+	})
+	tst.listPodSandbox(&kubeapi.PodSandboxFilter{
+		State: &kubeapi.PodSandboxStateValue{
+			State: kubeapi.PodSandboxState_SANDBOX_NOTREADY,
+		},
+	})
+	tst.listPodSandbox(&kubeapi.PodSandboxFilter{
+		LabelSelector: map[string]string{
+			"foo": "bar2",
+		},
+	})
+
+	tst.stopPodSandox(sandboxes[1].Metadata.Uid)
+	tst.listPodSandbox(&kubeapi.PodSandboxFilter{
+		State: &kubeapi.PodSandboxStateValue{
+			State: kubeapi.PodSandboxState_SANDBOX_READY,
+		},
+	})
+	tst.listPodSandbox(&kubeapi.PodSandboxFilter{
+		State: &kubeapi.PodSandboxStateValue{
+			State: kubeapi.PodSandboxState_SANDBOX_NOTREADY,
+		},
+	})
+
+	tst.verify()
+}
+
+func TestManagerContainerFilters(t *testing.T) {
+	tst := makeVirtletManagerTester(t)
+	tst.rec.AddFilter("ListContainers")
+	defer tst.teardown()
+
+	sandboxes := criapi.GetSandboxes(2)
+	containers := criapi.GetContainersConfig(sandboxes)
+	tst.pullImage(cirrosImg())
+	tst.runPodSandbox(sandboxes[0])
+	containerId1 := tst.createContainer(sandboxes[0], containers[0], cirrosImg(), nil)
+	tst.startContainer(containerId1)
+	tst.pullImage(ubuntuImg())
+	tst.runPodSandbox(sandboxes[1])
+	containerId2 := tst.createContainer(sandboxes[1], containers[1], ubuntuImg(), nil)
+	tst.startContainer(containerId2)
+
+	tst.listContainers(nil)
+	tst.listContainers(&kubeapi.ContainerFilter{Id: containerId1})
+	tst.listContainers(&kubeapi.ContainerFilter{
+		State: &kubeapi.ContainerStateValue{
+			State: kubeapi.ContainerState_CONTAINER_RUNNING,
+		},
+	})
+	tst.listContainers(&kubeapi.ContainerFilter{
+		State: &kubeapi.ContainerStateValue{
+			State: kubeapi.ContainerState_CONTAINER_EXITED,
+		},
+	})
+	tst.listContainers(&kubeapi.ContainerFilter{
+		LabelSelector: map[string]string{
+			"io.kubernetes.pod.name": "testName_1",
+		},
+	})
+	tst.listContainers(&kubeapi.ContainerFilter{
+		PodSandboxId: sandboxes[0].Metadata.Uid,
+	})
+
+	tst.stopContainer(containerId1)
+	tst.listContainers(&kubeapi.ContainerFilter{
+		State: &kubeapi.ContainerStateValue{
+			State: kubeapi.ContainerState_CONTAINER_RUNNING,
+		},
+	})
+	tst.listContainers(&kubeapi.ContainerFilter{
+		State: &kubeapi.ContainerStateValue{
+			State: kubeapi.ContainerState_CONTAINER_EXITED,
+		},
+	})
+
+	tst.verify()
+}
+
 // TODO: test Attach / PortForward
 // TODO: split grpc-related bits (register, serve) and ImageManager from VirtletManager.
 //       Also, remove RecoverAndGC() from it and do image gc via a hook in RemoveContainer()
