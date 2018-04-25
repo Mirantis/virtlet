@@ -84,18 +84,12 @@ func newContainerTester(t *testing.T, rec *testutils.TopLevelRecorder) *containe
 	}
 
 	imageManager := NewFakeImageManager(ct.rec)
-	volSrc := CombineVMVolumeSources(
-		GetRootVolume,
-		ScanFlexVolumes,
-		// XXX: GetConfigVolume must go last because it
-		// doesn't produce correct name for cdrom devices
-		GetConfigVolume)
-	ct.virtTool = NewVirtualizationTool(ct.domainConn, ct.storageConn, imageManager, ct.metadataStore, "volumes", "loop*", volSrc)
-	ct.virtTool.setClock(ct.clock)
-	// avoid unneeded difs in the golden master data
-	ct.virtTool.setForceKVM(true)
+	ct.virtTool = NewVirtualizationTool(ct.domainConn, ct.storageConn, imageManager, ct.metadataStore, "volumes", "loop*", GetDefaultVolumeSource())
+	ct.virtTool.SetClock(ct.clock)
+	// avoid unneeded diffs in the golden master data
+	ct.virtTool.SetForceKVM(true)
 	ct.kubeletRootDir = filepath.Join(ct.tmpDir, "kubelet-root")
-	ct.virtTool.setKubeletRootDir(ct.kubeletRootDir)
+	ct.virtTool.SetKubeletRootDir(ct.kubeletRootDir)
 
 	return ct
 }

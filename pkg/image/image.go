@@ -48,7 +48,7 @@ func (img *Image) hexDigest() (string, error) {
 }
 
 // Translator translates image name to a Endpoint
-type Translator func(string) Endpoint
+type Translator func(context.Context, string) Endpoint
 
 // RefGetter is a function that returns the list of images
 // that are currently in use
@@ -142,7 +142,7 @@ func (s *FileStore) dataFileName(hexDigest string) string {
 }
 
 func (s *FileStore) linkFileName(imageName string) string {
-	imageName = stripTags(imageName)
+	imageName = StripTags(imageName)
 	return filepath.Join(s.linkDir(), strings.Replace(imageName, "/", "%", -1))
 }
 
@@ -175,7 +175,7 @@ func (s *FileStore) getImageHexDigestsInUse() (map[string]bool, error) {
 		}
 	}
 	for _, imgSpec := range imgList {
-		if d := getHexDigest(imgSpec); d != "" {
+		if d := GetHexDigest(imgSpec); d != "" {
 			imagesInUse[d] = true
 		}
 	}
@@ -363,8 +363,8 @@ func (s *FileStore) ImageStatus(name string) (*Image, error) {
 
 // PullImage implements PullImage method of Store interface
 func (s *FileStore) PullImage(ctx context.Context, name string, translator Translator) (string, error) {
-	name = stripTags(name)
-	ep := translator(name)
+	name = StripTags(name)
+	ep := translator(ctx, name)
 	glog.V(1).Infof("Image translation: %q -> %q", name, ep.URL)
 	if err := os.MkdirAll(s.dataDir(), 0777); err != nil {
 		return "", fmt.Errorf("mkdir %q: %v", s.dataDir(), err)
@@ -507,10 +507,11 @@ func (s *FileStore) SetRefGetter(imageRefGetter RefGetter) {
 	s.refGetter = imageRefGetter
 }
 
-func stripTags(imageName string) string {
+// StripTags removes tags from an image name.
+func StripTags(imageName string) string {
 	ref, err := reference.Parse(imageName)
 	if err != nil {
-		glog.Warningf("stripTags: failed to parse image name as ref: %q: %v", imageName, err)
+		glog.Warningf("StripTags: failed to parse image name as ref: %q: %v", imageName, err)
 		return imageName
 	}
 	if namedTagged, ok := ref.(reference.NamedTagged); ok {
@@ -519,7 +520,9 @@ func stripTags(imageName string) string {
 	return imageName
 }
 
-func getHexDigest(imageSpec string) string {
+// GetHexDigest returns the hex digest contained in imageSpec, if any,
+// or an empty string if imageSpec doesn't have the spec.
+func GetHexDigest(imageSpec string) string {
 	if d, err := digest.Parse(imageSpec); err == nil {
 		if d.Algorithm() != digest.SHA256 {
 			return ""

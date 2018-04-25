@@ -27,6 +27,7 @@ import (
 
 	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/image"
+	"github.com/Mirantis/virtlet/pkg/imagetranslation"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
 	"github.com/Mirantis/virtlet/pkg/manager"
 	"github.com/Mirantis/virtlet/pkg/metadata"
@@ -92,10 +93,24 @@ func runVirtlet() {
 	imageStore := image.NewFileStore(*imageDir, downloader, nil)
 	imageStore.SetRefGetter(metadataStore.ImagesInUse)
 
-	server, err := manager.NewVirtletManager(*libvirtUri, *rawDevices, *imageTranslationConfigsDir, imageStore, metadataStore, c)
-	if err != nil {
-		glog.Errorf("Initializing server failed: %v", err)
+	if err = imagetranslation.RegisterCustomResourceType(); err != nil {
+		glog.Errorf("Failed to register image translation CRD: %v", err)
 		os.Exit(1)
+	}
+	translator := imagetranslation.GetDefaultImageTranslator(*imageTranslationConfigsDir)
+
+	conn, err := libvirttools.NewConnection(*libvirtUri)
+	if err != nil {
+		glog.Errorf("Error establishing libvirt connection: %v", err)
+		os.Exit(1)
+	}
+
+	virtTool := libvirttools.NewVirtualizationTool(conn, conn, imageStore, metadataStore, "volumes", *rawDevices, libvirttools.GetDefaultVolumeSource())
+	server := manager.NewVirtletManager(virtTool, imageStore, metadataStore, c, translator)
+	server.Register()
+	if err := server.RecoverAndGC(); err != nil {
+		// we consider recover / gc errors non-fatal
+		glog.Warning(err)
 	}
 
 	kubernetesDir := os.Getenv("KUBERNETES_POD_LOGS")

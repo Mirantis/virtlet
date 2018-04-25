@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"syscall"
 	"time"
 
@@ -35,7 +36,6 @@ import (
 
 	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/image"
-	"github.com/Mirantis/virtlet/pkg/imagetranslation"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
 	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/stream"
@@ -58,67 +58,57 @@ type VirtletManager struct {
 	imageStore                image.Store
 	libvirtVirtualizationTool *libvirttools.VirtualizationTool
 	// metadata
-	metadataStore              metadata.Store
-	fdManager                  tapmanager.FDManager
-	imageTranslationConfigsDir string
-	StreamServer               *stream.Server
+	metadataStore   metadata.Store
+	fdManager       tapmanager.FDManager
+	imageTranslator image.Translator
+	StreamServer    *stream.Server
+	clock           clockwork.Clock
 }
 
 // NewVirtletManager prepares libvirt connection, volumes component,
 // using them to prepare virtualization tool.  It calls garbage collection
 // for virtualization tool and image store, then it registers newly prepared
 // VirtletManager instance as runtime and image service through a grpc server.
-func NewVirtletManager(libvirtURI, rawDevices, imageTranslationConfigsDir string, imageStore image.Store, metadataStore metadata.Store, fdManager tapmanager.FDManager) (*VirtletManager, error) {
-	err := imagetranslation.RegisterCustomResourceType()
-	if err != nil {
-		return nil, err
+func NewVirtletManager(virtTool *libvirttools.VirtualizationTool, imageStore image.Store, metadataStore metadata.Store, fdManager tapmanager.FDManager, imageTranslator image.Translator) *VirtletManager {
+	return &VirtletManager{
+		server:                    grpc.NewServer(),
+		imageStore:                imageStore,
+		libvirtVirtualizationTool: virtTool,
+		metadataStore:             metadataStore,
+		fdManager:                 fdManager,
+		imageTranslator:           imageTranslator,
+		clock:                     clockwork.NewRealClock(),
+	}
+}
+
+// Register registers VirtletManager with gRPC
+func (v *VirtletManager) Register() {
+	kubeapi.RegisterRuntimeServiceServer(v.server, v)
+	kubeapi.RegisterImageServiceServer(v.server, v)
+}
+
+// RecoverAndGC performs the initial actions during VirtletManager
+// startup, including recovering network namespaces and performing
+// garbage collection for both libvirt and the image store.
+func (v *VirtletManager) RecoverAndGC() error {
+	var errors []string
+	for _, err := range recoverNetworkNamespaces(v.metadataStore, v.fdManager) {
+		errors = append(errors, fmt.Sprintf("* error recovering VM network namespaces: %v", err))
 	}
 
-	conn, err := libvirttools.NewConnection(libvirtURI)
-	if err != nil {
-		return nil, err
+	for _, err := range v.libvirtVirtualizationTool.GarbageCollect() {
+		errors = append(errors, fmt.Sprintf("* error performing libvirt GC: %v", err))
 	}
 
-	// TODO: there should be easy-to-use VirtualizationTool (or at least VMVolumeSource) provider
-	volSrc := libvirttools.CombineVMVolumeSources(
-		libvirttools.GetRootVolume,
-		libvirttools.ScanFlexVolumes,
-		// XXX: GetConfigVolume must go last because it
-		// doesn't produce correct name for cdrom devices
-		libvirttools.GetConfigVolume)
-	libvirtVirtualizationTool := libvirttools.NewVirtualizationTool(conn, conn, imageStore, metadataStore, "volumes", rawDevices, volSrc)
-
-	if errors := recoverNetworkNamespaces(metadataStore, fdManager); errors != nil {
-		glog.Warning("The following errors were encountered while recovering the VM network namespaces:")
-		for _, err := range errors {
-			glog.Warningf("* %q", err)
-		}
+	if err := v.imageStore.GC(); err != nil {
+		errors = append(errors, fmt.Sprintf("* error during image GC: %v", err))
 	}
 
-	if errors := libvirtVirtualizationTool.GarbageCollect(); errors != nil {
-		glog.Warning("The following errors were encountered while garbage collection process:")
-		for _, err := range errors {
-			glog.Warningf("* %q", err)
-		}
+	if len(errors) == 0 {
+		return nil
 	}
 
-	if err := imageStore.GC(); err != nil {
-		glog.Warningf("Error during the image GC: %v", err)
-	}
-
-	virtletManager := &VirtletManager{
-		server:                     grpc.NewServer(),
-		imageStore:                 imageStore,
-		libvirtVirtualizationTool:  libvirtVirtualizationTool,
-		metadataStore:              metadataStore,
-		fdManager:                  fdManager,
-		imageTranslationConfigsDir: imageTranslationConfigsDir,
-	}
-
-	kubeapi.RegisterRuntimeServiceServer(virtletManager.server, virtletManager)
-	kubeapi.RegisterImageServiceServer(virtletManager.server, virtletManager)
-
-	return virtletManager, nil
+	return fmt.Errorf("errors encountered during recover / GC:\n%s", strings.Join(errors, "\n"))
 }
 
 // Serve prepares a listener on unix socket, than it passes that listener to
@@ -220,7 +210,7 @@ func (v *VirtletManager) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSa
 		glog.Errorf("Error when adding pod %s (%s) to CNI network: %v", podName, podID, err)
 	}
 
-	psi, err := metadata.NewPodSandboxInfo(config, csnBytes, state, clockwork.NewRealClock())
+	psi, err := metadata.NewPodSandboxInfo(config, csnBytes, state, v.clock)
 	if err != nil {
 		glog.Errorf("Error serializing pod %q (%q) sandbox configuration: %v", podName, podID, err)
 		return nil, err
@@ -622,8 +612,7 @@ func (v *VirtletManager) PullImage(ctx context.Context, in *kubeapi.PullImageReq
 	imageName := in.GetImage().GetImage()
 	glog.V(2).Infof("PullImage called for: %s", imageName)
 
-	imageNameTranslator := v.getImageNameTranslator(ctx)
-	ref, err := v.imageStore.PullImage(ctx, imageName, imageNameTranslator.Translate)
+	ref, err := v.imageStore.PullImage(ctx, imageName, v.imageTranslator)
 	if err != nil {
 		glog.Errorf("PullImage: ERROR: %v", err)
 		return nil, err
@@ -632,17 +621,6 @@ func (v *VirtletManager) PullImage(ctx context.Context, in *kubeapi.PullImageReq
 	response := &kubeapi.PullImageResponse{ImageRef: ref}
 	glog.V(3).Infof("PullImage response: %s", spew.Sdump(response))
 	return response, nil
-}
-
-func (v *VirtletManager) getImageNameTranslator(ctx context.Context) imagetranslation.ImageNameTranslator {
-	var sources []imagetranslation.ConfigSource
-	sources = append(sources, imagetranslation.NewCRDSource("kube-system"))
-	if v.imageTranslationConfigsDir != "" {
-		sources = append(sources, imagetranslation.NewFileConfigSource(v.imageTranslationConfigsDir))
-	}
-	translator := imagetranslation.NewImageNameTranslator()
-	translator.LoadConfigs(ctx, sources...)
-	return translator
 }
 
 // RemoveImage method implements RemoveImage from CRI.

@@ -201,3 +201,26 @@ func NewImageNameTranslator() ImageNameTranslator {
 		AllowRegexp: env != "",
 	}
 }
+
+// GetDefaultImageTranslator returns a default image translation that
+// uses CRDs and a config directory
+func GetDefaultImageTranslator(imageTranslationConfigsDir string) image.Translator {
+	var sources []ConfigSource
+	sources = append(sources, NewCRDSource("kube-system"))
+	if imageTranslationConfigsDir != "" {
+		sources = append(sources, NewFileConfigSource(imageTranslationConfigsDir))
+	}
+	return func(ctx context.Context, name string) image.Endpoint {
+		translator := NewImageNameTranslator()
+		translator.LoadConfigs(ctx, sources...)
+		return translator.Translate(name)
+	}
+}
+
+// GetEmptyImageTranslator returns an empty image translator that
+// doesn't apply any translations
+func GetEmptyImageTranslator() image.Translator {
+	return func(ctx context.Context, name string) image.Endpoint {
+		return NewImageNameTranslator().Translate(name)
+	}
+}

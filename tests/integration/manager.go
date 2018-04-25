@@ -30,6 +30,8 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/Mirantis/virtlet/pkg/image"
+	"github.com/Mirantis/virtlet/pkg/imagetranslation"
+	"github.com/Mirantis/virtlet/pkg/libvirttools"
 	"github.com/Mirantis/virtlet/pkg/manager"
 	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
@@ -118,9 +120,16 @@ func (v *VirtletManager) Run() {
 
 	os.Setenv("KUBERNETES_CLUSTER_URL", "")
 	os.Setenv("VIRTLET_DISABLE_LOGGING", "true")
-	v.manager, err = manager.NewVirtletManager(libvirtUri, "loop*", "", imageStore, metadataStore, &fakeFDManager{})
+	conn, err := libvirttools.NewConnection(libvirtUri)
 	if err != nil {
-		v.t.Fatalf("Failed to create VirtletManager: %v", err)
+		v.t.Fatalf("Error establishing libvirt connection: %v", err)
+	}
+
+	virtTool := libvirttools.NewVirtualizationTool(conn, conn, imageStore, metadataStore, "volumes", "loop*", libvirttools.GetDefaultVolumeSource())
+	v.manager = manager.NewVirtletManager(virtTool, imageStore, metadataStore, &fakeFDManager{}, imagetranslation.GetEmptyImageTranslator())
+	v.manager.Register()
+	if err := v.manager.RecoverAndGC(); err != nil {
+		v.t.Fatalf("RecoverAndGC(): %v", err)
 	}
 	v.doneCh = make(chan struct{})
 	go func() {

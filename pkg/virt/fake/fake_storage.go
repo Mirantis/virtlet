@@ -134,7 +134,7 @@ func (p *FakeStoragePool) LookupVolumeByName(name string) (virt.StorageVolume, e
 
 func (p *FakeStoragePool) removeVolumeByName(name string) error {
 	if _, found := p.volumes[name]; !found {
-		return virt.ErrStorageVolumeNotFound
+		return nil
 	}
 	delete(p.volumes, name)
 	return nil
