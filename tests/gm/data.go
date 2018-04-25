@@ -17,6 +17,7 @@ limitations under the License.
 package gm
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -172,6 +173,49 @@ func (v YamlVerifier) Marshal() ([]byte, error) {
 		}
 		return out, nil
 	}
+}
+
+// Replacement specifies a replacement for SubstVerifier.
+type Replacement struct {
+	Old string
+	New string
+}
+
+// SubstVerifier wraps another verifier and replaces the specified
+// substrings in the data it generates.
+type SubstVerifier struct {
+	next         Verifier
+	replacements []Replacement
+}
+
+var _ Verifier = SubstVerifier{}
+
+// NewSubstVerifier makes a SubstVerifier that wraps another verifier
+// and does the specified replacements.
+func NewSubstVerifier(next Verifier, replacements []Replacement) SubstVerifier {
+	return SubstVerifier{next, replacements}
+}
+
+// Suffix implements Suffix method of the Verifier interface.
+func (v SubstVerifier) Suffix() string {
+	return v.next.Suffix()
+}
+
+// Verify implements Verify method of the Verifier interface.
+func (v SubstVerifier) Verify(content []byte) (bool, error) {
+	return v.next.Verify(content)
+}
+
+// Marshal implements Marshal method of the Verifier interface.
+func (v SubstVerifier) Marshal() ([]byte, error) {
+	d, err := v.next.Marshal()
+	if err != nil {
+		return nil, err
+	}
+	for _, rep := range v.replacements {
+		d = bytes.Replace(d, []byte(rep.Old), []byte(rep.New), -1)
+	}
+	return d, nil
 }
 
 func getVerifier(data interface{}) Verifier {
