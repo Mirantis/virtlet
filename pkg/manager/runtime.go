@@ -123,7 +123,7 @@ func (v *VirtletRuntimeService) RunPodSandbox(ctx context.Context, in *kubeapi.R
 		if status.State == kubeapi.PodSandboxState_SANDBOX_READY {
 			return &kubeapi.RunPodSandboxResponse{
 				PodSandboxId: podID,
-			}, err
+			}, nil
 		}
 	}
 
@@ -149,14 +149,22 @@ func (v *VirtletRuntimeService) RunPodSandbox(ctx context.Context, in *kubeapi.R
 	fdPayload := &tapmanager.GetFDPayload{Description: pnd}
 	csnBytes, err := v.fdManager.AddFDs(podID, fdPayload)
 	if err != nil {
-		// this will cause kubelet to delete the pod sandbox and then retry
-		// its creation
-		state = kubeapi.PodSandboxState_SANDBOX_NOTREADY
-		glog.Errorf("Error adding pod %s (%s) to CNI network: %v", podName, podID, err)
+		// Try to cleanup cni e.x. in case of multiple plugins behind cni genie.
+		// While one of them failed, other could already allocated some resources
+		// so give them a try to do cleanup.
+		if fdErr := v.fdManager.ReleaseFDs(podID); err != nil {
+			glog.Errorf("Error removing pod %s (%s) from CNI network: %v", podName, podID, fdErr)
+		}
+
+		return nil, fmt.Errorf("Error adding pod %s (%s) to CNI network: %v", podName, podID, err)
 	}
 
 	psi, err := metadata.NewPodSandboxInfo(config, csnBytes, state, v.clock)
 	if err != nil {
+		// cleanup cni if we could not add pod to metadata store to prevent resource leaking
+		if fdErr := v.fdManager.ReleaseFDs(podID); err != nil {
+			glog.Errorf("Error removing pod %s (%s) from CNI network: %v", podName, podID, fdErr)
+		}
 		return nil, err
 	}
 
@@ -166,14 +174,16 @@ func (v *VirtletRuntimeService) RunPodSandbox(ctx context.Context, in *kubeapi.R
 			return psi, nil
 		},
 	); storeErr != nil {
+		// cleanup cni if we could not add pod to metadata store to prevent resource leaking
+		if err := v.fdManager.ReleaseFDs(podID); err != nil {
+			glog.Errorf("Error removing pod %s (%s) from CNI network: %v", podName, podID, err)
+		}
 		return nil, storeErr
 	}
 
-	// If we don't return PodSandboxId upon RunPodSandbox, kubelet will not retry
-	// RunPodSandbox for this pod after CNI failure
 	return &kubeapi.RunPodSandboxResponse{
 		PodSandboxId: podID,
-	}, err
+	}, nil
 }
 
 // StopPodSandbox implements StopPodSandbox method of CRI.
