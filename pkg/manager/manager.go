@@ -38,7 +38,6 @@ import (
 	"github.com/Mirantis/virtlet/pkg/image"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
 	"github.com/Mirantis/virtlet/pkg/metadata"
-	"github.com/Mirantis/virtlet/pkg/stream"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
 )
 
@@ -48,6 +47,11 @@ const (
 	runtimeVersion          = "0.1.0"
 	defaultDownloadProtocol = "https"
 )
+
+type StreamServer interface {
+	GetAttach(req *kubeapi.AttachRequest) (*kubeapi.AttachResponse, error)
+	GetPortForward(req *kubeapi.PortForwardRequest) (*kubeapi.PortForwardResponse, error)
+}
 
 // VirtletManager serves grpc CRI requests translating them to libvirt calls
 // using additional data stored in metadata store. Network part also uses
@@ -61,7 +65,7 @@ type VirtletManager struct {
 	metadataStore   metadata.Store
 	fdManager       tapmanager.FDManager
 	imageTranslator image.Translator
-	StreamServer    *stream.Server
+	streamServer    StreamServer
 	clock           clockwork.Clock
 }
 
@@ -69,7 +73,7 @@ type VirtletManager struct {
 // using them to prepare virtualization tool.  It calls garbage collection
 // for virtualization tool and image store, then it registers newly prepared
 // VirtletManager instance as runtime and image service through a grpc server.
-func NewVirtletManager(virtTool *libvirttools.VirtualizationTool, imageStore image.Store, metadataStore metadata.Store, fdManager tapmanager.FDManager, imageTranslator image.Translator) *VirtletManager {
+func NewVirtletManager(virtTool *libvirttools.VirtualizationTool, imageStore image.Store, metadataStore metadata.Store, fdManager tapmanager.FDManager, imageTranslator image.Translator, streamServer StreamServer) *VirtletManager {
 	return &VirtletManager{
 		server:                    grpc.NewServer(),
 		imageStore:                imageStore,
@@ -77,6 +81,7 @@ func NewVirtletManager(virtTool *libvirttools.VirtualizationTool, imageStore ima
 		metadataStore:             metadataStore,
 		fdManager:                 fdManager,
 		imageTranslator:           imageTranslator,
+		streamServer:              streamServer,
 		clock:                     clockwork.NewRealClock(),
 	}
 }
@@ -521,13 +526,13 @@ func (v *VirtletManager) Attach(ctx context.Context, req *kubeapi.AttachRequest)
 		// by the Virtlet stream server.
 		req.Stdout = true
 	}
-	return v.StreamServer.GetAttach(req)
+	return v.streamServer.GetAttach(req)
 }
 
 // PortForward calls streamer server to implement PortForward functionality from CRI.
 func (v *VirtletManager) PortForward(ctx context.Context, req *kubeapi.PortForwardRequest) (*kubeapi.PortForwardResponse, error) {
 	glog.Errorf("PortForward() not implemented")
-	return v.StreamServer.GetPortForward(req)
+	return v.streamServer.GetPortForward(req)
 }
 
 // UpdateRuntimeConfig is a placeholder for an unimplemented CRI method.

@@ -155,6 +155,30 @@ func (m *fakeFDManager) Recover(key string, data interface{}) error {
 	return nil
 }
 
+type fakeStreamServer struct {
+	rec testutils.Recorder
+}
+
+var _ StreamServer = &fakeStreamServer{}
+
+func newFakeStreamServer(rec testutils.Recorder) *fakeStreamServer {
+	return &fakeStreamServer{rec}
+}
+
+func (s *fakeStreamServer) GetAttach(req *kubeapi.AttachRequest) (*kubeapi.AttachResponse, error) {
+	s.rec.Rec("GetAttach", req)
+	return &kubeapi.AttachResponse{
+		Url: "http://localhost:4242/",
+	}, nil
+}
+
+func (s *fakeStreamServer) GetPortForward(req *kubeapi.PortForwardRequest) (*kubeapi.PortForwardResponse, error) {
+	s.rec.Rec("GetPortForward", req)
+	return &kubeapi.PortForwardResponse{
+		Url: "http://localhost:4242/",
+	}, nil
+}
+
 func TestPodSanboxConfigValidation(t *testing.T) {
 	invalidSandboxes := criapi.GetSandboxes(1)
 
@@ -201,7 +225,8 @@ func makeVirtletManagerTester(t *testing.T) *virtletManagerTester {
 	virtTool.SetForceKVM(true)
 	kubeletRootDir := filepath.Join(tmpDir, "kubelet-root")
 	virtTool.SetKubeletRootDir(kubeletRootDir)
-	manager := NewVirtletManager(virtTool, imageStore, metadataStore, fdManager, translateImageName)
+	streamServer := newFakeStreamServer(rec.Child("streamServer"))
+	manager := NewVirtletManager(virtTool, imageStore, metadataStore, fdManager, translateImageName, streamServer)
 	manager.clock = clock
 	return &virtletManagerTester{
 		t:              t,
@@ -347,6 +372,14 @@ func (tst *virtletManagerTester) stopContainer(containerID string) {
 
 func (tst *virtletManagerTester) removeContainer(containerID string) {
 	tst.invoke("RemoveContainer", &kubeapi.RemoveContainerRequest{ContainerId: containerID})
+}
+
+func (tst *virtletManagerTester) attach(req *kubeapi.AttachRequest) {
+	tst.invoke("Attach", req)
+}
+
+func (tst *virtletManagerTester) portForward(req *kubeapi.PortForwardRequest) {
+	tst.invoke("PortForward", req)
 }
 
 func cirrosImg() *kubeapi.ImageSpec {
@@ -569,7 +602,41 @@ func TestManagerContainerFilters(t *testing.T) {
 	tst.verify()
 }
 
-// TODO: test Attach / PortForward
+func TestManagerAttachPortForward(t *testing.T) {
+	tst := makeVirtletManagerTester(t)
+	tst.rec.AddFilter("Attach")
+	tst.rec.AddFilter("PortForward")
+	defer tst.teardown()
+
+	sandboxes := criapi.GetSandboxes(1)
+	containers := criapi.GetContainersConfig(sandboxes)
+
+	tst.pullImage(cirrosImg())
+	tst.runPodSandbox(sandboxes[0])
+	tst.podSandboxStatus(sandboxes[0].Metadata.Uid)
+
+	containerId1 := tst.createContainer(sandboxes[0], containers[0], cirrosImg(), nil)
+	tst.containerStatus(containerId1)
+	tst.startContainer(containerId1)
+
+	tst.attach(&kubeapi.AttachRequest{
+		ContainerId: containerId1,
+		Stdin:       true,
+		Stdout:      true,
+		Stderr:      true,
+	})
+	tst.attach(&kubeapi.AttachRequest{
+		ContainerId: containerId1,
+		Stdin:       true,
+	})
+	tst.portForward(&kubeapi.PortForwardRequest{
+		PodSandboxId: sandboxes[0].Metadata.Uid,
+		Port:         []int32{42000},
+	})
+
+	tst.verify()
+}
+
 // TODO: split grpc-related bits (register, serve) and ImageManager from VirtletManager.
 //       Also, remove RecoverAndGC() from it and do image gc via a hook in RemoveContainer()
 // TODO: use interceptor for logging in the manager

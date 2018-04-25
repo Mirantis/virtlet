@@ -105,30 +105,31 @@ func runVirtlet() {
 		os.Exit(1)
 	}
 
+	kubernetesDir := os.Getenv("KUBERNETES_POD_LOGS")
+	if kubernetesDir == "" {
+		glog.Infoln("KUBERNETES_POD_LOGS environment variables must be set")
+		os.Exit(1)
+	}
+
+	streamServer, err := stream.NewServer(kubernetesDir, "/var/lib/libvirt/streamer.sock", metadataStore)
+	if err != nil {
+		glog.V(1).Infoln("Could not create stream server:", err)
+		os.Exit(2)
+	}
+	err = streamServer.Start()
+	if err != nil {
+		glog.V(1).Infoln("Could not start stream server: %s", err)
+
+	}
+
 	virtTool := libvirttools.NewVirtualizationTool(conn, conn, imageStore, metadataStore, "volumes", *rawDevices, libvirttools.GetDefaultVolumeSource())
-	server := manager.NewVirtletManager(virtTool, imageStore, metadataStore, c, translator)
+	server := manager.NewVirtletManager(virtTool, imageStore, metadataStore, c, translator, streamServer)
 	server.Register()
 	if err := server.RecoverAndGC(); err != nil {
 		// we consider recover / gc errors non-fatal
 		glog.Warning(err)
 	}
 
-	kubernetesDir := os.Getenv("KUBERNETES_POD_LOGS")
-	if kubernetesDir == "" {
-		glog.Infoln("KUBERNETES_POD_LOGS environment variables must be set")
-		os.Exit(1)
-	}
-	streamServer, err := stream.NewServer(kubernetesDir, "/var/lib/libvirt/streamer.sock", metadataStore)
-	if err != nil {
-		glog.V(1).Infoln("Could not create stream server:", err)
-		os.Exit(2)
-	}
-	server.StreamServer = streamServer
-	err = server.StreamServer.Start()
-	if err != nil {
-		glog.V(1).Infoln("Could not start stream server: %s", err)
-
-	}
 	glog.V(1).Infof("Starting server on socket %s", *listen)
 	if err = server.Serve(*listen); err != nil {
 		glog.Errorf("Serving failed: %v", err)

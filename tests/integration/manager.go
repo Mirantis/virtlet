@@ -126,7 +126,7 @@ func (v *VirtletManager) Run() {
 	}
 
 	virtTool := libvirttools.NewVirtualizationTool(conn, conn, imageStore, metadataStore, "volumes", "loop*", libvirttools.GetDefaultVolumeSource())
-	v.manager = manager.NewVirtletManager(virtTool, imageStore, metadataStore, &fakeFDManager{}, imagetranslation.GetEmptyImageTranslator())
+	v.manager = manager.NewVirtletManager(virtTool, imageStore, metadataStore, &fakeFDManager{}, imagetranslation.GetEmptyImageTranslator(), nil)
 	v.manager.Register()
 	if err := v.manager.RecoverAndGC(); err != nil {
 		v.t.Fatalf("RecoverAndGC(): %v", err)

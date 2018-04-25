@@ -1,0 +1,41 @@
+- name: 'enter: Attach'
+  value:
+    container_id: 231700d5-c9a6-5a49-738d-99a954c51550
+    stderr: true
+    stdin: true
+    stdout: true
+- name: 'streamServer: GetAttach'
+  value:
+    container_id: 231700d5-c9a6-5a49-738d-99a954c51550
+    stderr: true
+    stdin: true
+    stdout: true
+- name: 'leave: Attach'
+  value:
+    url: http://localhost:4242/
+- name: 'enter: Attach'
+  value:
+    container_id: 231700d5-c9a6-5a49-738d-99a954c51550
+    stdin: true
+    stdout: true
+- name: 'streamServer: GetAttach'
+  value:
+    container_id: 231700d5-c9a6-5a49-738d-99a954c51550
+    stdin: true
+    stdout: true
+- name: 'leave: Attach'
+  value:
+    url: http://localhost:4242/
+- name: 'enter: PortForward'
+  value:
+    pod_sandbox_id: 69eec606-0493-5825-73a4-c5e0c0236155
+    port:
+    - 42000
+- name: 'streamServer: GetPortForward'
+  value:
+    pod_sandbox_id: 69eec606-0493-5825-73a4-c5e0c0236155
+    port:
+    - 42000
+- name: 'leave: PortForward'
+  value:
+    url: http://localhost:4242/
