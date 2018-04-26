@@ -35,7 +35,7 @@ const (
 	defaultDownloadProtocol   = "https"
 	tapManagerConnectInterval = 200 * time.Millisecond
 	tapManagerAttemptCount    = 50
-	defaultLibvirtUri         = "qemu:///system"
+	defaultLibvirtURI         = "qemu:///system"
 	streamerSocketPath        = "/var/lib/libvirt/streamer.sock"
 	defaultCRISocketPath      = "/run/virtlet.sock"
 )
@@ -60,8 +60,8 @@ type VirtletConfig struct {
 	ImageTranslationConfigsDir string
 	// SkipImageTranslation disables image translations
 	SkipImageTranslation bool
-	// LibvirtUri specifies the libvirt connnection URI
-	LibvirtUri string
+	// LibvirtURI specifies the libvirt connnection URI
+	LibvirtURI string
 	// PodLogDir specifies a directory where Kubernetes pod logs are stored.
 	// The streaming server is not started if this value is empty.
 	PodLogDir string
@@ -74,8 +74,8 @@ type VirtletConfig struct {
 
 // ApplyDefaults applies default settings to VirtletConfig
 func (c *VirtletConfig) applyDefaults() {
-	if c.LibvirtUri == "" {
-		c.LibvirtUri = defaultLibvirtUri
+	if c.LibvirtURI == "" {
+		c.LibvirtURI = defaultLibvirtURI
 	}
 	if c.DownloadProtocol == "" {
 		c.DownloadProtocol = defaultDownloadProtocol
@@ -98,10 +98,14 @@ type VirtletManager struct {
 	server         *Server
 }
 
+// NewVirtletManager creates a new VirtletManager.
 func NewVirtletManager(config *VirtletConfig) *VirtletManager {
 	return &VirtletManager{config: config}
 }
 
+// Run sets up the environment for the runtime and image services and
+// starts the gRPC listener. It doesn't return until the server is
+// stopped or an error occurs.
 func (v *VirtletManager) Run() error {
 	v.config.applyDefaults()
 	var err error
@@ -140,7 +144,7 @@ func (v *VirtletManager) Run() error {
 		translator = imagetranslation.GetEmptyImageTranslator()
 	}
 
-	conn, err := libvirttools.NewConnection(v.config.LibvirtUri)
+	conn, err := libvirttools.NewConnection(v.config.LibvirtURI)
 	if err != nil {
 		return fmt.Errorf("error establishing libvirt connection: %v", err)
 	}
@@ -149,7 +153,7 @@ func (v *VirtletManager) Run() error {
 	if v.config.PodLogDir != "" {
 		s, err := stream.NewServer(v.config.PodLogDir, streamerSocketPath, v.metadataStore)
 		if err != nil {
-			return fmt.Errorf("could not create stream server:", err)
+			return fmt.Errorf("couldn't create stream server: %v", err)
 		}
 
 		err = s.Start()
@@ -181,6 +185,7 @@ func (v *VirtletManager) Run() error {
 	return nil
 }
 
+// Stop stops the gRPC listener of the VirtletManager, if it's active.
 func (v *VirtletManager) Stop() {
 	if v.server != nil {
 		v.server.Stop()

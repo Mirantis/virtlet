@@ -45,11 +45,14 @@ var capacityUnits = map[string]uint64{
 	"TiB":   1099511627776,
 }
 
+// FakeStorageConnection is a fake implementation of StorageConnection.
 type FakeStorageConnection struct {
 	rec   testutils.Recorder
 	pools map[string]*FakeStoragePool
 }
 
+// NewFakeStorageConnection creates a new FakeStorageConnection using
+// the specified Recorder to record any changes.
 func NewFakeStorageConnection(rec testutils.Recorder) *FakeStorageConnection {
 	return &FakeStorageConnection{
 		rec:   rec,
@@ -57,6 +60,7 @@ func NewFakeStorageConnection(rec testutils.Recorder) *FakeStorageConnection {
 	}
 }
 
+// CreateStoragePool implements CreateStoragePool method of StorageConnection interface.
 func (sc *FakeStorageConnection) CreateStoragePool(def *libvirtxml.StoragePool) (virt.StoragePool, error) {
 	sc.rec.Rec("CreateStoragePool", mustMarshal(def))
 	if _, found := sc.pools[def.Name]; found {
@@ -71,6 +75,7 @@ func (sc *FakeStorageConnection) CreateStoragePool(def *libvirtxml.StoragePool) 
 	return p, nil
 }
 
+// LookupStoragePoolByName implements LookupStoragePoolByName method of StorageConnection interface.
 func (sc *FakeStorageConnection) LookupStoragePoolByName(name string) (virt.StoragePool, error) {
 	if p, found := sc.pools[name]; found {
 		return p, nil
@@ -79,6 +84,7 @@ func (sc *FakeStorageConnection) LookupStoragePoolByName(name string) (virt.Stor
 	}
 }
 
+// FakeStoragePool is a fake implementation of StoragePool interface.
 type FakeStoragePool struct {
 	rec     testutils.Recorder
 	name    string
@@ -86,6 +92,8 @@ type FakeStoragePool struct {
 	volumes map[string]*FakeStorageVolume
 }
 
+// NewFakeStoragePool creates a new StoragePool using the specified
+// recorder, name and pool path.
 func NewFakeStoragePool(rec testutils.Recorder, name, poolPath string) *FakeStoragePool {
 	return &FakeStoragePool{
 		rec:     rec,
@@ -107,11 +115,13 @@ func (p *FakeStoragePool) createStorageVol(def *libvirtxml.StorageVolume) (virt.
 	return v, nil
 }
 
+// CreateStorageVol implements CreateStorageVol method of StoragePool interface.
 func (p *FakeStoragePool) CreateStorageVol(def *libvirtxml.StorageVolume) (virt.StorageVolume, error) {
 	p.rec.Rec("CreateStorageVol", mustMarshal(def))
 	return p.createStorageVol(def)
 }
 
+// ListAllVolumes implements ListAllVolumes method of StoragePool interface.
 func (p *FakeStoragePool) ListAllVolumes() ([]virt.StorageVolume, error) {
 	r := make([]virt.StorageVolume, len(p.volumes))
 	names := make([]string, 0, len(p.volumes))
@@ -125,6 +135,7 @@ func (p *FakeStoragePool) ListAllVolumes() ([]virt.StorageVolume, error) {
 	return r, nil
 }
 
+// LookupVolumeByName implements LookupVolumeByName method of StoragePool interface.
 func (p *FakeStoragePool) LookupVolumeByName(name string) (virt.StorageVolume, error) {
 	if v, found := p.volumes[name]; found {
 		return v, nil
@@ -145,6 +156,7 @@ func (p *FakeStoragePool) RemoveVolumeByName(name string) error {
 	return p.removeVolumeByName(name)
 }
 
+// FakeStorageVolume is a fake implementation of StorageVolume interface.
 type FakeStorageVolume struct {
 	rec  testutils.Recorder
 	pool *FakeStoragePool
@@ -183,23 +195,28 @@ func (v *FakeStorageVolume) descriptiveName() string {
 	return v.pool.name + "." + v.name
 }
 
+// Name implements Name method of StorageVolume interface.
 func (v *FakeStorageVolume) Name() string {
 	return v.name
 }
 
+// Size implements Size method of StorageVolume interface.
 func (v *FakeStorageVolume) Size() (uint64, error) {
 	return v.size, nil
 }
 
+// Path implements Path method of StorageVolume interface.
 func (v *FakeStorageVolume) Path() (string, error) {
 	return v.path, nil
 }
 
+// Remove implements Remove method of StorageVolume interface.
 func (v *FakeStorageVolume) Remove() error {
 	v.rec.Rec("Remove", nil)
 	return v.pool.removeVolumeByName(v.name)
 }
 
+// Format implements Format method of StorageVolume interface.
 func (v *FakeStorageVolume) Format() error {
 	v.rec.Rec("Format", nil)
 	return nil

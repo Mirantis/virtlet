@@ -34,7 +34,7 @@ import (
 )
 
 var (
-	libvirtUri = flag.String("libvirt-uri", "qemu:///system",
+	libvirtURI = flag.String("libvirt-uri", "qemu:///system",
 		"Libvirt connection URI")
 	imageDir = flag.String("image dir", "/var/lib/virtlet/images",
 		"Image directory")
@@ -74,7 +74,7 @@ func runVirtlet() {
 		DownloadProtocol:           *imageDownloadProtocol,
 		ImageDir:                   *imageDir,
 		ImageTranslationConfigsDir: *imageTranslationConfigsDir,
-		LibvirtUri:                 *libvirtUri,
+		LibvirtURI:                 *libvirtURI,
 		PodLogDir:                  kubernetesDir,
 		RawDevices:                 *rawDevices,
 		CRISocketPath:              *listen,

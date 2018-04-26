@@ -114,7 +114,7 @@ func (v *VirtletManager) Run() {
 		DownloadProtocol:     "http",
 		ImageDir:             filepath.Join(v.tempDir, "images"),
 		SkipImageTranslation: true,
-		LibvirtUri:           libvirtUri,
+		LibvirtURI:           libvirtURI,
 		RawDevices:           "loop*",
 		CRISocketPath:        virtletSocket,
 	})

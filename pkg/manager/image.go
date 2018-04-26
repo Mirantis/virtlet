@@ -25,7 +25,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/image"
 )
 
-// VirtletRuntimeService handles CRI image service calls.
+// VirtletImageService handles CRI image service calls.
 type VirtletImageService struct {
 	imageStore      image.Store
 	imageTranslator image.Translator

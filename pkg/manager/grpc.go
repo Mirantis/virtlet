@@ -36,10 +36,13 @@ const (
 	criListLogLevel    = 5
 )
 
+// Server wraps a gRPC server and provides listener setup and request
+// logging.
 type Server struct {
 	server *grpc.Server
 }
 
+// NewServer creates a new Server.
 func NewServer() *Server {
 	return &Server{
 		server: grpc.NewServer(grpc.UnaryInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {

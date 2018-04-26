@@ -28,6 +28,7 @@ import (
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 )
 
+// FakeStore is a fake implementation of Store interface for testing.
 type FakeStore struct {
 	rec       testutils.Recorder
 	images    map[string]*image.Image
@@ -36,6 +37,7 @@ type FakeStore struct {
 
 var _ image.Store = &FakeStore{}
 
+// NewFakeStore creates a new FakeStore.
 func NewFakeStore(rec testutils.Recorder) *FakeStore {
 	return &FakeStore{
 		rec:    rec,
@@ -43,6 +45,7 @@ func NewFakeStore(rec testutils.Recorder) *FakeStore {
 	}
 }
 
+// ListImages implements ListImages method of ImageStore interface.
 func (s *FakeStore) ListImages(filter string) ([]*image.Image, error) {
 	r := make([]*image.Image, 0, len(s.images))
 	for _, img := range s.images {
@@ -54,11 +57,13 @@ func (s *FakeStore) ListImages(filter string) ([]*image.Image, error) {
 	return r, nil
 }
 
+// ImageStatus implements ImageStatus method of Store interface.
 func (s *FakeStore) ImageStatus(name string) (*image.Image, error) {
 	name = image.StripTags(name)
 	return s.images[name], nil
 }
 
+// PullImage implements PullImage method of Store interface.
 func (s *FakeStore) PullImage(ctx context.Context, name string, translator image.Translator) (string, error) {
 	name = image.StripTags(name)
 	ep := translator(ctx, name)
@@ -84,12 +89,14 @@ func (s *FakeStore) PullImage(ctx context.Context, name string, translator image
 	return withDigest.String(), nil
 }
 
+// RemoveImage implements RemoveImage method of Store interface.
 func (s *FakeStore) RemoveImage(name string) error {
 	delete(s.images, name)
 	s.rec.Rec("RemoveImage", name)
 	return nil
 }
 
+// GC implements GC method of Store interface.
 func (s *FakeStore) GC() error {
 	var err error
 	var refSet map[string]bool
@@ -105,6 +112,7 @@ func (s *FakeStore) GC() error {
 	return nil
 }
 
+// GetImagePathAndVirtualSize implements GC method of Store interface.
 func (s *FakeStore) GetImagePathAndVirtualSize(imageName string) (string, uint64, error) {
 	img, found := s.images[imageName]
 	if !found {
@@ -113,6 +121,7 @@ func (s *FakeStore) GetImagePathAndVirtualSize(imageName string) (string, uint64
 	return img.Path, img.Size, nil
 }
 
+// SetRefGetter implements SetRefGetter method of Store interface.
 func (s *FakeStore) SetRefGetter(imageRefGetter image.RefGetter) {
 	s.refGetter = imageRefGetter
 }
