@@ -127,7 +127,7 @@ func (tst *ifsTester) teardown() {
 	os.RemoveAll(tst.tmpDir)
 }
 
-func (tst *ifsTester) translateImageName(name string) Endpoint {
+func (tst *ifsTester) translateImageName(ctx context.Context, name string) Endpoint {
 	if name == "foobar" {
 		name = "baz"
 	}

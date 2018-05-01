@@ -334,7 +334,7 @@ function gotest {
     virtlet_subdir >/dev/null
     subdir="$(virtlet_subdir)"
     if ! vcmd "cd '${subdir}' && go test $*"; then
-        vcmd_simple "find . -name 'Test*.json' | xargs tar -c -T -" | tar -C "${project_dir}" -x
+        vcmd_simple "find . -name 'Test*.out.*' | xargs tar -c -T -" | tar -C "${project_dir}" -x
         exit 1
     fi
 }

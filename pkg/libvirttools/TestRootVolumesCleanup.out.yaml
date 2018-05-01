@@ -1,0 +1,42 @@
+- name: 'storage: CreateStoragePool'
+  value: |-
+    <pool type="dir">
+      <name>volumes</name>
+      <target>
+        <path>/var/lib/virtlet/volumes</path>
+      </target>
+    </pool>
+- name: 'storage: volumes: CreateStorageVol'
+  value: |-
+    <volume>
+      <name>root for 5edfe2ad-9852-439b-bbfb-3fe8b7c72906</name>
+      <target>
+        <path>/some/path/virtlet_root_5edfe2ad-9852-439b-bbfb-3fe8b7c72906</path>
+      </target>
+    </volume>
+- name: 'storage: volumes: CreateStorageVol'
+  value: |-
+    <volume>
+      <name>root for 8a6163c3-e4ee-488f-836a-d2abe92d0744</name>
+      <target>
+        <path>/some/path/virtlet_root_8a6163c3-e4ee-488f-836a-d2abe92d0744</path>
+      </target>
+    </volume>
+- name: 'storage: volumes: CreateStorageVol'
+  value: |-
+    <volume>
+      <name>root for 13f51f8d-0f4e-4538-9db0-413380ff9c84</name>
+      <target>
+        <path>/some/path/virtlet_root_13f51f8d-0f4e-4538-9db0-413380ff9c84</path>
+      </target>
+    </volume>
+- name: 'storage: volumes: CreateStorageVol'
+  value: |-
+    <volume>
+      <name>some other volume</name>
+      <target>
+        <path>/path/with/different/prefix</path>
+      </target>
+    </volume>
+- name: 'storage: volumes: root for 5edfe2ad-9852-439b-bbfb-3fe8b7c72906: Remove'
+- name: 'storage: volumes: root for 8a6163c3-e4ee-488f-836a-d2abe92d0744: Remove'

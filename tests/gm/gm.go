@@ -69,7 +69,7 @@ func VerifyNamed(t *testing.T, name string, data interface{}) {
 	case gitDiff == "":
 		// no difference
 	default:
-		t.Errorf("got difference for %q:\n%s", testName, gitDiff)
+		t.Errorf("got difference for %q (%q):\n%s", testName, filename, gitDiff)
 	}
 }
 

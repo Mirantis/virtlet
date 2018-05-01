@@ -212,15 +212,18 @@ func NewVirtualizationTool(domainConn virt.DomainConnection, storageConn virt.St
 	}
 }
 
-func (v *VirtualizationTool) setForceKVM(forceKVM bool) {
+// SetForceKVM forces VirtualizationTool to use KVM (used in tests)
+func (v *VirtualizationTool) SetForceKVM(forceKVM bool) {
 	v.forceKVM = forceKVM
 }
 
-func (v *VirtualizationTool) setClock(clock clockwork.Clock) {
+// SetClock sets the clock to use (used in tests)
+func (v *VirtualizationTool) SetClock(clock clockwork.Clock) {
 	v.clock = clock
 }
 
-func (v *VirtualizationTool) setKubeletRootDir(kubeletRootDir string) {
+// SetKubeletRootDir sets kubelet root dir for VirtualizationTool
+func (v *VirtualizationTool) SetKubeletRootDir(kubeletRootDir string) {
 	v.kubeletRootDir = kubeletRootDir
 }
 

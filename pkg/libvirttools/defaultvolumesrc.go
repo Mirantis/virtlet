@@ -1,5 +1,3 @@
-// +build !linux
-
 /*
 Copyright 2018 Mirantis
 
@@ -16,24 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package nettools
+package libvirttools
 
-import (
-	"github.com/vishvananda/netlink"
-)
-
-// Some missing constants that break syntax check
-// on non-Linux systems
-const (
-	FAMILY_ALL     = 0
-	FAMILY_V4      = 0
-	RTPROT_KERNEL  = 0
-	SCOPE_LINK     = 0
-	SCOPE_UNIVERSE = 0
-)
-
-// there's bug in netlink_unspecified.go in netlink version we use
-// that breaks non-Linux builds
-func linkSetMaster(link netlink.Link, master *netlink.Bridge) error {
-	return netlink.ErrNotImplemented
+// GetDefaultVolumeSource returns a volume source that supports
+// root volume, flexvolumes and a ConfigSource for cloud-init
+func GetDefaultVolumeSource() VMVolumeSource {
+	return CombineVMVolumeSources(
+		GetRootVolume,
+		ScanFlexVolumes,
+		// XXX: GetConfigVolume must go last because it
+		// doesn't produce correct name for cdrom devices
+		GetConfigVolume)
 }

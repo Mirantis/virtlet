@@ -257,7 +257,7 @@ func SetupBridge(bridgeName string, links []netlink.Link) (*netlink.Bridge, erro
 	}
 
 	for _, link := range links {
-		if err = netlink.LinkSetMaster(link, br); err != nil {
+		if err = linkSetMaster(link, br); err != nil {
 			delMessage := ""
 			if delErr := netlink.LinkDel(br); delErr != nil {
 				delMessage = fmt.Sprintf(" (and failed to delete the bridge: %v", err)

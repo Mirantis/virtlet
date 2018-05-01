@@ -1,0 +1,101 @@
+- name: 'enter: ListImages'
+  value: {}
+- name: 'leave: ListImages'
+  value: {}
+- name: 'enter: PullImage'
+  value:
+    image:
+      image: localhost/cirros.img
+- name: 'imageStore: PullImage'
+  value:
+    image:
+      Digest: sha256:63eb9508e8efa129db412a9112b88422ea109574d6211853bbb4929b03bceeb3
+      Name: localhost/cirros.img
+      Path: /fake/volume/localhost/cirros.img
+      Size: 20
+    url: localhost/cirros.img
+- name: 'leave: PullImage'
+  value:
+    image_ref: localhost/cirros.img@sha256:63eb9508e8efa129db412a9112b88422ea109574d6211853bbb4929b03bceeb3
+- name: 'enter: PullImage'
+  value:
+    image:
+      image: localhost/ubuntu.img
+- name: 'imageStore: PullImage'
+  value:
+    image:
+      Digest: sha256:c23d870c59c0a60bdd2f10fceda540e7d811370edca24efdc71ca7ac990f3fa4
+      Name: localhost/ubuntu.img
+      Path: /fake/volume/localhost/ubuntu.img
+      Size: 20
+    url: localhost/ubuntu.img
+- name: 'leave: PullImage'
+  value:
+    image_ref: localhost/ubuntu.img@sha256:c23d870c59c0a60bdd2f10fceda540e7d811370edca24efdc71ca7ac990f3fa4
+- name: 'enter: ListImages'
+  value: {}
+- name: 'leave: ListImages'
+  value:
+    images:
+    - id: sha256:63eb9508e8efa129db412a9112b88422ea109574d6211853bbb4929b03bceeb3
+      repo_tags:
+      - localhost/cirros.img
+      size: 20
+    - id: sha256:c23d870c59c0a60bdd2f10fceda540e7d811370edca24efdc71ca7ac990f3fa4
+      repo_tags:
+      - localhost/ubuntu.img
+      size: 20
+- name: 'enter: ListImages'
+  value:
+    filter:
+      image:
+        image: localhost/cirros.img
+- name: 'leave: ListImages'
+  value:
+    images:
+    - id: sha256:63eb9508e8efa129db412a9112b88422ea109574d6211853bbb4929b03bceeb3
+      repo_tags:
+      - localhost/cirros.img
+      size: 20
+- name: 'enter: ImageStatus'
+  value:
+    image:
+      image: localhost/cirros.img
+- name: 'leave: ImageStatus'
+  value:
+    image:
+      id: sha256:63eb9508e8efa129db412a9112b88422ea109574d6211853bbb4929b03bceeb3
+      repo_tags:
+      - localhost/cirros.img
+      size: 20
+- name: 'enter: RemoveImage'
+  value:
+    image:
+      image: localhost/cirros.img
+- name: 'imageStore: RemoveImage'
+  value: localhost/cirros.img
+- name: 'leave: RemoveImage'
+  value: {}
+- name: 'enter: ImageStatus'
+  value:
+    image:
+      image: localhost/cirros.img
+- name: 'leave: ImageStatus'
+  value: {}
+- name: 'enter: ListImages'
+  value: {}
+- name: 'leave: ListImages'
+  value:
+    images:
+    - id: sha256:c23d870c59c0a60bdd2f10fceda540e7d811370edca24efdc71ca7ac990f3fa4
+      repo_tags:
+      - localhost/ubuntu.img
+      size: 20
+- name: 'enter: RemoveImage'
+  value:
+    image:
+      image: localhost/cirros.img
+- name: 'imageStore: RemoveImage'
+  value: localhost/cirros.img
+- name: 'leave: RemoveImage'
+  value: {}

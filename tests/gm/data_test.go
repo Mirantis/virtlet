@@ -136,8 +136,34 @@ func TestData(t *testing.T) {
 			diff:        false,
 		},
 		{
+			name: "yaml content (subst)",
+			toWrite: NewSubstVerifier(
+				NewYamlVerifier(map[string]interface{}{"ZZZ": 42}),
+				[]Replacement{
+					{
+						Old: "ZZZ",
+						New: "x",
+					},
+				}),
+			compareWith: NewYamlVerifier(map[string]interface{}{"x": 42}),
+			diff:        false,
+		},
+		{
 			name:        "yaml content with changes",
 			toWrite:     NewYamlVerifier(map[string]interface{}{"x": 42}),
+			compareWith: NewYamlVerifier(map[string]interface{}{"x": 43}),
+			diff:        true,
+		},
+		{
+			name: "yaml content with changes (subst)",
+			toWrite: NewSubstVerifier(
+				NewYamlVerifier(map[string]interface{}{"ZZZ": 42}),
+				[]Replacement{
+					{
+						Old: "ZZZ",
+						New: "x",
+					},
+				}),
 			compareWith: NewYamlVerifier(map[string]interface{}{"x": 43}),
 			diff:        true,
 		},

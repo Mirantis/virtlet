@@ -34,8 +34,17 @@ const (
 	configPathReplacement = "/var/lib/virtlet/config/"
 )
 
+func mustMarshal(d libvirtxml.Document) string {
+	s, err := d.Marshal()
+	if err != nil {
+		log.Panicf("Error marshaling libvirt doc: %v", err)
+	}
+	return s
+}
+
+// FakeDomainConnection is a fake implementation of DomainConnection interface.
 type FakeDomainConnection struct {
-	rec                Recorder
+	rec                testutils.Recorder
 	domains            map[string]*FakeDomain
 	domainsByUuid      map[string]*FakeDomain
 	secretsByUsageName map[string]*FakeSecret
@@ -44,9 +53,11 @@ type FakeDomainConnection struct {
 
 var _ virt.DomainConnection = &FakeDomainConnection{}
 
-func NewFakeDomainConnection(rec Recorder) *FakeDomainConnection {
+// NewFakeDomainConnection creates a new FakeDomainConnection using
+// the specified Recorder to record any changes.
+func NewFakeDomainConnection(rec testutils.Recorder) *FakeDomainConnection {
 	if rec == nil {
-		rec = NullRecorder
+		rec = testutils.NullRecorder
 	}
 	return &FakeDomainConnection{
 		rec:                rec,
@@ -56,6 +67,7 @@ func NewFakeDomainConnection(rec Recorder) *FakeDomainConnection {
 	}
 }
 
+// SetIgnoreShutdown implements SetIgnoreShutdown method of DomainConnection interface.
 func (dc *FakeDomainConnection) SetIgnoreShutdown(ignoreShutdown bool) {
 	dc.ignoreShutdown = ignoreShutdown
 }
@@ -78,6 +90,7 @@ func (dc *FakeDomainConnection) removeSecret(s *FakeSecret) {
 	delete(dc.secretsByUsageName, s.usageName)
 }
 
+// DefineDomain implements DefineDomain method of DomainConnection interface.
 func (dc *FakeDomainConnection) DefineDomain(def *libvirtxml.Domain) (virt.Domain, error) {
 	def = copyDomain(def)
 	addPciRoot(def)
@@ -110,10 +123,11 @@ func (dc *FakeDomainConnection) DefineDomain(def *libvirtxml.Domain) (virt.Domai
 		}
 	}
 
-	dc.rec.Rec("DefineDomain", updatedDef)
+	dc.rec.Rec("DefineDomain", mustMarshal(updatedDef))
 	return d, nil
 }
 
+// ListDomains implements ListDomains method of DomainConnection interface.
 func (dc *FakeDomainConnection) ListDomains() ([]virt.Domain, error) {
 	r := make([]virt.Domain, len(dc.domains))
 	names := make([]string, 0, len(dc.domains))
@@ -128,6 +142,7 @@ func (dc *FakeDomainConnection) ListDomains() ([]virt.Domain, error) {
 	return r, nil
 }
 
+// LookupDomainByName implements LookupDomainByName method of DomainConnection interface.
 func (dc *FakeDomainConnection) LookupDomainByName(name string) (virt.Domain, error) {
 	if d, found := dc.domains[name]; found {
 		return d, nil
@@ -135,6 +150,7 @@ func (dc *FakeDomainConnection) LookupDomainByName(name string) (virt.Domain, er
 	return nil, virt.ErrDomainNotFound
 }
 
+// LookupDomainByUUIDString implements LookupDomainByUUIDString method of DomainConnection interface.
 func (dc *FakeDomainConnection) LookupDomainByUUIDString(uuid string) (virt.Domain, error) {
 	if d, found := dc.domainsByUuid[uuid]; found {
 		return d, nil
@@ -142,6 +158,7 @@ func (dc *FakeDomainConnection) LookupDomainByUUIDString(uuid string) (virt.Doma
 	return nil, virt.ErrDomainNotFound
 }
 
+// DefineSecret implements DefineSecret method of DomainConnection interface.
 func (dc *FakeDomainConnection) DefineSecret(def *libvirtxml.Secret) (virt.Secret, error) {
 	if def.UUID == "" {
 		return nil, fmt.Errorf("the secret has empty uuid")
@@ -151,17 +168,19 @@ func (dc *FakeDomainConnection) DefineSecret(def *libvirtxml.Secret) (virt.Secre
 	}
 	// clear secret uuid as it's generated randomly
 	def.UUID = ""
-	dc.rec.Rec("DefineSecret", def)
+	dc.rec.Rec("DefineSecret", mustMarshal(def))
 
 	s := newFakeSecret(dc, def.Usage.Name)
 	dc.secretsByUsageName[def.Usage.Name] = s
 	return s, nil
 }
 
+// LookupSecretByUUIDString implements LookupSecretByUUIDString method of DomainConnection interface.
 func (dc *FakeDomainConnection) LookupSecretByUUIDString(uuid string) (virt.Secret, error) {
 	return nil, virt.ErrSecretNotFound
 }
 
+// LookupSecretByUsageName implements LookupSecretByUsageName method of DomainConnection interface.
 func (dc *FakeDomainConnection) LookupSecretByUsageName(usageType string, usageName string) (virt.Secret, error) {
 	if d, found := dc.secretsByUsageName[usageName]; found {
 		return d, nil
@@ -169,8 +188,9 @@ func (dc *FakeDomainConnection) LookupSecretByUsageName(usageType string, usageN
 	return nil, virt.ErrSecretNotFound
 }
 
+// FakeDomain is a fake implementation of Domain interface.
 type FakeDomain struct {
-	rec     Recorder
+	rec     testutils.Recorder
 	dc      *FakeDomainConnection
 	removed bool
 	created bool
@@ -178,15 +198,18 @@ type FakeDomain struct {
 	def     *libvirtxml.Domain
 }
 
+var _ virt.Domain = &FakeDomain{}
+
 func newFakeDomain(dc *FakeDomainConnection, def *libvirtxml.Domain) *FakeDomain {
 	return &FakeDomain{
-		rec:   NewChildRecorder(dc.rec, def.Name),
+		rec:   testutils.NewChildRecorder(dc.rec, def.Name),
 		dc:    dc,
 		state: virt.DomainStateShutoff,
 		def:   def,
 	}
 }
 
+// Create implements Create method of Domain interface.
 func (d *FakeDomain) Create() error {
 	d.rec.Rec("Create", nil)
 	if d.def.Devices != nil {
@@ -218,6 +241,7 @@ func (d *FakeDomain) Create() error {
 	return nil
 }
 
+// Destroy implements Destroy method of Domain interface.
 func (d *FakeDomain) Destroy() error {
 	d.rec.Rec("Destroy", nil)
 	if d.removed {
@@ -227,6 +251,7 @@ func (d *FakeDomain) Destroy() error {
 	return nil
 }
 
+// Undefine implements Undefine method of Domain interface.
 func (d *FakeDomain) Undefine() error {
 	d.rec.Rec("Undefine", nil)
 	if d.removed {
@@ -237,6 +262,7 @@ func (d *FakeDomain) Undefine() error {
 	return nil
 }
 
+// Shutdown implements Shutdown method of Domain interface.
 func (d *FakeDomain) Shutdown() error {
 	if d.dc.ignoreShutdown {
 		d.rec.Rec("Shutdown", map[string]interface{}{"ignored": true})
@@ -253,6 +279,7 @@ func (d *FakeDomain) Shutdown() error {
 	return nil
 }
 
+// State implements State method of Domain interface.
 func (d *FakeDomain) State() (virt.DomainState, error) {
 	if d.removed {
 		return virt.DomainStateNoState, fmt.Errorf("State() called on a removed (undefined) domain %q", d.def.Name)
@@ -260,6 +287,7 @@ func (d *FakeDomain) State() (virt.DomainState, error) {
 	return d.state, nil
 }
 
+// UUIDString implements UUIDString method of Domain interface.
 func (d *FakeDomain) UUIDString() (string, error) {
 	if d.removed {
 		return "", fmt.Errorf("UUIDString() called on a removed (undefined) domain %q", d.def.Name)
@@ -267,33 +295,40 @@ func (d *FakeDomain) UUIDString() (string, error) {
 	return d.def.UUID, nil
 }
 
+// Name implements Name method of Domain interface.
 func (d *FakeDomain) Name() (string, error) {
 	return d.def.Name, nil
 }
 
+// XML implements XML method of Domain interface.
 func (d *FakeDomain) XML() (*libvirtxml.Domain, error) {
 	return d.def, nil
 }
 
+// FakeSecret is a fake implementation of Secret interace.
 type FakeSecret struct {
-	rec       Recorder
+	rec       testutils.Recorder
 	dc        *FakeDomainConnection
 	usageName string
 }
 
+var _ virt.Secret = &FakeSecret{}
+
 func newFakeSecret(dc *FakeDomainConnection, usageName string) *FakeSecret {
 	return &FakeSecret{
-		rec:       NewChildRecorder(dc.rec, "secret "+usageName),
+		rec:       testutils.NewChildRecorder(dc.rec, "secret "+usageName),
 		dc:        dc,
 		usageName: usageName,
 	}
 }
 
+// SetValue implements SetValue method of Secret interface.
 func (s *FakeSecret) SetValue(value []byte) error {
 	s.rec.Rec("SetValue", fmt.Sprintf("% x", value))
 	return nil
 }
 
+// Remove implements Remove method of Secret interface.
 func (s *FakeSecret) Remove() error {
 	s.rec.Rec("Remove", nil)
 	s.dc.removeSecret(s)

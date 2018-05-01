@@ -1,0 +1,57 @@
+- name: 'domain conn: DefineDomain'
+  value: |-
+    <domain>
+      <name>virtlet-5edfe2ad-9852-container1</name>
+      <uuid>5edfe2ad-9852-439b-bbfb-3fe8b7c72906</uuid>
+      <devices>
+        <controller type="pci" model="pci-root"></controller>
+      </devices>
+    </domain>
+- name: 'domain conn: DefineDomain'
+  value: |-
+    <domain>
+      <name>virtlet-8a6163c3-e4ee-container1</name>
+      <uuid>8a6163c3-e4ee-488f-836a-d2abe92d0744</uuid>
+      <devices>
+        <controller type="pci" model="pci-root"></controller>
+      </devices>
+    </domain>
+- name: 'domain conn: DefineDomain'
+  value: |-
+    <domain>
+      <name>virtlet-13f51f8d-0f4e-container1</name>
+      <uuid>13f51f8d-0f4e-4538-9db0-413380ff9c84</uuid>
+      <devices>
+        <controller type="pci" model="pci-root"></controller>
+      </devices>
+    </domain>
+- name: 'domain conn: DefineDomain'
+  value: |-
+    <domain>
+      <name>other-than-virtlet-domain</name>
+      <uuid>12fdc902-3345-4d8e-a3f1-11a091e59455</uuid>
+      <devices>
+        <controller type="pci" model="pci-root"></controller>
+      </devices>
+    </domain>
+- name: 'domain conn: ListDomains'
+  value:
+  - other-than-virtlet-domain
+  - virtlet-13f51f8d-0f4e-container1
+  - virtlet-5edfe2ad-9852-container1
+  - virtlet-8a6163c3-e4ee-container1
+- name: 'domain conn: ListDomains'
+  value:
+  - other-than-virtlet-domain
+  - virtlet-13f51f8d-0f4e-container1
+  - virtlet-5edfe2ad-9852-container1
+  - virtlet-8a6163c3-e4ee-container1
+- name: 'domain conn: other-than-virtlet-domain: Destroy'
+- name: 'domain conn: other-than-virtlet-domain: Undefine'
+- name: 'domain conn: virtlet-5edfe2ad-9852-container1: Destroy'
+- name: 'domain conn: virtlet-5edfe2ad-9852-container1: Undefine'
+- name: 'domain conn: virtlet-8a6163c3-e4ee-container1: Destroy'
+- name: 'domain conn: virtlet-8a6163c3-e4ee-container1: Undefine'
+- name: 'domain conn: ListDomains'
+  value:
+  - virtlet-13f51f8d-0f4e-container1

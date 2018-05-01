@@ -31,7 +31,7 @@ import (
 
 const (
 	maxTime    = 60
-	libvirtUri = "qemu:///system"
+	libvirtURI = "qemu:///system"
 )
 
 func waitForSocket(filepath string) error {
@@ -50,7 +50,7 @@ func getDomainUUID(podID string) string {
 }
 
 func defineDummyVolume(poolName, volName string) (func(), error) {
-	conn, err := libvirt.NewConnect(libvirtUri)
+	conn, err := libvirt.NewConnect(libvirtURI)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func defineDummyVolume(poolName, volName string) (func(), error) {
 }
 
 func undefDomain(domainName string) error {
-	conn, err := libvirt.NewConnect(libvirtUri)
+	conn, err := libvirt.NewConnect(libvirtURI)
 	if err != nil {
 		return err
 	}
@@ -107,7 +107,7 @@ func defineDummyDomainWithName(domainName string) error {
 		domainName = "dummy-" + virtletutils.NewUUID()
 	}
 
-	conn, err := libvirt.NewConnect(libvirtUri)
+	conn, err := libvirt.NewConnect(libvirtURI)
 	if err != nil {
 		return err
 	}

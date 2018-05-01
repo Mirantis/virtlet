@@ -19,18 +19,22 @@ package manager
 import (
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
-
-	"github.com/Mirantis/virtlet/tests/criapi"
+	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
-func TestPodSanboxConfigValidation(t *testing.T) {
-	invalidSandboxes := criapi.GetSandboxes(1)
-
-	// Now let's make generated configs to be invalid
-	invalidSandboxes[0].Metadata = nil
-
-	if err := validatePodSandboxConfig(invalidSandboxes[0]); err == nil {
-		t.Errorf("Invalid pod sandbox passed validation:\n%s", spew.Sdump(invalidSandboxes[0]))
-	}
+func TestCRIImages(t *testing.T) {
+	tst := makeVirtletCRITester(t)
+	defer tst.teardown()
+	tst.listImages(nil)
+	tst.pullImage(cirrosImg())
+	tst.pullImage(ubuntuImg())
+	tst.listImages(nil)
+	tst.listImages(&kubeapi.ImageFilter{Image: cirrosImg()})
+	tst.imageStatus(cirrosImg())
+	tst.removeImage(cirrosImg())
+	tst.imageStatus(cirrosImg())
+	tst.listImages(nil)
+	// second RemoveImage() should not cause an error
+	tst.removeImage(cirrosImg())
+	tst.verify()
 }

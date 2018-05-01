@@ -26,13 +26,13 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
-	"github.com/libvirt/libvirt-go-xml"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 
 	"github.com/Mirantis/virtlet/pkg/flexvolume"
 	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/utils"
+	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 	"github.com/Mirantis/virtlet/pkg/virt/fake"
 	"github.com/Mirantis/virtlet/tests/criapi"
 	"github.com/Mirantis/virtlet/tests/gm"
@@ -53,13 +53,13 @@ type containerTester struct {
 	tmpDir         string
 	kubeletRootDir string
 	virtTool       *VirtualizationTool
-	rec            *fake.TopLevelRecorder
+	rec            *testutils.TopLevelRecorder
 	domainConn     *fake.FakeDomainConnection
 	storageConn    *fake.FakeStorageConnection
 	metadataStore  metadata.Store
 }
 
-func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTester {
+func newContainerTester(t *testing.T, rec *testutils.TopLevelRecorder) *containerTester {
 	ct := &containerTester{
 		t:     t,
 		clock: clockwork.NewFakeClockAt(time.Date(2017, 5, 30, 20, 19, 0, 0, time.UTC)),
@@ -84,18 +84,12 @@ func newContainerTester(t *testing.T, rec *fake.TopLevelRecorder) *containerTest
 	}
 
 	imageManager := NewFakeImageManager(ct.rec)
-	volSrc := CombineVMVolumeSources(
-		GetRootVolume,
-		ScanFlexVolumes,
-		// XXX: GetConfigVolume must go last because it
-		// doesn't produce correct name for cdrom devices
-		GetConfigVolume)
-	ct.virtTool = NewVirtualizationTool(ct.domainConn, ct.storageConn, imageManager, ct.metadataStore, "volumes", "loop*", volSrc)
-	ct.virtTool.setClock(ct.clock)
-	// avoid unneeded difs in the golden master data
-	ct.virtTool.setForceKVM(true)
+	ct.virtTool = NewVirtualizationTool(ct.domainConn, ct.storageConn, imageManager, ct.metadataStore, "volumes", "loop*", GetDefaultVolumeSource())
+	ct.virtTool.SetClock(ct.clock)
+	// avoid unneeded diffs in the golden master data
+	ct.virtTool.SetForceKVM(true)
 	ct.kubeletRootDir = filepath.Join(ct.tmpDir, "kubelet-root")
-	ct.virtTool.setKubeletRootDir(ct.kubeletRootDir)
+	ct.virtTool.SetKubeletRootDir(ct.kubeletRootDir)
 
 	return ct
 }
@@ -195,7 +189,7 @@ func (ct *containerTester) verifyContainerRootfsExists(container *kubeapi.Contai
 }
 
 func TestContainerLifecycle(t *testing.T) {
-	ct := newContainerTester(t, fake.NewToplevelRecorder())
+	ct := newContainerTester(t, testutils.NewToplevelRecorder())
 	defer ct.teardown()
 
 	sandbox := criapi.GetSandboxes(1)[0]
@@ -273,11 +267,11 @@ func TestContainerLifecycle(t *testing.T) {
 		t.Errorf("Rootfs volume was not deleted for the container: %#v", container)
 	}
 
-	gm.Verify(t, ct.rec.Content())
+	gm.Verify(t, gm.NewYamlVerifier(ct.rec.Content()))
 }
 
 func TestDomainForcedShutdown(t *testing.T) {
-	ct := newContainerTester(t, fake.NewToplevelRecorder())
+	ct := newContainerTester(t, testutils.NewToplevelRecorder())
 	defer ct.teardown()
 
 	sandbox := criapi.GetSandboxes(1)[0]
@@ -308,11 +302,11 @@ func TestDomainForcedShutdown(t *testing.T) {
 
 	ct.rec.Rec("invoking RemoveContainer()", nil)
 	ct.removeContainer(containerID)
-	gm.Verify(t, ct.rec.Content())
+	gm.Verify(t, gm.NewYamlVerifier(ct.rec.Content()))
 }
 
 func TestDoubleStartError(t *testing.T) {
-	ct := newContainerTester(t, fake.NewToplevelRecorder())
+	ct := newContainerTester(t, testutils.NewToplevelRecorder())
 	defer ct.teardown()
 
 	sandbox := criapi.GetSandboxes(1)[0]
@@ -419,7 +413,7 @@ func TestDomainDefinitions(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			rec := fake.NewToplevelRecorder()
+			rec := testutils.NewToplevelRecorder()
 
 			ct := newContainerTester(t, rec)
 			defer ct.teardown()
@@ -453,7 +447,7 @@ func TestDomainDefinitions(t *testing.T) {
 			// to dump the cloudinit iso content
 			ct.startContainer(containerID)
 			ct.removeContainer(containerID)
-			gm.Verify(t, ct.rec.Content())
+			gm.Verify(t, gm.NewYamlVerifier(ct.rec.Content()))
 		})
 	}
 }
@@ -465,7 +459,7 @@ func TestDomainResourceConstraints(t *testing.T) {
 	memoryLimit := 1234567
 	cpuCount := 2
 
-	rec := fake.NewToplevelRecorder()
+	rec := testutils.NewToplevelRecorder()
 	rec.AddFilter("DefineDomain")
 	ct := newContainerTester(t, rec)
 	defer ct.teardown()
@@ -495,49 +489,15 @@ func TestDomainResourceConstraints(t *testing.T) {
 		},
 		SandboxConfig: sandbox,
 	}
+
 	vmConfig, err := GetVMConfig(req, nil)
 	if err != nil {
 		t.Fatalf("GetVMConfig(): %v", err)
 	}
-	_, err = ct.virtTool.CreateContainer(vmConfig, "/tmp/fakenetns")
-	if err != nil {
+
+	if _, err = ct.virtTool.CreateContainer(vmConfig, "/tmp/fakenetns"); err != nil {
 		t.Fatalf("CreateContainer: %v", err)
 	}
 
-	domain := rec.Content()[0].Data.(*libvirtxml.Domain)
-
-	if domain.VCPU == nil {
-		t.Error("vCPU is not set")
-	} else if domain.VCPU.Value != cpuCount {
-		t.Errorf("unexpected vCPU count value: expected %v, got %v", cpuCount, domain.VCPU.Value)
-	}
-
-	if domain.CPUTune == nil {
-		t.Error("CPUTune is not set")
-	} else {
-		expectedQuota := int64(cpuQuota / cpuCount)
-		if domain.CPUTune.Quota == nil {
-			t.Error("CPU quota is not set")
-		} else if domain.CPUTune.Quota.Value != expectedQuota {
-			t.Errorf("unexpected CPU quota value: expected %v, got %v", expectedQuota, domain.CPUTune.Quota.Value)
-		}
-
-		if domain.CPUTune.Shares == nil {
-			t.Error("CPU shares is not set")
-		} else if domain.CPUTune.Shares.Value != uint(cpuShares) {
-			t.Errorf("unexpected CPU shares value: expected %v, got %v", cpuShares, domain.CPUTune.Shares.Value)
-		}
-
-		if domain.CPUTune.Period == nil {
-			t.Error("CPU period is not set")
-		} else if domain.CPUTune.Period.Value != uint64(cpuPeriod) {
-			t.Errorf("unexpected CPU period value: expected %v, got %v", cpuShares, domain.CPUTune.Period.Value)
-		}
-	}
-
-	if domain.Memory == nil {
-		t.Error("Memory is not set")
-	} else if domain.Memory.Value != uint(memoryLimit) || domain.Memory.Unit != "b" {
-		t.Errorf("unexpected memory limitvalue: expected %vb, got %v%s", memoryLimit, domain.Memory.Value, domain.Memory.Unit)
-	}
+	gm.Verify(t, gm.NewYamlVerifier(ct.rec.Content()))
 }

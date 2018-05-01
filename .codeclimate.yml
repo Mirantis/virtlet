@@ -14,7 +14,8 @@ checks:
       threshold: 100
   method-count:
     config:
-      threshold: 20
+      # CRI runtime implementation has >20 methods
+      threshold: 25
   method-lines:
     config:
       threshold: 200

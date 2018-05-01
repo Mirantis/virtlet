@@ -1,0 +1,793 @@
+- name: 'enter: ListPodSandbox'
+  value: {}
+- name: 'leave: ListPodSandbox'
+  value: {}
+- name: 'enter: ListContainers'
+  value: {}
+- name: 'domain conn: ListDomains'
+  value: []
+- name: 'leave: ListContainers'
+  value: {}
+- name: 'enter: PullImage'
+  value:
+    image:
+      image: localhost/cirros.img
+- name: 'imageStore: PullImage'
+  value:
+    image:
+      Digest: sha256:63eb9508e8efa129db412a9112b88422ea109574d6211853bbb4929b03bceeb3
+      Name: localhost/cirros.img
+      Path: /fake/volume/localhost/cirros.img
+      Size: 20
+    url: localhost/cirros.img
+- name: 'leave: PullImage'
+  value:
+    image_ref: localhost/cirros.img@sha256:63eb9508e8efa129db412a9112b88422ea109574d6211853bbb4929b03bceeb3
+- name: 'enter: RunPodSandbox'
+  value:
+    config:
+      annotations:
+        hello: world
+        virt: let
+      hostname: localhost
+      labels:
+        fizz: buzz
+        foo: bar
+      linux:
+        security_context:
+          namespace_options: {}
+      log_directory: /var/log/test_log_directory
+      metadata:
+        name: testName_0
+        namespace: default
+        uid: 69eec606-0493-5825-73a4-c5e0c0236155
+- name: 'fdManager: AddFDs'
+  value:
+    data:
+      csn: null
+      podNetworkDesc:
+        DNS: null
+        podId: 69eec606-0493-5825-73a4-c5e0c0236155
+        podName: testName_0
+        podNs: default
+    key: 69eec606-0493-5825-73a4-c5e0c0236155
+- name: 'leave: RunPodSandbox'
+  value:
+    pod_sandbox_id: 69eec606-0493-5825-73a4-c5e0c0236155
+- name: 'enter: ListPodSandbox'
+  value: {}
+- name: 'leave: ListPodSandbox'
+  value:
+    items:
+    - created_at: 1524648266720331175
+      id: 69eec606-0493-5825-73a4-c5e0c0236155
+      labels:
+        fizz: buzz
+        foo: bar
+      metadata:
+        name: testName_0
+        namespace: default
+        uid: 69eec606-0493-5825-73a4-c5e0c0236155
+- name: 'enter: PodSandboxStatus'
+  value:
+    pod_sandbox_id: 69eec606-0493-5825-73a4-c5e0c0236155
+- name: 'leave: PodSandboxStatus'
+  value:
+    status:
+      annotations:
+        hello: world
+        virt: let
+      created_at: 1524648266720331175
+      id: 69eec606-0493-5825-73a4-c5e0c0236155
+      labels:
+        fizz: buzz
+        foo: bar
+      linux:
+        namespaces:
+          options: {}
+      metadata:
+        name: testName_0
+        namespace: default
+        uid: 69eec606-0493-5825-73a4-c5e0c0236155
+      network:
+        ip: 10.1.90.5
+- name: 'enter: CreateContainer'
+  value:
+    config:
+      image:
+        image: localhost/cirros.img
+      labels:
+        fizz: buzz
+        foo: bar
+      metadata:
+        name: container-for-testName_0
+    pod_sandbox_id: 69eec606-0493-5825-73a4-c5e0c0236155
+    sandbox_config:
+      annotations:
+        hello: world
+        virt: let
+      hostname: localhost
+      labels:
+        fizz: buzz
+        foo: bar
+      linux:
+        security_context:
+          namespace_options: {}
+      log_directory: /var/log/test_log_directory
+      metadata:
+        name: testName_0
+        namespace: default
+        uid: 69eec606-0493-5825-73a4-c5e0c0236155
+- name: 'storage: CreateStoragePool'
+  value: |-
+    <pool type="dir">
+      <name>volumes</name>
+      <target>
+        <path>/var/lib/virtlet/volumes</path>
+      </target>
+    </pool>
+- name: 'storage: volumes: CreateStorageVol'
+  value: |-
+    <volume type="file">
+      <name>virtlet_root_231700d5-c9a6-5a49-738d-99a954c51550</name>
+      <allocation unit="b">0</allocation>
+      <capacity unit="b">20</capacity>
+      <target>
+        <format type="qcow2"></format>
+      </target>
+      <backingStore>
+        <path>/fake/volume/localhost/cirros.img</path>
+        <format type="qcow2"></format>
+      </backingStore>
+    </volume>
+- name: 'domain conn: DefineDomain'
+  value: |-
+    <domain type="kvm">
+      <name>virtlet-231700d5-c9a6-container-for-testName_0</name>
+      <uuid>231700d5-c9a6-5a49-738d-99a954c51550</uuid>
+      <memory unit="MiB">1024</memory>
+      <vcpu>1</vcpu>
+      <cputune>
+        <shares>0</shares>
+        <period>0</period>
+        <quota>0</quota>
+      </cputune>
+      <os>
+        <type>hvm</type>
+        <boot dev="hd"></boot>
+      </os>
+      <features>
+        <acpi></acpi>
+      </features>
+      <on_poweroff>destroy</on_poweroff>
+      <on_reboot>restart</on_reboot>
+      <on_crash>restart</on_crash>
+      <devices>
+        <emulator>/vmwrapper</emulator>
+        <disk type="file" device="disk">
+          <driver name="qemu" type="qcow2"></driver>
+          <source file="/var/lib/virtlet/volumes/virtlet_root_231700d5-c9a6-5a49-738d-99a954c51550"></source>
+          <target dev="sda" bus="scsi"></target>
+          <address type="drive" controller="0" bus="0" target="0" unit="0"></address>
+        </disk>
+        <disk type="file" device="cdrom">
+          <driver name="qemu" type="raw"></driver>
+          <source file="/var/lib/virtlet/config/config-231700d5-c9a6-5a49-738d-99a954c51550.iso"></source>
+          <target dev="sdb" bus="scsi"></target>
+          <readonly></readonly>
+          <address type="drive" controller="0" bus="0" target="0" unit="1"></address>
+        </disk>
+        <controller type="scsi" index="0" model="virtio-scsi">
+          <address type="pci" domain="0x0000" bus="0x00" slot="0x01" function="0x0"></address>
+        </controller>
+        <controller type="pci" model="pci-root"></controller>
+        <serial type="unix">
+          <source mode="connect" path="/var/lib/libvirt/streamer.sock">
+            <reconnect enabled="yes" timeout="1"></reconnect>
+          </source>
+          <target port="0"></target>
+        </serial>
+        <input type="tablet" bus="usb"></input>
+        <graphics type="vnc" port="-1"></graphics>
+        <video>
+          <model type="cirrus"></model>
+        </video>
+      </devices>
+      <commandline xmlns="http://libvirt.org/schemas/domain/qemu/1.0">
+        <env name="VIRTLET_EMULATOR" value="/usr/bin/kvm"></env>
+        <env name="VIRTLET_NET_KEY" value="69eec606-0493-5825-73a4-c5e0c0236155"></env>
+        <env name="VIRTLET_POD_NAME" value="testName_0"></env>
+        <env name="VIRTLET_POD_NAMESPACE" value="default"></env>
+        <env name="VIRTLET_POD_UID" value="69eec606-0493-5825-73a4-c5e0c0236155"></env>
+        <env name="VIRTLET_CONTAINER_ID" value="231700d5-c9a6-5a49-738d-99a954c51550"></env>
+        <env name="VIRTLET_CONTAINER_NAME" value="container-for-testName_0"></env>
+        <env name="CONTAINER_ATTEMPTS" value="0"></env>
+      </commandline>
+    </domain>
+- name: 'leave: CreateContainer'
+  value:
+    container_id: 231700d5-c9a6-5a49-738d-99a954c51550
+- name: 'enter: ListContainers'
+  value: {}
+- name: 'domain conn: ListDomains'
+  value:
+  - virtlet-231700d5-c9a6-container-for-testName_0
+- name: 'leave: ListContainers'
+  value:
+    containers:
+    - created_at: 1524648266720331175
+      id: 231700d5-c9a6-5a49-738d-99a954c51550
+      image:
+        image: localhost/cirros.img
+      image_ref: localhost/cirros.img
+      labels:
+        fizz: buzz
+        foo: bar
+        io.kubernetes.container.name: container-for-testName_0
+        io.kubernetes.pod.name: testName_0
+        io.kubernetes.pod.namespace: default
+        io.kubernetes.pod.uid: 69eec606-0493-5825-73a4-c5e0c0236155
+      metadata:
+        name: container-for-testName_0
+      pod_sandbox_id: 69eec606-0493-5825-73a4-c5e0c0236155
+- name: 'enter: ContainerStatus'
+  value:
+    container_id: 231700d5-c9a6-5a49-738d-99a954c51550
+- name: 'leave: ContainerStatus'
+  value:
+    status:
+      created_at: 1524648266720331175
+      id: 231700d5-c9a6-5a49-738d-99a954c51550
+      image:
+        image: localhost/cirros.img
+      image_ref: localhost/cirros.img
+      labels:
+        fizz: buzz
+        foo: bar
+        io.kubernetes.container.name: container-for-testName_0
+        io.kubernetes.pod.name: testName_0
+        io.kubernetes.pod.namespace: default
+        io.kubernetes.pod.uid: 69eec606-0493-5825-73a4-c5e0c0236155
+      metadata:
+        name: container-for-testName_0
+- name: 'enter: StartContainer'
+  value:
+    container_id: 231700d5-c9a6-5a49-738d-99a954c51550
+- name: 'domain conn: virtlet-231700d5-c9a6-container-for-testName_0: Create'
+- name: 'domain conn: virtlet-231700d5-c9a6-container-for-testName_0: iso image'
+  value:
+    meta-data: '{"instance-id":"testName_0.default","local-hostname":"testName_0"}'
+    network-config: |
+      version: 1
+      config:
+      - mac_address: 42:a4:a6:22:80:2e
+        mtu: 0
+        name: eth0
+        subnets:
+        - address: 10.1.90.5
+          netmask: 255.255.255.0
+          type: static
+        type: physical
+      - destination: 0.0.0.0/0
+        gateway: 10.1.90.1
+        type: route
+    user-data: |
+      #cloud-config
+- name: 'leave: StartContainer'
+  value: {}
+- name: 'enter: ContainerStatus'
+  value:
+    container_id: 231700d5-c9a6-5a49-738d-99a954c51550
+- name: 'leave: ContainerStatus'
+  value:
+    status:
+      created_at: 1524648266720331175
+      id: 231700d5-c9a6-5a49-738d-99a954c51550
+      image:
+        image: localhost/cirros.img
+      image_ref: localhost/cirros.img
+      labels:
+        fizz: buzz
+        foo: bar
+        io.kubernetes.container.name: container-for-testName_0
+        io.kubernetes.pod.name: testName_0
+        io.kubernetes.pod.namespace: default
+        io.kubernetes.pod.uid: 69eec606-0493-5825-73a4-c5e0c0236155
+      metadata:
+        name: container-for-testName_0
+      started_at: 1524648266720331175
+      state: 1
+- name: 'enter: PullImage'
+  value:
+    image:
+      image: localhost/ubuntu.img
+- name: 'imageStore: PullImage'
+  value:
+    image:
+      Digest: sha256:c23d870c59c0a60bdd2f10fceda540e7d811370edca24efdc71ca7ac990f3fa4
+      Name: localhost/ubuntu.img
+      Path: /fake/volume/localhost/ubuntu.img
+      Size: 20
+    url: localhost/ubuntu.img
+- name: 'leave: PullImage'
+  value:
+    image_ref: localhost/ubuntu.img@sha256:c23d870c59c0a60bdd2f10fceda540e7d811370edca24efdc71ca7ac990f3fa4
+- name: 'enter: RunPodSandbox'
+  value:
+    config:
+      annotations:
+        hello: world
+        virt: let
+      hostname: localhost
+      labels:
+        fizz: buzz
+        foo: bar
+      linux:
+        security_context:
+          namespace_options: {}
+      log_directory: /var/log/test_log_directory
+      metadata:
+        name: testName_1
+        namespace: default
+        uid: d25ded14-d35d-510b-5749-f83cc165794e
+- name: 'fdManager: AddFDs'
+  value:
+    data:
+      csn: null
+      podNetworkDesc:
+        DNS: null
+        podId: d25ded14-d35d-510b-5749-f83cc165794e
+        podName: testName_1
+        podNs: default
+    key: d25ded14-d35d-510b-5749-f83cc165794e
+- name: 'leave: RunPodSandbox'
+  value:
+    pod_sandbox_id: d25ded14-d35d-510b-5749-f83cc165794e
+- name: 'enter: CreateContainer'
+  value:
+    config:
+      image:
+        image: localhost/ubuntu.img
+      labels:
+        fizz: buzz
+        foo: bar
+      metadata:
+        name: container-for-testName_1
+    pod_sandbox_id: d25ded14-d35d-510b-5749-f83cc165794e
+    sandbox_config:
+      annotations:
+        hello: world
+        virt: let
+      hostname: localhost
+      labels:
+        fizz: buzz
+        foo: bar
+      linux:
+        security_context:
+          namespace_options: {}
+      log_directory: /var/log/test_log_directory
+      metadata:
+        name: testName_1
+        namespace: default
+        uid: d25ded14-d35d-510b-5749-f83cc165794e
+- name: 'storage: volumes: CreateStorageVol'
+  value: |-
+    <volume type="file">
+      <name>virtlet_root_6b94d9a7-e22a-5d08-65ee-16b9b1e07ab0</name>
+      <allocation unit="b">0</allocation>
+      <capacity unit="b">20</capacity>
+      <target>
+        <format type="qcow2"></format>
+      </target>
+      <backingStore>
+        <path>/fake/volume/localhost/ubuntu.img</path>
+        <format type="qcow2"></format>
+      </backingStore>
+    </volume>
+- name: 'domain conn: DefineDomain'
+  value: |-
+    <domain type="kvm">
+      <name>virtlet-6b94d9a7-e22a-container-for-testName_1</name>
+      <uuid>6b94d9a7-e22a-5d08-65ee-16b9b1e07ab0</uuid>
+      <memory unit="MiB">1024</memory>
+      <vcpu>1</vcpu>
+      <cputune>
+        <shares>0</shares>
+        <period>0</period>
+        <quota>0</quota>
+      </cputune>
+      <os>
+        <type>hvm</type>
+        <boot dev="hd"></boot>
+      </os>
+      <features>
+        <acpi></acpi>
+      </features>
+      <on_poweroff>destroy</on_poweroff>
+      <on_reboot>restart</on_reboot>
+      <on_crash>restart</on_crash>
+      <devices>
+        <emulator>/vmwrapper</emulator>
+        <disk type="file" device="disk">
+          <driver name="qemu" type="qcow2"></driver>
+          <source file="/var/lib/virtlet/volumes/virtlet_root_6b94d9a7-e22a-5d08-65ee-16b9b1e07ab0"></source>
+          <target dev="sda" bus="scsi"></target>
+          <address type="drive" controller="0" bus="0" target="0" unit="0"></address>
+        </disk>
+        <disk type="file" device="cdrom">
+          <driver name="qemu" type="raw"></driver>
+          <source file="/var/lib/virtlet/config/config-6b94d9a7-e22a-5d08-65ee-16b9b1e07ab0.iso"></source>
+          <target dev="sdb" bus="scsi"></target>
+          <readonly></readonly>
+          <address type="drive" controller="0" bus="0" target="0" unit="1"></address>
+        </disk>
+        <controller type="scsi" index="0" model="virtio-scsi">
+          <address type="pci" domain="0x0000" bus="0x00" slot="0x01" function="0x0"></address>
+        </controller>
+        <controller type="pci" model="pci-root"></controller>
+        <serial type="unix">
+          <source mode="connect" path="/var/lib/libvirt/streamer.sock">
+            <reconnect enabled="yes" timeout="1"></reconnect>
+          </source>
+          <target port="0"></target>
+        </serial>
+        <input type="tablet" bus="usb"></input>
+        <graphics type="vnc" port="-1"></graphics>
+        <video>
+          <model type="cirrus"></model>
+        </video>
+      </devices>
+      <commandline xmlns="http://libvirt.org/schemas/domain/qemu/1.0">
+        <env name="VIRTLET_EMULATOR" value="/usr/bin/kvm"></env>
+        <env name="VIRTLET_NET_KEY" value="d25ded14-d35d-510b-5749-f83cc165794e"></env>
+        <env name="VIRTLET_POD_NAME" value="testName_1"></env>
+        <env name="VIRTLET_POD_NAMESPACE" value="default"></env>
+        <env name="VIRTLET_POD_UID" value="d25ded14-d35d-510b-5749-f83cc165794e"></env>
+        <env name="VIRTLET_CONTAINER_ID" value="6b94d9a7-e22a-5d08-65ee-16b9b1e07ab0"></env>
+        <env name="VIRTLET_CONTAINER_NAME" value="container-for-testName_1"></env>
+        <env name="CONTAINER_ATTEMPTS" value="0"></env>
+      </commandline>
+    </domain>
+- name: 'leave: CreateContainer'
+  value:
+    container_id: 6b94d9a7-e22a-5d08-65ee-16b9b1e07ab0
+- name: 'enter: ListPodSandbox'
+  value: {}
+- name: 'leave: ListPodSandbox'
+  value:
+    items:
+    - created_at: 1524648266720331175
+      id: 69eec606-0493-5825-73a4-c5e0c0236155
+      labels:
+        fizz: buzz
+        foo: bar
+      metadata:
+        name: testName_0
+        namespace: default
+        uid: 69eec606-0493-5825-73a4-c5e0c0236155
+    - created_at: 1524648266720331175
+      id: d25ded14-d35d-510b-5749-f83cc165794e
+      labels:
+        fizz: buzz
+        foo: bar
+      metadata:
+        name: testName_1
+        namespace: default
+        uid: d25ded14-d35d-510b-5749-f83cc165794e
+- name: 'enter: ListContainers'
+  value: {}
+- name: 'domain conn: ListDomains'
+  value:
+  - virtlet-231700d5-c9a6-container-for-testName_0
+  - virtlet-6b94d9a7-e22a-container-for-testName_1
+- name: 'leave: ListContainers'
+  value:
+    containers:
+    - created_at: 1524648266720331175
+      id: 231700d5-c9a6-5a49-738d-99a954c51550
+      image:
+        image: localhost/cirros.img
+      image_ref: localhost/cirros.img
+      labels:
+        fizz: buzz
+        foo: bar
+        io.kubernetes.container.name: container-for-testName_0
+        io.kubernetes.pod.name: testName_0
+        io.kubernetes.pod.namespace: default
+        io.kubernetes.pod.uid: 69eec606-0493-5825-73a4-c5e0c0236155
+      metadata:
+        name: container-for-testName_0
+      pod_sandbox_id: 69eec606-0493-5825-73a4-c5e0c0236155
+      state: 1
+    - created_at: 1524648266720331175
+      id: 6b94d9a7-e22a-5d08-65ee-16b9b1e07ab0
+      image:
+        image: localhost/ubuntu.img
+      image_ref: localhost/ubuntu.img
+      labels:
+        fizz: buzz
+        foo: bar
+        io.kubernetes.container.name: container-for-testName_1
+        io.kubernetes.pod.name: testName_1
+        io.kubernetes.pod.namespace: default
+        io.kubernetes.pod.uid: d25ded14-d35d-510b-5749-f83cc165794e
+      metadata:
+        name: container-for-testName_1
+      pod_sandbox_id: d25ded14-d35d-510b-5749-f83cc165794e
+- name: 'enter: ContainerStatus'
+  value:
+    container_id: 6b94d9a7-e22a-5d08-65ee-16b9b1e07ab0
+- name: 'leave: ContainerStatus'
+  value:
+    status:
+      created_at: 1524648266720331175
+      id: 6b94d9a7-e22a-5d08-65ee-16b9b1e07ab0
+      image:
+        image: localhost/ubuntu.img
+      image_ref: localhost/ubuntu.img
+      labels:
+        fizz: buzz
+        foo: bar
+        io.kubernetes.container.name: container-for-testName_1
+        io.kubernetes.pod.name: testName_1
+        io.kubernetes.pod.namespace: default
+        io.kubernetes.pod.uid: d25ded14-d35d-510b-5749-f83cc165794e
+      metadata:
+        name: container-for-testName_1
+- name: 'enter: StartContainer'
+  value:
+    container_id: 6b94d9a7-e22a-5d08-65ee-16b9b1e07ab0
+- name: 'domain conn: virtlet-6b94d9a7-e22a-container-for-testName_1: Create'
+- name: 'domain conn: virtlet-6b94d9a7-e22a-container-for-testName_1: iso image'
+  value:
+    meta-data: '{"instance-id":"testName_1.default","local-hostname":"testName_1"}'
+    network-config: |
+      version: 1
+      config:
+      - mac_address: 42:a4:a6:22:80:2e
+        mtu: 0
+        name: eth0
+        subnets:
+        - address: 10.1.90.6
+          netmask: 255.255.255.0
+          type: static
+        type: physical
+      - destination: 0.0.0.0/0
+        gateway: 10.1.90.1
+        type: route
+    user-data: |
+      #cloud-config
+- name: 'leave: StartContainer'
+  value: {}
+- name: 'enter: ContainerStatus'
+  value:
+    container_id: 6b94d9a7-e22a-5d08-65ee-16b9b1e07ab0
+- name: 'leave: ContainerStatus'
+  value:
+    status:
+      created_at: 1524648266720331175
+      id: 6b94d9a7-e22a-5d08-65ee-16b9b1e07ab0
+      image:
+        image: localhost/ubuntu.img
+      image_ref: localhost/ubuntu.img
+      labels:
+        fizz: buzz
+        foo: bar
+        io.kubernetes.container.name: container-for-testName_1
+        io.kubernetes.pod.name: testName_1
+        io.kubernetes.pod.namespace: default
+        io.kubernetes.pod.uid: d25ded14-d35d-510b-5749-f83cc165794e
+      metadata:
+        name: container-for-testName_1
+      started_at: 1524648266720331175
+      state: 1
+- name: 'enter: StopContainer'
+  value:
+    container_id: 231700d5-c9a6-5a49-738d-99a954c51550
+- name: 'domain conn: virtlet-231700d5-c9a6-container-for-testName_0: Destroy'
+- name: 'storage: volumes: RemoveVolumeByName'
+  value: virtlet_root_231700d5-c9a6-5a49-738d-99a954c51550
+- name: 'leave: StopContainer'
+  value: {}
+- name: 'enter: StopContainer'
+  value:
+    container_id: 6b94d9a7-e22a-5d08-65ee-16b9b1e07ab0
+- name: 'domain conn: virtlet-6b94d9a7-e22a-container-for-testName_1: Destroy'
+- name: 'storage: volumes: RemoveVolumeByName'
+  value: virtlet_root_6b94d9a7-e22a-5d08-65ee-16b9b1e07ab0
+- name: 'leave: StopContainer'
+  value: {}
+- name: 'enter: StopContainer'
+  value:
+    container_id: 6b94d9a7-e22a-5d08-65ee-16b9b1e07ab0
+- name: 'domain conn: virtlet-6b94d9a7-e22a-container-for-testName_1: Destroy'
+- name: 'storage: volumes: RemoveVolumeByName'
+  value: virtlet_root_6b94d9a7-e22a-5d08-65ee-16b9b1e07ab0
+- name: 'leave: StopContainer'
+  value: {}
+- name: 'enter: ListContainers'
+  value: {}
+- name: 'domain conn: ListDomains'
+  value:
+  - virtlet-231700d5-c9a6-container-for-testName_0
+  - virtlet-6b94d9a7-e22a-container-for-testName_1
+- name: 'leave: ListContainers'
+  value:
+    containers:
+    - created_at: 1524648266720331175
+      id: 231700d5-c9a6-5a49-738d-99a954c51550
+      image:
+        image: localhost/cirros.img
+      image_ref: localhost/cirros.img
+      labels:
+        fizz: buzz
+        foo: bar
+        io.kubernetes.container.name: container-for-testName_0
+        io.kubernetes.pod.name: testName_0
+        io.kubernetes.pod.namespace: default
+        io.kubernetes.pod.uid: 69eec606-0493-5825-73a4-c5e0c0236155
+      metadata:
+        name: container-for-testName_0
+      pod_sandbox_id: 69eec606-0493-5825-73a4-c5e0c0236155
+      state: 2
+    - created_at: 1524648266720331175
+      id: 6b94d9a7-e22a-5d08-65ee-16b9b1e07ab0
+      image:
+        image: localhost/ubuntu.img
+      image_ref: localhost/ubuntu.img
+      labels:
+        fizz: buzz
+        foo: bar
+        io.kubernetes.container.name: container-for-testName_1
+        io.kubernetes.pod.name: testName_1
+        io.kubernetes.pod.namespace: default
+        io.kubernetes.pod.uid: d25ded14-d35d-510b-5749-f83cc165794e
+      metadata:
+        name: container-for-testName_1
+      pod_sandbox_id: d25ded14-d35d-510b-5749-f83cc165794e
+      state: 2
+- name: 'enter: ContainerStatus'
+  value:
+    container_id: 231700d5-c9a6-5a49-738d-99a954c51550
+- name: 'leave: ContainerStatus'
+  value:
+    status:
+      created_at: 1524648266720331175
+      id: 231700d5-c9a6-5a49-738d-99a954c51550
+      image:
+        image: localhost/cirros.img
+      image_ref: localhost/cirros.img
+      labels:
+        fizz: buzz
+        foo: bar
+        io.kubernetes.container.name: container-for-testName_0
+        io.kubernetes.pod.name: testName_0
+        io.kubernetes.pod.namespace: default
+        io.kubernetes.pod.uid: 69eec606-0493-5825-73a4-c5e0c0236155
+      metadata:
+        name: container-for-testName_0
+      started_at: 1524648266720331175
+      state: 2
+- name: 'enter: RemoveContainer'
+  value:
+    container_id: 231700d5-c9a6-5a49-738d-99a954c51550
+- name: 'domain conn: virtlet-231700d5-c9a6-container-for-testName_0: Undefine'
+- name: 'storage: volumes: RemoveVolumeByName'
+  value: virtlet_root_231700d5-c9a6-5a49-738d-99a954c51550
+- name: 'imageStore: GC'
+  value:
+    refSet: null
+- name: 'leave: RemoveContainer'
+  value: {}
+- name: 'enter: RemoveContainer'
+  value:
+    container_id: 6b94d9a7-e22a-5d08-65ee-16b9b1e07ab0
+- name: 'domain conn: virtlet-6b94d9a7-e22a-container-for-testName_1: Undefine'
+- name: 'storage: volumes: RemoveVolumeByName'
+  value: virtlet_root_6b94d9a7-e22a-5d08-65ee-16b9b1e07ab0
+- name: 'imageStore: GC'
+  value:
+    refSet: null
+- name: 'leave: RemoveContainer'
+  value: {}
+- name: 'enter: RemoveContainer'
+  value:
+    container_id: 6b94d9a7-e22a-5d08-65ee-16b9b1e07ab0
+- name: 'imageStore: GC'
+  value:
+    refSet: null
+- name: 'leave: RemoveContainer'
+  value: {}
+- name: 'enter: StopPodSandbox'
+  value:
+    pod_sandbox_id: 69eec606-0493-5825-73a4-c5e0c0236155
+- name: 'fdManager: ReleaseFDs'
+  value: 69eec606-0493-5825-73a4-c5e0c0236155
+- name: 'leave: StopPodSandbox'
+  value: {}
+- name: 'enter: StopPodSandbox'
+  value:
+    pod_sandbox_id: d25ded14-d35d-510b-5749-f83cc165794e
+- name: 'fdManager: ReleaseFDs'
+  value: d25ded14-d35d-510b-5749-f83cc165794e
+- name: 'leave: StopPodSandbox'
+  value: {}
+- name: 'enter: StopPodSandbox'
+  value:
+    pod_sandbox_id: d25ded14-d35d-510b-5749-f83cc165794e
+- name: 'leave: StopPodSandbox'
+  value: {}
+- name: 'enter: ListPodSandbox'
+  value: {}
+- name: 'leave: ListPodSandbox'
+  value:
+    items:
+    - created_at: 1524648266720331175
+      id: 69eec606-0493-5825-73a4-c5e0c0236155
+      labels:
+        fizz: buzz
+        foo: bar
+      metadata:
+        name: testName_0
+        namespace: default
+        uid: 69eec606-0493-5825-73a4-c5e0c0236155
+      state: 1
+    - created_at: 1524648266720331175
+      id: d25ded14-d35d-510b-5749-f83cc165794e
+      labels:
+        fizz: buzz
+        foo: bar
+      metadata:
+        name: testName_1
+        namespace: default
+        uid: d25ded14-d35d-510b-5749-f83cc165794e
+      state: 1
+- name: 'enter: PodSandboxStatus'
+  value:
+    pod_sandbox_id: 69eec606-0493-5825-73a4-c5e0c0236155
+- name: 'leave: PodSandboxStatus'
+  value:
+    status:
+      annotations:
+        hello: world
+        virt: let
+      created_at: 1524648266720331175
+      id: 69eec606-0493-5825-73a4-c5e0c0236155
+      labels:
+        fizz: buzz
+        foo: bar
+      linux:
+        namespaces:
+          options: {}
+      metadata:
+        name: testName_0
+        namespace: default
+        uid: 69eec606-0493-5825-73a4-c5e0c0236155
+      network:
+        ip: 10.1.90.5
+      state: 1
+- name: 'enter: RemovePodSandbox'
+  value:
+    pod_sandbox_id: 69eec606-0493-5825-73a4-c5e0c0236155
+- name: 'leave: RemovePodSandbox'
+  value: {}
+- name: 'enter: RemovePodSandbox'
+  value:
+    pod_sandbox_id: d25ded14-d35d-510b-5749-f83cc165794e
+- name: 'leave: RemovePodSandbox'
+  value: {}
+- name: 'enter: RemovePodSandbox'
+  value:
+    pod_sandbox_id: d25ded14-d35d-510b-5749-f83cc165794e
+- name: 'leave: RemovePodSandbox'
+  value: {}
+- name: 'enter: ListPodSandbox'
+  value: {}
+- name: 'leave: ListPodSandbox'
+  value: {}
+- name: 'enter: ListContainers'
+  value: {}
+- name: 'domain conn: ListDomains'
+  value: []
+- name: 'leave: ListContainers'
+  value: {}

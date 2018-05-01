@@ -1,0 +1,19 @@
+- name: 'volumes: CreateStorageVol'
+  value: |-
+    <volume>
+      <name>virtlet-77f29a0e-46af-4188-a6af-9ff8b8a65224-test-volume</name>
+      <allocation>0</allocation>
+      <capacity unit="MB">424242</capacity>
+      <target>
+        <format type="qcow2"></format>
+      </target>
+    </volume>
+- name: 'volumes: virtlet-77f29a0e-46af-4188-a6af-9ff8b8a65224-test-volume: Format'
+- name: volume retuned by qcow2_flexvolume
+  value: |-
+    <disk type="file" device="disk">
+      <driver name="qemu" type="qcow2"></driver>
+      <source file="/fake/volumes/pool/virtlet-77f29a0e-46af-4188-a6af-9ff8b8a65224-test-volume"></source>
+    </disk>
+- name: 'volumes: RemoveVolumeByName'
+  value: virtlet-77f29a0e-46af-4188-a6af-9ff8b8a65224-test-volume

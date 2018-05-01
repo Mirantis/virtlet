@@ -30,7 +30,7 @@ import (
 	digest "github.com/opencontainers/go-digest"
 )
 
-// Image describes an image
+// Image describes an image.
 type Image struct {
 	Digest string
 	Name   string
@@ -47,34 +47,34 @@ func (img *Image) hexDigest() (string, error) {
 	return d.Hex(), nil
 }
 
-// Translator translates image name to a Endpoint
-type Translator func(string) Endpoint
+// Translator translates image name to a Endpoint.
+type Translator func(context.Context, string) Endpoint
 
 // RefGetter is a function that returns the list of images
-// that are currently in use
+// that are currently in use.
 type RefGetter func() (map[string]bool, error)
 
-// Store is an interface for the image store
+// Store is an interface for the image store.
 type Store interface {
 	// ListImage returns the list of images in the store.
 	// If filter is specified, the list will only contain the
 	// image with the same name as the value of 'filter',
-	// or no images at all if there are no such images
+	// or no images at all if there are no such images.
 	ListImages(filter string) ([]*Image, error)
 
 	// ImageStatus returns the description of the specified image.
 	// If the image doesn't exist, no error is returned, just
-	// nil instead of an image
+	// nil instead of an image.
 	ImageStatus(name string) (*Image, error)
 
 	// PullImage pulls the image using specified image name translation
-	// function
+	// function.
 	PullImage(ctx context.Context, name string, translator Translator) (string, error)
 
-	// RemoveImage removes the specified image
+	// RemoveImage removes the specified image.
 	RemoveImage(name string) error
 
-	// GC removes all unused or partially downloaded images
+	// GC removes all unused or partially downloaded images.
 	GC() error
 
 	// GetImagePathAndVirtualSize returns the path to image data
@@ -88,7 +88,7 @@ type Store interface {
 }
 
 // VirtualSizeFunc specifies a function that returns the virtual
-// size of the specified QCOW2 image file
+// size of the specified QCOW2 image file.
 type VirtualSizeFunc func(string) (uint64, error)
 
 // FileStore implements Store. For more info on its
@@ -106,7 +106,7 @@ var _ Store = &FileStore{}
 // NewFileStore creates a new FileStore that will be using
 // the specified dir to store the images, image downloader and
 // a function for getting virtual size of the image. If vsizeFunc
-// is nil, the default GetImageVirtualSize function will be used
+// is nil, the default GetImageVirtualSize function will be used.
 func NewFileStore(dir string, downloader Downloader, vsizeFunc VirtualSizeFunc) *FileStore {
 	if vsizeFunc == nil {
 		vsizeFunc = GetImageVirtualSize
@@ -142,7 +142,7 @@ func (s *FileStore) dataFileName(hexDigest string) string {
 }
 
 func (s *FileStore) linkFileName(imageName string) string {
-	imageName = stripTags(imageName)
+	imageName = StripTags(imageName)
 	return filepath.Join(s.linkDir(), strings.Replace(imageName, "/", "%", -1))
 }
 
@@ -175,7 +175,7 @@ func (s *FileStore) getImageHexDigestsInUse() (map[string]bool, error) {
 		}
 	}
 	for _, imgSpec := range imgList {
-		if d := getHexDigest(imgSpec); d != "" {
+		if d := GetHexDigest(imgSpec); d != "" {
 			imagesInUse[d] = true
 		}
 	}
@@ -334,7 +334,7 @@ func (s *FileStore) listImagesUnlocked(filter string) ([]*Image, error) {
 	return r, nil
 }
 
-// ListImages implements ListImages method of ImageStore interface
+// ListImages implements ListImages method of ImageStore interface.
 func (s *FileStore) ListImages(filter string) ([]*Image, error) {
 	s.Lock()
 	defer s.Unlock()
@@ -354,17 +354,17 @@ func (s *FileStore) imageStatusUnlocked(name string) (*Image, error) {
 	}
 }
 
-// ImageStatus implements ImageStatus method of Store interface
+// ImageStatus implements ImageStatus method of Store interface.
 func (s *FileStore) ImageStatus(name string) (*Image, error) {
 	s.Lock()
 	defer s.Unlock()
 	return s.imageStatusUnlocked(name)
 }
 
-// PullImage implements PullImage method of Store interface
+// PullImage implements PullImage method of Store interface.
 func (s *FileStore) PullImage(ctx context.Context, name string, translator Translator) (string, error) {
-	name = stripTags(name)
-	ep := translator(name)
+	name = StripTags(name)
+	ep := translator(ctx, name)
 	glog.V(1).Infof("Image translation: %q -> %q", name, ep.URL)
 	if err := os.MkdirAll(s.dataDir(), 0777); err != nil {
 		return "", fmt.Errorf("mkdir %q: %v", s.dataDir(), err)
@@ -406,7 +406,7 @@ func (s *FileStore) PullImage(ctx context.Context, name string, translator Trans
 	return withDigest.String(), nil
 }
 
-// RemoveImage implements RemoveImage method of Store interface
+// RemoveImage implements RemoveImage method of Store interface.
 func (s *FileStore) RemoveImage(name string) error {
 	s.Lock()
 	defer s.Unlock()
@@ -414,7 +414,7 @@ func (s *FileStore) RemoveImage(name string) error {
 	return err
 }
 
-// GC implements GC method of Store interface
+// GC implements GC method of Store interface.
 func (s *FileStore) GC() error {
 	s.Lock()
 	defer s.Unlock()
@@ -439,7 +439,7 @@ func (s *FileStore) GC() error {
 	return nil
 }
 
-// GetImagePathAndVirtualSize implements GC method of Store interface
+// GetImagePathAndVirtualSize implements GC method of Store interface.
 func (s *FileStore) GetImagePathAndVirtualSize(ref string) (string, uint64, error) {
 	s.Lock()
 	defer s.Unlock()
@@ -502,15 +502,16 @@ func (s *FileStore) GetImagePathAndVirtualSize(ref string) (string, uint64, erro
 	return path, vsize, nil
 }
 
-// SetRefGetter implements SetRefGetter method of Store interface
+// SetRefGetter implements SetRefGetter method of Store interface.
 func (s *FileStore) SetRefGetter(imageRefGetter RefGetter) {
 	s.refGetter = imageRefGetter
 }
 
-func stripTags(imageName string) string {
+// StripTags removes tags from an image name.
+func StripTags(imageName string) string {
 	ref, err := reference.Parse(imageName)
 	if err != nil {
-		glog.Warningf("stripTags: failed to parse image name as ref: %q: %v", imageName, err)
+		glog.Warningf("StripTags: failed to parse image name as ref: %q: %v", imageName, err)
 		return imageName
 	}
 	if namedTagged, ok := ref.(reference.NamedTagged); ok {
@@ -519,7 +520,9 @@ func stripTags(imageName string) string {
 	return imageName
 }
 
-func getHexDigest(imageSpec string) string {
+// GetHexDigest returns the hex digest contained in imageSpec, if any,
+// or an empty string if imageSpec doesn't have the spec.
+func GetHexDigest(imageSpec string) string {
 	if d, err := digest.Parse(imageSpec); err == nil {
 		if d.Algorithm() != digest.SHA256 {
 			return ""

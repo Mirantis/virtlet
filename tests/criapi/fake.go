@@ -21,10 +21,9 @@ type ContainerTestConfig struct {
 	Annotations         map[string]string
 }
 
-func GetSandboxes(sandboxNum int) []*kubeapi.PodSandboxConfig {
+func GetSandboxes(sandboxCount int) []*kubeapi.PodSandboxConfig {
 	sandboxes := []*kubeapi.PodSandboxConfig{}
-
-	for i := 0; i < sandboxNum; i++ {
+	for i := 0; i < sandboxCount; i++ {
 		name := "testName_" + strconv.Itoa(i)
 
 		namespace := "default"

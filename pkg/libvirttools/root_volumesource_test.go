@@ -19,6 +19,7 @@ package libvirttools
 import (
 	"testing"
 
+	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 	"github.com/Mirantis/virtlet/pkg/virt"
 	"github.com/Mirantis/virtlet/pkg/virt/fake"
 	"github.com/Mirantis/virtlet/tests/gm"
@@ -29,12 +30,12 @@ const (
 )
 
 type FakeImageManager struct {
-	rec fake.Recorder
+	rec testutils.Recorder
 }
 
 var _ ImageManager = &FakeImageManager{}
 
-func NewFakeImageManager(rec fake.Recorder) *FakeImageManager {
+func NewFakeImageManager(rec testutils.Recorder) *FakeImageManager {
 	return &FakeImageManager{
 		rec: rec,
 	}
@@ -60,7 +61,7 @@ func TestRootVolumeNaming(t *testing.T) {
 }
 
 func TestRootVolumeLifeCycle(t *testing.T) {
-	rec := fake.NewToplevelRecorder()
+	rec := testutils.NewToplevelRecorder()
 
 	volumesPoolPath := "/fake/volumes/pool"
 	expectedRootVolumePath := volumesPoolPath + "/virtlet_root_" + testUUID
@@ -99,13 +100,17 @@ func TestRootVolumeLifeCycle(t *testing.T) {
 		t.Errorf("Expected '%s' as root volume path, received: %s", expectedRootVolumePath, vol.Source.File)
 	}
 
-	rec.Rec("root disk retuned by virtlet_root_volumesource", vol)
+	out, err := vol.Marshal()
+	if err != nil {
+		t.Fatalf("error marshalling the volume: %v", err)
+	}
+	rec.Rec("root disk retuned by virtlet_root_volumesource", out)
 
 	if err := rootVol.Teardown(); err != nil {
 		t.Errorf("Teardown returned an error: %v", err)
 	}
 
-	gm.Verify(t, rec.Content())
+	gm.Verify(t, gm.NewYamlVerifier(rec.Content()))
 }
 
 type fakeVolumeOwner struct {

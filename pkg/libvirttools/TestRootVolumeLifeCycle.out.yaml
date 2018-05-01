@@ -1,0 +1,24 @@
+- name: 'image: GetImagePathAndVirtualSize'
+  value: rootfs image name
+- name: 'volumes: CreateStorageVol'
+  value: |-
+    <volume type="file">
+      <name>virtlet_root_77f29a0e-46af-4188-a6af-9ff8b8a65224</name>
+      <allocation unit="b">0</allocation>
+      <capacity unit="b">424242</capacity>
+      <target>
+        <format type="qcow2"></format>
+      </target>
+      <backingStore>
+        <path>/fake/volume/path</path>
+        <format type="qcow2"></format>
+      </backingStore>
+    </volume>
+- name: root disk retuned by virtlet_root_volumesource
+  value: |-
+    <disk type="file" device="disk">
+      <driver name="qemu" type="qcow2"></driver>
+      <source file="/fake/volumes/pool/virtlet_root_77f29a0e-46af-4188-a6af-9ff8b8a65224"></source>
+    </disk>
+- name: 'volumes: RemoveVolumeByName'
+  value: virtlet_root_77f29a0e-46af-4188-a6af-9ff8b8a65224
