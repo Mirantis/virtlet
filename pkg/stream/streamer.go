@@ -56,7 +56,7 @@ func (s *Server) Attach(containerID string, inputStream io.Reader, outputStream,
 	s.unixServer.AddOutputReader(containerID, outChan)
 
 	kubecontainer.HandleResizing(resize, func(size remotecommand.TerminalSize) {
-		glog.Info("Got a resize event: %+v", size)
+		glog.Infof("Got a resize event: %+v", size)
 	})
 
 	receiveStdout := make(chan error)
