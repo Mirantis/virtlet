@@ -149,9 +149,7 @@ func (v *VirtletRuntimeService) RunPodSandbox(ctx context.Context, in *kubeapi.R
 	fdPayload := &tapmanager.GetFDPayload{Description: pnd}
 	csnBytes, err := v.fdManager.AddFDs(podID, fdPayload)
 	if err != nil {
-		// Try to cleanup cni e.x. in case of multiple plugins behind cni genie.
-		// While one of them failed, other could already allocated some resources
-		// so give them a try to do cleanup.
+		// Try to clean up CNI netns (this may be necessary e.g. in case of multiple CNI plugins with CNI Genie)
 		if fdErr := v.fdManager.ReleaseFDs(podID); err != nil {
 			glog.Errorf("Error removing pod %s (%s) from CNI network: %v", podName, podID, fdErr)
 		}
