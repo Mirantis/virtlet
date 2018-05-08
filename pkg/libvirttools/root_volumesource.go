@@ -21,6 +21,7 @@ import (
 
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	"github.com/Mirantis/virtlet/pkg/virt"
 )
 
@@ -32,7 +33,7 @@ type rootVolume struct {
 var _ VMVolume = &rootVolume{}
 
 // GetRootVolume returns volume source for root volume clone.
-func GetRootVolume(config *VMConfig, owner volumeOwner) ([]VMVolume, error) {
+func GetRootVolume(config *types.VMConfig, owner volumeOwner) ([]VMVolume, error) {
 	return []VMVolume{
 		&rootVolume{
 			volumeBase{config, owner},

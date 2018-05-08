@@ -25,6 +25,7 @@ import (
 
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/Mirantis/virtlet/pkg/virt"
 )
@@ -51,7 +52,7 @@ type cephVolume struct {
 
 var _ VMVolume = &cephVolume{}
 
-func newCephVolume(volumeName, configPath string, config *VMConfig, owner volumeOwner) (VMVolume, error) {
+func newCephVolume(volumeName, configPath string, config *types.VMConfig, owner volumeOwner) (VMVolume, error) {
 	v := &cephVolume{
 		volumeBase: volumeBase{config, owner},
 	}

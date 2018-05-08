@@ -36,6 +36,7 @@ import (
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
 	"github.com/Mirantis/virtlet/pkg/flexvolume"
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	"github.com/Mirantis/virtlet/pkg/network"
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
@@ -49,12 +50,12 @@ const (
 // CloudInitGenerator provides a common part for Cloud Init ISO drive preparation
 // for NoCloud and ConfigDrive volume sources.
 type CloudInitGenerator struct {
-	config *VMConfig
+	config *types.VMConfig
 	isoDir string
 }
 
 // NewCloudInitGenerator returns new CloudInitGenerator.
-func NewCloudInitGenerator(config *VMConfig, isoDir string) *CloudInitGenerator {
+func NewCloudInitGenerator(config *types.VMConfig, isoDir string) *CloudInitGenerator {
 	return &CloudInitGenerator{
 		config: config,
 		isoDir: isoDir,
@@ -67,7 +68,8 @@ func (g *CloudInitGenerator) generateMetaData() ([]byte, error) {
 		"local-hostname": g.config.PodName,
 	}
 
-	if g.config.ParsedAnnotations.ImageType == imageTypeConfigDrive {
+	// TODO: get rid of this if. Use descriptor for cloud-init image types.
+	if g.config.ParsedAnnotations.CDImageType == types.CloudInitImageTypeConfigDrive {
 		m["uuid"] = m["instance-id"]
 		m["hostname"] = m["local-hostname"]
 	}
@@ -133,14 +135,15 @@ func (g *CloudInitGenerator) generateUserData(volumeMap diskPathMap) ([]byte, er
 }
 
 func (g *CloudInitGenerator) generateNetworkConfiguration() ([]byte, error) {
-	switch g.config.ParsedAnnotations.ImageType {
-	case imageTypeNoCloud:
+	// TODO: get rid of this switch. Use descriptor for cloud-init image types.
+	switch g.config.ParsedAnnotations.CDImageType {
+	case types.CloudInitImageTypeNoCloud:
 		return g.generateNetworkConfigurationNoCloud()
-	case imageTypeConfigDrive:
+	case types.CloudInitImageTypeConfigDrive:
 		return g.generateNetworkConfigurationConfigDrive()
 	}
 
-	return nil, fmt.Errorf("unknown cloud-init config image type: %q", g.config.ParsedAnnotations.ImageType)
+	return nil, fmt.Errorf("unknown cloud-init config image type: %q", g.config.ParsedAnnotations.CDImageType)
 }
 
 func (g *CloudInitGenerator) generateNetworkConfigurationNoCloud() ([]byte, error) {
@@ -402,13 +405,14 @@ func (g *CloudInitGenerator) GenerateImage(volumeMap diskPathMap) error {
 	var userDataLocation, metaDataLocation, networkConfigLocation string
 	var volumeName string
 
-	switch g.config.ParsedAnnotations.ImageType {
-	case imageTypeNoCloud:
+	// TODO: get rid of this switch. Use descriptor for cloud-init image types.
+	switch g.config.ParsedAnnotations.CDImageType {
+	case types.CloudInitImageTypeNoCloud:
 		userDataLocation = "user-data"
 		metaDataLocation = "meta-data"
 		networkConfigLocation = "network-config"
 		volumeName = "cidata"
-	case imageTypeConfigDrive:
+	case types.CloudInitImageTypeConfigDrive:
 		userDataLocation = "openstack/latest/user_data"
 		metaDataLocation = "openstack/latest/meta_data.json"
 		networkConfigLocation = "openstack/latest/network_data.json"
@@ -416,7 +420,7 @@ func (g *CloudInitGenerator) GenerateImage(volumeMap diskPathMap) error {
 	default:
 		// that should newer happen, as imageType should be validated
 		// already earlier
-		return fmt.Errorf("unknown cloud-init config image type: %q", g.config.ParsedAnnotations.ImageType)
+		return fmt.Errorf("unknown cloud-init config image type: %q", g.config.ParsedAnnotations.CDImageType)
 	}
 
 	if err := utils.WriteFiles(tmpDir, map[string][]byte{
@@ -502,10 +506,10 @@ func (g *CloudInitGenerator) generateMounts(volumeMap diskPathMap) ([]interface{
 
 type writeFilesUpdater struct {
 	entries []interface{}
-	mounts  []*VMMount
+	mounts  []types.VMMount
 }
 
-func newWriteFilesUpdater(mounts []*VMMount) *writeFilesUpdater {
+func newWriteFilesUpdater(mounts []types.VMMount) *writeFilesUpdater {
 	return &writeFilesUpdater{
 		mounts: mounts,
 	}
@@ -591,7 +595,7 @@ func (u *writeFilesUpdater) addEnvironmentFile(content string) {
 	u.putPlainText(envFileLocation, content, 0644)
 }
 
-func (u *writeFilesUpdater) addFilesForMount(mount *VMMount) []interface{} {
+func (u *writeFilesUpdater) addFilesForMount(mount types.VMMount) []interface{} {
 	var writeFiles []interface{}
 
 	addFileContent := func(fullPath string) error {
@@ -617,8 +621,8 @@ func (u *writeFilesUpdater) addFilesForMount(mount *VMMount) []interface{} {
 	return writeFiles
 }
 
-func (u *writeFilesUpdater) filterMounts(filter func(string) bool) []*VMMount {
-	var r []*VMMount
+func (u *writeFilesUpdater) filterMounts(filter func(string) bool) []types.VMMount {
+	var r []types.VMMount
 	for _, mount := range u.mounts {
 		if filter(mount.HostPath) {
 			r = append(r, mount)

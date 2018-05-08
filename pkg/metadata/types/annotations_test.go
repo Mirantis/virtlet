@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package libvirttools
+package types
 
 import (
 	"reflect"
@@ -32,54 +32,54 @@ func TestVirtletAnnotations(t *testing.T) {
 			name:        "nil annotations",
 			annotations: nil,
 			va: &VirtletAnnotations{
-				VCPUCount:  1,
-				DiskDriver: "scsi",
-				ImageType:  "nocloud",
+				VCPUCount:   1,
+				DiskDriver:  "scsi",
+				CDImageType: "nocloud",
 			},
 		},
 		{
 			name:        "empty annotations",
 			annotations: map[string]string{},
 			va: &VirtletAnnotations{
-				VCPUCount:  1,
-				DiskDriver: "scsi",
-				ImageType:  "nocloud",
+				VCPUCount:   1,
+				DiskDriver:  "scsi",
+				CDImageType: "nocloud",
 			},
 		},
 		{
 			name:        "non empty cloud init type annotation",
 			annotations: map[string]string{"VirtletCloudInitImageType": "configdrive"},
 			va: &VirtletAnnotations{
-				VCPUCount:  1,
-				DiskDriver: "scsi",
-				ImageType:  "configdrive",
+				VCPUCount:   1,
+				DiskDriver:  "scsi",
+				CDImageType: "configdrive",
 			},
 		},
 		{
 			name:        "negative vcpu count (default)",
 			annotations: map[string]string{"VirtletVCPUCount": "-1"},
 			va: &VirtletAnnotations{
-				VCPUCount:  1,
-				DiskDriver: "scsi",
-				ImageType:  "nocloud",
+				VCPUCount:   1,
+				DiskDriver:  "scsi",
+				CDImageType: "nocloud",
 			},
 		},
 		{
 			name:        "zero vcpu count (default)",
 			annotations: map[string]string{"VirtletVCPUCount": "0"},
 			va: &VirtletAnnotations{
-				VCPUCount:  1,
-				DiskDriver: "scsi",
-				ImageType:  "nocloud",
+				VCPUCount:   1,
+				DiskDriver:  "scsi",
+				CDImageType: "nocloud",
 			},
 		},
 		{
 			name:        "vcpu count specified",
 			annotations: map[string]string{"VirtletVCPUCount": "4"},
 			va: &VirtletAnnotations{
-				VCPUCount:  4,
-				DiskDriver: "scsi",
-				ImageType:  "nocloud",
+				VCPUCount:   4,
+				DiskDriver:  "scsi",
+				CDImageType: "nocloud",
 			},
 		},
 		{
@@ -105,9 +105,9 @@ func TestVirtletAnnotations(t *testing.T) {
 						},
 					},
 				},
-				SSHKeys:    []string{"key1", "key2"},
-				DiskDriver: "scsi",
-				ImageType:  "nocloud",
+				SSHKeys:     []string{"key1", "key2"},
+				DiskDriver:  "scsi",
+				CDImageType: "nocloud",
 			},
 		},
 		{
@@ -119,7 +119,7 @@ func TestVirtletAnnotations(t *testing.T) {
 				VCPUCount:         1,
 				UserDataOverwrite: true,
 				DiskDriver:        "scsi",
-				ImageType:         "nocloud",
+				CDImageType:       "nocloud",
 			},
 		},
 		{
@@ -131,7 +131,7 @@ func TestVirtletAnnotations(t *testing.T) {
 				VCPUCount:      1,
 				UserDataScript: "#!/bin/sh\necho hi\n",
 				DiskDriver:     "scsi",
-				ImageType:      "nocloud",
+				CDImageType:    "nocloud",
 			},
 		},
 		// bad metadata items follow
@@ -163,7 +163,7 @@ func TestVirtletAnnotations(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			va, err := LoadAnnotations("", testCase.annotations)
+			va, err := loadAnnotations("", testCase.annotations)
 			switch {
 			case testCase.va == nil && err == nil:
 				t.Errorf("invalid annotations considered valid:\n%#v", testCase.annotations)

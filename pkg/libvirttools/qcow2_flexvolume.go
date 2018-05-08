@@ -23,6 +23,7 @@ import (
 
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/Mirantis/virtlet/pkg/virt"
 )
@@ -56,7 +57,7 @@ type qcow2Volume struct {
 
 var _ VMVolume = &qcow2Volume{}
 
-func newQCOW2Volume(volumeName, configPath string, config *VMConfig, owner volumeOwner) (VMVolume, error) {
+func newQCOW2Volume(volumeName, configPath string, config *types.VMConfig, owner volumeOwner) (VMVolume, error) {
 	var err error
 	var opts qcow2VolumeOptions
 	if err = utils.ReadJSON(configPath, &opts); err != nil {

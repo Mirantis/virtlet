@@ -23,6 +23,7 @@ import (
 
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
@@ -46,7 +47,7 @@ type rawDeviceVolume struct {
 
 var _ VMVolume = &rawDeviceVolume{}
 
-func newRawDeviceVolume(volumeName, configPath string, config *VMConfig, owner volumeOwner) (VMVolume, error) {
+func newRawDeviceVolume(volumeName, configPath string, config *types.VMConfig, owner volumeOwner) (VMVolume, error) {
 	var opts rawVolumeOptions
 	if err := utils.ReadJSON(configPath, &opts); err != nil {
 		return nil, fmt.Errorf("failed to parse raw volume config %q: %v", configPath, err)

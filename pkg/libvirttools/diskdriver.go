@@ -22,6 +22,8 @@ import (
 	"sort"
 
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
+
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
 )
 
 const (
@@ -41,9 +43,9 @@ type diskDriver interface {
 
 type diskDriverFactory func(n int) (diskDriver, error)
 
-var diskDriverMap = map[diskDriverName]diskDriverFactory{
-	diskDriverVirtio: virtioBlkDriverFactory,
-	diskDriverScsi:   scsiDriverFactory,
+var diskDriverMap = map[types.DiskDriverName]diskDriverFactory{
+	types.DiskDriverVirtio: virtioBlkDriverFactory,
+	types.DiskDriverScsi:   scsiDriverFactory,
 }
 
 type virtioBlkDriver struct {
@@ -179,7 +181,7 @@ func (d *scsiDriver) address() *libvirtxml.DomainAddress {
 	}
 }
 
-func getDiskDriverFactory(name diskDriverName) (diskDriverFactory, error) {
+func getDiskDriverFactory(name types.DiskDriverName) (diskDriverFactory, error) {
 	if f, found := diskDriverMap[name]; found {
 		return f, nil
 	}

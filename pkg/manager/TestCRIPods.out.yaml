@@ -59,7 +59,10 @@
 - name: 'leave: ListPodSandbox'
   value:
     items:
-    - created_at: 1524648266720331175
+    - annotations:
+        hello: world
+        virt: let
+      created_at: 1524648266720331175
       id: 69eec606-0493-5825-73a4-c5e0c0236155
       labels:
         fizz: buzz
@@ -99,6 +102,10 @@
       labels:
         fizz: buzz
         foo: bar
+        io.kubernetes.container.name: container-for-testName_0
+        io.kubernetes.pod.name: testName_0
+        io.kubernetes.pod.namespace: default
+        io.kubernetes.pod.uid: 69eec606-0493-5825-73a4-c5e0c0236155
       metadata:
         name: container-for-testName_0
     pod_sandbox_id: 69eec606-0493-5825-73a4-c5e0c0236155
@@ -351,6 +358,10 @@
       labels:
         fizz: buzz
         foo: bar
+        io.kubernetes.container.name: container-for-testName_1
+        io.kubernetes.pod.name: testName_1
+        io.kubernetes.pod.namespace: default
+        io.kubernetes.pod.uid: d25ded14-d35d-510b-5749-f83cc165794e
       metadata:
         name: container-for-testName_1
     pod_sandbox_id: d25ded14-d35d-510b-5749-f83cc165794e
@@ -456,7 +467,10 @@
 - name: 'leave: ListPodSandbox'
   value:
     items:
-    - created_at: 1524648266720331175
+    - annotations:
+        hello: world
+        virt: let
+      created_at: 1524648266720331175
       id: 69eec606-0493-5825-73a4-c5e0c0236155
       labels:
         fizz: buzz
@@ -465,7 +479,10 @@
         name: testName_0
         namespace: default
         uid: 69eec606-0493-5825-73a4-c5e0c0236155
-    - created_at: 1524648266720331175
+    - annotations:
+        hello: world
+        virt: let
+      created_at: 1524648266720331175
       id: d25ded14-d35d-510b-5749-f83cc165794e
       labels:
         fizz: buzz
@@ -722,7 +739,10 @@
 - name: 'leave: ListPodSandbox'
   value:
     items:
-    - created_at: 1524648266720331175
+    - annotations:
+        hello: world
+        virt: let
+      created_at: 1524648266720331175
       id: 69eec606-0493-5825-73a4-c5e0c0236155
       labels:
         fizz: buzz
@@ -732,7 +752,10 @@
         namespace: default
         uid: 69eec606-0493-5825-73a4-c5e0c0236155
       state: 1
-    - created_at: 1524648266720331175
+    - annotations:
+        hello: world
+        virt: let
+      created_at: 1524648266720331175
       id: d25ded14-d35d-510b-5749-f83cc165794e
       labels:
         fizz: buzz

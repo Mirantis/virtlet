@@ -656,3 +656,5 @@ func TestCRIAttachPortForward(t *testing.T) {
 
 // TODO: use interceptor for logging in the manager
 //       (apply it only if glog level is high enough)
+// TODO: make sure non-default namespace settings cause pod startup to fail.
+// TODO: don't use criapi, convert test objects from metadata instead

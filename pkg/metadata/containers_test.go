@@ -21,12 +21,13 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/Mirantis/virtlet/tests/criapi"
+	"github.com/Mirantis/virtlet/pkg/metadata/fake"
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
 )
 
 func TestSetGetContainerInfo(t *testing.T) {
-	sandboxes := criapi.GetSandboxes(2)
-	containers := criapi.GetContainersConfig(sandboxes)
+	sandboxes := fake.GetSandboxes(2)
+	containers := fake.GetContainersConfig(sandboxes)
 
 	store := setUpTestStore(t, sandboxes, containers, nil)
 
@@ -39,27 +40,31 @@ func TestSetGetContainerInfo(t *testing.T) {
 			t.Fatal(fmt.Errorf("containerInfo of container %q not found in Virtlet metadata store", container.ContainerId))
 		}
 
-		if containerInfo.SandboxID != container.SandboxId {
-			t.Errorf("Expected %s, instead got %s", container.SandboxId, containerInfo.SandboxID)
+		if containerInfo.Id != container.ContainerId {
+			t.Errorf("Expected %s, instead got %s", container.ContainerId, containerInfo.Id)
 		}
 
-		if containerInfo.Image != container.Image {
-			t.Errorf("Expected %s, instead got %s", container.Image, containerInfo.Image)
+		if containerInfo.Config.PodSandboxID != container.SandboxId {
+			t.Errorf("Expected %s, instead got %s", container.SandboxId, containerInfo.Config.PodSandboxID)
 		}
 
-		if !reflect.DeepEqual(containerInfo.Labels, container.Labels) {
-			t.Errorf("Expected %v, instead got %v", container.Labels, containerInfo.Labels)
+		if containerInfo.Config.Image != container.Image {
+			t.Errorf("Expected %s, instead got %s", container.Image, containerInfo.Config.Image)
 		}
 
-		if !reflect.DeepEqual(containerInfo.Annotations, container.Annotations) {
-			t.Errorf("Expected %v, instead got %v", container.Annotations, containerInfo.Annotations)
+		if !reflect.DeepEqual(containerInfo.Config.ContainerLabels, container.Labels) {
+			t.Errorf("Expected %v, instead got %v", container.Labels, containerInfo.Config.ContainerLabels)
+		}
+
+		if !reflect.DeepEqual(containerInfo.Config.ContainerAnnotations, container.Annotations) {
+			t.Errorf("Expected %v, instead got %v", container.Annotations, containerInfo.Config.ContainerAnnotations)
 		}
 	}
 }
 
 func TestGetImagesInUse(t *testing.T) {
-	sandboxes := criapi.GetSandboxes(2)
-	containers := criapi.GetContainersConfig(sandboxes)
+	sandboxes := fake.GetSandboxes(2)
+	containers := fake.GetContainersConfig(sandboxes)
 
 	store := setUpTestStore(t, sandboxes, containers, nil)
 
@@ -74,8 +79,8 @@ func TestGetImagesInUse(t *testing.T) {
 }
 
 func TestRemoveContainer(t *testing.T) {
-	sandboxes := criapi.GetSandboxes(2)
-	containers := criapi.GetContainersConfig(sandboxes)
+	sandboxes := fake.GetSandboxes(2)
+	containers := fake.GetContainersConfig(sandboxes)
 
 	store := setUpTestStore(t, sandboxes, containers, nil)
 
@@ -87,7 +92,7 @@ func TestRemoveContainer(t *testing.T) {
 		if len(podContainers) != 1 || podContainers[0].GetID() != container.ContainerId {
 			t.Errorf("Unexpected container list length: %d != 1", len(podContainers))
 		}
-		if err := store.Container(container.ContainerId).Save(func(c *ContainerInfo) (*ContainerInfo, error) {
+		if err := store.Container(container.ContainerId).Save(func(c *types.ContainerInfo) (*types.ContainerInfo, error) {
 			return nil, nil
 		}); err != nil {
 			t.Fatal(err)

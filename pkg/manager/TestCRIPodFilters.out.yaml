@@ -3,7 +3,10 @@
 - name: 'leave: ListPodSandbox'
   value:
     items:
-    - created_at: 1524648266720331175
+    - annotations:
+        hello: world
+        virt: let
+      created_at: 1524648266720331175
       id: 69eec606-0493-5825-73a4-c5e0c0236155
       labels:
         fizz: buzz
@@ -12,7 +15,10 @@
         name: testName_0
         namespace: default
         uid: 69eec606-0493-5825-73a4-c5e0c0236155
-    - created_at: 1524648266720331175
+    - annotations:
+        hello: world
+        virt: let
+      created_at: 1524648266720331175
       id: d25ded14-d35d-510b-5749-f83cc165794e
       labels:
         fizz: buzz
@@ -28,7 +34,10 @@
 - name: 'leave: ListPodSandbox'
   value:
     items:
-    - created_at: 1524648266720331175
+    - annotations:
+        hello: world
+        virt: let
+      created_at: 1524648266720331175
       id: 69eec606-0493-5825-73a4-c5e0c0236155
       labels:
         fizz: buzz
@@ -44,7 +53,10 @@
 - name: 'leave: ListPodSandbox'
   value:
     items:
-    - created_at: 1524648266720331175
+    - annotations:
+        hello: world
+        virt: let
+      created_at: 1524648266720331175
       id: 69eec606-0493-5825-73a4-c5e0c0236155
       labels:
         fizz: buzz
@@ -53,7 +65,10 @@
         name: testName_0
         namespace: default
         uid: 69eec606-0493-5825-73a4-c5e0c0236155
-    - created_at: 1524648266720331175
+    - annotations:
+        hello: world
+        virt: let
+      created_at: 1524648266720331175
       id: d25ded14-d35d-510b-5749-f83cc165794e
       labels:
         fizz: buzz
@@ -77,7 +92,10 @@
 - name: 'leave: ListPodSandbox'
   value:
     items:
-    - created_at: 1524648266720331175
+    - annotations:
+        hello: world
+        virt: let
+      created_at: 1524648266720331175
       id: d25ded14-d35d-510b-5749-f83cc165794e
       labels:
         fizz: buzz
@@ -93,7 +111,10 @@
 - name: 'leave: ListPodSandbox'
   value:
     items:
-    - created_at: 1524648266720331175
+    - annotations:
+        hello: world
+        virt: let
+      created_at: 1524648266720331175
       id: 69eec606-0493-5825-73a4-c5e0c0236155
       labels:
         fizz: buzz
@@ -110,7 +131,10 @@
 - name: 'leave: ListPodSandbox'
   value:
     items:
-    - created_at: 1524648266720331175
+    - annotations:
+        hello: world
+        virt: let
+      created_at: 1524648266720331175
       id: d25ded14-d35d-510b-5749-f83cc165794e
       labels:
         fizz: buzz

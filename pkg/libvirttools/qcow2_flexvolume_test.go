@@ -21,6 +21,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 	"github.com/Mirantis/virtlet/pkg/virt/fake"
 	"github.com/Mirantis/virtlet/tests/gm"
@@ -48,7 +49,7 @@ func prepareOptsFileForQcow2Volume() (string, error) {
 func TestQCOW2VolumeNaming(t *testing.T) {
 	v := qcow2Volume{
 		volumeBase: volumeBase{
-			&VMConfig{DomainUUID: testUUID},
+			&types.VMConfig{DomainUUID: testUUID},
 			nil,
 		},
 		name: TestVolumeName,
@@ -78,7 +79,7 @@ func TestQCOW2VolumeLifeCycle(t *testing.T) {
 	volume, err := newQCOW2Volume(
 		TestVolumeName,
 		optsFilePath,
-		&VMConfig{DomainUUID: testUUID, Image: "rootfs image name"},
+		&types.VMConfig{DomainUUID: testUUID, Image: "rootfs image name"},
 		newFakeVolumeOwner(spool, im),
 	)
 	if err != nil {

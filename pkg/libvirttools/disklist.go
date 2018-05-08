@@ -23,6 +23,7 @@ import (
 	"github.com/golang/glog"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	"github.com/Mirantis/virtlet/pkg/virt"
 )
 
@@ -31,7 +32,7 @@ type diskItem struct {
 	volume VMVolume
 }
 
-func (di *diskItem) setup(config *VMConfig) (*libvirtxml.DomainDisk, error) {
+func (di *diskItem) setup(config *types.VMConfig) (*libvirtxml.DomainDisk, error) {
 	diskDef, err := di.volume.Setup()
 	if err != nil {
 		return nil, err
@@ -42,13 +43,13 @@ func (di *diskItem) setup(config *VMConfig) (*libvirtxml.DomainDisk, error) {
 }
 
 type diskList struct {
-	config *VMConfig
+	config *types.VMConfig
 	items  []*diskItem
 }
 
-// newDiskList creates a diskList for the specified VMConfig, volume
+// newDiskList creates a diskList for the specified types.VMConfig, volume
 // source and volume owner
-func newDiskList(config *VMConfig, source VMVolumeSource, owner volumeOwner) (*diskList, error) {
+func newDiskList(config *types.VMConfig, source VMVolumeSource, owner volumeOwner) (*diskList, error) {
 	vmVols, err := source(config, owner)
 	if err != nil {
 		return nil, err

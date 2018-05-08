@@ -19,6 +19,7 @@ package libvirttools
 import (
 	"testing"
 
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 	"github.com/Mirantis/virtlet/pkg/virt"
 	"github.com/Mirantis/virtlet/pkg/virt/fake"
@@ -49,7 +50,7 @@ func (im *FakeImageManager) GetImagePathAndVirtualSize(imageName string) (string
 func TestRootVolumeNaming(t *testing.T) {
 	v := rootVolume{
 		volumeBase{
-			&VMConfig{DomainUUID: testUUID},
+			&types.VMConfig{DomainUUID: testUUID},
 			nil,
 		},
 	}
@@ -70,7 +71,7 @@ func TestRootVolumeLifeCycle(t *testing.T) {
 	im := NewFakeImageManager(rec.Child("image"))
 
 	volumes, err := GetRootVolume(
-		&VMConfig{DomainUUID: testUUID, Image: "rootfs image name"},
+		&types.VMConfig{DomainUUID: testUUID, Image: "rootfs image name"},
 		newFakeVolumeOwner(spool, im),
 	)
 	if err != nil {

@@ -75,6 +75,10 @@
       labels:
         fizz: buzz
         foo: bar
+        io.kubernetes.container.name: container-for-testName_0
+        io.kubernetes.pod.name: testName_0
+        io.kubernetes.pod.namespace: default
+        io.kubernetes.pod.uid: 69eec606-0493-5825-73a4-c5e0c0236155
       metadata:
         name: container-for-testName_0
       mounts:
@@ -223,6 +227,9 @@
         io.kubernetes.pod.uid: 69eec606-0493-5825-73a4-c5e0c0236155
       metadata:
         name: container-for-testName_0
+      mounts:
+      - container_path: /mnt
+        host_path: __top__/kubelet-root/69eec606-0493-5825-73a4-c5e0c0236155/volumes/virtlet~flexvolume_driver/vol1
 - name: 'enter: StartContainer'
   value:
     container_id: 231700d5-c9a6-5a49-738d-99a954c51550

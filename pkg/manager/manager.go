@@ -243,8 +243,8 @@ func (v *VirtletManager) recoverNetworkNamespaces() (allErrors []error) {
 				ContainerSideNetwork: psi.ContainerSideNetwork,
 				Description: &tapmanager.PodNetworkDesc{
 					PodID:   s.GetID(),
-					PodNs:   psi.Metadata.GetNamespace(),
-					PodName: psi.Metadata.GetName(),
+					PodNs:   psi.Config.Namespace,
+					PodName: psi.Config.Name,
 				},
 			},
 		); err != nil {

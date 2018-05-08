@@ -21,9 +21,9 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/jonboulle/clockwork"
-	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/Mirantis/virtlet/tests/criapi"
+	"github.com/Mirantis/virtlet/pkg/metadata/fake"
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
 )
 
 func dumpDB(t *testing.T, store Store, context string) error {
@@ -61,13 +61,13 @@ func dumpDB(t *testing.T, store Store, context string) error {
 	return err
 }
 
-func setUpTestStore(t *testing.T, sandboxConfigs []*kubeapi.PodSandboxConfig, containerConfigs []*criapi.ContainerTestConfig, clock clockwork.Clock) Store {
+func setUpTestStore(t *testing.T, sandboxConfigs []*types.PodSandboxConfig, containerConfigs []*fake.ContainerTestConfig, clock clockwork.Clock) Store {
 	store, err := NewFakeStore()
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Check filter on empty DB
-	sandboxList, err := store.ListPodSandboxes(&kubeapi.PodSandboxFilter{})
+	sandboxList, err := store.ListPodSandboxes(&types.PodSandboxFilter{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,9 +79,9 @@ func setUpTestStore(t *testing.T, sandboxConfigs []*kubeapi.PodSandboxConfig, co
 		clock = clockwork.NewRealClock()
 	}
 	for _, sandbox := range sandboxConfigs {
-		psi, _ := NewPodSandboxInfo(sandbox, "", kubeapi.PodSandboxState_SANDBOX_READY, clock)
-		if err := store.PodSandbox(sandbox.Metadata.Uid).Save(
-			func(c *PodSandboxInfo) (*PodSandboxInfo, error) {
+		psi, _ := NewPodSandboxInfo(sandbox, "", types.PodSandboxState_SANDBOX_READY, clock)
+		if err := store.PodSandbox(sandbox.Uid).Save(
+			func(c *types.PodSandboxInfo) (*types.PodSandboxInfo, error) {
 				return psi, nil
 			},
 		); err != nil {
@@ -90,17 +90,19 @@ func setUpTestStore(t *testing.T, sandboxConfigs []*kubeapi.PodSandboxConfig, co
 	}
 
 	for _, container := range containerConfigs {
-		ci := &ContainerInfo{
+		ci := &types.ContainerInfo{
 			Name:                container.Name,
-			SandboxID:           container.SandboxId,
-			Image:               container.Image,
 			RootImageVolumeName: container.RootImageVolumeName,
-			Labels:              container.Labels,
-			Annotations:         container.Annotations,
 			CreatedAt:           clock.Now().UnixNano(),
+			Config: types.VMConfig{
+				PodSandboxID:         container.SandboxId,
+				Image:                container.Image,
+				ContainerLabels:      container.Labels,
+				ContainerAnnotations: container.Annotations,
+			},
 		}
 		if err := store.Container(container.ContainerId).Save(
-			func(c *ContainerInfo) (*ContainerInfo, error) {
+			func(c *types.ContainerInfo) (*types.ContainerInfo, error) {
 				return ci, nil
 			},
 		); err != nil {

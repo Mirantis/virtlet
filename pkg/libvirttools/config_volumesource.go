@@ -21,6 +21,8 @@ import (
 
 	"github.com/golang/glog"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
+
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
 )
 
 var configIsoDir = "/var/lib/virtlet/config"
@@ -35,7 +37,7 @@ var _ VMVolume = &configVolume{}
 
 // GetConfigVolume returns a config volume source which will produce an ISO
 // image with CloudInit compatible configuration data.
-func GetConfigVolume(config *VMConfig, owner volumeOwner) ([]VMVolume, error) {
+func GetConfigVolume(config *types.VMConfig, owner volumeOwner) ([]VMVolume, error) {
 	return []VMVolume{
 		&configVolume{
 			volumeBase{config, owner},

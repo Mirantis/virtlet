@@ -32,6 +32,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ghodss/yaml"
 
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	"github.com/Mirantis/virtlet/pkg/network"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
@@ -64,7 +65,7 @@ func newFakeFlexvolume(t *testing.T, parentDir string, uuid string, part int) *f
 	}
 }
 
-func buildNetworkedPodConfig(cniResult *cnicurrent.Result, imageTypeName string) *VMConfig {
+func buildNetworkedPodConfig(cniResult *cnicurrent.Result, imageTypeName string) *types.VMConfig {
 	var descs []*network.InterfaceDescription
 	for _, iface := range cniResult.Interfaces {
 		if iface.Sandbox != "" {
@@ -75,10 +76,10 @@ func buildNetworkedPodConfig(cniResult *cnicurrent.Result, imageTypeName string)
 			})
 		}
 	}
-	return &VMConfig{
+	return &types.VMConfig{
 		PodName:           "foo",
 		PodNamespace:      "default",
-		ParsedAnnotations: &VirtletAnnotations{ImageType: imageType(imageTypeName)},
+		ParsedAnnotations: &types.VirtletAnnotations{CDImageType: types.CloudInitImageType(imageTypeName)},
 		ContainerSideNetwork: &network.ContainerSideNetwork{
 			Result:     cniResult,
 			Interfaces: descs,
@@ -100,7 +101,7 @@ func TestCloudInitGenerator(t *testing.T) {
 
 	for _, tc := range []struct {
 		name                  string
-		config                *VMConfig
+		config                *types.VMConfig
 		volumeMap             diskPathMap
 		expectedMetaData      map[string]interface{}
 		expectedUserData      map[string]interface{}
@@ -109,10 +110,10 @@ func TestCloudInitGenerator(t *testing.T) {
 	}{
 		{
 			name: "plain pod",
-			config: &VMConfig{
+			config: &types.VMConfig{
 				PodName:           "foo",
 				PodNamespace:      "default",
-				ParsedAnnotations: &VirtletAnnotations{ImageType: "nocloud"},
+				ParsedAnnotations: &types.VirtletAnnotations{CDImageType: types.CloudInitImageTypeNoCloud},
 			},
 			expectedMetaData: map[string]interface{}{
 				"instance-id":    "foo.default",
@@ -125,10 +126,10 @@ func TestCloudInitGenerator(t *testing.T) {
 		},
 		{
 			name: "metadata for configdrive",
-			config: &VMConfig{
+			config: &types.VMConfig{
 				PodName:           "foo",
 				PodNamespace:      "default",
-				ParsedAnnotations: &VirtletAnnotations{ImageType: "configdrive"},
+				ParsedAnnotations: &types.VirtletAnnotations{CDImageType: types.CloudInitImageTypeConfigDrive},
 			},
 			expectedMetaData: map[string]interface{}{
 				"instance-id":    "foo.default",
@@ -139,12 +140,12 @@ func TestCloudInitGenerator(t *testing.T) {
 		},
 		{
 			name: "pod with ssh keys",
-			config: &VMConfig{
+			config: &types.VMConfig{
 				PodName:      "foo",
 				PodNamespace: "default",
-				ParsedAnnotations: &VirtletAnnotations{
-					SSHKeys:   []string{"key1", "key2"},
-					ImageType: "nocloud",
+				ParsedAnnotations: &types.VirtletAnnotations{
+					SSHKeys:     []string{"key1", "key2"},
+					CDImageType: types.CloudInitImageTypeNoCloud,
 				},
 			},
 			expectedMetaData: map[string]interface{}{
@@ -155,15 +156,15 @@ func TestCloudInitGenerator(t *testing.T) {
 		},
 		{
 			name: "pod with ssh keys and meta-data override",
-			config: &VMConfig{
+			config: &types.VMConfig{
 				PodName:      "foo",
 				PodNamespace: "default",
-				ParsedAnnotations: &VirtletAnnotations{
+				ParsedAnnotations: &types.VirtletAnnotations{
 					SSHKeys: []string{"key1", "key2"},
 					MetaData: map[string]interface{}{
 						"instance-id": "foobar",
 					},
-					ImageType: "nocloud",
+					CDImageType: types.CloudInitImageTypeNoCloud,
 				},
 			},
 			expectedMetaData: map[string]interface{}{
@@ -174,10 +175,10 @@ func TestCloudInitGenerator(t *testing.T) {
 		},
 		{
 			name: "pod with user data",
-			config: &VMConfig{
+			config: &types.VMConfig{
 				PodName:      "foo",
 				PodNamespace: "default",
-				ParsedAnnotations: &VirtletAnnotations{
+				ParsedAnnotations: &types.VirtletAnnotations{
 					UserData: map[string]interface{}{
 						"users": []interface{}{
 							map[string]interface{}{
@@ -185,8 +186,8 @@ func TestCloudInitGenerator(t *testing.T) {
 							},
 						},
 					},
-					SSHKeys:   []string{"key1", "key2"},
-					ImageType: "nocloud",
+					SSHKeys:     []string{"key1", "key2"},
+					CDImageType: types.CloudInitImageTypeNoCloud,
 				},
 			},
 			expectedMetaData: map[string]interface{}{
@@ -204,11 +205,11 @@ func TestCloudInitGenerator(t *testing.T) {
 		},
 		{
 			name: "pod with env variables",
-			config: &VMConfig{
+			config: &types.VMConfig{
 				PodName:           "foo",
 				PodNamespace:      "default",
-				ParsedAnnotations: &VirtletAnnotations{ImageType: "nocloud"},
-				Environment: []*VMKeyValue{
+				ParsedAnnotations: &types.VirtletAnnotations{CDImageType: types.CloudInitImageTypeNoCloud},
+				Environment: []types.VMKeyValue{
 					{"foo", "bar"},
 					{"baz", "abc"},
 				},
@@ -229,10 +230,10 @@ func TestCloudInitGenerator(t *testing.T) {
 		},
 		{
 			name: "pod with env variables and user data",
-			config: &VMConfig{
+			config: &types.VMConfig{
 				PodName:      "foo",
 				PodNamespace: "default",
-				ParsedAnnotations: &VirtletAnnotations{
+				ParsedAnnotations: &types.VirtletAnnotations{
 					UserData: map[string]interface{}{
 						"users": []interface{}{
 							map[string]interface{}{
@@ -246,9 +247,9 @@ func TestCloudInitGenerator(t *testing.T) {
 							},
 						},
 					},
-					ImageType: "nocloud",
+					CDImageType: types.CloudInitImageTypeNoCloud,
 				},
-				Environment: []*VMKeyValue{
+				Environment: []types.VMKeyValue{
 					{"foo", "bar"},
 					{"baz", "abc"},
 				},
@@ -278,13 +279,13 @@ func TestCloudInitGenerator(t *testing.T) {
 		},
 		{
 			name: "pod with user data script",
-			config: &VMConfig{
+			config: &types.VMConfig{
 				PodName:      "foo",
 				PodNamespace: "default",
-				ParsedAnnotations: &VirtletAnnotations{
+				ParsedAnnotations: &types.VirtletAnnotations{
 					UserDataScript: "#!/bin/sh\necho hi\n",
 					SSHKeys:        []string{"key1", "key2"},
-					ImageType:      "nocloud",
+					CDImageType:    types.CloudInitImageTypeNoCloud,
 				},
 			},
 			expectedMetaData: map[string]interface{}{
@@ -296,11 +297,11 @@ func TestCloudInitGenerator(t *testing.T) {
 		},
 		{
 			name: "pod with volumes to mount",
-			config: &VMConfig{
+			config: &types.VMConfig{
 				PodName:           "foo",
 				PodNamespace:      "default",
-				ParsedAnnotations: &VirtletAnnotations{ImageType: "nocloud"},
-				Mounts: []*VMMount{
+				ParsedAnnotations: &types.VirtletAnnotations{CDImageType: types.CloudInitImageTypeNoCloud},
+				Mounts: []types.VMMount{
 					{
 						ContainerPath: "/opt",
 						HostPath:      vols[0].path,
@@ -353,14 +354,14 @@ func TestCloudInitGenerator(t *testing.T) {
 		},
 		{
 			name: "injecting mount script into user data script",
-			config: &VMConfig{
+			config: &types.VMConfig{
 				PodName:      "foo",
 				PodNamespace: "default",
-				ParsedAnnotations: &VirtletAnnotations{
+				ParsedAnnotations: &types.VirtletAnnotations{
 					UserDataScript: "#!/bin/sh\necho hi\n@virtlet-mount-script@",
-					ImageType:      "nocloud",
+					CDImageType:    types.CloudInitImageTypeNoCloud,
 				},
-				Mounts: []*VMMount{
+				Mounts: []types.VMMount{
 					{
 						ContainerPath: "/opt",
 						HostPath:      vols[0].path,
@@ -792,10 +793,10 @@ func TestCloudInitGenerator(t *testing.T) {
 }
 
 func TestCloudInitDiskDef(t *testing.T) {
-	g := NewCloudInitGenerator(&VMConfig{
+	g := NewCloudInitGenerator(&types.VMConfig{
 		PodName:           "foo",
 		PodNamespace:      "default",
-		ParsedAnnotations: &VirtletAnnotations{ImageType: "nocloud"},
+		ParsedAnnotations: &types.VirtletAnnotations{CDImageType: types.CloudInitImageTypeNoCloud},
 	}, "")
 	diskDef := g.DiskDef()
 	if !reflect.DeepEqual(diskDef, &libvirtxml.DomainDisk{
@@ -815,10 +816,10 @@ func TestCloudInitGenerateImage(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	g := NewCloudInitGenerator(&VMConfig{
+	g := NewCloudInitGenerator(&types.VMConfig{
 		PodName:           "foo",
 		PodNamespace:      "default",
-		ParsedAnnotations: &VirtletAnnotations{ImageType: "nocloud"},
+		ParsedAnnotations: &types.VirtletAnnotations{CDImageType: types.CloudInitImageTypeNoCloud},
 	}, tmpDir)
 
 	if err := g.GenerateImage(nil); err != nil {
@@ -841,8 +842,8 @@ func TestCloudInitGenerateImage(t *testing.T) {
 
 func TestEnvDataGeneration(t *testing.T) {
 	expected := "key=value\n"
-	g := NewCloudInitGenerator(&VMConfig{
-		Environment: []*VMKeyValue{
+	g := NewCloudInitGenerator(&types.VMConfig{
+		Environment: []types.VMKeyValue{
 			{Key: "key", Value: "value"},
 		},
 	}, "")
@@ -903,7 +904,7 @@ func withFakeVolumeDir(t *testing.T, subdir string, perms os.FileMode, toRun fun
 
 func TestAddingSecrets(t *testing.T) {
 	withFakeVolumeDir(t, "volumes/kubernetes.io~secret/test-volume", 0640, func(location string) {
-		u := newWriteFilesUpdater([]*VMMount{
+		u := newWriteFilesUpdater([]types.VMMount{
 			{ContainerPath: "/container", HostPath: location},
 		})
 		u.addSecrets()
@@ -918,7 +919,7 @@ func TestAddingSecrets(t *testing.T) {
 
 func TestAddingConfigMap(t *testing.T) {
 	withFakeVolumeDir(t, "volumes/kubernetes.io~configmap/test-volume", 0, func(location string) {
-		u := newWriteFilesUpdater([]*VMMount{
+		u := newWriteFilesUpdater([]types.VMMount{
 			{ContainerPath: "/container", HostPath: location},
 		})
 		u.addConfigMapEntries()
@@ -933,7 +934,7 @@ func TestAddingConfigMap(t *testing.T) {
 
 func TestAddingFileLikeMount(t *testing.T) {
 	withFakeVolumeDir(t, "", 0, func(location string) {
-		u := newWriteFilesUpdater([]*VMMount{
+		u := newWriteFilesUpdater([]types.VMMount{
 			{ContainerPath: "/container", HostPath: location},
 		})
 		u.addFileLikeMounts()

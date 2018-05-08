@@ -24,7 +24,8 @@ import (
 
 	"github.com/boltdb/bolt"
 	"k8s.io/apimachinery/pkg/fields"
-	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
 )
 
 var (
@@ -47,11 +48,11 @@ func (m podSandboxMeta) GetID() string {
 }
 
 // Retrieve loads from DB and returns pod sandbox data bound to the object
-func (m podSandboxMeta) Retrieve() (*PodSandboxInfo, error) {
+func (m podSandboxMeta) Retrieve() (*types.PodSandboxInfo, error) {
 	if m.GetID() == "" {
 		return nil, errors.New("Pod sandbox ID cannot be empty")
 	}
-	var psi *PodSandboxInfo
+	var psi *types.PodSandboxInfo
 	err := m.client.db.View(func(tx *bolt.Tx) error {
 		bucket, err := getSandboxBucket(tx, m.GetID(), false, false)
 		if err != nil {
@@ -60,7 +61,7 @@ func (m podSandboxMeta) Retrieve() (*PodSandboxInfo, error) {
 		return retrieveSandboxFromDB(bucket, &psi)
 	})
 	if err == nil && psi != nil {
-		psi.podID = m.GetID()
+		psi.PodID = m.GetID()
 	}
 	return psi, err
 }
@@ -69,13 +70,13 @@ func (m podSandboxMeta) Retrieve() (*PodSandboxInfo, error) {
 // Supplied handler gets current PodSandboxInfo value (nil if doesn't exist) and returns new structure
 // value to be saved or nil to delete. If error value is returned from the handler, the transaction is
 // rolled back and returned error becomes the result of the function
-func (m podSandboxMeta) Save(updater func(*PodSandboxInfo) (*PodSandboxInfo, error)) error {
+func (m podSandboxMeta) Save(updater func(*types.PodSandboxInfo) (*types.PodSandboxInfo, error)) error {
 	if m.GetID() == "" {
 		return errors.New("Pod sandbox ID cannot be empty")
 	}
 	return m.client.db.Update(func(tx *bolt.Tx) error {
 		key := sandboxKey(m.GetID())
-		var current *PodSandboxInfo
+		var current *types.PodSandboxInfo
 		bucket, err := getSandboxBucket(tx, m.GetID(), true, false)
 		if err != nil {
 			return err
@@ -101,7 +102,7 @@ func (b *boltClient) PodSandbox(podID string) PodSandboxMetadata {
 }
 
 // ListPodSandboxes returns list of pod sandboxes that match given filter
-func (b *boltClient) ListPodSandboxes(filter *kubeapi.PodSandboxFilter) ([]PodSandboxMetadata, error) {
+func (b *boltClient) ListPodSandboxes(filter *types.PodSandboxFilter) ([]PodSandboxMetadata, error) {
 	var result []PodSandboxMetadata
 	err := b.db.View(func(tx *bolt.Tx) error {
 		c := tx.Cursor()
@@ -139,7 +140,7 @@ func getSandboxBucket(tx *bolt.Tx, podID string, create, optional bool) (*bolt.B
 	return bucket, nil
 }
 
-func retrieveSandboxFromDB(bucket *bolt.Bucket, psi **PodSandboxInfo) error {
+func retrieveSandboxFromDB(bucket *bolt.Bucket, psi **types.PodSandboxInfo) error {
 	data := bucket.Get(sandboxDataBucket)
 	if data == nil {
 		return nil
@@ -147,7 +148,7 @@ func retrieveSandboxFromDB(bucket *bolt.Bucket, psi **PodSandboxInfo) error {
 	return json.Unmarshal(data, psi)
 }
 
-func saveSandboxToDB(bucket *bolt.Bucket, psi *PodSandboxInfo) error {
+func saveSandboxToDB(bucket *bolt.Bucket, psi *types.PodSandboxInfo) error {
 	data, err := json.Marshal(psi)
 	if err != nil {
 		return err
@@ -156,7 +157,7 @@ func saveSandboxToDB(bucket *bolt.Bucket, psi *PodSandboxInfo) error {
 	return bucket.Put(sandboxDataBucket, data)
 }
 
-func filterPodSandboxMeta(psm PodSandboxMetadata, filter *kubeapi.PodSandboxFilter) (bool, error) {
+func filterPodSandboxMeta(psm PodSandboxMetadata, filter *types.PodSandboxFilter) (bool, error) {
 	if filter == nil {
 		return true, nil
 	}
@@ -173,13 +174,12 @@ func filterPodSandboxMeta(psm PodSandboxMetadata, filter *kubeapi.PodSandboxFilt
 		return false, fmt.Errorf("no data found for pod id %q", psm.GetID())
 	}
 
-	if filter.State != nil && psi.State != filter.GetState().State {
+	if filter.State != nil && psi.State != *filter.State {
 		return false, nil
 	}
 
-	filterSelector := filter.GetLabelSelector()
-	sel := fields.SelectorFromSet(filterSelector)
-	if !sel.Matches(fields.Set(psi.Labels)) {
+	sel := fields.SelectorFromSet(filter.LabelSelector)
+	if !sel.Matches(fields.Set(psi.Config.Labels)) {
 		return false, nil
 	}
 
