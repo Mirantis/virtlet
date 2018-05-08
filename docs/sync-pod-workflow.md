@@ -9,6 +9,7 @@
 **II. Process containers**
 
 Container will be killed&re-created&started if:
+
 1. Container status is not RUNNING and RestartPolicy != RestartPolicyNever or (RestartPolicy == RestartOnFailure and container exit code != 0)
 2. SandBox has been changed (look at I. above for details) and RestartPolicy != RestartPolicyNever
 3. Compares the hash of old and new container's spec. NOTE: Allowed changes in Spec for now only - containers[*].image 
