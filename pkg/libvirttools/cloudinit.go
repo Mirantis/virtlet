@@ -450,10 +450,23 @@ func (g *CloudInitGenerator) generateEnvVarsContent() string {
 	return buffer.String()
 }
 
+func isRegularFile(path string) bool {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return fi.Mode().IsRegular()
+}
+
 func (g *CloudInitGenerator) generateMounts(volumeMap diskPathMap) ([]interface{}, string) {
 	var r []interface{}
 	var mountScriptLines []string
 	for _, m := range g.config.Mounts {
+		// Skip file based mounts (including secrets and config maps).
+		if isRegularFile(m.HostPath) {
+			continue
+		}
+
 		uuid, part, err := flexvolume.GetFlexvolumeInfo(m.HostPath)
 		if err != nil {
 			glog.Errorf("Can't mount directory %q to %q inside the VM: can't get flexvolume uuid: %v", m.HostPath, m.ContainerPath, err)
