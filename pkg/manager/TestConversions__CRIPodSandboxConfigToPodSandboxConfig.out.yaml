@@ -1,0 +1,70 @@
+- in:
+    annotations:
+      hello: world
+      virt: let
+    hostname: localhost
+    labels:
+      fizz: buzz
+      foo: bar
+    linux:
+      security_context:
+        namespace_options: {}
+    log_directory: /var/log/test_log_directory
+    metadata:
+      name: testName_0
+      namespace: default
+      uid: 69eec606-0493-5825-73a4-c5e0c0236155
+  out:
+    Annotations:
+      hello: world
+      virt: let
+    Attempt: 0
+    CgroupParent: ""
+    DnsConfig:
+      Options: null
+      Searches: null
+      Servers: null
+    Hostname: localhost
+    Labels:
+      fizz: buzz
+      foo: bar
+    LogDirectory: /var/log/test_log_directory
+    Name: testName_0
+    Namespace: default
+    PortMappings: null
+    Uid: 69eec606-0493-5825-73a4-c5e0c0236155
+- in:
+    annotations:
+      hello: world
+      virt: let
+    hostname: localhost
+    labels:
+      fizz: buzz
+      foo: bar
+    linux:
+      security_context:
+        namespace_options: {}
+    log_directory: /var/log/test_log_directory
+    metadata:
+      name: testName_1
+      namespace: default
+      uid: d25ded14-d35d-510b-5749-f83cc165794e
+  out:
+    Annotations:
+      hello: world
+      virt: let
+    Attempt: 0
+    CgroupParent: ""
+    DnsConfig:
+      Options: null
+      Searches: null
+      Servers: null
+    Hostname: localhost
+    Labels:
+      fizz: buzz
+      foo: bar
+    LogDirectory: /var/log/test_log_directory
+    Name: testName_1
+    Namespace: default
+    PortMappings: null
+    Uid: d25ded14-d35d-510b-5749-f83cc165794e

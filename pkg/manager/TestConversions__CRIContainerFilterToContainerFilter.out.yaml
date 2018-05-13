@@ -1,0 +1,51 @@
+- in: null
+  out: null
+- in: {}
+  out:
+    Id: ""
+    LabelSelector: null
+    PodSandboxID: ""
+    State: null
+- in:
+    id: a393e311-5f4f-402b-8567-864d2ab81b83
+  out:
+    Id: a393e311-5f4f-402b-8567-864d2ab81b83
+    LabelSelector: null
+    PodSandboxID: ""
+    State: null
+- in:
+    pod_sandbox_id: c5134b10-6474-4139-8bf9-f6f61a1f5906
+  out:
+    Id: ""
+    LabelSelector: null
+    PodSandboxID: c5134b10-6474-4139-8bf9-f6f61a1f5906
+    State: null
+- in:
+    id: a393e311-5f4f-402b-8567-864d2ab81b83
+    state: {}
+  out:
+    Id: a393e311-5f4f-402b-8567-864d2ab81b83
+    LabelSelector: null
+    PodSandboxID: ""
+    State: 0
+- in:
+    id: a393e311-5f4f-402b-8567-864d2ab81b83
+    state:
+      state: 1
+  out:
+    Id: a393e311-5f4f-402b-8567-864d2ab81b83
+    LabelSelector: null
+    PodSandboxID: ""
+    State: 1
+- in:
+    id: a393e311-5f4f-402b-8567-864d2ab81b83
+    label_selector:
+      foo: bar
+    state:
+      state: 2
+  out:
+    Id: a393e311-5f4f-402b-8567-864d2ab81b83
+    LabelSelector:
+      foo: bar
+    PodSandboxID: ""
+    State: 2

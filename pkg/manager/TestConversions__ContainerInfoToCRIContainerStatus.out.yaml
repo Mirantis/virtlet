@@ -1,0 +1,83 @@
+- in:
+    Config:
+      Attempt: 0
+      CPUPeriod: 0
+      CPUQuota: 0
+      CPUShares: 0
+      ContainerAnnotations:
+        containerAnnotation: foobar
+      ContainerLabels:
+        containerLabel: foo
+      ContainerSideNetwork: null
+      DomainUUID: ""
+      Environment: null
+      Image: testImage
+      MemoryLimitInBytes: 0
+      Mounts: null
+      Name: ""
+      ParsedAnnotations: null
+      PodAnnotations: null
+      PodName: ""
+      PodNamespace: ""
+      PodSandboxID: 69eec606-0493-5825-73a4-c5e0c0236155
+    CreatedAt: 1496175540000000000
+    Id: f1bfb494-af3d-48ab-b8b1-2c850e1e8a00
+    Name: testcontainer
+    RootImageVolumeName: ""
+    StartedAt: 1496175550000000000
+    State: 0
+  out:
+    annotations:
+      containerAnnotation: foobar
+    created_at: 1496175540000000000
+    id: f1bfb494-af3d-48ab-b8b1-2c850e1e8a00
+    image:
+      image: testImage
+    image_ref: testImage
+    labels:
+      containerLabel: foo
+    metadata:
+      name: testcontainer
+    started_at: 1496175550000000000
+- in:
+    Config:
+      Attempt: 0
+      CPUPeriod: 0
+      CPUQuota: 0
+      CPUShares: 0
+      ContainerAnnotations:
+        containerAnnotation: foobar1
+      ContainerLabels:
+        containerLabel: foo1
+      ContainerSideNetwork: null
+      DomainUUID: ""
+      Environment: null
+      Image: testImage1
+      MemoryLimitInBytes: 0
+      Mounts: null
+      Name: ""
+      ParsedAnnotations: null
+      PodAnnotations: null
+      PodName: ""
+      PodNamespace: ""
+      PodSandboxID: d25ded14-d35d-510b-5749-f83cc165794e
+    CreatedAt: 1496175560000000000
+    Id: 13bdedae-540d-4131-959b-366c6343d5b4
+    Name: testcontainer1
+    RootImageVolumeName: ""
+    StartedAt: 1496175570000000000
+    State: 2
+  out:
+    annotations:
+      containerAnnotation: foobar1
+    created_at: 1496175560000000000
+    id: 13bdedae-540d-4131-959b-366c6343d5b4
+    image:
+      image: testImage1
+    image_ref: testImage1
+    labels:
+      containerLabel: foo1
+    metadata:
+      name: testcontainer1
+    started_at: 1496175570000000000
+    state: 2
