@@ -203,12 +203,8 @@
       <commandline xmlns="http://libvirt.org/schemas/domain/qemu/1.0">
         <env name="VIRTLET_EMULATOR" value="/usr/bin/kvm"></env>
         <env name="VIRTLET_NET_KEY" value="69eec606-0493-5825-73a4-c5e0c0236155"></env>
-        <env name="VIRTLET_POD_NAME" value="testName_0"></env>
-        <env name="VIRTLET_POD_NAMESPACE" value="default"></env>
-        <env name="VIRTLET_POD_UID" value="69eec606-0493-5825-73a4-c5e0c0236155"></env>
         <env name="VIRTLET_CONTAINER_ID" value="231700d5-c9a6-5a49-738d-99a954c51550"></env>
-        <env name="VIRTLET_CONTAINER_NAME" value="container-for-testName_0"></env>
-        <env name="CONTAINER_ATTEMPTS" value="0"></env>
+        <env name="VIRTLET_CONTAINER_LOG_PATH" value="/var/log/test_log_directory/container-for-testName_0_0.log"></env>
       </commandline>
     </domain>
 - name: 'leave: CreateContainer'
@@ -255,6 +251,7 @@
         io.kubernetes.pod.name: testName_0
         io.kubernetes.pod.namespace: default
         io.kubernetes.pod.uid: 69eec606-0493-5825-73a4-c5e0c0236155
+      log_path: container-for-testName_0_0.log
       metadata:
         name: container-for-testName_0
 - name: 'enter: StartContainer'
@@ -300,6 +297,7 @@
         io.kubernetes.pod.name: testName_0
         io.kubernetes.pod.namespace: default
         io.kubernetes.pod.uid: 69eec606-0493-5825-73a4-c5e0c0236155
+      log_path: container-for-testName_0_0.log
       metadata:
         name: container-for-testName_0
       started_at: 1524648266720331175
@@ -451,12 +449,8 @@
       <commandline xmlns="http://libvirt.org/schemas/domain/qemu/1.0">
         <env name="VIRTLET_EMULATOR" value="/usr/bin/kvm"></env>
         <env name="VIRTLET_NET_KEY" value="d25ded14-d35d-510b-5749-f83cc165794e"></env>
-        <env name="VIRTLET_POD_NAME" value="testName_1"></env>
-        <env name="VIRTLET_POD_NAMESPACE" value="default"></env>
-        <env name="VIRTLET_POD_UID" value="d25ded14-d35d-510b-5749-f83cc165794e"></env>
         <env name="VIRTLET_CONTAINER_ID" value="6b94d9a7-e22a-5d08-65ee-16b9b1e07ab0"></env>
-        <env name="VIRTLET_CONTAINER_NAME" value="container-for-testName_1"></env>
-        <env name="CONTAINER_ATTEMPTS" value="0"></env>
+        <env name="VIRTLET_CONTAINER_LOG_PATH" value="/var/log/test_log_directory/container-for-testName_1_0.log"></env>
       </commandline>
     </domain>
 - name: 'leave: CreateContainer'
@@ -549,6 +543,7 @@
         io.kubernetes.pod.name: testName_1
         io.kubernetes.pod.namespace: default
         io.kubernetes.pod.uid: d25ded14-d35d-510b-5749-f83cc165794e
+      log_path: container-for-testName_1_0.log
       metadata:
         name: container-for-testName_1
 - name: 'enter: StartContainer'
@@ -594,6 +589,7 @@
         io.kubernetes.pod.name: testName_1
         io.kubernetes.pod.namespace: default
         io.kubernetes.pod.uid: d25ded14-d35d-510b-5749-f83cc165794e
+      log_path: container-for-testName_1_0.log
       metadata:
         name: container-for-testName_1
       started_at: 1524648266720331175
@@ -681,6 +677,7 @@
         io.kubernetes.pod.name: testName_0
         io.kubernetes.pod.namespace: default
         io.kubernetes.pod.uid: 69eec606-0493-5825-73a4-c5e0c0236155
+      log_path: container-for-testName_0_0.log
       metadata:
         name: container-for-testName_0
       started_at: 1524648266720331175

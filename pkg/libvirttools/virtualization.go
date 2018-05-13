@@ -19,6 +19,7 @@ package libvirttools
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -158,12 +159,8 @@ func (ds *domainSettings) createDomain(config *types.VMConfig) *libvirtxml.Domai
 			Envs: []libvirtxml.DomainQEMUCommandlineEnv{
 				{Name: "VIRTLET_EMULATOR", Value: emulator},
 				{Name: "VIRTLET_NET_KEY", Value: ds.netFdKey},
-				{Name: "VIRTLET_POD_NAME", Value: config.PodName},
-				{Name: "VIRTLET_POD_NAMESPACE", Value: config.PodNamespace},
-				{Name: "VIRTLET_POD_UID", Value: config.PodSandboxID},
 				{Name: "VIRTLET_CONTAINER_ID", Value: config.DomainUUID},
-				{Name: "VIRTLET_CONTAINER_NAME", Value: config.Name},
-				{Name: "CONTAINER_ATTEMPTS", Value: fmt.Sprint(config.Attempt)},
+				{Name: "VIRTLET_CONTAINER_LOG_PATH", Value: filepath.Join(config.LogDirectory, config.LogPath)},
 			},
 		},
 	}
@@ -185,16 +182,17 @@ func canUseKvm() bool {
 
 // VirtualizationTool provides methods to operate on libvirt.
 type VirtualizationTool struct {
-	domainConn     virt.DomainConnection
-	storageConn    virt.StorageConnection
-	volumePoolName string
-	imageManager   ImageManager
-	metadataStore  metadata.Store
-	clock          clockwork.Clock
-	forceKVM       bool
-	kubeletRootDir string
-	rawDevices     []string
-	volumeSource   VMVolumeSource
+	domainConn      virt.DomainConnection
+	storageConn     virt.StorageConnection
+	volumePoolName  string
+	imageManager    ImageManager
+	metadataStore   metadata.Store
+	clock           clockwork.Clock
+	forceKVM        bool
+	kubeletRootDir  string
+	rawDevices      []string
+	volumeSource    VMVolumeSource
+	loggingDisabled bool
 }
 
 var _ volumeOwner = &VirtualizationTool{}
@@ -235,15 +233,15 @@ func (v *VirtualizationTool) SetKubeletRootDir(kubeletRootDir string) {
 	v.kubeletRootDir = kubeletRootDir
 }
 
-func loggingDisabled() bool {
-	disabled := os.Getenv("VIRTLET_DISABLE_LOGGING")
-	return utils.GetBoolFromString(disabled)
+// DisableLogging disables logging using the streamer
+func (v *VirtualizationTool) DisableLogging() {
+	v.loggingDisabled = true
 }
 
 func (v *VirtualizationTool) addSerialDevicesToDomain(domain *libvirtxml.Domain) error {
 	port := uint(0)
 	timeout := uint(1)
-	if !loggingDisabled() {
+	if !v.loggingDisabled {
 		domain.Devices.Serials = []libvirtxml.DomainSerial{
 			{
 				Source: &libvirtxml.DomainChardevSource{

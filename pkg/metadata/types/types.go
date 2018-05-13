@@ -223,6 +223,12 @@ type VMConfig struct {
 	Mounts []VMMount
 	// ContainerSideNetwork stores info about container side network configuration.
 	ContainerSideNetwork *network.ContainerSideNetwork
+	// Path to the directory on the host in which container log files are
+	// stored.
+	LogDirectory string
+	// Path relative to LogDirectory for container to store the
+	// log (STDOUT and STDERR) on the host.
+	LogPath string
 }
 
 // LoadAnnotations parses pod annotations in the VM config an

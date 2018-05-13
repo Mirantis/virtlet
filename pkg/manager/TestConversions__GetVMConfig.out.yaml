@@ -40,6 +40,63 @@
     DomainUUID: ""
     Environment: null
     Image: testImage
+    LogDirectory: /var/log/test_log_directory
+    LogPath: testcontainer_0.log
+    MemoryLimitInBytes: 0
+    Mounts: null
+    Name: testcontainer
+    ParsedAnnotations: null
+    PodAnnotations:
+      hello: world
+      virt: let
+    PodName: testName_0
+    PodNamespace: default
+    PodSandboxID: 69eec606-0493-5825-73a4-c5e0c0236155
+- in:
+    config:
+      image:
+        image: testImage
+      labels:
+        fizz: buzz
+        foo: bar
+      log_path: some_logpath_0.log
+      metadata:
+        name: testcontainer
+    pod_sandbox_id: 69eec606-0493-5825-73a4-c5e0c0236155
+    sandbox_config:
+      annotations:
+        hello: world
+        virt: let
+      hostname: localhost
+      labels:
+        fizz: buzz
+        foo: bar
+      linux:
+        security_context:
+          namespace_options: {}
+      log_directory: /some/pod/log/dir/69eec606-0493-5825-73a4-c5e0c0236155
+      metadata:
+        name: testName_0
+        namespace: default
+        uid: 69eec606-0493-5825-73a4-c5e0c0236155
+  out:
+    Attempt: 0
+    CPUPeriod: 0
+    CPUQuota: 0
+    CPUShares: 0
+    ContainerAnnotations: null
+    ContainerLabels:
+      fizz: buzz
+      foo: bar
+    ContainerSideNetwork:
+      Interfaces: null
+      NsPath: /var/run/netns/bae464f1-6ee7-4ee2-826e-33293a9de95e
+      Result: null
+    DomainUUID: ""
+    Environment: null
+    Image: testImage
+    LogDirectory: /some/pod/log/dir/69eec606-0493-5825-73a4-c5e0c0236155
+    LogPath: some_logpath_0.log
     MemoryLimitInBytes: 0
     Mounts: null
     Name: testcontainer
@@ -95,6 +152,8 @@
     DomainUUID: ""
     Environment: null
     Image: testImage
+    LogDirectory: /var/log/test_log_directory
+    LogPath: testcontainer_0.log
     MemoryLimitInBytes: 0
     Mounts:
     - ContainerPath: /mnt

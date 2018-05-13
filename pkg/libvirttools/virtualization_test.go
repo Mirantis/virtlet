@@ -18,6 +18,7 @@ package libvirttools
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -119,6 +120,8 @@ func (ct *containerTester) createContainer(sandbox *types.PodSandboxConfig, moun
 		PodAnnotations:       sandbox.Annotations,
 		ContainerAnnotations: map[string]string{"foo": "bar"},
 		Mounts:               mounts,
+		LogDirectory:         fmt.Sprintf("/var/log/pods/%s", sandbox.Uid),
+		LogPath:              fmt.Sprintf("%s_%d.log", fakeContainerName, fakeContainerAttempt),
 	}
 	containerID, err := ct.virtTool.CreateContainer(vmConfig, "/tmp/fakenetns")
 	if err != nil {
@@ -465,6 +468,8 @@ func TestDomainResourceConstraints(t *testing.T) {
 		CPUPeriod:          int64(cpuPeriod),
 		CPUQuota:           int64(cpuQuota),
 		PodAnnotations:     sandbox.Annotations,
+		LogDirectory:       fmt.Sprintf("/var/log/pods/%s", sandbox.Uid),
+		LogPath:            fmt.Sprintf("%s_%d.log", fakeContainerName, fakeContainerAttempt),
 	}
 	if _, err := ct.virtTool.CreateContainer(vmConfig, "/tmp/fakenetns"); err != nil {
 		t.Fatalf("CreateContainer: %v", err)

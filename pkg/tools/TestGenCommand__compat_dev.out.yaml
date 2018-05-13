@@ -29,8 +29,8 @@ spec:
         - name: VIRTLET_SRIOV_SUPPORT
           valueFrom:
             configMapKeyRef:
-              name: virtlet-config
               key: sriov_support
+              name: virtlet-config
               optional: true
         - name: VIRTLET_DISABLE_KVM
           valueFrom:
@@ -126,8 +126,6 @@ spec:
               optional: true
         - name: IMAGE_TRANSLATIONS_DIR
           value: /etc/virtlet/images
-        - name: KUBERNETES_POD_LOGS
-          value: /kubernetes-log
         image: mirantis/virtlet
         imagePullPolicy: IfNotPresent
         name: virtlet
@@ -163,7 +161,7 @@ spec:
           name: vms-log
         - mountPath: /etc/virtlet/images
           name: image-name-translations
-        - mountPath: /kubernetes-log
+        - mountPath: /var/log/pods
           name: pods-log
         - mountPath: /dind
           name: dind

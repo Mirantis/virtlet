@@ -150,7 +150,7 @@ spec:
         - mountPath: /etc/virtlet/images
           name: image-name-translations
         - name: pods-log
-          mountPath: /kubernetes-log
+          mountPath: /var/log/pods
         securityContext:
           privileged: true
         env:
@@ -204,8 +204,6 @@ spec:
               optional: true
         - name: IMAGE_TRANSLATIONS_DIR
           value: /etc/virtlet/images
-        - name: KUBERNETES_POD_LOGS
-          value: "/kubernetes-log"
         readinessProbe:
           exec:
             command:

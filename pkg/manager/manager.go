@@ -62,14 +62,13 @@ type VirtletConfig struct {
 	SkipImageTranslation bool
 	// LibvirtURI specifies the libvirt connnection URI
 	LibvirtURI string
-	// PodLogDir specifies a directory where Kubernetes pod logs are stored.
-	// The streaming server is not started if this value is empty.
-	PodLogDir string
 	// RawDevices specifies a comma-separated list of raw device
 	// glob patterns which VMs can access
 	RawDevices string
 	// CRISocketPath specifies the socket path for the gRPC endpoint.
 	CRISocketPath string
+	// DisableLogging disables the streaming server
+	DisableLogging bool
 }
 
 // ApplyDefaults applies default settings to VirtletConfig
@@ -149,9 +148,12 @@ func (v *VirtletManager) Run() error {
 		return fmt.Errorf("error establishing libvirt connection: %v", err)
 	}
 
+	volSrc := libvirttools.GetDefaultVolumeSource()
+	v.virtTool = libvirttools.NewVirtualizationTool(conn, conn, v.imageStore, v.metadataStore, "volumes", v.config.RawDevices, volSrc)
+
 	var streamServer StreamServer
-	if v.config.PodLogDir != "" {
-		s, err := stream.NewServer(v.config.PodLogDir, streamerSocketPath, v.metadataStore)
+	if !v.config.DisableLogging {
+		s, err := stream.NewServer(streamerSocketPath, v.metadataStore)
 		if err != nil {
 			return fmt.Errorf("couldn't create stream server: %v", err)
 		}
@@ -162,10 +164,10 @@ func (v *VirtletManager) Run() error {
 
 		}
 		streamServer = s
+	} else {
+		v.virtTool.DisableLogging()
 	}
 
-	volSrc := libvirttools.GetDefaultVolumeSource()
-	v.virtTool = libvirttools.NewVirtualizationTool(conn, conn, v.imageStore, v.metadataStore, "volumes", v.config.RawDevices, volSrc)
 	runtimeService := NewVirtletRuntimeService(v.virtTool, v.metadataStore, v.fdManager, streamServer, v.imageStore, nil)
 	imageService := NewVirtletImageService(v.imageStore, translator)
 

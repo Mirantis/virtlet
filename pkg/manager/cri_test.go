@@ -32,6 +32,8 @@ import (
 func TestConversions(t *testing.T) {
 	configs := fake.GetSandboxes(2)
 	criConfigs := criapi.GetSandboxes(2)
+	criConfigWithAltLogDir := *criConfigs[0]
+	criConfigWithAltLogDir.LogDirectory = "/some/pod/log/dir/" + criConfigWithAltLogDir.Metadata.Uid
 	csn := &network.ContainerSideNetwork{
 		NsPath: "/var/run/netns/bae464f1-6ee7-4ee2-826e-33293a9de95e",
 	}
@@ -66,6 +68,7 @@ func TestConversions(t *testing.T) {
 				ContainerAnnotations: map[string]string{
 					"containerAnnotation": "foobar",
 				},
+				LogPath: "testcontainer_0.log",
 			},
 		},
 		&types.ContainerInfo{
@@ -84,6 +87,7 @@ func TestConversions(t *testing.T) {
 				ContainerAnnotations: map[string]string{
 					"containerAnnotation": "foobar1",
 				},
+				LogPath: "testcontainer1_0.log",
 			},
 		},
 	}
@@ -162,6 +166,18 @@ func TestConversions(t *testing.T) {
 						},
 					},
 					SandboxConfig: criConfigs[0],
+				},
+				&kubeapi.CreateContainerRequest{
+					PodSandboxId: criConfigs[0].Metadata.Uid,
+					Config: &kubeapi.ContainerConfig{
+						Image:  &kubeapi.ImageSpec{Image: "testImage"},
+						Labels: map[string]string{"foo": "bar", "fizz": "buzz"},
+						Metadata: &kubeapi.ContainerMetadata{
+							Name: "testcontainer",
+						},
+						LogPath: "some_logpath_0.log",
+					},
+					SandboxConfig: &criConfigWithAltLogDir,
 				},
 				&kubeapi.CreateContainerRequest{
 					PodSandboxId: criConfigs[1].Metadata.Uid,

@@ -18,6 +18,7 @@ package manager
 
 import (
 	"errors"
+	"fmt"
 
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
@@ -117,6 +118,17 @@ func GetVMConfig(in *kubeapi.CreateContainerRequest, csn *network.ContainerSideN
 		return nil, errors.New("invalid input data")
 	}
 
+	// Note that the fallbacks used belog for log dir & path
+	// shouldn't actually be used for real kubelet.
+	logDir := in.SandboxConfig.LogDirectory
+	if logDir == "" {
+		logDir = fmt.Sprintf("/var/log/pods/%s", in.PodSandboxId)
+	}
+
+	logPath := in.Config.LogPath
+	if logPath == "" {
+		logPath = fmt.Sprintf("%s_%d.log", in.Config.Metadata.Name, in.Config.Metadata.Attempt)
+	}
 	r := &types.VMConfig{
 		PodSandboxID:         in.PodSandboxId,
 		PodName:              in.SandboxConfig.Metadata.Name,
@@ -128,6 +140,8 @@ func GetVMConfig(in *kubeapi.CreateContainerRequest, csn *network.ContainerSideN
 		ContainerAnnotations: in.Config.Annotations,
 		ContainerLabels:      in.Config.Labels,
 		ContainerSideNetwork: csn,
+		LogDirectory:         logDir,
+		LogPath:              logPath,
 	}
 
 	if linuxCfg := in.Config.Linux; linuxCfg != nil && linuxCfg.Resources != nil {
@@ -213,7 +227,7 @@ func ContainerInfoToCRIContainerStatus(in *types.ContainerInfo) *kubeapi.Contain
 		Labels:      in.Config.ContainerLabels,
 		Annotations: in.Config.ContainerAnnotations,
 		Mounts:      mounts,
-		// TODO: LogPath!!!
+		LogPath:     in.Config.LogPath,
 		// TODO: FinishedAt, Reason, Message
 	}
 }

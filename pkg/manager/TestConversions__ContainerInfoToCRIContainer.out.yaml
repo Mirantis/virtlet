@@ -12,6 +12,8 @@
       DomainUUID: ""
       Environment: null
       Image: testImage
+      LogDirectory: ""
+      LogPath: testcontainer_0.log
       MemoryLimitInBytes: 0
       Mounts: null
       Name: ""
@@ -53,6 +55,8 @@
       DomainUUID: ""
       Environment: null
       Image: testImage1
+      LogDirectory: ""
+      LogPath: testcontainer1_0.log
       MemoryLimitInBytes: 0
       Mounts: null
       Name: ""

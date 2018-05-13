@@ -12,6 +12,8 @@
       DomainUUID: ""
       Environment: null
       Image: testImage
+      LogDirectory: ""
+      LogPath: testcontainer_0.log
       MemoryLimitInBytes: 0
       Mounts: null
       Name: ""
@@ -36,6 +38,7 @@
     image_ref: testImage
     labels:
       containerLabel: foo
+    log_path: testcontainer_0.log
     metadata:
       name: testcontainer
     started_at: 1496175550000000000
@@ -53,6 +56,8 @@
       DomainUUID: ""
       Environment: null
       Image: testImage1
+      LogDirectory: ""
+      LogPath: testcontainer1_0.log
       MemoryLimitInBytes: 0
       Mounts: null
       Name: ""
@@ -77,6 +82,7 @@
     image_ref: testImage1
     labels:
       containerLabel: foo1
+    log_path: testcontainer1_0.log
     metadata:
       name: testcontainer1
     started_at: 1496175570000000000

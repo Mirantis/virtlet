@@ -80,12 +80,8 @@
       <commandline xmlns="http://libvirt.org/schemas/domain/qemu/1.0">
         <env name="VIRTLET_EMULATOR" value="/usr/bin/kvm"></env>
         <env name="VIRTLET_NET_KEY" value="/tmp/fakenetns"></env>
-        <env name="VIRTLET_POD_NAME" value="testName_0"></env>
-        <env name="VIRTLET_POD_NAMESPACE" value="default"></env>
-        <env name="VIRTLET_POD_UID" value="69eec606-0493-5825-73a4-c5e0c0236155"></env>
         <env name="VIRTLET_CONTAINER_ID" value="231700d5-c9a6-5a49-738d-99a954c51550"></env>
-        <env name="VIRTLET_CONTAINER_NAME" value="container1"></env>
-        <env name="CONTAINER_ATTEMPTS" value="42"></env>
+        <env name="VIRTLET_CONTAINER_LOG_PATH" value="/var/log/pods/69eec606-0493-5825-73a4-c5e0c0236155/container1_42.log"></env>
       </commandline>
     </domain>
 - name: 'domain conn: ListDomains'
@@ -109,6 +105,8 @@
       DomainUUID: 231700d5-c9a6-5a49-738d-99a954c51550
       Environment: null
       Image: fake/image1
+      LogDirectory: /var/log/pods/69eec606-0493-5825-73a4-c5e0c0236155
+      LogPath: container1_42.log
       MemoryLimitInBytes: 0
       Mounts: null
       Name: container1
@@ -159,6 +157,8 @@
       DomainUUID: 231700d5-c9a6-5a49-738d-99a954c51550
       Environment: null
       Image: fake/image1
+      LogDirectory: /var/log/pods/69eec606-0493-5825-73a4-c5e0c0236155
+      LogPath: container1_42.log
       MemoryLimitInBytes: 0
       Mounts: null
       Name: container1
@@ -204,6 +204,8 @@
       DomainUUID: 231700d5-c9a6-5a49-738d-99a954c51550
       Environment: null
       Image: fake/image1
+      LogDirectory: /var/log/pods/69eec606-0493-5825-73a4-c5e0c0236155
+      LogPath: container1_42.log
       MemoryLimitInBytes: 0
       Mounts: null
       Name: container1
