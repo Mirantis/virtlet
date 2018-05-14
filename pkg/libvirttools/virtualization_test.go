@@ -90,6 +90,7 @@ func newContainerTester(t *testing.T, rec *testutils.TopLevelRecorder) *containe
 	ct.virtTool.SetForceKVM(true)
 	ct.kubeletRootDir = filepath.Join(ct.tmpDir, "kubelet-root")
 	ct.virtTool.SetKubeletRootDir(ct.kubeletRootDir)
+	ct.virtTool.SetStreamerSocketPath("/var/lib/libvirt/streamer.sock")
 
 	return ct
 }

@@ -164,8 +164,7 @@ func (v *VirtletManager) Run() error {
 
 		}
 		streamServer = s
-	} else {
-		v.virtTool.DisableLogging()
+		v.virtTool.SetStreamerSocketPath(streamerSocketPath)
 	}
 
 	runtimeService := NewVirtletRuntimeService(v.virtTool, v.metadataStore, v.fdManager, streamServer, v.imageStore, nil)

@@ -235,6 +235,7 @@ func makeVirtletCRITester(t *testing.T) *virtletCRITester {
 	virtTool.SetForceKVM(true)
 	kubeletRootDir := filepath.Join(tmpDir, "kubelet-root")
 	virtTool.SetKubeletRootDir(kubeletRootDir)
+	virtTool.SetStreamerSocketPath(streamerSocketPath)
 	streamServer := newFakeStreamServer(rec.Child("streamServer"))
 	criHandler := &criHandler{
 		VirtletRuntimeService: NewVirtletRuntimeService(virtTool, metadataStore, fdManager, streamServer, imageStore, clock),

@@ -182,17 +182,17 @@ func canUseKvm() bool {
 
 // VirtualizationTool provides methods to operate on libvirt.
 type VirtualizationTool struct {
-	domainConn      virt.DomainConnection
-	storageConn     virt.StorageConnection
-	volumePoolName  string
-	imageManager    ImageManager
-	metadataStore   metadata.Store
-	clock           clockwork.Clock
-	forceKVM        bool
-	kubeletRootDir  string
-	rawDevices      []string
-	volumeSource    VMVolumeSource
-	loggingDisabled bool
+	domainConn         virt.DomainConnection
+	storageConn        virt.StorageConnection
+	volumePoolName     string
+	imageManager       ImageManager
+	metadataStore      metadata.Store
+	clock              clockwork.Clock
+	forceKVM           bool
+	kubeletRootDir     string
+	rawDevices         []string
+	volumeSource       VMVolumeSource
+	streamerSocketPath string
 }
 
 var _ volumeOwner = &VirtualizationTool{}
@@ -233,21 +233,23 @@ func (v *VirtualizationTool) SetKubeletRootDir(kubeletRootDir string) {
 	v.kubeletRootDir = kubeletRootDir
 }
 
-// DisableLogging disables logging using the streamer
-func (v *VirtualizationTool) DisableLogging() {
-	v.loggingDisabled = true
+// SetStreamerSocketPath sets the path of streamer socket used for
+// logging. By default, the path is empty. When the path is empty,
+// logging is disabled for the VMs.
+func (v *VirtualizationTool) SetStreamerSocketPath(streamerSocketPath string) {
+	v.streamerSocketPath = streamerSocketPath
 }
 
 func (v *VirtualizationTool) addSerialDevicesToDomain(domain *libvirtxml.Domain) error {
 	port := uint(0)
 	timeout := uint(1)
-	if !v.loggingDisabled {
+	if v.streamerSocketPath != "" {
 		domain.Devices.Serials = []libvirtxml.DomainSerial{
 			{
 				Source: &libvirtxml.DomainChardevSource{
 					UNIX: &libvirtxml.DomainChardevSourceUNIX{
 						Mode: "connect",
-						Path: "/var/lib/libvirt/streamer.sock",
+						Path: v.streamerSocketPath,
 						Reconnect: &libvirtxml.DomainChardevSourceReconnect{
 							Enabled: "yes",
 							Timeout: &timeout,
