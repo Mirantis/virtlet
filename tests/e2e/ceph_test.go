@@ -57,11 +57,11 @@ var _ = Describe("Ceph volumes tests", func() {
 			podCustomization := func(pod *framework.PodInterface) {
 				pod.Pod.Spec.Volumes = append(pod.Pod.Spec.Volumes, v1.Volume{
 					Name:         "test1",
-					VolumeSource: v1.VolumeSource{FlexVolume: cephVolume("rbd-test-image1", monitorIP, secret)},
+					VolumeSource: v1.VolumeSource{FlexVolume: cephVolumeSource("rbd-test-image1", monitorIP, secret)},
 				})
 				pod.Pod.Spec.Volumes = append(pod.Pod.Spec.Volumes, v1.Volume{
 					Name:         "test2",
-					VolumeSource: v1.VolumeSource{FlexVolume: cephVolume("rbd-test-image2", monitorIP, secret)},
+					VolumeSource: v1.VolumeSource{FlexVolume: cephVolumeSource("rbd-test-image2", monitorIP, secret)},
 				})
 			}
 
@@ -108,7 +108,7 @@ var _ = Describe("Ceph volumes tests", func() {
 					},
 					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 					PersistentVolumeSource: v1.PersistentVolumeSource{
-						FlexVolume: cephVolume("rbd-test-image-pv", monitorIP, secret),
+						FlexVolume: cephPersistentVolumeSource("rbd-test-image-pv", monitorIP, secret),
 					},
 				},
 			}
@@ -227,16 +227,27 @@ func setupCeph() (string, string) {
 	return monIP, out
 }
 
-func cephVolume(volume, monitorIP, secret string) *v1.FlexVolumeSource {
+func cephOptions(volume, monitorIP, secret string) map[string]string {
+	return map[string]string{
+		"type":    "ceph",
+		"monitor": monitorIP + ":6789",
+		"user":    "libvirt",
+		"secret":  secret,
+		"volume":  volume,
+		"pool":    "libvirt-pool",
+	}
+}
+
+func cephVolumeSource(volume, monitorIP, secret string) *v1.FlexVolumeSource {
 	return &v1.FlexVolumeSource{
-		Driver: "virtlet/flexvolume_driver",
-		Options: map[string]string{
-			"type":    "ceph",
-			"monitor": monitorIP + ":6789",
-			"user":    "libvirt",
-			"secret":  secret,
-			"volume":  volume,
-			"pool":    "libvirt-pool",
-		},
+		Driver:  "virtlet/flexvolume_driver",
+		Options: cephOptions(volume, monitorIP, secret),
+	}
+}
+
+func cephPersistentVolumeSource(volume, monitorIP, secret string) *v1.FlexPersistentVolumeSource {
+	return &v1.FlexPersistentVolumeSource{
+		Driver:  "virtlet/flexvolume_driver",
+		Options: cephOptions(volume, monitorIP, secret),
 	}
 }
