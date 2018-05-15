@@ -665,26 +665,55 @@ func getVirtFNNo(pciAddress string) (int, error) {
 	}
 }
 
-// SetMacOnVf uses VF pci address to locate its parent device and uses
-// it to set mac address on VF.  It needs to be called from host netns.
-func SetMacOnVf(pciAddress string, mac net.HardwareAddr) error {
+func getMasterLinkOfVf(pciAddress string) (netlink.Link, error) {
 	dest, err := os.Readlink(filepath.Join("/sys/bus/pci/devices", pciAddress, "physfn"))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	masterDev, err := getDevNameByPCIAddress(dest[3:])
 	if err != nil {
-		return err
+		return nil, err
 	}
+	masterLink, err := netlink.LinkByName(masterDev)
+	if err != nil {
+		return nil, err
+	}
+
+	return masterLink, nil
+}
+
+// SetMacAndVlanOnVf uses VF pci address to locate its parent device and uses
+// it to set mac address and vlan id on VF.  It needs to be called from host netns.
+func SetMacAndVlanOnVf(pciAddress string, vlanID int, mac net.HardwareAddr) error {
 	virtFNNo, err := getVirtFNNo(pciAddress)
 	if err != nil {
 		return err
 	}
-	masterLink, err := netlink.LinkByName(masterDev)
+	masterLink, err := getMasterLinkOfVf(pciAddress)
 	if err != nil {
 		return err
 	}
-	return netlink.LinkSetVfHardwareAddr(masterLink, virtFNNo, mac)
+	if err := netlink.LinkSetVfHardwareAddr(masterLink, virtFNNo, mac); err != nil {
+		return err
+	}
+	return netlink.LinkSetVfVlan(masterLink, virtFNNo, vlanID)
+}
+
+func getVfVlanID(pciAddress string) (int, error) {
+	virtFNNo, err := getVirtFNNo(pciAddress)
+	if err != nil {
+		return 0, err
+	}
+	masterLink, err := getMasterLinkOfVf(pciAddress)
+	if err != nil {
+		return 0, err
+	}
+	for _, vfInfo := range masterLink.Attrs().Vfs {
+		if vfInfo.ID == virtFNNo {
+			return int(vfInfo.Vlan), nil
+		}
+	}
+	return 0, fmt.Errorf("vlan info for %d vf on %s not found", virtFNNo, masterLink.Attrs().Name)
 }
 
 // SetupContainerSideNetwork sets up networking in container
@@ -711,6 +740,7 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 		pciAddress := ""
 		var ifaceType network.InterfaceType
 		var fo *os.File
+		var vlanID int
 
 		mtu := link.Attrs().MTU
 
@@ -732,6 +762,11 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 
 			fo, err = openVfConfigFile(pciAddress)
 			if err != nil {
+				return nil, err
+			}
+
+			var err error
+			if vlanID, err = getVfVlanID(pciAddress); err != nil {
 				return nil, err
 			}
 
@@ -807,6 +842,7 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 			HardwareAddr: hwAddr,
 			PCIAddress:   pciAddress,
 			MTU:          uint16(mtu),
+			VLanID:       vlanID,
 		})
 	}
 
