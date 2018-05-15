@@ -26,6 +26,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -77,7 +78,11 @@ func (m *fakeFDManager) AddFDs(key string, data interface{}) ([]byte, error) {
 	})
 
 	if m.items[key] {
-		return nil, fmt.Errorf("Duplicate key: %q", key)
+		return nil, fmt.Errorf("duplicate key: %q", key)
+	}
+
+	if strings.Contains(key, "should-fail-cni") {
+		return nil, fmt.Errorf("simulated cni failure on request")
 	}
 
 	fdPayload := data.(*tapmanager.GetFDPayload)
@@ -150,7 +155,7 @@ func (m *fakeFDManager) ReleaseFDs(key string) error {
 func (m *fakeFDManager) Recover(key string, data interface{}) error {
 	m.rec.Rec("Recover", key)
 	if m.items[key] {
-		return fmt.Errorf("Duplicate key: %q", key)
+		return fmt.Errorf("duplicate key: %q", key)
 	}
 	return nil
 }
@@ -248,7 +253,7 @@ func (tst *virtletCRITester) teardown() {
 	os.RemoveAll(tst.tmpDir)
 }
 
-func (tst *virtletCRITester) invoke(name string, req interface{}) interface{} {
+func (tst *virtletCRITester) invoke(name string, req interface{}, failOnError bool) (interface{}, error) {
 	tst.rec.Rec("enter: "+name, req)
 	v := reflect.ValueOf(tst.handler)
 	method := v.MethodByName(name)
@@ -267,15 +272,16 @@ func (tst *virtletCRITester) invoke(name string, req interface{}) interface{} {
 		err, ok := vals[1].Interface().(error)
 		if !ok {
 			tst.t.Fatalf("2nd returned value is %#v instead of error", vals[1].Interface())
+		} else {
+			if failOnError {
+				tst.t.Errorf("method %q returned error: %v", name, err)
+			}
 		}
-		if err != nil {
-			tst.t.Errorf("method %q returned error: %v", name, err)
-		}
-		return nil
+		return nil, err
 	} else {
 		resp := vals[0].Interface()
 		tst.rec.Rec("leave: "+name, resp)
-		return resp
+		return resp, nil
 	}
 }
 
@@ -315,48 +321,59 @@ func (tst *virtletCRITester) verify() {
 }
 
 func (tst *virtletCRITester) listImages(filter *kubeapi.ImageFilter) {
-	tst.invoke("ListImages", &kubeapi.ListImagesRequest{Filter: filter})
+	tst.invoke("ListImages", &kubeapi.ListImagesRequest{Filter: filter}, true)
 }
 
 func (tst *virtletCRITester) pullImage(image *kubeapi.ImageSpec) {
-	tst.invoke("PullImage", &kubeapi.PullImageRequest{Image: image})
+	tst.invoke("PullImage", &kubeapi.PullImageRequest{Image: image}, true)
 }
 
 func (tst *virtletCRITester) imageStatus(image *kubeapi.ImageSpec) {
-	tst.invoke("ImageStatus", &kubeapi.ImageStatusRequest{Image: image})
+	tst.invoke("ImageStatus", &kubeapi.ImageStatusRequest{Image: image}, true)
 }
 
 func (tst *virtletCRITester) removeImage(image *kubeapi.ImageSpec) {
-	tst.invoke("RemoveImage", &kubeapi.RemoveImageRequest{Image: image})
+	tst.invoke("RemoveImage", &kubeapi.RemoveImageRequest{Image: image}, true)
 }
 
 func (tst *virtletCRITester) listPodSandbox(filter *kubeapi.PodSandboxFilter) {
-	tst.invoke("ListPodSandbox", &kubeapi.ListPodSandboxRequest{Filter: filter})
+	tst.invoke("ListPodSandbox", &kubeapi.ListPodSandboxRequest{Filter: filter}, true)
 }
 
 func (tst *virtletCRITester) runPodSandbox(config *kubeapi.PodSandboxConfig) {
-	tst.invoke("RunPodSandbox", &kubeapi.RunPodSandboxRequest{Config: config})
+	tst.invoke("RunPodSandbox", &kubeapi.RunPodSandboxRequest{Config: config}, true)
+}
+
+func (tst *virtletCRITester) runPodSandboxAndExpectError(config *kubeapi.PodSandboxConfig) {
+	_, err := tst.invoke("RunPodSandbox", &kubeapi.RunPodSandboxRequest{Config: config}, false)
+	if err == nil {
+		tst.t.Errorf("didn't get an expected error from RunPodSandbox")
+	}
 }
 
 func (tst *virtletCRITester) podSandboxStatus(podSandboxID string) {
-	tst.invoke("PodSandboxStatus", &kubeapi.PodSandboxStatusRequest{PodSandboxId: podSandboxID})
+	tst.invoke("PodSandboxStatus", &kubeapi.PodSandboxStatusRequest{PodSandboxId: podSandboxID}, true)
 }
 
 func (tst *virtletCRITester) stopPodSandox(podSandboxID string) {
-	tst.invoke("StopPodSandbox", &kubeapi.StopPodSandboxRequest{PodSandboxId: podSandboxID})
+	tst.invoke("StopPodSandbox", &kubeapi.StopPodSandboxRequest{PodSandboxId: podSandboxID}, true)
 }
 
 func (tst *virtletCRITester) removePodSandox(podSandboxID string) {
-	tst.invoke("RemovePodSandbox", &kubeapi.RemovePodSandboxRequest{PodSandboxId: podSandboxID})
+	tst.invoke("RemovePodSandbox", &kubeapi.RemovePodSandboxRequest{PodSandboxId: podSandboxID}, true)
 }
 
 func (tst *virtletCRITester) listContainers(filter *kubeapi.ContainerFilter) {
-	tst.invoke("ListContainers", &kubeapi.ListContainersRequest{Filter: filter})
+	tst.invoke("ListContainers", &kubeapi.ListContainersRequest{Filter: filter}, true)
 }
 
 func (tst *virtletCRITester) createContainer(sandbox *kubeapi.PodSandboxConfig, container *criapi.ContainerTestConfig, imageSpec *kubeapi.ImageSpec, mounts []*kubeapi.Mount) string {
 	req := createContainerRequest(sandbox, container, imageSpec, mounts)
-	resp := tst.invoke("CreateContainer", req)
+	resp, err := tst.invoke("CreateContainer", req, true)
+	if err != nil {
+		tst.t.Fatalf("CreateContainer returned an error: %v", err)
+		return "" // unreachable
+	}
 	if r, ok := resp.(*kubeapi.CreateContainerResponse); ok {
 		return r.ContainerId
 	} else {
@@ -366,27 +383,27 @@ func (tst *virtletCRITester) createContainer(sandbox *kubeapi.PodSandboxConfig, 
 }
 
 func (tst *virtletCRITester) containerStatus(containerID string) {
-	tst.invoke("ContainerStatus", &kubeapi.ContainerStatusRequest{ContainerId: containerID})
+	tst.invoke("ContainerStatus", &kubeapi.ContainerStatusRequest{ContainerId: containerID}, true)
 }
 
 func (tst *virtletCRITester) startContainer(containerID string) {
-	tst.invoke("StartContainer", &kubeapi.StartContainerRequest{ContainerId: containerID})
+	tst.invoke("StartContainer", &kubeapi.StartContainerRequest{ContainerId: containerID}, true)
 }
 
 func (tst *virtletCRITester) stopContainer(containerID string) {
-	tst.invoke("StopContainer", &kubeapi.StopContainerRequest{ContainerId: containerID})
+	tst.invoke("StopContainer", &kubeapi.StopContainerRequest{ContainerId: containerID}, true)
 }
 
 func (tst *virtletCRITester) removeContainer(containerID string) {
-	tst.invoke("RemoveContainer", &kubeapi.RemoveContainerRequest{ContainerId: containerID})
+	tst.invoke("RemoveContainer", &kubeapi.RemoveContainerRequest{ContainerId: containerID}, true)
 }
 
 func (tst *virtletCRITester) attach(req *kubeapi.AttachRequest) {
-	tst.invoke("Attach", req)
+	tst.invoke("Attach", req, true)
 }
 
 func (tst *virtletCRITester) portForward(req *kubeapi.PortForwardRequest) {
-	tst.invoke("PortForward", req)
+	tst.invoke("PortForward", req, true)
 }
 
 func cirrosImg() *kubeapi.ImageSpec {
@@ -472,6 +489,16 @@ func TestCRIPods(t *testing.T) {
 	tst.listPodSandbox(nil)
 	tst.listContainers(nil)
 
+	tst.verify()
+}
+
+func TestRunPodSandboxWithFailingCNI(t *testing.T) {
+	tst := makeVirtletCRITester(t)
+	defer tst.teardown()
+
+	sandboxes := criapi.GetSandboxes(1)
+	sandboxes[0].Metadata.Uid = "should-fail-cni"
+	tst.runPodSandboxAndExpectError(sandboxes[0])
 	tst.verify()
 }
 

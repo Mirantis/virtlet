@@ -1,0 +1,30 @@
+- name: 'enter: RunPodSandbox'
+  value:
+    config:
+      annotations:
+        hello: world
+        virt: let
+      hostname: localhost
+      labels:
+        fizz: buzz
+        foo: bar
+      linux:
+        security_context:
+          namespace_options: {}
+      log_directory: /var/log/test_log_directory
+      metadata:
+        name: testName_0
+        namespace: default
+        uid: should-fail-cni
+- name: 'fdManager: AddFDs'
+  value:
+    data:
+      csn: null
+      podNetworkDesc:
+        DNS: null
+        podId: should-fail-cni
+        podName: testName_0
+        podNs: default
+    key: should-fail-cni
+- name: 'fdManager: ReleaseFDs'
+  value: should-fail-cni
