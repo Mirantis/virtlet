@@ -1,5 +1,5 @@
-hash: 0b297200374183e166619f9379c0b345ea2eaddb9f357a054b1dfc1a4b8fa40b
-updated: 2018-03-28T23:07:46.68093219+03:00
+hash: ba199c875994a9ff46a6b66ca9a551adf2dca981eacabf7d7078068a4616ecc3
+updated: 2018-05-15T15:21:37.182832031+02:00
 imports:
 - name: github.com/beorn7/perks
   version: 3ac7bf7a47d159a033b107610db8a1b6575507a4
@@ -249,13 +249,13 @@ imports:
 - name: github.com/shurcooL/sanitized_anchor_name
   version: 10ef21a441db47d8b13ebcc5fd2310f636973c77
 - name: github.com/spf13/cobra
-  version: 7b2c5ac9fc04fc5efafb60700713d4fa609b777b
+  version: a1f051bc3eba734da4772d60e2d677f47cf93ef4
   subpackages:
   - doc
 - name: github.com/spf13/pflag
   version: 4c012f6dcd9546820e378d0bdda4d8fc772cdfea
 - name: github.com/vishvananda/netlink
-  version: fe3b5664d23a11b52ba59bece4ff29c52772a56b
+  version: 769bb84935352fee05c1390d5301ed39b95208d2
   subpackages:
   - nl
 - name: github.com/vishvananda/netns
@@ -295,7 +295,7 @@ imports:
   subpackages:
   - syncmap
 - name: golang.org/x/sys
-  version: 076b546753157f758b316e59bcb51e6807c04057
+  version: 7c87d13f8e835d2fb3a70a2912c811ed0c1d241b
   subpackages:
   - unix
   - windows
@@ -676,7 +676,6 @@ imports:
 - name: k8s.io/kubernetes
   version: 9f8ebd171479bec0ada837d7ee641dec2f8c6dd1
   subpackages:
-  - pkg/api
   - pkg/api/legacyscheme
   - pkg/api/service
   - pkg/api/v1/pod
