@@ -1,4 +1,5 @@
 # virtlet [![CircleCI](https://circleci.com/gh/Mirantis/virtlet/tree/master.svg?style=svg)](https://circleci.com/gh/Mirantis/virtlet/tree/master) [![Maintainability](https://api.codeclimate.com/v1/badges/7e40b1e1d7cd78c86a50/maintainability)](https://codeclimate.com/github/Mirantis/virtlet/maintainability) [![Go Report Card](https://goreportcard.com/badge/github.com/Mirantis/virtlet)](https://goreportcard.com/report/github.com/Mirantis/virtlet)
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FMirantis%2Fvirtlet.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2FMirantis%2Fvirtlet?ref=badge_shield)
 
 Virtlet is a Kubernetes runtime server which allows you to run VM workloads, based on QCOW2 images.
 
@@ -93,3 +94,6 @@ Virtlet is an open source project and any contributions are welcomed. Look into 
 
 Unless specifically noted, all parts of this project are licensed under the [Apache 2.0 license](LICENSE).
 
+
+
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FMirantis%2Fvirtlet.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2FMirantis%2Fvirtlet?ref=badge_large)
