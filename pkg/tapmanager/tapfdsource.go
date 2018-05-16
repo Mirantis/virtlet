@@ -198,7 +198,7 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 
 	for _, iface := range csn.Interfaces {
 		if iface.Type == network.InterfaceTypeVF {
-			if err := nettools.SetMacOnVf(iface.PCIAddress, iface.HardwareAddr); err != nil {
+			if err := nettools.SetMacAndVlanOnVf(iface.PCIAddress, iface.VLanID, iface.HardwareAddr); err != nil {
 				gotError = true
 				return nil, nil, err
 			}
