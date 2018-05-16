@@ -392,7 +392,6 @@ func (s *FDServer) Stop() error {
 // domain socket
 type FDClient struct {
 	socketPath string
-	conn       *net.UnixConn
 }
 
 var _ FDManager = &FDClient{}
@@ -402,54 +401,58 @@ func NewFDClient(socketPath string) *FDClient {
 	return &FDClient{socketPath: socketPath}
 }
 
-// Connect makes FDClient connect to its socket. You must call
-// Connect() method to be able to use the FDClient
-func (c *FDClient) Connect() error {
-	if c.conn != nil {
-		return nil
+// IsRunning check if the fdserver is running.
+// It will return nil when it is running.
+func (c *FDClient) IsRunning() error {
+	conn, err := c.connect()
+	if err == nil {
+		c.close(conn)
 	}
+	return err
+}
 
+func (c *FDClient) connect() (*net.UnixConn, error) {
 	addr, err := net.ResolveUnixAddr("unix", c.socketPath)
 	if err != nil {
-		return fmt.Errorf("failed to resolve unix addr %q: %v", c.socketPath, err)
+		return nil, fmt.Errorf("failed to resolve unix addr %q: %v", c.socketPath, err)
 	}
 
 	conn, err := net.DialUnix("unix", nil, addr)
 	if err != nil {
-		return fmt.Errorf("can't connect to %q: %v", c.socketPath, err)
+		return nil, fmt.Errorf("can't connect to %q: %v", c.socketPath, err)
 	}
-	c.conn = conn
-	return nil
+	return conn, nil
 }
 
 // Close closes the connection to FDServer
-func (c *FDClient) Close() error {
+func (c *FDClient) close(conn *net.UnixConn) error {
 	var err error
-	if c.conn != nil {
-		err = c.conn.Close()
-		c.conn = nil
+	if conn != nil {
+		err = conn.Close()
 	}
 	return err
 }
 
 func (c *FDClient) request(hdr *fdHeader, data []byte) (*fdHeader, []byte, []byte, error) {
-	hdr.Magic = fdMagic
-	if c.conn == nil {
+	conn, err := c.connect()
+	if err != nil {
 		return nil, nil, nil, errors.New("not connected")
 	}
+	defer c.close(conn)
 
-	if err := binary.Write(c.conn, binary.BigEndian, hdr); err != nil {
+	hdr.Magic = fdMagic
+	if err := binary.Write(conn, binary.BigEndian, hdr); err != nil {
 		return nil, nil, nil, fmt.Errorf("error writing request header: %v", err)
 	}
 
 	if len(data) > 0 {
-		if err := binary.Write(c.conn, binary.BigEndian, data); err != nil {
+		if err := binary.Write(conn, binary.BigEndian, data); err != nil {
 			return nil, nil, nil, fmt.Errorf("error writing request payload: %v", err)
 		}
 	}
 
 	var respHdr fdHeader
-	if err := binary.Read(c.conn, binary.BigEndian, &respHdr); err != nil {
+	if err := binary.Read(conn, binary.BigEndian, &respHdr); err != nil {
 		return nil, nil, nil, fmt.Errorf("error reading response header: %v", err)
 	}
 	if respHdr.Magic != fdMagic {
@@ -459,7 +462,7 @@ func (c *FDClient) request(hdr *fdHeader, data []byte) (*fdHeader, []byte, []byt
 	respData := make([]byte, respHdr.DataSize)
 	oobData := make([]byte, respHdr.OobSize)
 	if len(respData) > 0 || len(oobData) > 0 {
-		n, oobn, _, _, err := c.conn.ReadMsgUnix(respData, oobData)
+		n, oobn, _, _, err := conn.ReadMsgUnix(respData, oobData)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("error reading the message: %v", err)
 		}

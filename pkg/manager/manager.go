@@ -70,10 +70,10 @@ func (v *VirtletManager) Run() error {
 	if v.fdManager == nil {
 		client := tapmanager.NewFDClient(*v.config.FDServerSocketPath)
 		for i := 0; i < tapManagerAttemptCount; i++ {
-			time.Sleep(tapManagerConnectInterval)
-			if err = client.Connect(); err == nil {
+			if err = client.IsRunning(); err == nil {
 				break
 			}
+			time.Sleep(tapManagerConnectInterval)
 		}
 		if err != nil {
 			return fmt.Errorf("failed to connect to tapmanager: %v", err)

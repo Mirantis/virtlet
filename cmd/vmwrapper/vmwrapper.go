@@ -84,10 +84,6 @@ func main() {
 
 		if netFdKey != "" {
 			c := tapmanager.NewFDClient(fdSocketPath)
-			if err := c.Connect(); err != nil {
-				glog.Errorf("Can't connect to fd server: %v", err)
-				os.Exit(1)
-			}
 			fds, marshaledData, err := c.GetFDs(netFdKey)
 			if err != nil {
 				glog.Errorf("Failed to obtain tap fds for key %q: %v", netFdKey, err)
