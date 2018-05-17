@@ -248,8 +248,8 @@ func (ct *containerTester) createContainer(sandbox *kubeapi.PodSandboxConfig, co
 	if err != nil {
 		ct.t.Fatalf("Creating container %s failure: %v", sandbox.Metadata.Name, err)
 	}
-	container.ContainerId = resp.ContainerId
-	ct.t.Logf("Container created: %q", container.ContainerId)
+	container.ContainerID = resp.ContainerId
+	ct.t.Logf("Container created: %q", container.ContainerID)
 	return resp
 }
 

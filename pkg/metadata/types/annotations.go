@@ -36,19 +36,19 @@ const (
 	cloudInitUserDataScriptKeyName    = "VirtletCloudInitUserDataScript"
 	cloudInitImageType                = "VirtletCloudInitImageType"
 	sshKeysKeyName                    = "VirtletSSHKeys"
-	// The name of user data source key in the pod annotations.
+	// CloudInitUserDataSourceKeyName is the name of user data source key in the pod annotations.
 	CloudInitUserDataSourceKeyName = "VirtletCloudInitUserDataSource"
-	// The name of ssh key source key in the pod annotations.
+	// SSHKeySourceKeyName is the name of ssh key source key in the pod annotations.
 	SSHKeySourceKeyName = "VirtletSSHKeySource"
 )
 
-// ImageType specifies the image type used for cloud-init
+// CloudInitImageType specifies the image type used for cloud-init
 type CloudInitImageType string
 
 const (
-	// NoCloud image.
+	// CloudInitImageTypeNoCloud specified nocloud cloud-init image type.
 	CloudInitImageTypeNoCloud CloudInitImageType = "nocloud"
-	// ConfigDrive image.
+	// CloudInitImageTypeConfigDrive specified configdrive cloud-init image type.
 	CloudInitImageTypeConfigDrive CloudInitImageType = "configdrive"
 )
 
@@ -56,9 +56,9 @@ const (
 type DiskDriverName string
 
 const (
-	// virtio disk driver.
+	// DiskDriverVirtio specifies virtio disk driver.
 	DiskDriverVirtio DiskDriverName = "virtio"
-	// scsi disk driver.
+	// DiskDriverScsi specifies scsi disk driver.
 	DiskDriverScsi DiskDriverName = "scsi"
 )
 
@@ -66,14 +66,21 @@ const (
 // by Virtlet.
 type VirtletAnnotations struct {
 	// Number of virtual CPUs.
-	VCPUCount         int
-	CDImageType       CloudInitImageType
-	MetaData          map[string]interface{}
-	UserData          map[string]interface{}
+	VCPUCount int
+	// Cloud-Init image type to use.
+	CDImageType CloudInitImageType
+	// Cloud-Init metadata.
+	MetaData map[string]interface{}
+	// Cloud-Init userdata
+	UserData map[string]interface{}
+	// True if the userdata is overridden.
 	UserDataOverwrite bool
-	UserDataScript    string
-	SSHKeys           []string
-	DiskDriver        DiskDriverName
+	// UserDataScript specifies the script to be used as userdata.
+	UserDataScript string
+	// SSHKets specifies ssh public keys to use.
+	SSHKeys []string
+	// DiskDriver specifies the disk driver to use.
+	DiskDriver DiskDriverName
 }
 
 // ExternalDataLoader is a function that loads external data that's specified

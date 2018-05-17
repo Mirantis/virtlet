@@ -54,13 +54,13 @@ const (
 	ContainerNsUUID       = "67b7fb47-7735-4b64-86d2-6d062d121966"
 	defaultKubeletRootDir = "/var/lib/kubelet/pods"
 
-	// Pod name container label (copied from kubetypes).
+	// KubernetesPodNameLabel is pod name container label (copied from kubetypes).
 	KubernetesPodNameLabel = "io.kubernetes.pod.name"
-	// Pod namespace container label (copied from kubetypes),
+	// KubernetesPodNamespaceLabel is pod namespace container label (copied from kubetypes),
 	KubernetesPodNamespaceLabel = "io.kubernetes.pod.namespace"
-	// Pod uid container label (copied from kubetypes).
+	// KubernetesPodUIDLabel is uid container label (copied from kubetypes).
 	KubernetesPodUIDLabel = "io.kubernetes.pod.uid"
-	// Pod container name label (copied from kubetypes)
+	// KubernetesContainerNameLabel is container name label (copied from kubetypes)
 	KubernetesContainerNameLabel = "io.kubernetes.container.name"
 )
 
@@ -293,7 +293,6 @@ func (v *VirtualizationTool) CreateContainer(config *types.VMConfig, netFdKey st
 		netFdKey:   netFdKey,
 	}
 
-	cloneName := "virtlet_root_" + settings.domainUUID
 	settings.vcpuNum = config.ParsedAnnotations.VCPUCount
 	settings.memory = int(config.MemoryLimitInBytes)
 	settings.cpuShares = uint(config.CPUShares)
@@ -352,11 +351,10 @@ func (v *VirtualizationTool) CreateContainer(config *types.VMConfig, netFdKey st
 		err = v.metadataStore.Container(settings.domainUUID).Save(
 			func(_ *types.ContainerInfo) (*types.ContainerInfo, error) {
 				return &types.ContainerInfo{
-					Name:                config.Name,
-					CreatedAt:           v.clock.Now().UnixNano(),
-					RootImageVolumeName: cloneName,
-					Config:              *config,
-					State:               types.ContainerState_CONTAINER_CREATED,
+					Name:      config.Name,
+					CreatedAt: v.clock.Now().UnixNano(),
+					Config:    *config,
+					State:     types.ContainerState_CONTAINER_CREATED,
 				}, nil
 			})
 	}

@@ -33,10 +33,10 @@ func TestPodStatuses(t *testing.T) {
 	ct.verifyPodSandboxState(sandbox, kubeapi.PodSandboxState_SANDBOX_READY)
 	ct.createContainer(sandbox, container, imageSpec, nil)
 	ct.verifyPodSandboxState(sandbox, kubeapi.PodSandboxState_SANDBOX_READY)
-	ct.startContainer(container.ContainerId)
+	ct.startContainer(container.ContainerID)
 	ct.verifyPodSandboxState(sandbox, kubeapi.PodSandboxState_SANDBOX_READY)
-	ct.stopContainer(container.ContainerId)
-	ct.removeContainer(container.ContainerId)
+	ct.stopContainer(container.ContainerID)
+	ct.removeContainer(container.ContainerID)
 	ct.stopPodSandbox(sandbox.Metadata.Uid)
 	ct.verifyPodSandboxState(sandbox, kubeapi.PodSandboxState_SANDBOX_NOTREADY)
 	// make sure stopping sandbox is idempotent

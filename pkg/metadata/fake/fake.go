@@ -24,27 +24,35 @@ import (
 )
 
 const (
-	samplePodNsUuid       = "cd6bc1b7-a9e2-4739-ade9-3e2447d28a90"
-	sampleContainerNsUuid = "a51f5bed-db9c-49b1-a1b6-9989d46d637b"
+	samplePodNsUUID       = "cd6bc1b7-a9e2-4739-ade9-3e2447d28a90"
+	sampleContainerNsUUID = "a51f5bed-db9c-49b1-a1b6-9989d46d637b"
 )
 
+// ContainerTestConfig specifies configuration for a container test.
 type ContainerTestConfig struct {
-	Name                string
-	SandboxId           string
-	ContainerId         string
-	Image               string
-	RootImageVolumeName string
-	Labels              map[string]string
-	Annotations         map[string]string
+	// Container name.
+	Name string
+	// Pod sandbox id.
+	SandboxID string
+	// Container id.
+	ContainerID string
+	// Image reference.
+	Image string
+	// Container labels.
+	Labels map[string]string
+	// Container annotations.
+	Annotations map[string]string
 }
 
+// GetSandboxes returns the specified number of PodSandboxConfig
+// objects with "fake" contents.
 func GetSandboxes(sandboxCount int) []*types.PodSandboxConfig {
 	sandboxes := []*types.PodSandboxConfig{}
 	for i := 0; i < sandboxCount; i++ {
 		name := "testName_" + strconv.Itoa(i)
 		sandboxConfig := &types.PodSandboxConfig{
 			Name:         name,
-			Uid:          utils.NewUUID5(samplePodNsUuid, name),
+			Uid:          utils.NewUUID5(samplePodNsUUID, name),
 			Namespace:    "default",
 			Attempt:      uint32(0),
 			Hostname:     "localhost",
@@ -65,18 +73,19 @@ func GetSandboxes(sandboxCount int) []*types.PodSandboxConfig {
 	return sandboxes
 }
 
+// GetContainersConfig returns the specified number of
+// ContainerTestConfig objects.
 func GetContainersConfig(sandboxConfigs []*types.PodSandboxConfig) []*ContainerTestConfig {
 	containers := []*ContainerTestConfig{}
 	for _, sandbox := range sandboxConfigs {
 		name := "container-for-" + sandbox.Name
 		containerConf := &ContainerTestConfig{
-			Name:                name,
-			SandboxId:           sandbox.Uid,
-			Image:               "testImage",
-			RootImageVolumeName: "sample_name",
-			ContainerId:         utils.NewUUID5(sampleContainerNsUuid, name),
-			Labels:              map[string]string{"foo": "bar", "fizz": "buzz"},
-			Annotations:         map[string]string{"hello": "world", "virt": "let"},
+			Name:        name,
+			SandboxID:   sandbox.Uid,
+			Image:       "testImage",
+			ContainerID: utils.NewUUID5(sampleContainerNsUUID, name),
+			Labels:      map[string]string{"foo": "bar", "fizz": "buzz"},
+			Annotations: map[string]string{"hello": "world", "virt": "let"},
 		}
 		containers = append(containers, containerConf)
 	}

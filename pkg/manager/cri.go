@@ -35,7 +35,7 @@ func podSandboxMetadata(in *types.PodSandboxInfo) *kubeapi.PodSandboxMetadata {
 	}
 }
 
-// PodSandboxInfoToKubeapiPodSandboxStatus converts PodSandboxInfo to CRI PodSandboxStatus.
+// PodSandboxInfoToCRIPodSandboxStatus converts PodSandboxInfo to CRI PodSandboxStatus.
 func PodSandboxInfoToCRIPodSandboxStatus(in *types.PodSandboxInfo) *kubeapi.PodSandboxStatus {
 	return &kubeapi.PodSandboxStatus{
 		Id:        in.PodID,
@@ -53,7 +53,7 @@ func PodSandboxInfoToCRIPodSandboxStatus(in *types.PodSandboxInfo) *kubeapi.PodS
 	}
 }
 
-// PodSandboxInfoToKubeapiPodSandboxStatus converts PodSandboxInfo to CRI PodSandbox.
+// PodSandboxInfoToCRIPodSandbox converts PodSandboxInfo to CRI PodSandbox.
 func PodSandboxInfoToCRIPodSandbox(in *types.PodSandboxInfo) *kubeapi.PodSandbox {
 	return &kubeapi.PodSandbox{
 		Id:          in.PodID,

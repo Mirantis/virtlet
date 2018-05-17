@@ -91,17 +91,16 @@ func setUpTestStore(t *testing.T, sandboxConfigs []*types.PodSandboxConfig, cont
 
 	for _, container := range containerConfigs {
 		ci := &types.ContainerInfo{
-			Name:                container.Name,
-			RootImageVolumeName: container.RootImageVolumeName,
-			CreatedAt:           clock.Now().UnixNano(),
+			Name:      container.Name,
+			CreatedAt: clock.Now().UnixNano(),
 			Config: types.VMConfig{
-				PodSandboxID:         container.SandboxId,
+				PodSandboxID:         container.SandboxID,
 				Image:                container.Image,
 				ContainerLabels:      container.Labels,
 				ContainerAnnotations: container.Annotations,
 			},
 		}
-		if err := store.Container(container.ContainerId).Save(
+		if err := store.Container(container.ContainerID).Save(
 			func(c *types.ContainerInfo) (*types.ContainerInfo, error) {
 				return ci, nil
 			},

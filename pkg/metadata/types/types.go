@@ -79,8 +79,6 @@ type ContainerInfo struct {
 	CreatedAt int64
 	// Container startup timestamp
 	StartedAt int64
-	// Name of the container's root volume
-	RootImageVolumeName string
 	// Current state of the container
 	State ContainerState
 	// Container configuration

@@ -53,12 +53,11 @@ func TestConversions(t *testing.T) {
 	}
 	containerInfos := []interface{}{
 		&types.ContainerInfo{
-			Id:                  "f1bfb494-af3d-48ab-b8b1-2c850e1e8a00",
-			Name:                "testcontainer",
-			CreatedAt:           1496175540000000000,
-			StartedAt:           1496175550000000000,
-			RootImageVolumeName: "",
-			State:               types.ContainerState_CONTAINER_CREATED,
+			Id:        "f1bfb494-af3d-48ab-b8b1-2c850e1e8a00",
+			Name:      "testcontainer",
+			CreatedAt: 1496175540000000000,
+			StartedAt: 1496175550000000000,
+			State:     types.ContainerState_CONTAINER_CREATED,
 			Config: types.VMConfig{
 				PodSandboxID: configs[0].Uid,
 				Image:        "testImage",
@@ -72,12 +71,11 @@ func TestConversions(t *testing.T) {
 			},
 		},
 		&types.ContainerInfo{
-			Id:                  "13bdedae-540d-4131-959b-366c6343d5b4",
-			Name:                "testcontainer1",
-			CreatedAt:           1496175560000000000,
-			StartedAt:           1496175570000000000,
-			RootImageVolumeName: "",
-			State:               types.ContainerState_CONTAINER_EXITED,
+			Id:        "13bdedae-540d-4131-959b-366c6343d5b4",
+			Name:      "testcontainer1",
+			CreatedAt: 1496175560000000000,
+			StartedAt: 1496175570000000000,
+			State:     types.ContainerState_CONTAINER_EXITED,
 			Config: types.VMConfig{
 				PodSandboxID: configs[1].Uid,
 				Image:        "testImage1",

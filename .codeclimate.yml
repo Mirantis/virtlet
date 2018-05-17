@@ -46,3 +46,7 @@ exclude_patterns:
   - "**/*_test.go"
   - "*_test.go"
   - "pkg/tools/bindata.go"
+  # the fields and consts there are named after corresponding
+  # CRI fields / consts, but make CodeClimate unhappy due to
+  # underscores and "Id" instead of "ID"
+  - "pkg/metadata/types/types.go"

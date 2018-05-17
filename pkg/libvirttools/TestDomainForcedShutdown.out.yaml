@@ -144,7 +144,6 @@
     CreatedAt: 1496175540000000000
     Id: 231700d5-c9a6-5a49-738d-99a954c51550
     Name: container1
-    RootImageVolumeName: virtlet_root_231700d5-c9a6-5a49-738d-99a954c51550
     StartedAt: 1496175541000000000
     State: 2
 - name: invoking RemoveContainer()
