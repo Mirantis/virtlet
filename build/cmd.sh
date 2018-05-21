@@ -442,10 +442,9 @@ function release_internal {
     local -a files=(virtletctl virtletctl.darwin)
     local description="$(release_description "${tag}" "${files[@]}")"
     local pre_release=
-    # TODO: uncomment this 'if/fi' once we start making 'non-pre' releases
-    # if [[ ${tag} =~ -(test|pre).*$ ]]; then
-    pre_release="--pre-release"
-    # fi
+    if [[ ${tag} =~ -(test|pre).*$ ]]; then
+        pre_release="--pre-release"
+    fi
     if github-release --quiet delete "${opts[@]}"; then
         echo >&2 "Replacing the old Virtlet release"
     fi
