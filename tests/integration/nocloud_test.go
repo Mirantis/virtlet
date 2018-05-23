@@ -42,9 +42,9 @@ func TestCloudInitNoCloud(t *testing.T) {
 	ct.pullImage(imageSpec)
 	ct.runPodSandbox(sandbox)
 	ct.createContainer(sandbox, container, imageSpec, nil)
-	ct.startContainer(container.ContainerId)
+	ct.startContainer(container.ContainerID)
 
-	ct.verifyContainerState(container.ContainerId, container.Name, kubeapi.ContainerState_CONTAINER_RUNNING)
+	ct.verifyContainerState(container.ContainerID, container.Name, kubeapi.ContainerState_CONTAINER_RUNNING)
 
 	isoPath := runShellCommand(t, `virsh domblklist $(virsh list --name)|grep -o '/.*config-.*\.iso[^ ]*'`)
 	files, err := testutils.IsoToMap(isoPath)
@@ -60,7 +60,7 @@ func TestCloudInitNoCloud(t *testing.T) {
 		t.Errorf("bad nocloud metadata iso:\n%s\n-- instead of --\n%s", utils.MapToJSON(files), utils.MapToJSON(expectedFiles))
 	}
 
-	ct.stopContainer(container.ContainerId)
-	ct.removeContainer(container.ContainerId)
+	ct.stopContainer(container.ContainerID)
+	ct.removeContainer(container.ContainerID)
 	ct.verifyNoContainers(nil)
 }

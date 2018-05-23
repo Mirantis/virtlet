@@ -29,6 +29,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Mirantis/virtlet/pkg/metadata"
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
 )
 
 const (
@@ -153,7 +154,7 @@ func dumpMetadata(fname string) error {
 	return nil
 }
 
-func dumpSandbox(podid string, sandbox *metadata.PodSandboxInfo, s metadata.Store) error {
+func dumpSandbox(podid string, sandbox *types.PodSandboxInfo, s metadata.Store) error {
 	printlnIndented(2, "Sandbox id: %s", podid)
 	printlnIndented(0, spew.Sdump(sandbox))
 

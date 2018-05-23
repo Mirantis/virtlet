@@ -31,6 +31,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
 	"github.com/Mirantis/virtlet/pkg/metadata"
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
 )
 
@@ -119,8 +120,7 @@ func (v *VirtletRuntimeService) RunPodSandbox(ctx context.Context, in *kubeapi.R
 	sandbox := v.metadataStore.PodSandbox(podID)
 	sandboxInfo, err := sandbox.Retrieve()
 	if err == nil && sandboxInfo != nil {
-		status := sandboxInfo.AsPodSandboxStatus()
-		if status.State == kubeapi.PodSandboxState_SANDBOX_READY {
+		if sandboxInfo.State == types.PodSandboxState_SANDBOX_READY {
 			return &kubeapi.RunPodSandboxResponse{
 				PodSandboxId: podID,
 			}, nil
@@ -157,7 +157,9 @@ func (v *VirtletRuntimeService) RunPodSandbox(ctx context.Context, in *kubeapi.R
 		return nil, fmt.Errorf("Error adding pod %s (%s) to CNI network: %v", podName, podID, err)
 	}
 
-	psi, err := metadata.NewPodSandboxInfo(config, csnBytes, state, v.clock)
+	psi, err := metadata.NewPodSandboxInfo(
+		CRIPodSandboxConfigToPodSandboxConfig(config),
+		csnBytes, types.PodSandboxState(state), v.clock)
 	if err != nil {
 		// cleanup cni if we could not add pod to metadata store to prevent resource leaking
 		if fdErr := v.fdManager.ReleaseFDs(podID); err != nil {
@@ -168,7 +170,7 @@ func (v *VirtletRuntimeService) RunPodSandbox(ctx context.Context, in *kubeapi.R
 
 	sandbox = v.metadataStore.PodSandbox(config.Metadata.Uid)
 	if storeErr := sandbox.Save(
-		func(c *metadata.PodSandboxInfo) (*metadata.PodSandboxInfo, error) {
+		func(c *types.PodSandboxInfo) (*types.PodSandboxInfo, error) {
 			return psi, nil
 		},
 	); storeErr != nil {
@@ -187,22 +189,18 @@ func (v *VirtletRuntimeService) RunPodSandbox(ctx context.Context, in *kubeapi.R
 // StopPodSandbox implements StopPodSandbox method of CRI.
 func (v *VirtletRuntimeService) StopPodSandbox(ctx context.Context, in *kubeapi.StopPodSandboxRequest) (*kubeapi.StopPodSandboxResponse, error) {
 	sandbox := v.metadataStore.PodSandbox(in.PodSandboxId)
-	sandboxInfo, err := sandbox.Retrieve()
-	if err != nil {
+	switch sandboxInfo, err := sandbox.Retrieve(); {
+	case err != nil:
 		return nil, err
-	}
-	if sandboxInfo == nil {
+	case sandboxInfo == nil:
 		return nil, fmt.Errorf("sandbox %q not found in Virtlet metadata store", in.PodSandboxId)
-	}
-	status := sandboxInfo.AsPodSandboxStatus()
-
 	// check if the sandbox is already stopped
-	if status.State != kubeapi.PodSandboxState_SANDBOX_NOTREADY {
+	case sandboxInfo.State != types.PodSandboxState_SANDBOX_NOTREADY:
 		if err := sandbox.Save(
-			func(c *metadata.PodSandboxInfo) (*metadata.PodSandboxInfo, error) {
+			func(c *types.PodSandboxInfo) (*types.PodSandboxInfo, error) {
 				// make sure the pod is not removed during the call
 				if c != nil {
-					c.State = kubeapi.PodSandboxState_SANDBOX_NOTREADY
+					c.State = types.PodSandboxState_SANDBOX_NOTREADY
 				}
 				return c, nil
 			},
@@ -224,7 +222,7 @@ func (v *VirtletRuntimeService) RemovePodSandbox(ctx context.Context, in *kubeap
 	podSandboxID := in.PodSandboxId
 
 	if err := v.metadataStore.PodSandbox(podSandboxID).Save(
-		func(c *metadata.PodSandboxInfo) (*metadata.PodSandboxInfo, error) {
+		func(c *types.PodSandboxInfo) (*types.PodSandboxInfo, error) {
 			return nil, nil
 		},
 	); err != nil {
@@ -247,7 +245,7 @@ func (v *VirtletRuntimeService) PodSandboxStatus(ctx context.Context, in *kubeap
 	if sandboxInfo == nil {
 		return nil, fmt.Errorf("sandbox %q not found in Virtlet metadata store", podSandboxID)
 	}
-	status := sandboxInfo.AsPodSandboxStatus()
+	status := PodSandboxInfoToCRIPodSandboxStatus(sandboxInfo)
 
 	var cniResult *cnicurrent.Result
 	if sandboxInfo.ContainerSideNetwork != nil {
@@ -265,7 +263,7 @@ func (v *VirtletRuntimeService) PodSandboxStatus(ctx context.Context, in *kubeap
 
 // ListPodSandbox method implements ListPodSandbox from CRI.
 func (v *VirtletRuntimeService) ListPodSandbox(ctx context.Context, in *kubeapi.ListPodSandboxRequest) (*kubeapi.ListPodSandboxResponse, error) {
-	filter := in.GetFilter()
+	filter := CRIPodSandboxFilterToPodSandboxFilter(in.GetFilter())
 	sandboxes, err := v.metadataStore.ListPodSandboxes(filter)
 	if err != nil {
 		return nil, err
@@ -277,7 +275,7 @@ func (v *VirtletRuntimeService) ListPodSandbox(ctx context.Context, in *kubeapi.
 			glog.Errorf("Error retrieving pod sandbox %q", sandbox.GetID())
 		}
 		if sandboxInfo != nil {
-			podSandboxList = append(podSandboxList, sandboxInfo.AsPodSandbox())
+			podSandboxList = append(podSandboxList, PodSandboxInfoToCRIPodSandbox(sandboxInfo))
 		}
 	}
 	response := &kubeapi.ListPodSandboxResponse{Items: podSandboxList}
@@ -318,7 +316,7 @@ func (v *VirtletRuntimeService) CreateContainer(ctx context.Context, in *kubeapi
 	}
 
 	fdKey := podSandboxID
-	vmConfig, err := libvirttools.GetVMConfig(in, sandboxInfo.ContainerSideNetwork)
+	vmConfig, err := GetVMConfig(in, sandboxInfo.ContainerSideNetwork)
 	if err != nil {
 		return nil, err
 	}
@@ -338,8 +336,8 @@ func (v *VirtletRuntimeService) CreateContainer(ctx context.Context, in *kubeapi
 
 // StartContainer method implements StartContainer from CRI.
 func (v *VirtletRuntimeService) StartContainer(ctx context.Context, in *kubeapi.StartContainerRequest) (*kubeapi.StartContainerResponse, error) {
-	status, err := v.virtTool.ContainerStatus(in.ContainerId)
-	if err == nil && status != nil && status.State == kubeapi.ContainerState_CONTAINER_RUNNING {
+	info, err := v.virtTool.ContainerInfo(in.ContainerId)
+	if err == nil && info != nil && info.State == types.ContainerState_CONTAINER_RUNNING {
 		glog.V(2).Infof("StartContainer: Container %s is already running", in.ContainerId)
 		response := &kubeapi.StartContainerResponse{}
 		return response, nil
@@ -377,23 +375,27 @@ func (v *VirtletRuntimeService) RemoveContainer(ctx context.Context, in *kubeapi
 
 // ListContainers method implements ListContainers from CRI.
 func (v *VirtletRuntimeService) ListContainers(ctx context.Context, in *kubeapi.ListContainersRequest) (*kubeapi.ListContainersResponse, error) {
-	filter := in.GetFilter()
+	filter := CRIContainerFilterToContainerFilter(in.GetFilter())
 	containers, err := v.virtTool.ListContainers(filter)
 	if err != nil {
 		return nil, err
 	}
-	response := &kubeapi.ListContainersResponse{Containers: containers}
+	var r []*kubeapi.Container
+	for _, c := range containers {
+		r = append(r, ContainerInfoToCRIContainer(c))
+	}
+	response := &kubeapi.ListContainersResponse{Containers: r}
 	return response, nil
 }
 
 // ContainerStatus method implements ContainerStatus from CRI.
 func (v *VirtletRuntimeService) ContainerStatus(ctx context.Context, in *kubeapi.ContainerStatusRequest) (*kubeapi.ContainerStatusResponse, error) {
-	status, err := v.virtTool.ContainerStatus(in.ContainerId)
+	info, err := v.virtTool.ContainerInfo(in.ContainerId)
 	if err != nil {
 		return nil, err
 	}
 
-	response := &kubeapi.ContainerStatusResponse{Status: status}
+	response := &kubeapi.ContainerStatusResponse{Status: ContainerInfoToCRIContainerStatus(info)}
 	return response, nil
 }
 

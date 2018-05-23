@@ -1,9 +1,26 @@
-package criapi
+/*
+Copyright 2018 Mirantis
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package fake
 
 import (
-	"github.com/Mirantis/virtlet/pkg/utils"
-	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"strconv"
+
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 const (
@@ -29,43 +46,17 @@ type ContainerTestConfig struct {
 
 // GetSandboxes returns the specified number of PodSandboxConfig
 // objects with "fake" contents.
-func GetSandboxes(sandboxCount int) []*kubeapi.PodSandboxConfig {
-	sandboxes := []*kubeapi.PodSandboxConfig{}
+func GetSandboxes(sandboxCount int) []*types.PodSandboxConfig {
+	sandboxes := []*types.PodSandboxConfig{}
 	for i := 0; i < sandboxCount; i++ {
 		name := "testName_" + strconv.Itoa(i)
-
-		namespace := "default"
-		attempt := uint32(0)
-		metadata := &kubeapi.PodSandboxMetadata{
-			Name:      name,
-			Uid:       utils.NewUUID5(samplePodNsUUID, name),
-			Namespace: namespace,
-			Attempt:   attempt,
-		}
-
-		hostNetwork := false
-		hostPid := false
-		hostIpc := false
-		namespaceOptions := &kubeapi.NamespaceOption{
-			HostNetwork: hostNetwork,
-			HostPid:     hostPid,
-			HostIpc:     hostIpc,
-		}
-
-		cgroupParent := ""
-		linuxSandbox := &kubeapi.LinuxPodSandboxConfig{
-			CgroupParent: cgroupParent,
-			SecurityContext: &kubeapi.LinuxSandboxSecurityContext{
-				NamespaceOptions: namespaceOptions,
-			},
-		}
-
-		hostname := "localhost"
-		logDirectory := "/var/log/test_log_directory"
-		sandboxConfig := &kubeapi.PodSandboxConfig{
-			Metadata:     metadata,
-			Hostname:     hostname,
-			LogDirectory: logDirectory,
+		sandboxConfig := &types.PodSandboxConfig{
+			Name:         name,
+			Uid:          utils.NewUUID5(samplePodNsUUID, name),
+			Namespace:    "default",
+			Attempt:      uint32(0),
+			Hostname:     "localhost",
+			LogDirectory: "/var/log/test_log_directory",
 			Labels: map[string]string{
 				"foo":  "bar",
 				"fizz": "buzz",
@@ -74,7 +65,6 @@ func GetSandboxes(sandboxCount int) []*kubeapi.PodSandboxConfig {
 				"hello": "world",
 				"virt":  "let",
 			},
-			Linux: linuxSandbox,
 		}
 
 		sandboxes = append(sandboxes, sandboxConfig)
@@ -85,13 +75,13 @@ func GetSandboxes(sandboxCount int) []*kubeapi.PodSandboxConfig {
 
 // GetContainersConfig returns the specified number of
 // ContainerTestConfig objects.
-func GetContainersConfig(sandboxConfigs []*kubeapi.PodSandboxConfig) []*ContainerTestConfig {
+func GetContainersConfig(sandboxConfigs []*types.PodSandboxConfig) []*ContainerTestConfig {
 	containers := []*ContainerTestConfig{}
 	for _, sandbox := range sandboxConfigs {
-		name := "container-for-" + sandbox.Metadata.Name
+		name := "container-for-" + sandbox.Name
 		containerConf := &ContainerTestConfig{
 			Name:        name,
-			SandboxID:   sandbox.Metadata.Uid,
+			SandboxID:   sandbox.Uid,
 			Image:       "testImage",
 			ContainerID: utils.NewUUID5(sampleContainerNsUUID, name),
 			Labels:      map[string]string{"foo": "bar", "fizz": "buzz"},

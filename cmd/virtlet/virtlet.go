@@ -63,11 +63,6 @@ const (
 )
 
 func runVirtlet() {
-	kubernetesDir := os.Getenv("KUBERNETES_POD_LOGS")
-	if kubernetesDir == "" {
-		glog.Infoln("KUBERNETES_POD_LOGS environment variables must be set")
-		os.Exit(1)
-	}
 	manager := manager.NewVirtletManager(&manager.VirtletConfig{
 		FDServerSocketPath:         *fdServerSocketPath,
 		DatabasePath:               *boltPath,
@@ -75,9 +70,9 @@ func runVirtlet() {
 		ImageDir:                   *imageDir,
 		ImageTranslationConfigsDir: *imageTranslationConfigsDir,
 		LibvirtURI:                 *libvirtURI,
-		PodLogDir:                  kubernetesDir,
 		RawDevices:                 *rawDevices,
 		CRISocketPath:              *listen,
+		DisableLogging:             os.Getenv("VIRTLET_DISABLE_LOGGING") != "",
 	})
 	if err := manager.Run(); err != nil {
 		glog.Errorf("Error: %v", err)

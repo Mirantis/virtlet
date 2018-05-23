@@ -31,21 +31,21 @@ func TestContainerStatuses(t *testing.T) {
 	ct.pullImage(imageSpec)
 	ct.runPodSandbox(sandbox)
 	ct.createContainer(sandbox, container, imageSpec, nil)
-	ct.verifyContainerState(container.ContainerId, container.Name, kubeapi.ContainerState_CONTAINER_CREATED)
-	ct.startContainer(container.ContainerId)
+	ct.verifyContainerState(container.ContainerID, container.Name, kubeapi.ContainerState_CONTAINER_CREATED)
+	ct.startContainer(container.ContainerID)
 
 	listResp := ct.listContainers(&kubeapi.ContainerFilter{
-		Id: container.ContainerId,
+		Id: container.ContainerID,
 	})
 	if len(listResp.Containers) != 1 {
 		t.Errorf("Expected single container, instead got: %d", len(listResp.Containers))
-	} else if listResp.Containers[0].Id != container.ContainerId {
-		t.Errorf("Didn't find expected container id %s in returned containers list %v", container.ContainerId, listResp.Containers)
+	} else if listResp.Containers[0].Id != container.ContainerID {
+		t.Errorf("Didn't find expected container id %s in returned containers list %v", container.ContainerID, listResp.Containers)
 	}
 
-	ct.verifyContainerState(container.ContainerId, container.Name, kubeapi.ContainerState_CONTAINER_RUNNING)
-	ct.stopContainer(container.ContainerId)
-	ct.verifyContainerState(container.ContainerId, container.Name, kubeapi.ContainerState_CONTAINER_EXITED)
-	ct.removeContainer(container.ContainerId)
+	ct.verifyContainerState(container.ContainerID, container.Name, kubeapi.ContainerState_CONTAINER_RUNNING)
+	ct.stopContainer(container.ContainerID)
+	ct.verifyContainerState(container.ContainerID, container.Name, kubeapi.ContainerState_CONTAINER_EXITED)
+	ct.removeContainer(container.ContainerID)
 	ct.verifyNoContainers(nil)
 }

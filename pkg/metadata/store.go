@@ -22,54 +22,10 @@ import (
 	"io"
 
 	"github.com/jonboulle/clockwork"
-	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	"github.com/Mirantis/virtlet/pkg/network"
 )
-
-// PodSandboxInfo contains metadata information about pod sandbox instance
-type PodSandboxInfo struct {
-	podID string
-
-	Metadata             *kubeapi.PodSandboxMetadata
-	CreatedAt            int64
-	Labels               map[string]string
-	Hostname             string
-	LogDirectory         string
-	Annotations          map[string]string
-	State                kubeapi.PodSandboxState
-	CgroupParent         string
-	NamespaceOption      *kubeapi.NamespaceOption
-	ContainerSideNetwork *network.ContainerSideNetwork
-}
-
-// AsPodSandboxStatus converts PodSandboxInfo to an instance of PodSandboxStatus
-func (psi *PodSandboxInfo) AsPodSandboxStatus() *kubeapi.PodSandboxStatus {
-	return &kubeapi.PodSandboxStatus{
-		Id:        psi.podID,
-		Metadata:  psi.Metadata,
-		State:     psi.State,
-		CreatedAt: psi.CreatedAt,
-		Linux: &kubeapi.LinuxPodSandboxStatus{
-			Namespaces: &kubeapi.Namespace{
-				Options: psi.NamespaceOption,
-			},
-		},
-		Labels:      psi.Labels,
-		Annotations: psi.Annotations,
-	}
-}
-
-// AsPodSandbox converts PodSandboxInfo to an instance of PodSandbox
-func (psi *PodSandboxInfo) AsPodSandbox() *kubeapi.PodSandbox {
-	return &kubeapi.PodSandbox{
-		Id:        psi.podID,
-		Metadata:  psi.Metadata,
-		State:     psi.State,
-		CreatedAt: psi.CreatedAt,
-		Labels:    psi.Labels,
-	}
-}
 
 // PodSandboxMetadata contains methods of a single Pod sandbox
 type PodSandboxMetadata interface {
@@ -77,13 +33,13 @@ type PodSandboxMetadata interface {
 	GetID() string
 
 	// Retrieve loads from DB and returns pod sandbox data bound to the object
-	Retrieve() (*PodSandboxInfo, error)
+	Retrieve() (*types.PodSandboxInfo, error)
 
 	// Save allows to create/modify/delete pod sandbox instance bound to the object.
 	// Supplied handler gets current PodSandboxInfo value (nil if doesn't exist) and returns new structure
 	// value to be saved or nil to delete. If error value is returned from the handler, the transaction is
 	// rolled back and returned error becomes the result of the function
-	Save(func(*PodSandboxInfo) (*PodSandboxInfo, error)) error
+	Save(func(*types.PodSandboxInfo) (*types.PodSandboxInfo, error)) error
 }
 
 // SandboxStore contains methods to operate on Pod sandboxes
@@ -92,21 +48,7 @@ type SandboxStore interface {
 	PodSandbox(podID string) PodSandboxMetadata
 
 	// ListPodSandboxes returns list of pod sandboxes that match given filter
-	ListPodSandboxes(filter *kubeapi.PodSandboxFilter) ([]PodSandboxMetadata, error)
-}
-
-// ContainerInfo contains metadata information about container instance
-type ContainerInfo struct {
-	Name                string
-	CreatedAt           int64
-	StartedAt           int64
-	SandboxID           string
-	Image               string
-	RootImageVolumeName string
-	Labels              map[string]string
-	Annotations         map[string]string
-	Attempt             uint32
-	State               kubeapi.ContainerState
+	ListPodSandboxes(filter *types.PodSandboxFilter) ([]PodSandboxMetadata, error)
 }
 
 // ContainerMetadata contains methods of a single container (VM)
@@ -115,13 +57,13 @@ type ContainerMetadata interface {
 	GetID() string
 
 	// Retrieve loads from DB and returns container data bound to the object
-	Retrieve() (*ContainerInfo, error)
+	Retrieve() (*types.ContainerInfo, error)
 
 	// Save allows to create/modify/delete container data bound to the object.
 	// Supplied handler gets current ContainerInfo value (nil if doesn't exist) and returns new structure
 	// value to be saved or nil to delete. If error value is returned from the handler, the transaction is
 	// rolled back and returned error becomes the result of the function
-	Save(func(*ContainerInfo) (*ContainerInfo, error)) error
+	Save(func(*types.ContainerInfo) (*types.ContainerInfo, error)) error
 }
 
 // ContainerStore contains methods to operate on containers (VMs)
@@ -145,16 +87,7 @@ type Store interface {
 }
 
 // NewPodSandboxInfo is a factory function for PodSandboxInfo instances
-func NewPodSandboxInfo(config *kubeapi.PodSandboxConfig, csnData interface{}, state kubeapi.PodSandboxState, clock clockwork.Clock) (*PodSandboxInfo, error) {
-	linuxSandbox := config.Linux
-	if linuxSandbox == nil {
-		linuxSandbox = &kubeapi.LinuxPodSandboxConfig{}
-	}
-	namespaceOptions := &kubeapi.NamespaceOption{}
-	if linuxSandbox.SecurityContext != nil && linuxSandbox.SecurityContext.NamespaceOptions != nil {
-		namespaceOptions = linuxSandbox.SecurityContext.NamespaceOptions
-	}
-
+func NewPodSandboxInfo(config *types.PodSandboxConfig, csnData interface{}, state types.PodSandboxState, clock clockwork.Clock) (*types.PodSandboxInfo, error) {
 	var csn *network.ContainerSideNetwork
 	switch csnData.(type) {
 	case string:
@@ -179,16 +112,10 @@ func NewPodSandboxInfo(config *kubeapi.PodSandboxConfig, csnData interface{}, st
 		return nil, fmt.Errorf("CSN data in unknown format: %v", csnData)
 	}
 
-	return &PodSandboxInfo{
-		Metadata:             config.Metadata,
+	return &types.PodSandboxInfo{
+		Config:               config,
 		CreatedAt:            clock.Now().UnixNano(),
-		Labels:               config.Labels,
-		Hostname:             config.Hostname,
-		LogDirectory:         config.LogDirectory,
-		Annotations:          config.Annotations,
 		State:                state,
-		CgroupParent:         linuxSandbox.CgroupParent,
-		NamespaceOption:      namespaceOptions,
 		ContainerSideNetwork: csn,
 	}, nil
 }

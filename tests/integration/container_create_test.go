@@ -42,10 +42,10 @@ func (c *containerFilterTestCase) containerFilter(ct *containerTester) *kubeapi.
 	}
 	filter := &kubeapi.ContainerFilter{LabelSelector: c.labelSelector}
 	if c.filterByPodSandbox {
-		filter.PodSandboxId = ct.containers[0].SandboxId
+		filter.PodSandboxId = ct.containers[0].SandboxID
 	}
 	if c.filterByContainer {
-		filter.Id = ct.containers[0].ContainerId
+		filter.Id = ct.containers[0].ContainerID
 	}
 	return filter
 }
@@ -53,7 +53,7 @@ func (c *containerFilterTestCase) containerFilter(ct *containerTester) *kubeapi.
 func (c *containerFilterTestCase) expectedIds(ct *containerTester) []string {
 	r := make([]string, len(c.expectedContainers))
 	for n, idx := range c.expectedContainers {
-		r[n] = ct.containers[idx].ContainerId
+		r[n] = ct.containers[idx].ContainerID
 	}
 	return r
 }
@@ -186,9 +186,9 @@ func TestContainerVolumes(t *testing.T) {
 	}
 
 	for _, container := range ct.containers {
-		ct.stopContainer(container.ContainerId)
-		ct.removeContainer(container.ContainerId)
-		checkAllCleaned(t, container.ContainerId)
+		ct.stopContainer(container.ContainerID)
+		ct.removeContainer(container.ContainerID)
+		checkAllCleaned(t, container.ContainerID)
 	}
 }
 
@@ -284,9 +284,9 @@ func TestContainerCreateStartListRemove(t *testing.T) {
 	}
 
 	for _, container := range ct.containers {
-		ct.stopContainer(container.ContainerId)
-		ct.removeContainer(container.ContainerId)
-		checkAllCleaned(t, container.ContainerId)
+		ct.stopContainer(container.ContainerID)
+		ct.removeContainer(container.ContainerID)
+		checkAllCleaned(t, container.ContainerID)
 	}
 
 	if len(ct.listContainers(nil).Containers) != 0 {

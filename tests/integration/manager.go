@@ -107,7 +107,6 @@ func (v *VirtletManager) Run() {
 	}
 
 	os.Setenv("KUBERNETES_CLUSTER_URL", "")
-	os.Setenv("VIRTLET_DISABLE_LOGGING", "true")
 	v.manager = manager.NewVirtletManager(&manager.VirtletConfig{
 		FDManager:            &fakeFDManager{},
 		DatabasePath:         filepath.Join(v.tempDir, "virtlet.db"),
@@ -117,6 +116,7 @@ func (v *VirtletManager) Run() {
 		LibvirtURI:           libvirtURI,
 		RawDevices:           "loop*",
 		CRISocketPath:        virtletSocket,
+		DisableLogging:       true,
 	})
 	v.doneCh = make(chan struct{})
 	go func() {

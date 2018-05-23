@@ -1,0 +1,38 @@
+- in: null
+  out: null
+- in: {}
+  out:
+    Id: ""
+    LabelSelector: null
+    State: null
+- in:
+    id: a393e311-5f4f-402b-8567-864d2ab81b83
+  out:
+    Id: a393e311-5f4f-402b-8567-864d2ab81b83
+    LabelSelector: null
+    State: null
+- in:
+    id: a393e311-5f4f-402b-8567-864d2ab81b83
+    state:
+      state: 1
+  out:
+    Id: a393e311-5f4f-402b-8567-864d2ab81b83
+    LabelSelector: null
+    State: 1
+- in:
+    id: a393e311-5f4f-402b-8567-864d2ab81b83
+    state: {}
+  out:
+    Id: a393e311-5f4f-402b-8567-864d2ab81b83
+    LabelSelector: null
+    State: 0
+- in:
+    id: a393e311-5f4f-402b-8567-864d2ab81b83
+    label_selector:
+      foo: bar
+    state: {}
+  out:
+    Id: a393e311-5f4f-402b-8567-864d2ab81b83
+    LabelSelector:
+      foo: bar
+    State: 0

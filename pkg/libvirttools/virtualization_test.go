@@ -18,6 +18,7 @@ package libvirttools
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -26,15 +27,14 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
-	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 
 	"github.com/Mirantis/virtlet/pkg/flexvolume"
 	"github.com/Mirantis/virtlet/pkg/metadata"
+	fakemeta "github.com/Mirantis/virtlet/pkg/metadata/fake"
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 	"github.com/Mirantis/virtlet/pkg/virt/fake"
-	"github.com/Mirantis/virtlet/tests/criapi"
 	"github.com/Mirantis/virtlet/tests/gm"
 )
 
@@ -90,18 +90,17 @@ func newContainerTester(t *testing.T, rec *testutils.TopLevelRecorder) *containe
 	ct.virtTool.SetForceKVM(true)
 	ct.kubeletRootDir = filepath.Join(ct.tmpDir, "kubelet-root")
 	ct.virtTool.SetKubeletRootDir(ct.kubeletRootDir)
+	ct.virtTool.SetStreamerSocketPath("/var/lib/libvirt/streamer.sock")
 
 	return ct
 }
 
-func (ct *containerTester) setPodSandbox(config *kubeapi.PodSandboxConfig) {
-	psi, _ := metadata.NewPodSandboxInfo(config, nil, kubeapi.PodSandboxState_SANDBOX_READY, ct.clock)
-	sandbox := ct.metadataStore.PodSandbox(config.Metadata.Uid)
-	err := sandbox.Save(
-		func(c *metadata.PodSandboxInfo) (*metadata.PodSandboxInfo, error) {
-			return psi, nil
-		},
-	)
+func (ct *containerTester) setPodSandbox(config *types.PodSandboxConfig) {
+	psi, _ := metadata.NewPodSandboxInfo(config, nil, types.PodSandboxState_SANDBOX_READY, ct.clock)
+	sandbox := ct.metadataStore.PodSandbox(config.Uid)
+	err := sandbox.Save(func(c *types.PodSandboxInfo) (*types.PodSandboxInfo, error) {
+		return psi, nil
+	})
 	if err != nil {
 		ct.t.Fatalf("Failed to store pod sandbox: %v", err)
 	}
@@ -111,30 +110,20 @@ func (ct *containerTester) teardown() {
 	os.RemoveAll(ct.tmpDir)
 }
 
-func (ct *containerTester) createContainer(sandbox *kubeapi.PodSandboxConfig, mounts []*kubeapi.Mount) string {
-	req := &kubeapi.CreateContainerRequest{
-		PodSandboxId: sandbox.Metadata.Uid,
-		Config: &kubeapi.ContainerConfig{
-			Metadata: &kubeapi.ContainerMetadata{
-				Name:    fakeContainerName,
-				Attempt: fakeContainerAttempt,
-			},
-			Image: &kubeapi.ImageSpec{
-				Image: fakeImageName,
-			},
-			Mounts:      mounts,
-			Annotations: map[string]string{"foo": "bar"},
-		},
-		SandboxConfig: sandbox,
+func (ct *containerTester) createContainer(sandbox *types.PodSandboxConfig, mounts []types.VMMount) string {
+	vmConfig := &types.VMConfig{
+		PodSandboxID:         sandbox.Uid,
+		PodName:              sandbox.Name,
+		PodNamespace:         sandbox.Namespace,
+		Name:                 fakeContainerName,
+		Image:                fakeImageName,
+		Attempt:              fakeContainerAttempt,
+		PodAnnotations:       sandbox.Annotations,
+		ContainerAnnotations: map[string]string{"foo": "bar"},
+		Mounts:               mounts,
+		LogDirectory:         fmt.Sprintf("/var/log/pods/%s", sandbox.Uid),
+		LogPath:              fmt.Sprintf("%s_%d.log", fakeContainerName, fakeContainerAttempt),
 	}
-	// Here we pass "" as cniConfig argument of GetVMConfig because we
-	// don't test CNI aspect here. It's taken care of in pkg/manager
-	// and cloud-init part of this package.
-	vmConfig, err := GetVMConfig(req, nil)
-	if err != nil {
-		ct.t.Fatalf("GetVMConfig(): %v", err)
-	}
-
 	containerID, err := ct.virtTool.CreateContainer(vmConfig, "/tmp/fakenetns")
 	if err != nil {
 		ct.t.Fatalf("CreateContainer: %v", err)
@@ -142,18 +131,18 @@ func (ct *containerTester) createContainer(sandbox *kubeapi.PodSandboxConfig, mo
 	return containerID
 }
 
-func (ct *containerTester) listContainers(filter *kubeapi.ContainerFilter) []*kubeapi.Container {
-	containers, err := ct.virtTool.ListContainers(nil)
+func (ct *containerTester) listContainers(filter *types.ContainerFilter) []*types.ContainerInfo {
+	containers, err := ct.virtTool.ListContainers(filter)
 	if err != nil {
 		ct.t.Fatalf("ListContainers() failed: %v", err)
 	}
 	return containers
 }
 
-func (ct *containerTester) containerStatus(containerID string) *kubeapi.ContainerStatus {
-	status, err := ct.virtTool.ContainerStatus(containerID)
+func (ct *containerTester) containerInfo(containerID string) *types.ContainerInfo {
+	status, err := ct.virtTool.ContainerInfo(containerID)
 	if err != nil {
-		ct.t.Errorf("ContainerStatus(): %v", err)
+		ct.t.Errorf("ContainerInfo(): %v", err)
 	}
 	return status
 }
@@ -176,7 +165,7 @@ func (ct *containerTester) removeContainer(containerID string) {
 	}
 }
 
-func (ct *containerTester) verifyContainerRootfsExists(container *kubeapi.Container) bool {
+func (ct *containerTester) verifyContainerRootfsExists(containerInfo *types.ContainerInfo) bool {
 	storagePool, err := ct.storageConn.LookupStoragePoolByName("volumes")
 	if err != nil {
 		ct.t.Fatalf("Expected to found 'volumes' storage pool but failed with: %v", err)
@@ -184,7 +173,7 @@ func (ct *containerTester) verifyContainerRootfsExists(container *kubeapi.Contai
 	// TODO: this is third place where rootfs volume name is calculated
 	// so there should be a func which will do it in consistent way there,
 	// in virtlet_root_volumesource.go and in virtualization.go
-	_, err = storagePool.LookupVolumeByName("virtlet_root_" + container.PodSandboxId)
+	_, err = storagePool.LookupVolumeByName("virtlet_root_" + containerInfo.Config.PodSandboxID)
 	return err == nil
 }
 
@@ -192,7 +181,7 @@ func TestContainerLifecycle(t *testing.T) {
 	ct := newContainerTester(t, testutils.NewToplevelRecorder())
 	defer ct.teardown()
 
-	sandbox := criapi.GetSandboxes(1)[0]
+	sandbox := fakemeta.GetSandboxes(1)[0]
 	ct.setPodSandbox(sandbox)
 
 	containers := ct.listContainers(nil)
@@ -210,51 +199,51 @@ func TestContainerLifecycle(t *testing.T) {
 	if container.Id != containerID {
 		t.Errorf("Bad container id in response: %q instead of %q", containers[0].Id, containerID)
 	}
-	if container.State != kubeapi.ContainerState_CONTAINER_CREATED {
-		t.Errorf("Bad container state: %v instead of %v", containers[0].State, kubeapi.ContainerState_CONTAINER_CREATED)
+	if container.State != types.ContainerState_CONTAINER_CREATED {
+		t.Errorf("Bad container state: %v instead of %v", containers[0].State, types.ContainerState_CONTAINER_CREATED)
 	}
-	if container.Metadata.Name != fakeContainerName {
-		t.Errorf("Bad container name: %q instead of %q", containers[0].Metadata.Name, fakeContainerName)
+	if container.Config.Name != fakeContainerName {
+		t.Errorf("Bad container name: %q instead of %q", containers[0].Config.Name, fakeContainerName)
 	}
-	if container.Metadata.Attempt != fakeContainerAttempt {
-		t.Errorf("Bad container attempt: %d instead of %d", containers[0].Metadata.Attempt, fakeContainerAttempt)
+	if container.Config.Attempt != fakeContainerAttempt {
+		t.Errorf("Bad container attempt: %d instead of %d", containers[0].Config.Attempt, fakeContainerAttempt)
 	}
-	if container.Labels[kubetypes.KubernetesContainerNameLabel] != fakeContainerName {
-		t.Errorf("Bad container name label: %q instead of %q", containers[0].Labels[kubetypes.KubernetesContainerNameLabel], fakeContainerName)
+	if container.Config.ContainerLabels[KubernetesContainerNameLabel] != fakeContainerName {
+		t.Errorf("Bad container name label: %q instead of %q", containers[0].Config.ContainerLabels[KubernetesContainerNameLabel], fakeContainerName)
 	}
-	if container.Annotations["foo"] != "bar" {
-		t.Errorf("Bad container annotation value: %q instead of %q", containers[0].Annotations["foo"], "bar")
+	if container.Config.ContainerAnnotations["foo"] != "bar" {
+		t.Errorf("Bad container annotation value: %q instead of %q", containers[0].Config.ContainerAnnotations["foo"], "bar")
 	}
 	ct.rec.Rec("container list after the container is created", containers)
 
 	ct.clock.Advance(1 * time.Second)
 	ct.startContainer(containerID)
 
-	status := ct.containerStatus(containerID)
-	if status.State != kubeapi.ContainerState_CONTAINER_RUNNING {
-		t.Errorf("Bad container state: %v instead of %v", status.State, kubeapi.ContainerState_CONTAINER_RUNNING)
+	container = ct.containerInfo(containerID)
+	if container.State != types.ContainerState_CONTAINER_RUNNING {
+		t.Errorf("Bad container state: %v instead of %v", container.State, types.ContainerState_CONTAINER_RUNNING)
 	}
-	ct.rec.Rec("container status after the container is started", status)
+	ct.rec.Rec("container info after the container is started", container)
 
 	ct.stopContainer(containerID)
 
-	status = ct.containerStatus(containerID)
-	if status.State != kubeapi.ContainerState_CONTAINER_EXITED {
-		t.Errorf("Bad container state: %v instead of %v", status.State, kubeapi.ContainerState_CONTAINER_EXITED)
+	container = ct.containerInfo(containerID)
+	if container.State != types.ContainerState_CONTAINER_EXITED {
+		t.Errorf("Bad container state: %v instead of %v", container.State, types.ContainerState_CONTAINER_EXITED)
 	}
-	if status.Metadata.Name != fakeContainerName {
-		t.Errorf("Bad container name: %q instead of %q", status.Metadata.Name, fakeContainerName)
+	if container.Config.Name != fakeContainerName {
+		t.Errorf("Bad container name: %q instead of %q", container.Config.Name, fakeContainerName)
 	}
-	if status.Metadata.Attempt != fakeContainerAttempt {
-		t.Errorf("Bad container attempt: %d instead of %d", status.Metadata.Attempt, fakeContainerAttempt)
+	if container.Config.Attempt != fakeContainerAttempt {
+		t.Errorf("Bad container attempt: %d instead of %d", container.Config.Attempt, fakeContainerAttempt)
 	}
-	if status.Labels[kubetypes.KubernetesContainerNameLabel] != fakeContainerName {
-		t.Errorf("Bad container name label: %q instead of %q", containers[0].Labels[kubetypes.KubernetesContainerNameLabel], fakeContainerName)
+	if container.Config.ContainerLabels[KubernetesContainerNameLabel] != fakeContainerName {
+		t.Errorf("Bad container name label: %q instead of %q", containers[0].Config.ContainerLabels[KubernetesContainerNameLabel], fakeContainerName)
 	}
-	if status.Annotations["foo"] != "bar" {
-		t.Errorf("Bad container annotation value: %q instead of %q", status.Annotations["foo"], "bar")
+	if container.Config.ContainerAnnotations["foo"] != "bar" {
+		t.Errorf("Bad container annotation value: %q instead of %q", container.Config.ContainerAnnotations["foo"], "bar")
 	}
-	ct.rec.Rec("container status after the container is stopped", status)
+	ct.rec.Rec("container info after the container is stopped", container)
 
 	ct.removeContainer(containerID)
 
@@ -274,7 +263,7 @@ func TestDomainForcedShutdown(t *testing.T) {
 	ct := newContainerTester(t, testutils.NewToplevelRecorder())
 	defer ct.teardown()
 
-	sandbox := criapi.GetSandboxes(1)[0]
+	sandbox := fakemeta.GetSandboxes(1)[0]
 	ct.setPodSandbox(sandbox)
 
 	containerID := ct.createContainer(sandbox, nil)
@@ -294,11 +283,11 @@ func TestDomainForcedShutdown(t *testing.T) {
 
 	ct.rec.Rec("invoking StopContainer()", nil)
 	ct.stopContainer(containerID)
-	status := ct.containerStatus(containerID)
-	if status.State != kubeapi.ContainerState_CONTAINER_EXITED {
-		t.Errorf("Bad container state: %v instead of %v", status.State, kubeapi.ContainerState_CONTAINER_EXITED)
+	container := ct.containerInfo(containerID)
+	if container.State != types.ContainerState_CONTAINER_EXITED {
+		t.Errorf("Bad container state: %v instead of %v", container.State, types.ContainerState_CONTAINER_EXITED)
 	}
-	ct.rec.Rec("container status after the container is stopped", status)
+	ct.rec.Rec("container info after the container is stopped", container)
 
 	ct.rec.Rec("invoking RemoveContainer()", nil)
 	ct.removeContainer(containerID)
@@ -309,7 +298,7 @@ func TestDoubleStartError(t *testing.T) {
 	ct := newContainerTester(t, testutils.NewToplevelRecorder())
 	defer ct.teardown()
 
-	sandbox := criapi.GetSandboxes(1)[0]
+	sandbox := fakemeta.GetSandboxes(1)[0]
 	ct.setPodSandbox(sandbox)
 
 	containerID := ct.createContainer(sandbox, nil)
@@ -418,12 +407,12 @@ func TestDomainDefinitions(t *testing.T) {
 			ct := newContainerTester(t, rec)
 			defer ct.teardown()
 
-			sandbox := criapi.GetSandboxes(1)[0]
+			sandbox := fakemeta.GetSandboxes(1)[0]
 			sandbox.Annotations = tc.annotations
 			ct.setPodSandbox(sandbox)
 
 			for name, def := range tc.flexVolumes {
-				targetDir := filepath.Join(ct.kubeletRootDir, sandbox.Metadata.Uid, "volumes/virtlet~flexvolume_driver", name)
+				targetDir := filepath.Join(ct.kubeletRootDir, sandbox.Uid, "volumes/virtlet~flexvolume_driver", name)
 				resultStr := flexVolumeDriver.Run([]string{"mount", targetDir, utils.MapToJSON(def)})
 				var r map[string]interface{}
 				if err := json.Unmarshal([]byte(resultStr), &r); err != nil {
@@ -435,10 +424,10 @@ func TestDomainDefinitions(t *testing.T) {
 				}
 			}
 
-			var mounts []*kubeapi.Mount
+			var mounts []types.VMMount
 			for _, m := range tc.mounts {
-				mounts = append(mounts, &kubeapi.Mount{
-					HostPath:      filepath.Join(ct.kubeletRootDir, sandbox.Metadata.Uid, "volumes/virtlet~flexvolume_driver", m.name),
+				mounts = append(mounts, types.VMMount{
+					HostPath:      filepath.Join(ct.kubeletRootDir, sandbox.Uid, "volumes/virtlet~flexvolume_driver", m.name),
 					ContainerPath: m.containerPath,
 				})
 			}
@@ -463,39 +452,27 @@ func TestDomainResourceConstraints(t *testing.T) {
 	rec.AddFilter("DefineDomain")
 	ct := newContainerTester(t, rec)
 	defer ct.teardown()
-	sandbox := criapi.GetSandboxes(1)[0]
+	sandbox := fakemeta.GetSandboxes(1)[0]
 	sandbox.Annotations = map[string]string{
 		"VirtletVCPUCount": strconv.Itoa(cpuCount),
 	}
 	ct.setPodSandbox(sandbox)
-	req := &kubeapi.CreateContainerRequest{
-		PodSandboxId: sandbox.Metadata.Uid,
-		Config: &kubeapi.ContainerConfig{
-			Metadata: &kubeapi.ContainerMetadata{
-				Name:    fakeContainerName,
-				Attempt: fakeContainerAttempt,
-			},
-			Image: &kubeapi.ImageSpec{
-				Image: fakeImageName,
-			},
-			Linux: &kubeapi.LinuxContainerConfig{
-				Resources: &kubeapi.LinuxContainerResources{
-					CpuQuota:           int64(cpuQuota),
-					CpuPeriod:          int64(cpuPeriod),
-					CpuShares:          int64(cpuShares),
-					MemoryLimitInBytes: int64(memoryLimit),
-				},
-			},
-		},
-		SandboxConfig: sandbox,
+	vmConfig := &types.VMConfig{
+		PodSandboxID:       sandbox.Uid,
+		PodName:            sandbox.Name,
+		PodNamespace:       sandbox.Namespace,
+		Name:               fakeContainerName,
+		Image:              fakeImageName,
+		Attempt:            fakeContainerAttempt,
+		MemoryLimitInBytes: int64(memoryLimit),
+		CPUShares:          int64(cpuShares),
+		CPUPeriod:          int64(cpuPeriod),
+		CPUQuota:           int64(cpuQuota),
+		PodAnnotations:     sandbox.Annotations,
+		LogDirectory:       fmt.Sprintf("/var/log/pods/%s", sandbox.Uid),
+		LogPath:            fmt.Sprintf("%s_%d.log", fakeContainerName, fakeContainerAttempt),
 	}
-
-	vmConfig, err := GetVMConfig(req, nil)
-	if err != nil {
-		t.Fatalf("GetVMConfig(): %v", err)
-	}
-
-	if _, err = ct.virtTool.CreateContainer(vmConfig, "/tmp/fakenetns"); err != nil {
+	if _, err := ct.virtTool.CreateContainer(vmConfig, "/tmp/fakenetns"); err != nil {
 		t.Fatalf("CreateContainer: %v", err)
 	}
 

@@ -46,11 +46,11 @@ type Server struct {
 var _ streaming.Runtime = (*Server)(nil)
 
 // NewServer creates a new Server
-func NewServer(kubernetesDir, socketPath string, metadataStore metadata.Store) (*Server, error) {
+func NewServer(socketPath string, metadataStore metadata.Store) (*Server, error) {
 	s := &Server{DeadlineSeconds: 10}
 
 	// Prepare unix server
-	s.unixServer = NewUnixServer(socketPath, kubernetesDir)
+	s.unixServer = NewUnixServer(socketPath)
 
 	bindAddress, err := knet.ChooseBindAddress(net.IP{0, 0, 0, 0})
 	if err != nil {

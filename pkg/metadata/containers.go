@@ -23,6 +23,8 @@ import (
 	"fmt"
 
 	"github.com/boltdb/bolt"
+
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
 )
 
 var (
@@ -45,11 +47,11 @@ func (m containerMeta) GetID() string {
 }
 
 // Retrieve loads from DB and returns container data bound to the object
-func (m containerMeta) Retrieve() (*ContainerInfo, error) {
+func (m containerMeta) Retrieve() (*types.ContainerInfo, error) {
 	if m.GetID() == "" {
 		return nil, errors.New("Container ID cannot be empty")
 	}
-	var ci *ContainerInfo
+	var ci *types.ContainerInfo
 	err := m.client.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(containersBucket)
 		if bucket == nil {
@@ -68,7 +70,7 @@ func (m containerMeta) Retrieve() (*ContainerInfo, error) {
 // Supplied handler gets current ContainerInfo value (nil if doesn't exist) and returns new structure
 // value to be saved or nil to delete. If error value is returned from the handler, the transaction is
 // rolled back and returned error becomes the result of the function
-func (m containerMeta) Save(updater func(*ContainerInfo) (*ContainerInfo, error)) error {
+func (m containerMeta) Save(updater func(*types.ContainerInfo) (*types.ContainerInfo, error)) error {
 	if m.GetID() == "" {
 		return errors.New("Container ID cannot be empty")
 	}
@@ -77,14 +79,14 @@ func (m containerMeta) Save(updater func(*ContainerInfo) (*ContainerInfo, error)
 		if err != nil {
 			return err
 		}
-		var current *ContainerInfo
+		var current *types.ContainerInfo
 		var oldPodID string
 		data := bucket.Get([]byte(m.GetID()))
 		if data != nil {
 			if err = json.Unmarshal(data, &current); err != nil {
 				return err
 			}
-			oldPodID = current.SandboxID
+			oldPodID = current.Config.PodSandboxID
 		}
 		newData, err := updater(current)
 		if err != nil {
@@ -103,19 +105,20 @@ func (m containerMeta) Save(updater func(*ContainerInfo) (*ContainerInfo, error)
 			}
 			return bucket.Delete([]byte(m.GetID()))
 		}
+		newData.Id = m.GetID()
 		data, err = json.Marshal(newData)
 		if err != nil {
 			return err
 		}
 
-		if oldPodID != newData.SandboxID {
+		if oldPodID != newData.Config.PodSandboxID {
 			if oldPodID != "" {
 				if err = removeContainerFromSandbox(tx, m.GetID(), oldPodID); err != nil {
 					return err
 				}
 			}
-			if newData.SandboxID != "" {
-				if err = addContainerToSandbox(tx, m.GetID(), newData.SandboxID); err != nil {
+			if newData.Config.PodSandboxID != "" {
+				if err = addContainerToSandbox(tx, m.GetID(), newData.Config.PodSandboxID); err != nil {
 					return err
 				}
 			}
@@ -187,7 +190,7 @@ func (b *boltClient) ImagesInUse() (map[string]bool, error) {
 				if ci == nil {
 					return fmt.Errorf("containerInfo of container %q not found in Virtlet metadata store", containerMeta.GetID())
 				}
-				result[ci.Image] = true
+				result[ci.Config.Image] = true
 			}
 		}
 		return nil

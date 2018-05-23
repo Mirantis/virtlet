@@ -20,19 +20,21 @@ import (
 	"testing"
 
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
+
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
 )
 
 func TestDiskPath(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
-		driverName diskDriverName
+		driverName types.DiskDriverName
 		diskCount  int
 		devList    libvirtxml.DomainDeviceList
 		diskPaths  []diskPath
 	}{
 		{
 			name:       "scsi driver",
-			driverName: diskDriverScsi,
+			driverName: types.DiskDriverScsi,
 			diskCount:  3,
 			devList: libvirtxml.DomainDeviceList{
 				Disks: []libvirtxml.DomainDisk{
@@ -95,7 +97,7 @@ func TestDiskPath(t *testing.T) {
 		},
 		{
 			name:       "virtio driver",
-			driverName: diskDriverVirtio,
+			driverName: types.DiskDriverVirtio,
 			diskCount:  3,
 			devList: libvirtxml.DomainDeviceList{
 				Disks: []libvirtxml.DomainDisk{

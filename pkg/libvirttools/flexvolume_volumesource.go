@@ -24,6 +24,8 @@ import (
 	"path/filepath"
 
 	"github.com/golang/glog"
+
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
 )
 
 const (
@@ -31,7 +33,7 @@ const (
 	flexvolumeDataFile = "virtlet-flexvolume.json"
 )
 
-type flexvolumeSource func(volumeName, configPath string, config *VMConfig, owner volumeOwner) (VMVolume, error)
+type flexvolumeSource func(volumeName, configPath string, config *types.VMConfig, owner volumeOwner) (VMVolume, error)
 
 var flexvolumeTypeMap = map[string]flexvolumeSource{}
 
@@ -41,7 +43,7 @@ func addFlexvolumeSource(fvType string, source flexvolumeSource) {
 
 // ScanFlexVolumes using prepared by kubelet volumes and contained in pod sandbox
 // annotations prepares volumes to be passed to libvirt as a DomainDisk definitions.
-func ScanFlexVolumes(config *VMConfig, owner volumeOwner) ([]VMVolume, error) {
+func ScanFlexVolumes(config *types.VMConfig, owner volumeOwner) ([]VMVolume, error) {
 	dir := filepath.Join(owner.KubeletRootDir(), config.PodSandboxID, flexvolumeSubdir)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		glog.V(2).Infof("No flexvolumes to process for %q with uuid %q", config.Name, config.DomainUUID)

@@ -72,16 +72,16 @@ func TestRawDevices(t *testing.T) {
 	ct.pullImage(imageSpec)
 	ct.runPodSandbox(sandbox)
 	ct.createContainer(sandbox, container, imageSpec, nil)
-	ct.startContainer(container.ContainerId)
+	ct.startContainer(container.ContainerID)
 
-	ct.verifyContainerState(container.ContainerId, container.Name, kubeapi.ContainerState_CONTAINER_RUNNING)
+	ct.verifyContainerState(container.ContainerID, container.Name, kubeapi.ContainerState_CONTAINER_RUNNING)
 
 	// check for loop in container dom
-	cmd := fmt.Sprintf("virsh domblklist %s | grep '/dev/loop' | wc -l", container.ContainerId)
+	cmd := fmt.Sprintf("virsh domblklist %s | grep '/dev/loop' | wc -l", container.ContainerID)
 	verifyUsingShell(t, cmd, "the number of loop devices attached", "1")
 
-	ct.stopContainer(container.ContainerId)
-	ct.removeContainer(container.ContainerId)
+	ct.stopContainer(container.ContainerID)
+	ct.removeContainer(container.ContainerID)
 	ct.verifyNoContainers(nil)
 }
 

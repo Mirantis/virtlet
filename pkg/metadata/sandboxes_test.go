@@ -23,17 +23,17 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
-	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 
-	"github.com/Mirantis/virtlet/tests/criapi"
+	"github.com/Mirantis/virtlet/pkg/metadata/fake"
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
 )
 
 func TestRemovePodSandbox(t *testing.T) {
-	sandboxes := criapi.GetSandboxes(1)
+	sandboxes := fake.GetSandboxes(1)
 	sandbox := sandboxes[0]
 
 	tests := []struct {
-		sandbox *kubeapi.PodSandboxConfig
+		sandbox *types.PodSandboxConfig
 		error   bool
 	}{
 		{
@@ -54,16 +54,16 @@ func TestRemovePodSandbox(t *testing.T) {
 
 		uid := ""
 		if tc.sandbox != nil {
-			uid = tc.sandbox.GetMetadata().Uid
-			psi, _ := NewPodSandboxInfo(tc.sandbox, nil, kubeapi.PodSandboxState_SANDBOX_READY, clockwork.NewRealClock())
-			if err := store.PodSandbox(uid).Save(func(c *PodSandboxInfo) (*PodSandboxInfo, error) {
+			uid = tc.sandbox.Uid
+			psi, _ := NewPodSandboxInfo(tc.sandbox, nil, types.PodSandboxState_SANDBOX_READY, clockwork.NewRealClock())
+			if err := store.PodSandbox(uid).Save(func(c *types.PodSandboxInfo) (*types.PodSandboxInfo, error) {
 				return psi, nil
 			}); err != nil {
 				t.Fatal(err)
 			}
 			dumpDB(t, store, "before delete")
 		}
-		if err := store.PodSandbox(uid).Save(func(c *PodSandboxInfo) (*PodSandboxInfo, error) {
+		if err := store.PodSandbox(uid).Save(func(c *types.PodSandboxInfo) (*types.PodSandboxInfo, error) {
 			return nil, nil
 		}); err != nil {
 			if tc.error {
@@ -83,31 +83,31 @@ func TestRemovePodSandbox(t *testing.T) {
 }
 
 func TestRetrieve(t *testing.T) {
-	sandboxes := criapi.GetSandboxes(2)
+	sandboxes := fake.GetSandboxes(2)
 
 	fakeClock := clockwork.NewFakeClockAt(time.Now())
-	store := setUpTestStore(t, sandboxes, []*criapi.ContainerTestConfig{}, fakeClock)
+	store := setUpTestStore(t, sandboxes, []*fake.ContainerTestConfig{}, fakeClock)
 
 	for _, sandbox := range sandboxes {
-		expectedSandboxInfo, err := NewPodSandboxInfo(sandbox, nil, kubeapi.PodSandboxState_SANDBOX_READY, fakeClock)
+		expectedSandboxInfo, err := NewPodSandboxInfo(sandbox, nil, types.PodSandboxState_SANDBOX_READY, fakeClock)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if expectedSandboxInfo.podID != "" {
+		if expectedSandboxInfo.PodID != "" {
 			t.Error("podID must be empty for new PodSandboxInfo object")
 		}
-		sandboxManager := store.PodSandbox(sandbox.GetMetadata().Uid)
+		sandboxManager := store.PodSandbox(sandbox.Uid)
 		actualSandboxInfo, err := sandboxManager.Retrieve()
 		if err != nil {
 			t.Fatal(err)
 		}
 		if actualSandboxInfo == nil {
-			t.Fatal(fmt.Errorf("missing PodSandboxInfo for sandbox %q", sandbox.GetMetadata().Uid))
+			t.Fatal(fmt.Errorf("missing PodSandboxInfo for sandbox %q", sandbox.Uid))
 		}
-		if actualSandboxInfo.podID != sandboxManager.GetID() {
-			t.Errorf("invalid podID for retrieved PodSandboxInfo: %s != %s", actualSandboxInfo.podID, sandboxManager.GetID())
+		if actualSandboxInfo.PodID != sandboxManager.GetID() {
+			t.Errorf("invalid podID for retrieved PodSandboxInfo: %s != %s", actualSandboxInfo.PodID, sandboxManager.GetID())
 		}
-		expectedSandboxInfo.podID = sandboxManager.GetID()
+		expectedSandboxInfo.PodID = sandboxManager.GetID()
 		if !reflect.DeepEqual(expectedSandboxInfo, actualSandboxInfo) {
 			t.Error("retrieved sandbox info object is not equal to expected value")
 		}
@@ -115,40 +115,39 @@ func TestRetrieve(t *testing.T) {
 }
 
 func TestSetGetPodSandboxStatus(t *testing.T) {
-	sandboxes := criapi.GetSandboxes(2)
+	sandboxes := fake.GetSandboxes(2)
 
-	store := setUpTestStore(t, sandboxes, []*criapi.ContainerTestConfig{}, nil)
+	store := setUpTestStore(t, sandboxes, []*fake.ContainerTestConfig{}, nil)
 
 	for _, sandbox := range sandboxes {
-		sandboxInfo, err := store.PodSandbox(sandbox.GetMetadata().Uid).Retrieve()
+		sandboxInfo, err := store.PodSandbox(sandbox.Uid).Retrieve()
 		if err != nil {
 			t.Fatal(err)
 		}
 		if sandboxInfo == nil {
-			t.Fatal(fmt.Errorf("missing PodSandboxInfo for sandbox %q", sandbox.GetMetadata().Uid))
+			t.Fatal(fmt.Errorf("missing PodSandboxInfo for sandbox %q", sandbox.Uid))
 		}
-		status := sandboxInfo.AsPodSandboxStatus()
 
-		if status.State != kubeapi.PodSandboxState_SANDBOX_READY {
+		if sandboxInfo.State != types.PodSandboxState_SANDBOX_READY {
 			t.Errorf("Sandbox state not ready")
 		}
 
-		if !reflect.DeepEqual(status.GetLabels(), sandbox.GetLabels()) {
-			t.Errorf("Expected %v, instead got %v", sandbox.GetLabels(), status.GetLabels())
+		if !reflect.DeepEqual(sandboxInfo.Config.Labels, sandbox.Labels) {
+			t.Errorf("Expected %v, instead got %v", sandbox.Labels, sandboxInfo.Config.Labels)
 		}
 
-		if !reflect.DeepEqual(status.GetAnnotations(), sandbox.GetAnnotations()) {
-			t.Errorf("Expected %v, instead got %v", sandbox.GetAnnotations(), status.GetAnnotations())
+		if !reflect.DeepEqual(sandboxInfo.Config.Annotations, sandbox.Annotations) {
+			t.Errorf("Expected %v, instead got %v", sandbox.Annotations, sandboxInfo.Config.Annotations)
 		}
 
-		if status.GetMetadata().Name != sandbox.GetMetadata().Name {
-			t.Errorf("Expected %s, instead got %s", sandbox.GetMetadata().Name, status.GetMetadata().Name)
+		if sandboxInfo.Config.Name != sandbox.Name {
+			t.Errorf("Expected %s, instead got %s", sandbox.Name, sandboxInfo.Config.Name)
 		}
 	}
 }
 
 func TestListPodSandbox(t *testing.T) {
-	genSandboxes := criapi.GetSandboxes(2)
+	genSandboxes := fake.GetSandboxes(2)
 
 	firstSandboxConfig := genSandboxes[0]
 	secondSandboxConfig := genSandboxes[1]
@@ -156,78 +155,78 @@ func TestListPodSandbox(t *testing.T) {
 	firstSandboxConfig.Labels = map[string]string{"unique": "first", "common": "both"}
 	secondSandboxConfig.Labels = map[string]string{"unique": "second", "common": "both"}
 
-	sandboxConfigs := []*kubeapi.PodSandboxConfig{firstSandboxConfig, secondSandboxConfig}
-	stateReady := kubeapi.PodSandboxState_SANDBOX_READY
-	stateNotReady := kubeapi.PodSandboxState_SANDBOX_NOTREADY
+	sandboxConfigs := []*types.PodSandboxConfig{firstSandboxConfig, secondSandboxConfig}
+	stateReady := types.PodSandboxState_SANDBOX_READY
+	stateNotReady := types.PodSandboxState_SANDBOX_NOTREADY
 
 	tests := []struct {
-		filter      *kubeapi.PodSandboxFilter
+		filter      *types.PodSandboxFilter
 		expectedIds []string
 	}{
 		{
-			filter:      &kubeapi.PodSandboxFilter{},
-			expectedIds: []string{firstSandboxConfig.Metadata.Uid, secondSandboxConfig.Metadata.Uid},
+			filter:      &types.PodSandboxFilter{},
+			expectedIds: []string{firstSandboxConfig.Uid, secondSandboxConfig.Uid},
 		},
 		{
-			filter: &kubeapi.PodSandboxFilter{
-				Id: firstSandboxConfig.Metadata.Uid,
+			filter: &types.PodSandboxFilter{
+				Id: firstSandboxConfig.Uid,
 			},
-			expectedIds: []string{firstSandboxConfig.Metadata.Uid},
+			expectedIds: []string{firstSandboxConfig.Uid},
 		},
 		{
-			filter: &kubeapi.PodSandboxFilter{
-				State: &kubeapi.PodSandboxStateValue{State: stateReady},
+			filter: &types.PodSandboxFilter{
+				State: &stateReady,
 			},
-			expectedIds: []string{firstSandboxConfig.Metadata.Uid, secondSandboxConfig.Metadata.Uid},
+			expectedIds: []string{firstSandboxConfig.Uid, secondSandboxConfig.Uid},
 		},
 		{
-			filter: &kubeapi.PodSandboxFilter{
-				State: &kubeapi.PodSandboxStateValue{State: stateNotReady},
+			filter: &types.PodSandboxFilter{
+				State: &stateNotReady,
 			},
 			expectedIds: []string{},
 		},
 		{
-			filter: &kubeapi.PodSandboxFilter{
+			filter: &types.PodSandboxFilter{
 				LabelSelector: map[string]string{"unique": "first"},
 			},
-			expectedIds: []string{firstSandboxConfig.Metadata.Uid},
+			expectedIds: []string{firstSandboxConfig.Uid},
 		},
 		{
-			filter: &kubeapi.PodSandboxFilter{
+			filter: &types.PodSandboxFilter{
 				LabelSelector: map[string]string{"common": "both"},
 			},
-			expectedIds: []string{firstSandboxConfig.Metadata.Uid, secondSandboxConfig.Metadata.Uid},
+			expectedIds: []string{firstSandboxConfig.Uid, secondSandboxConfig.Uid},
 		},
 		{
-			filter: &kubeapi.PodSandboxFilter{
+			filter: &types.PodSandboxFilter{
 				LabelSelector: map[string]string{"unique": "second", "common": "both"},
 			},
-			expectedIds: []string{secondSandboxConfig.Metadata.Uid},
+			expectedIds: []string{secondSandboxConfig.Uid},
 		},
 		{
-			filter: &kubeapi.PodSandboxFilter{
-				Id:            firstSandboxConfig.Metadata.Uid,
+			filter: &types.PodSandboxFilter{
+				Id:            firstSandboxConfig.Uid,
 				LabelSelector: map[string]string{"unique": "second", "common": "both"},
 			},
 			expectedIds: []string{},
 		},
 		{
-			filter: &kubeapi.PodSandboxFilter{
-				Id:            firstSandboxConfig.Metadata.Uid,
+			filter: &types.PodSandboxFilter{
+				Id:            firstSandboxConfig.Uid,
 				LabelSelector: map[string]string{"unique": "first", "common": "both"},
 			},
-			expectedIds: []string{firstSandboxConfig.Metadata.Uid},
+			expectedIds: []string{firstSandboxConfig.Uid},
 		},
 		{
-			filter: &kubeapi.PodSandboxFilter{
-				Id:            firstSandboxConfig.Metadata.Uid,
+			filter: &types.PodSandboxFilter{
+				Id:            firstSandboxConfig.Uid,
 				LabelSelector: map[string]string{"common": "both"},
 			},
-			expectedIds: []string{firstSandboxConfig.Metadata.Uid},
+			expectedIds: []string{firstSandboxConfig.Uid},
 		},
 	}
 
-	cc := criapi.GetContainersConfig(sandboxConfigs)
+	cc := fake.GetContainersConfig(sandboxConfigs)
 	b := setUpTestStore(t, sandboxConfigs, cc, nil)
 
 	for _, tc := range tests {

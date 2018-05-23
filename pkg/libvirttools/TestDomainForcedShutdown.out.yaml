@@ -78,12 +78,8 @@
       <commandline xmlns="http://libvirt.org/schemas/domain/qemu/1.0">
         <env name="VIRTLET_EMULATOR" value="/usr/bin/kvm"></env>
         <env name="VIRTLET_NET_KEY" value="/tmp/fakenetns"></env>
-        <env name="VIRTLET_POD_NAME" value="testName_0"></env>
-        <env name="VIRTLET_POD_NAMESPACE" value="default"></env>
-        <env name="VIRTLET_POD_UID" value="69eec606-0493-5825-73a4-c5e0c0236155"></env>
         <env name="VIRTLET_CONTAINER_ID" value="231700d5-c9a6-5a49-738d-99a954c51550"></env>
-        <env name="VIRTLET_CONTAINER_NAME" value="container1"></env>
-        <env name="CONTAINER_ATTEMPTS" value="42"></env>
+        <env name="VIRTLET_CONTAINER_LOG_PATH" value="/var/log/pods/69eec606-0493-5825-73a4-c5e0c0236155/container1_42.log"></env>
       </commandline>
     </domain>
 - name: 'domain conn: virtlet-231700d5-c9a6-container1: Create'
@@ -107,25 +103,49 @@
 - name: 'domain conn: virtlet-231700d5-c9a6-container1: Destroy'
 - name: 'storage: volumes: RemoveVolumeByName'
   value: virtlet_root_231700d5-c9a6-5a49-738d-99a954c51550
-- name: container status after the container is stopped
+- name: container info after the container is stopped
   value:
-    annotations:
-      foo: bar
-    created_at: 1496175540000000000
-    id: 231700d5-c9a6-5a49-738d-99a954c51550
-    image:
-      image: fake/image1
-    image_ref: fake/image1
-    labels:
-      io.kubernetes.container.name: container1
-      io.kubernetes.pod.name: testName_0
-      io.kubernetes.pod.namespace: default
-      io.kubernetes.pod.uid: 69eec606-0493-5825-73a4-c5e0c0236155
-    metadata:
-      attempt: 42
-      name: container1
-    started_at: 1496175541000000000
-    state: 2
+    Config:
+      Attempt: 42
+      CPUPeriod: 0
+      CPUQuota: 0
+      CPUShares: 0
+      ContainerAnnotations:
+        foo: bar
+      ContainerLabels:
+        io.kubernetes.container.name: container1
+        io.kubernetes.pod.name: testName_0
+        io.kubernetes.pod.namespace: default
+        io.kubernetes.pod.uid: 69eec606-0493-5825-73a4-c5e0c0236155
+      ContainerSideNetwork: null
+      DomainUUID: 231700d5-c9a6-5a49-738d-99a954c51550
+      Environment: null
+      Image: fake/image1
+      LogDirectory: /var/log/pods/69eec606-0493-5825-73a4-c5e0c0236155
+      LogPath: container1_42.log
+      MemoryLimitInBytes: 0
+      Mounts: null
+      Name: container1
+      ParsedAnnotations:
+        CDImageType: nocloud
+        DiskDriver: scsi
+        MetaData: null
+        SSHKeys: null
+        UserData: null
+        UserDataOverwrite: false
+        UserDataScript: ""
+        VCPUCount: 1
+      PodAnnotations:
+        hello: world
+        virt: let
+      PodName: testName_0
+      PodNamespace: default
+      PodSandboxID: 69eec606-0493-5825-73a4-c5e0c0236155
+    CreatedAt: 1496175540000000000
+    Id: 231700d5-c9a6-5a49-738d-99a954c51550
+    Name: container1
+    StartedAt: 1496175541000000000
+    State: 2
 - name: invoking RemoveContainer()
 - name: 'domain conn: virtlet-231700d5-c9a6-container1: Undefine'
 - name: 'storage: volumes: RemoveVolumeByName'

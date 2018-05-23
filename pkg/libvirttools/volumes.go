@@ -19,6 +19,7 @@ package libvirttools
 import (
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	"github.com/Mirantis/virtlet/pkg/virt"
 )
 
@@ -36,7 +37,7 @@ type volumeOwner interface {
 }
 
 // VMVolumeSource is a function that provides `VMVolume`s for VMs
-type VMVolumeSource func(config *VMConfig, owner volumeOwner) ([]VMVolume, error)
+type VMVolumeSource func(config *types.VMConfig, owner volumeOwner) ([]VMVolume, error)
 
 // VMVolume describes a volume provider.
 type VMVolume interface {
@@ -47,7 +48,7 @@ type VMVolume interface {
 }
 
 type volumeBase struct {
-	config *VMConfig
+	config *types.VMConfig
 	owner  volumeOwner
 }
 
@@ -57,7 +58,7 @@ func (v *volumeBase) Teardown() error              { return nil }
 // CombineVMVolumeSources returns a function which will pass VM configuration
 // to all listed volumes sources combining returned by them `VMVolume`s.
 func CombineVMVolumeSources(srcs ...VMVolumeSource) VMVolumeSource {
-	return func(config *VMConfig, owner volumeOwner) ([]VMVolume, error) {
+	return func(config *types.VMConfig, owner volumeOwner) ([]VMVolume, error) {
 		var vols []VMVolume
 		for _, src := range srcs {
 			vs, err := src(config, owner)

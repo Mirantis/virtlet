@@ -23,7 +23,6 @@ import (
 	"net"
 	"os"
 	"os/user"
-	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
@@ -37,7 +36,6 @@ import (
 // stdout to registered channels.
 type UnixServer struct {
 	SocketPath      string
-	kubernetesDir   string
 	closeCh         chan bool
 	listenDone      chan bool
 	deadlineSeconds int
@@ -51,10 +49,9 @@ type UnixServer struct {
 
 // NewUnixServer creates new UnixServer. Requires socketPath on which it will listen
 // and kubernetesDir where logs will be written
-func NewUnixServer(socketPath, kubernetesDir string) *UnixServer {
+func NewUnixServer(socketPath string) *UnixServer {
 	u := UnixServer{
 		SocketPath:      socketPath,
-		kubernetesDir:   kubernetesDir,
 		deadlineSeconds: 5,
 	}
 	u.UnixConnections = new(syncmap.Map)
@@ -116,10 +113,8 @@ func (u *UnixServer) Listen() {
 			glog.Warningf("couldn't get pod information from pid: %v", err)
 			continue
 		}
-		podUID := podEnv["VIRTLET_POD_UID"]
-		containerName := podEnv["VIRTLET_CONTAINER_NAME"]
+		logPath := podEnv["VIRTLET_CONTAINER_LOG_PATH"]
 		containerID := podEnv["VIRTLET_CONTAINER_ID"]
-		attempt := podEnv["CONTAINER_ATTEMPTS"]
 
 		oldConn, ok := u.UnixConnections.Load(containerID)
 		if ok {
@@ -133,10 +128,8 @@ func (u *UnixServer) Listen() {
 		u.workersWG.Add(1)
 		go u.reader(containerID, &u.workersWG)
 
-		fileName := fmt.Sprintf("%s_%s.log", containerName, attempt)
-		outputFile := filepath.Join(u.kubernetesDir, podUID, fileName)
 		u.workersWG.Add(1)
-		go NewLogWriter(logChan, outputFile, &u.workersWG)
+		go NewLogWriter(logChan, logPath, &u.workersWG)
 	}
 }
 

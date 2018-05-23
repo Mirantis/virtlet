@@ -99,8 +99,7 @@ var _ = Describe("Virtlet [Basic cirros tests]", func() {
 
 	Context("Virtlet logs", func() {
 		var (
-			filename     string
-			sandboxID    string
+			logPath      string
 			nodeExecutor framework.Executor
 		)
 
@@ -112,26 +111,17 @@ var _ = Describe("Virtlet [Basic cirros tests]", func() {
 
 			domain, err := vm.Domain()
 			Expect(err).NotTo(HaveOccurred())
-			var vmName, attempt string
 			for _, env := range domain.QEMUCommandline.Envs {
-				if env.Name == "VIRTLET_POD_NAME" {
-					vmName = env.Value
-				} else if env.Name == "CONTAINER_ATTEMPTS" {
-					attempt = env.Value
-				} else if env.Name == "VIRTLET_POD_UID" {
-					sandboxID = env.Value
+				if env.Name == "VIRTLET_CONTAINER_LOG_PATH" {
+					logPath = env.Value
 				}
 			}
-			Expect(sandboxID).NotTo(BeEmpty())
-			Expect(vmName).NotTo(BeEmpty())
-			Expect(attempt).NotTo(BeEmpty())
-			filename = fmt.Sprintf("%s_%s.log", vmName, attempt)
+			Expect(logPath).NotTo(BeEmpty())
 		})
 
 		It("Should contain login string in pod log and each line of that log must be a valid JSON", func() {
 			Eventually(func() error {
-				out, err := framework.RunSimple(nodeExecutor, "cat",
-					fmt.Sprintf("/var/log/pods/%s/%s", sandboxID, filename))
+				out, err := framework.RunSimple(nodeExecutor, "cat", logPath)
 				if err != nil {
 					return err
 				}

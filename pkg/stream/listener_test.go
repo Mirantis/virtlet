@@ -31,7 +31,7 @@ func getServer() *UnixServer {
 	baseDir, _ := ioutil.TempDir("", "virtlet-log")
 	os.Mkdir(baseDir, 0777)
 	socketPath := filepath.Join(baseDir, "streamer.sock")
-	return NewUnixServer(socketPath, baseDir)
+	return NewUnixServer(socketPath)
 }
 
 func TestAddOutputReader(t *testing.T) {
@@ -121,10 +121,8 @@ func TestCleaningReader(t *testing.T) {
 	// setup client
 	containerID := "1123ab2-baed-32e7-6d1d-13110da12345"
 	tc := testutils.RunProcess(t, "nc", []string{"-U", u.SocketPath}, []string{
-		"VIRTLET_POD_UID=8c8e8cf1-acea-11e7-8e0e-02420ac00002",
-		"VIRTLET_CONTAINER_NAME=ubuntu",
+		"VIRTLET_CONTAINER_LOG_PATH=/var/log/pods/8c8e8cf1-acea-11e7-8e0e-02420ac00002/ubuntu_0.log",
 		fmt.Sprintf("VIRTLET_CONTAINER_ID=%s", containerID),
-		"CONTAINER_ATTEMPTS=0",
 	})
 	defer tc.Stop()
 
