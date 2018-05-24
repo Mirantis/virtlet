@@ -1,5 +1,5 @@
 /*
-Copyright 2017 Mirantis
+Copyright 2017-2018 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,26 +14,38 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Some changes are merged back from
+// https://github.com/cilium/cilium/blob/5b9699f71a930c1f99c17e80431071491dfaa732/test/ginkgo-ext/scopes.go
+
 package ginkgoext
 
 import (
+	"bytes"
+	"flag"
+	"os"
 	"reflect"
+	"regexp"
+	"strings"
 	"sync/atomic"
 
 	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/config"
 )
 
 type scope struct {
-	parent       *scope
-	children     []*scope
-	counter      int32
-	before       []func()
-	after        []func()
-	started      int32
-	failed       bool
-	normalTests  int
-	focusedTests int
-	focused      bool
+	parent        *scope
+	children      []*scope
+	counter       int32
+	before        []func()
+	after         []func()
+	afterEach     []func()
+	justAfterEach []func()
+	afterFail     []func()
+	started       int32
+	failed        bool
+	normalTests   int
+	focusedTests  int
+	focused       bool
 }
 
 var (
@@ -69,6 +81,23 @@ var (
 
 type Done ginkgo.Done
 
+func init() {
+	// Only use the Ginkgo options and discard all other options
+	args := []string{}
+	for _, arg := range os.Args[1:] {
+		if strings.Contains(arg, "-ginkgo") {
+			args = append(args, arg)
+		}
+	}
+
+	//Get GinkgoConfig flags
+	commandFlags := flag.NewFlagSet("ginkgo", flag.ContinueOnError)
+	commandFlags.SetOutput(new(bytes.Buffer))
+
+	config.Flags(commandFlags, "ginkgo", true)
+	commandFlags.Parse(args)
+}
+
 // BeforeAll runs the function once before any test in context
 func BeforeAll(body func()) bool {
 	if currentScope != nil {
@@ -95,6 +124,128 @@ func AfterAll(body func()) bool {
 	return true
 }
 
+//JustAfterEach runs the function just after each test, before all AfterEeach,
+//AfterFailed and AfterAll
+func JustAfterEach(body func()) bool {
+	if currentScope != nil {
+		if body == nil {
+			currentScope.before = nil
+			return true
+		}
+		currentScope.justAfterEach = append(currentScope.justAfterEach, body)
+		return AfterEach(func() {})
+	}
+	return true
+}
+
+// JustAfterFailed runs the function after test and JustAfterEach if the test
+// has failed and before all AfterEach
+func AfterFailed(body func()) bool {
+	if currentScope != nil {
+		if body == nil {
+			currentScope.before = nil
+			return true
+		}
+		currentScope.afterFail = append(currentScope.afterFail, body)
+		return AfterEach(func() {})
+	}
+	return true
+}
+
+// justAfterEachStatus map to store what `justAfterEach` functions have been
+// already executed for the given test
+var justAfterEachStatus map[string]bool = map[string]bool{}
+
+// runAllJustAfterEach runs all the `scope.justAfterEach` functions for the
+// given scope and parent scopes. This function make sure that all the
+// `JustAfterEach` functions are called before AfterEach functions.
+func runAllJustAfterEach(cs *scope, testName string) {
+	if _, ok := justAfterEachStatus[testName]; ok {
+		// JustAfterEach calls are already executed in the children
+		return
+	}
+
+	for _, body := range cs.justAfterEach {
+		body()
+	}
+
+	if cs.parent != nil {
+		runAllJustAfterEach(cs.parent, testName)
+	}
+}
+
+// afterFailedStatus map to store what `AfterFail` functions have been
+// already executed for the given test.
+var afterFailedStatus map[string]bool = map[string]bool{}
+
+// runAllAfterFail runs all the afterFail functions for the given
+// scope and parent scopes. This function make sure that all the `AfterFail`
+// functions are called before AfterEach.
+func runAllAfterFail(cs *scope, testName string) {
+	if _, ok := afterFailedStatus[testName]; ok {
+		// AfterFailcalls are already executed in the children
+		return
+	}
+
+	for _, body := range cs.afterFail {
+		if ginkgo.CurrentGinkgoTestDescription().Failed {
+			body()
+		}
+	}
+
+	if cs.parent != nil {
+		runAllAfterFail(cs.parent, testName)
+	}
+}
+
+// RunAfterEach is a wrapper that executes all AfterEach functions that are
+// stored in cs.afterEach array.
+func RunAfterEach(cs *scope) {
+	if cs == nil {
+		return
+	}
+	testName := ginkgo.CurrentGinkgoTestDescription().FullTestText
+	runAllJustAfterEach(cs, testName)
+	justAfterEachStatus[testName] = true
+
+	runAllAfterFail(cs, testName)
+	afterFailedStatus[testName] = true
+
+	for _, body := range cs.afterEach {
+		body()
+	}
+
+	// Only run afterAll when all the counters are 0 and all afterEach are executed
+	after := func() {
+		if cs.counter == 0 && cs.after != nil {
+			for _, after := range cs.after {
+				after()
+			}
+		}
+	}
+	after()
+}
+
+// AfterEach runs the function after each test in context
+func AfterEach(body func(), timeout ...float64) bool {
+	if currentScope == nil {
+		return ginkgo.AfterEach(body, timeout...)
+	}
+	cs := currentScope
+	result := true
+	if cs.afterEach == nil {
+		// If no scope, register only one AfterEach in the scope, after that
+		// RunAfterEeach will run all afterEach functions registered in the
+		// scope.
+		fn := func() {
+			RunAfterEach(cs)
+		}
+		result = ginkgo.AfterEach(fn, timeout...)
+	}
+	cs.afterEach = append(cs.afterEach, body)
+	return result
+}
+
 // BeforeEach runs the function before each test in context
 func BeforeEach(body interface{}, timeout ...float64) bool {
 	if currentScope == nil {
@@ -117,22 +268,6 @@ func BeforeEach(body interface{}, timeout ...float64) bool {
 		}
 	}
 	return ginkgo.BeforeEach(applyAdvice(body, before, nil), timeout...)
-}
-
-// AfterEach runs the function after each test in context
-func AfterEach(body interface{}, timeout ...float64) bool {
-	if currentScope == nil {
-		return ginkgo.AfterEach(body, timeout...)
-	}
-	cs := currentScope
-	after := func() {
-		if cs.counter == 0 && cs.after != nil {
-			for _, after := range cs.after {
-				after()
-			}
-		}
-	}
-	return ginkgo.AfterEach(applyAdvice(body, nil, after), timeout...)
 }
 
 func wrapContextFunc(fn func(string, func()) bool, focused bool) func(string, func()) bool {
@@ -170,13 +305,29 @@ func wrapItFunc(fn func(string, interface{}, ...float64) bool, focused bool) fun
 		if currentScope == nil {
 			return fn(text, body, timeout...)
 		}
-		if focused {
+		if focused || isTestFocused(text) {
 			currentScope.focusedTests++
 		} else {
 			currentScope.normalTests++
 		}
 		return fn(text, wrapTest(body), timeout...)
 	}
+}
+
+// isTestFocused checks the value of FocusString and return true if the given
+// text name is focussed, returns false if the test is not focussed.
+func isTestFocused(text string) bool {
+	if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
+		return false
+	}
+
+	skipFilter := regexp.MustCompile(config.GinkgoConfig.SkipString)
+	if skipFilter.Match([]byte(text)) {
+		return false
+	}
+
+	focusFilter := regexp.MustCompile(config.GinkgoConfig.FocusString)
+	return focusFilter.Match([]byte(text))
 }
 
 func applyAdvice(f interface{}, before, after func()) interface{} {
