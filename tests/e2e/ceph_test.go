@@ -146,9 +146,9 @@ var _ = Describe("Ceph volumes tests", func() {
 		})
 
 		AfterAll(func() {
+			deleteVM(vm)
 			controller.PersistentVolumeClaimsClient().Delete("rbd-claim", nil)
 			controller.PersistentVolumesClient().Delete("rbd-pv-virtlet", nil)
-			deleteVM(vm)
 		})
 
 		It("Must be attached to libvirt domain", func() {
@@ -178,10 +178,10 @@ func setupCeph() (string, string) {
 	nodeExecutor, err := controller.DinDNodeExecutor("kube-master")
 	Expect(err).NotTo(HaveOccurred())
 
-	route, err := framework.RunSimple(nodeExecutor, "route")
+	route, err := framework.RunSimple(nodeExecutor, "route", "-n")
 	Expect(err).NotTo(HaveOccurred())
 
-	match := regexp.MustCompile(`default\s+([\d.]+)`).FindStringSubmatch(route)
+	match := regexp.MustCompile(`(?:default|0\.0\.0\.0)\s+([\d.]+)`).FindStringSubmatch(route)
 	Expect(match).To(HaveLen(2))
 
 	monIP := match[1]
