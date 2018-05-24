@@ -18,6 +18,7 @@ package libvirttools
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/golang/glog"
 	libvirt "github.com/libvirt/libvirt-go"
@@ -28,6 +29,11 @@ import (
 )
 
 type libvirtStorageConnection struct {
+	// Trying to do several storage-related operations at the same time
+	// may cause a race condition.
+	// As right now Virtlet uses just one storage pool, a single sync.Mutex
+	// is enough for handling the storage.
+	sync.Mutex
 	conn libvirtConnection
 }
 
@@ -49,7 +55,7 @@ func (sc *libvirtStorageConnection) CreateStoragePool(def *libvirtxml.StoragePoo
 	if err != nil {
 		return nil, err
 	}
-	return &libvirtStoragePool{conn: sc.conn, p: p.(*libvirt.StoragePool)}, nil
+	return &libvirtStoragePool{Mutex: &sc.Mutex, conn: sc.conn, p: p.(*libvirt.StoragePool)}, nil
 }
 
 func (sc *libvirtStorageConnection) LookupStoragePoolByName(name string) (virt.StoragePool, error) {
@@ -63,10 +69,11 @@ func (sc *libvirtStorageConnection) LookupStoragePoolByName(name string) (virt.S
 		}
 		return nil, err
 	}
-	return &libvirtStoragePool{conn: sc.conn, p: p.(*libvirt.StoragePool)}, nil
+	return &libvirtStoragePool{Mutex: &sc.Mutex, conn: sc.conn, p: p.(*libvirt.StoragePool)}, nil
 }
 
 type libvirtStoragePool struct {
+	*sync.Mutex
 	conn libvirtConnection
 	p    *libvirt.StoragePool
 }
@@ -74,6 +81,8 @@ type libvirtStoragePool struct {
 var _ virt.StoragePool = &libvirtStoragePool{}
 
 func (pool *libvirtStoragePool) CreateStorageVol(def *libvirtxml.StorageVolume) (virt.StorageVolume, error) {
+	pool.Lock()
+	defer pool.Unlock()
 	xml, err := def.Marshal()
 	if err != nil {
 		return nil, err
@@ -90,10 +99,12 @@ func (pool *libvirtStoragePool) CreateStorageVol(def *libvirtxml.StorageVolume) 
 	if err := pool.p.Refresh(0); err != nil {
 		return nil, fmt.Errorf("failed to refresh the storage pool: %v", err)
 	}
-	return &libvirtStorageVolume{name: def.Name, v: v}, nil
+	return &libvirtStorageVolume{Mutex: pool.Mutex, name: def.Name, v: v}, nil
 }
 
 func (pool *libvirtStoragePool) ListAllVolumes() ([]virt.StorageVolume, error) {
+	pool.Lock()
+	defer pool.Unlock()
 	volumes, err := pool.p.ListAllStorageVolumes(0)
 	if err != nil {
 		return nil, err
@@ -106,12 +117,14 @@ func (pool *libvirtStoragePool) ListAllVolumes() ([]virt.StorageVolume, error) {
 		}
 		// need to make a copy here
 		curVolume := v
-		r[n] = &libvirtStorageVolume{name: name, v: &curVolume}
+		r[n] = &libvirtStorageVolume{Mutex: pool.Mutex, name: name, v: &curVolume}
 	}
 	return r, nil
 }
 
 func (pool *libvirtStoragePool) LookupVolumeByName(name string) (virt.StorageVolume, error) {
+	pool.Lock()
+	defer pool.Unlock()
 	v, err := pool.p.LookupStorageVolByName(name)
 	if err != nil {
 		libvirtErr, ok := err.(libvirt.Error)
@@ -120,7 +133,7 @@ func (pool *libvirtStoragePool) LookupVolumeByName(name string) (virt.StorageVol
 		}
 		return nil, err
 	}
-	return &libvirtStorageVolume{name: name, v: v}, nil
+	return &libvirtStorageVolume{Mutex: pool.Mutex, name: name, v: v}, nil
 }
 
 func (pool *libvirtStoragePool) RemoveVolumeByName(name string) error {
@@ -136,6 +149,7 @@ func (pool *libvirtStoragePool) RemoveVolumeByName(name string) error {
 }
 
 type libvirtStorageVolume struct {
+	*sync.Mutex
 	name string
 	v    *libvirt.StorageVol
 }
@@ -147,6 +161,8 @@ func (volume *libvirtStorageVolume) Name() string {
 }
 
 func (volume *libvirtStorageVolume) Size() (uint64, error) {
+	volume.Lock()
+	defer volume.Unlock()
 	info, err := volume.v.GetInfo()
 	if err != nil {
 		return 0, err
@@ -155,15 +171,21 @@ func (volume *libvirtStorageVolume) Size() (uint64, error) {
 }
 
 func (volume *libvirtStorageVolume) Path() (string, error) {
+	volume.Lock()
+	defer volume.Unlock()
 	return volume.v.GetPath()
 }
 
 func (volume *libvirtStorageVolume) Remove() error {
+	volume.Lock()
+	defer volume.Unlock()
 	return volume.v.Delete(0)
 }
 
 func (volume *libvirtStorageVolume) Format() error {
-	volPath, err := volume.Path()
+	volume.Lock()
+	defer volume.Unlock()
+	volPath, err := volume.v.GetPath()
 	if err != nil {
 		return fmt.Errorf("can't get volume path: %v", err)
 	}
