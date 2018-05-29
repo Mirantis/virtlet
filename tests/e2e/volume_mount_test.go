@@ -46,7 +46,14 @@ var _ = Describe("Container volume mounts", func() {
 
 			_, err = framework.RunSimple(nodeExecutor, "dd", "if=/dev/zero", "of=/rawdevtest", "bs=1M", "count=10")
 			Expect(err).NotTo(HaveOccurred())
-			_, err = framework.RunSimple(nodeExecutor, "mkfs.ext4", "/rawdevtest")
+			// We use mkfs.ext3 here because mkfs.ext4 on
+			// the node may be too new for CirrOS, causing
+			// errors like this in VM's dmesg:
+			// [    1.316395] EXT3-fs (vdb): error: couldn't mount because of unsupported optional features (2c0)
+			// [    1.320222] EXT4-fs (vdb): couldn't mount RDWR because of unsupported optional features (400)
+			// [    1.339594] EXT3-fs (vdc1): error: couldn't mount because of unsupported optional features (240)
+			// [    1.342850] EXT4-fs (vdc1): mounted filesystem with ordered data mode. Opts: (null)
+			_, err = framework.RunSimple(nodeExecutor, "mkfs.ext3", "/rawdevtest")
 			Expect(err).NotTo(HaveOccurred())
 			devPath, err = framework.RunSimple(nodeExecutor, "losetup", "-f", "/rawdevtest", "--show")
 			Expect(err).NotTo(HaveOccurred())
