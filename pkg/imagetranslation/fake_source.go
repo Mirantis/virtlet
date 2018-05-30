@@ -16,11 +16,15 @@ limitations under the License.
 
 package imagetranslation
 
-import "context"
+import (
+	"context"
+
+	"github.com/Mirantis/virtlet/pkg/api/types/v1"
+)
 
 type objectConfig struct {
 	name        string
-	translation ImageTranslation
+	translation v1.ImageTranslation
 }
 
 var _ TranslationConfig = objectConfig{}
@@ -31,12 +35,12 @@ func (c objectConfig) Name() string {
 }
 
 // Payload implements TranslationConfig Payload
-func (c objectConfig) Payload() (ImageTranslation, error) {
+func (c objectConfig) Payload() (v1.ImageTranslation, error) {
 	return c.translation, nil
 }
 
 type fakeConfigSource struct {
-	configs map[string]ImageTranslation
+	configs map[string]v1.ImageTranslation
 }
 
 var _ ConfigSource = fakeConfigSource{}
@@ -56,6 +60,6 @@ func (cs fakeConfigSource) Description() string {
 }
 
 // NewFakeConfigSource is a factory for a fake config source
-func NewFakeConfigSource(configs map[string]ImageTranslation) ConfigSource {
+func NewFakeConfigSource(configs map[string]v1.ImageTranslation) ConfigSource {
 	return &fakeConfigSource{configs: configs}
 }

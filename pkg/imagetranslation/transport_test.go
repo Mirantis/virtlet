@@ -28,15 +28,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Mirantis/virtlet/pkg/api/types/v1"
 	"github.com/Mirantis/virtlet/pkg/image"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 )
 
-func translate(config ImageTranslation, name string, server *httptest.Server) image.Endpoint {
+func translate(config v1.ImageTranslation, name string, server *httptest.Server) image.Endpoint {
 	for i, rule := range config.Rules {
 		config.Rules[i].URL = strings.Replace(rule.URL, "%", server.Listener.Addr().String(), 1)
 	}
-	configs := map[string]ImageTranslation{"config": config}
+	configs := map[string]v1.ImageTranslation{"config": config}
 
 	translator := NewImageNameTranslator()
 	translator.LoadConfigs(context.Background(), NewFakeConfigSource(configs))
@@ -47,7 +48,7 @@ func intptr(v int) *int {
 	return &v
 }
 
-func download(t *testing.T, proto string, config ImageTranslation, name string, server *httptest.Server) {
+func download(t *testing.T, proto string, config v1.ImageTranslation, name string, server *httptest.Server) {
 	downloader := image.NewDownloader(proto)
 	if err := downloader.DownloadFile(context.Background(), translate(config, name, server), ioutil.Discard); err != nil {
 		t.Fatal(err)
@@ -71,9 +72,9 @@ func TestImageDownload(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	config := ImageTranslation{
+	config := v1.ImageTranslation{
 		Prefix: "test",
-		Rules: []TranslationRule{
+		Rules: []v1.TranslationRule{
 			{
 				Name: "image1",
 				URL:  "http://%/base.qcow2",
@@ -103,8 +104,8 @@ func TestImageDownloadRedirects(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	config := ImageTranslation{
-		Rules: []TranslationRule{
+	config := v1.ImageTranslation{
+		Rules: []v1.TranslationRule{
 			{
 				Name:      "image1",
 				URL:       "http://%/base.qcow2",
@@ -126,7 +127,7 @@ func TestImageDownloadRedirects(t *testing.T) {
 				Transport: "profile4",
 			},
 		},
-		Transports: map[string]TransportProfile{
+		Transports: map[string]v1.TransportProfile{
 			"profile1": {MaxRedirects: intptr(0)},
 			"profile2": {MaxRedirects: intptr(1)},
 			"profile3": {MaxRedirects: intptr(5)},
@@ -243,14 +244,14 @@ func TestImageDownloadWithProxy(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	config := ImageTranslation{
-		Rules: []TranslationRule{
+	config := v1.ImageTranslation{
+		Rules: []v1.TranslationRule{
 			{
 				Name: "image1",
 				URL:  "example.net/base.qcow2",
 			},
 		},
-		Transports: map[string]TransportProfile{
+		Transports: map[string]v1.TransportProfile{
 			"": {Proxy: "http://" + ts.Listener.Addr().String()},
 		},
 	}
@@ -271,14 +272,14 @@ func TestImageDownloadWithTimeout(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	config := ImageTranslation{
-		Rules: []TranslationRule{
+	config := v1.ImageTranslation{
+		Rules: []v1.TranslationRule{
 			{
 				Name: "image",
 				URL:  "%/base.qcow2",
 			},
 		},
-		Transports: map[string]TransportProfile{
+		Transports: map[string]v1.TransportProfile{
 			"": {TimeoutMilliseconds: 250},
 		},
 	}
@@ -336,18 +337,18 @@ func TestImageDownloadTLS(t *testing.T) {
 	ts.StartTLS()
 	defer ts.Close()
 
-	config := ImageTranslation{
-		Rules: []TranslationRule{
+	config := v1.ImageTranslation{
+		Rules: []v1.TranslationRule{
 			{
 				Name:      "image1",
 				URL:       "%/base.qcow2",
 				Transport: "tlsProfile",
 			},
 		},
-		Transports: map[string]TransportProfile{
+		Transports: map[string]v1.TransportProfile{
 			"tlsProfile": {
-				TLS: &TLSConfig{
-					Certificates: []TLSCertificate{
+				TLS: &v1.TLSConfig{
+					Certificates: []v1.TLSCertificate{
 						{Cert: testutils.EncodePEMCert(ca)},
 					},
 				},
@@ -389,18 +390,18 @@ func TestImageDownloadTLSWithClientCerts(t *testing.T) {
 	ts.StartTLS()
 	defer ts.Close()
 
-	config := ImageTranslation{
-		Rules: []TranslationRule{
+	config := v1.ImageTranslation{
+		Rules: []v1.TranslationRule{
 			{
 				Name:      "image",
 				URL:       "%/base.qcow2",
 				Transport: "tlsProfile",
 			},
 		},
-		Transports: map[string]TransportProfile{
+		Transports: map[string]v1.TransportProfile{
 			"tlsProfile": {
-				TLS: &TLSConfig{
-					Certificates: []TLSCertificate{
+				TLS: &v1.TLSConfig{
+					Certificates: []v1.TLSCertificate{
 						{
 							Cert: testutils.EncodePEMCert(ca),
 						},
@@ -440,18 +441,18 @@ func TestImageDownloadTLSWithServerName(t *testing.T) {
 	ts.StartTLS()
 	defer ts.Close()
 
-	config := ImageTranslation{
-		Rules: []TranslationRule{
+	config := v1.ImageTranslation{
+		Rules: []v1.TranslationRule{
 			{
 				Name:      "image",
 				URL:       "%/base.qcow2",
 				Transport: "tlsProfile",
 			},
 		},
-		Transports: map[string]TransportProfile{
+		Transports: map[string]v1.TransportProfile{
 			"tlsProfile": {
-				TLS: &TLSConfig{
-					Certificates: []TLSCertificate{
+				TLS: &v1.TLSConfig{
+					Certificates: []v1.TLSCertificate{
 						{Cert: testutils.EncodePEMCert(ca)},
 					},
 					ServerName: "test.corp",
@@ -475,17 +476,17 @@ func TestImageDownloadTLSWithoutCertValidation(t *testing.T) {
 	ts.StartTLS()
 	defer ts.Close()
 
-	config := ImageTranslation{
-		Rules: []TranslationRule{
+	config := v1.ImageTranslation{
+		Rules: []v1.TranslationRule{
 			{
 				Name:      "image",
 				URL:       "%/base.qcow2",
 				Transport: "tlsProfile",
 			},
 		},
-		Transports: map[string]TransportProfile{
+		Transports: map[string]v1.TransportProfile{
 			"tlsProfile": {
-				TLS: &TLSConfig{Insecure: true},
+				TLS: &v1.TLSConfig{Insecure: true},
 			},
 		},
 	}

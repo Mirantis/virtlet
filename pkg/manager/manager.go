@@ -23,6 +23,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"github.com/Mirantis/virtlet/pkg/api/types/v1"
 	"github.com/Mirantis/virtlet/pkg/image"
 	"github.com/Mirantis/virtlet/pkg/imagetranslation"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
@@ -135,7 +136,7 @@ func (v *VirtletManager) Run() error {
 
 	var translator image.Translator
 	if !v.config.SkipImageTranslation {
-		if err = imagetranslation.RegisterCustomResourceType(); err != nil {
+		if err = v1.RegisterCustomResourceTypes(); err != nil {
 			return fmt.Errorf("failed to register image translation CRD: %v", err)
 		}
 		translator = imagetranslation.GetDefaultImageTranslator(v.config.ImageTranslationConfigsDir)

@@ -28,7 +28,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/Mirantis/virtlet/pkg/imagetranslation"
+	virtlet_v1 "github.com/Mirantis/virtlet/pkg/api/types/v1"
 )
 
 var ClusterURL = flag.String("cluster-url", "http://127.0.0.1:8080", "apiserver URL")
@@ -91,12 +91,12 @@ func (c *Controller) Finalize() error {
 	return c.client.Namespaces().Delete(c.namespace.Name, nil)
 }
 
-func (c *Controller) CreateVirtletImageMapping(mapping imagetranslation.VirtletImageMapping) (*imagetranslation.VirtletImageMapping, error) {
-	client, err := imagetranslation.GetCRDRestClient(c.restConfig)
+func (c *Controller) CreateVirtletImageMapping(mapping virtlet_v1.VirtletImageMapping) (*virtlet_v1.VirtletImageMapping, error) {
+	client, err := virtlet_v1.GetCRDRestClient(c.restConfig)
 	if err != nil {
 		return nil, err
 	}
-	var result imagetranslation.VirtletImageMapping
+	var result virtlet_v1.VirtletImageMapping
 	err = client.Post().
 		Resource("virtletimagemappings").
 		Namespace("kube-system").
@@ -109,7 +109,7 @@ func (c *Controller) CreateVirtletImageMapping(mapping imagetranslation.VirtletI
 }
 
 func (c *Controller) DeleteVirtletImageMapping(name string) error {
-	client, err := imagetranslation.GetCRDRestClient(c.restConfig)
+	client, err := virtlet_v1.GetCRDRestClient(c.restConfig)
 	if err != nil {
 		return err
 	}

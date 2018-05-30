@@ -20,140 +20,9 @@ import (
 	"context"
 	"fmt"
 
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apimachinery/pkg/api/errors"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/rest"
-
+	"github.com/Mirantis/virtlet/pkg/api/types/v1"
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
-
-const groupName = "virtlet.k8s"
-const version = "v1"
-
-var (
-	schemeBuilder      = runtime.NewSchemeBuilder(addKnownTypes)
-	scheme             = runtime.NewScheme()
-	schemeGroupVersion = schema.GroupVersion{Group: groupName, Version: version}
-)
-
-// VirtletImageMapping represents an ImageTranslation wrapped in k8s object
-type VirtletImageMapping struct {
-	meta_v1.TypeMeta   `json:",inline"`
-	meta_v1.ObjectMeta `json:"metadata"`
-	Spec               ImageTranslation `json:"spec"`
-}
-
-// DeepCopyObject implements DeepCopyObject method of runtime.Object interface
-func (vim *VirtletImageMapping) DeepCopyObject() runtime.Object {
-	if vim == nil {
-		return nil
-	}
-	r := *vim
-	if vim.Spec.Transports == nil {
-		return &r
-	}
-
-	transportMap := make(map[string]TransportProfile)
-	for k, tr := range vim.Spec.Transports {
-		if tr.MaxRedirects != nil {
-			redirs := *tr.MaxRedirects
-			tr.MaxRedirects = &redirs
-		}
-		if tr.TLS != nil {
-			tls := *tr.TLS
-			tr.TLS = &tls
-		}
-		transportMap[k] = tr
-	}
-	return &r
-}
-
-var _ TranslationConfig = VirtletImageMapping{}
-
-// VirtletImageMappingList is a k8s representation of list of translation configs
-type VirtletImageMappingList struct {
-	meta_v1.TypeMeta `json:",inline"`
-	meta_v1.ListMeta `json:"metadata"`
-	Items            []VirtletImageMapping `json:"items"`
-}
-
-// DeepCopyObject implements DeepCopyObject method of runtime.Object interface
-func (l *VirtletImageMappingList) DeepCopyObject() runtime.Object {
-	if l == nil {
-		return l
-	}
-	r := &VirtletImageMappingList{
-		TypeMeta: l.TypeMeta,
-		ListMeta: l.ListMeta,
-	}
-	for _, vim := range l.Items {
-		r.Items = append(r.Items, *vim.DeepCopyObject().(*VirtletImageMapping))
-	}
-	return r
-}
-
-func addKnownTypes(scheme *runtime.Scheme) error {
-	scheme.AddKnownTypes(schemeGroupVersion,
-		&VirtletImageMapping{},
-		&VirtletImageMappingList{},
-	)
-	meta_v1.AddToGroupVersion(scheme, schemeGroupVersion)
-	return nil
-}
-
-func init() {
-	if err := schemeBuilder.AddToScheme(scheme); err != nil {
-		panic(err)
-	}
-}
-
-// RegisterCustomResourceType registers custom resource definition for VirtletImageMapping kind in k8s
-func RegisterCustomResourceType() error {
-	crd := apiextensionsv1beta1.CustomResourceDefinition{
-		ObjectMeta: meta_v1.ObjectMeta{
-			Name: "virtletimagemappings." + groupName,
-		},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   groupName,
-			Version: version,
-			Scope:   apiextensionsv1beta1.NamespaceScoped,
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-				Plural:     "virtletimagemappings",
-				Singular:   "virtletimagemapping",
-				Kind:       "VirtletImageMapping",
-				ShortNames: []string{"vim"},
-			},
-		},
-	}
-	cfg, err := utils.GetK8sClientConfig("")
-	if err != nil || cfg.Host == "" {
-		return err
-	}
-	extensionsClientSet, err := apiextensionsclient.NewForConfig(cfg)
-	if err != nil {
-		panic(err)
-	}
-
-	_, err = extensionsClientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(&crd)
-	if err == nil || errors.IsAlreadyExists(err) {
-		return nil
-	}
-	return err
-}
-
-// Name implements TranslationConfig Name
-func (vim VirtletImageMapping) Name() string {
-	return vim.ObjectMeta.Name
-}
-
-// Payload implements TranslationConfig Payload
-func (vim VirtletImageMapping) Payload() (ImageTranslation, error) {
-	return vim.Spec, nil
-}
 
 type crdConfigSource struct {
 	namespace string
@@ -172,11 +41,11 @@ func (cs crdConfigSource) Configs(ctx context.Context) ([]TranslationConfig, err
 		return nil, nil
 	}
 
-	client, err := GetCRDRestClient(cfg)
+	client, err := v1.GetCRDRestClient(cfg)
 	if err != nil {
 		return nil, err
 	}
-	var list VirtletImageMappingList
+	var list v1.VirtletImageMappingList
 	err = client.Get().
 		Context(ctx).
 		Resource("virtletimagemappings").
@@ -187,15 +56,10 @@ func (cs crdConfigSource) Configs(ctx context.Context) ([]TranslationConfig, err
 	}
 	result := make([]TranslationConfig, len(list.Items))
 	for i, v := range list.Items {
-		result[i] = v
+		result[i] = &v
 	}
 
 	return result, nil
-}
-
-// GetCRDRestClient returns ReST client that can be used to work with virtlet CRDs
-func GetCRDRestClient(cfg *rest.Config) (*rest.RESTClient, error) {
-	return utils.GetK8sRestClient(cfg, scheme, &schemeGroupVersion)
 }
 
 // Description implements ConfigSource Description

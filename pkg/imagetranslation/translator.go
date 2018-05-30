@@ -31,18 +31,19 @@ import (
 
 	"github.com/golang/glog"
 
+	"github.com/Mirantis/virtlet/pkg/api/types/v1"
 	"github.com/Mirantis/virtlet/pkg/image"
 )
 
 type imageNameTranslator struct {
 	AllowRegexp bool
 
-	translations map[string]*ImageTranslation
+	translations map[string]*v1.ImageTranslation
 }
 
 // LoadConfigs implements ImageNameTranslator LoadConfigs
 func (t *imageNameTranslator) LoadConfigs(ctx context.Context, sources ...ConfigSource) {
-	translations := map[string]*ImageTranslation{}
+	translations := map[string]*v1.ImageTranslation{}
 	for _, source := range sources {
 		configs, err := source.Configs(ctx)
 		if err != nil {
@@ -62,7 +63,7 @@ func (t *imageNameTranslator) LoadConfigs(ctx context.Context, sources ...Config
 	t.translations = translations
 }
 
-func convertEndpoint(rule TranslationRule, config *ImageTranslation) image.Endpoint {
+func convertEndpoint(rule v1.TranslationRule, config *v1.ImageTranslation) image.Endpoint {
 	profile, exists := config.Transports[rule.Transport]
 	if !exists {
 		return image.Endpoint{
