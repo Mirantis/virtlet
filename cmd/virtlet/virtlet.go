@@ -20,7 +20,6 @@ import (
 	"flag"
 	"math/rand"
 	"os"
-	"os/exec"
 	"time"
 
 	"github.com/golang/glog"
@@ -105,21 +104,6 @@ func runTapManager() {
 	}
 }
 
-func startTapManagerProcess() {
-	cmd := exec.Command(os.Args[0], os.Args[1:]...)
-	cmd.Env = append(os.Environ(), WantTapManagerEnv+"=1")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	// Here we make this process die with the main Virtlet process.
-	// Note that this is Linux-specific, and also it may fail if virtlet is PID 1:
-	// https://github.com/golang/go/issues/9263
-	setPdeathsig(cmd)
-	if err := cmd.Start(); err != nil {
-		glog.Errorf("Error starting tapmanager process: %v", err)
-		os.Exit(1)
-	}
-}
-
 func printVersion() {
 	out, err := version.Get().ToBytes(*versionFormat)
 	if err == nil {
@@ -141,7 +125,7 @@ func main() {
 
 	rand.Seed(time.Now().UnixNano())
 	if os.Getenv(WantTapManagerEnv) == "" {
-		startTapManagerProcess()
+		go runTapManager()
 		runVirtlet()
 	} else {
 		runTapManager()
