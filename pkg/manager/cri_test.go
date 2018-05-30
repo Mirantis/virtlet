@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
 	"github.com/Mirantis/virtlet/pkg/metadata/fake"
 	"github.com/Mirantis/virtlet/pkg/metadata/types"

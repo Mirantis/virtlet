@@ -2,7 +2,7 @@ package criapi
 
 import (
 	"github.com/Mirantis/virtlet/pkg/utils"
-	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"strconv"
 )
 
@@ -43,13 +43,10 @@ func GetSandboxes(sandboxCount int) []*kubeapi.PodSandboxConfig {
 			Attempt:   attempt,
 		}
 
-		hostNetwork := false
-		hostPid := false
-		hostIpc := false
 		namespaceOptions := &kubeapi.NamespaceOption{
-			HostNetwork: hostNetwork,
-			HostPid:     hostPid,
-			HostIpc:     hostIpc,
+			Network: kubeapi.NamespaceMode_POD,
+			Pid:     kubeapi.NamespaceMode_POD,
+			Ipc:     kubeapi.NamespaceMode_POD,
 		}
 
 		cgroupParent := ""

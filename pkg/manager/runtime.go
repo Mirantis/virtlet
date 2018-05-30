@@ -26,7 +26,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/jonboulle/clockwork"
 	"golang.org/x/net/context"
-	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
 	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
@@ -465,6 +465,11 @@ func (v *VirtletRuntimeService) ContainerStats(ctx context.Context, in *kubeapi.
 // ListContainerStats is a placeholder for an unimplemented CRI method.
 func (v *VirtletRuntimeService) ListContainerStats(ctx context.Context, in *kubeapi.ListContainerStatsRequest) (*kubeapi.ListContainerStatsResponse, error) {
 	return nil, errors.New("ListContainerStats() not implemented")
+}
+
+// ReopenContainerLog is a placeholder for an unimplemented CRI method.
+func (v *VirtletRuntimeService) ReopenContainerLog(ctx context.Context, in *kubeapi.ReopenContainerLogRequest) (*kubeapi.ReopenContainerLogResponse, error) {
+	return &kubeapi.ReopenContainerLogResponse{}, nil
 }
 
 func validatePodSandboxConfig(config *kubeapi.PodSandboxConfig) error {
