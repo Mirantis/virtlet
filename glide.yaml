@@ -4,7 +4,7 @@ import:
   version: 4484981625c1a6a2ecb40a390fcb6a9bcfee76e3
 - package: github.com/golang/glog
 - package: golang.org/x/net
-  version: f2499483f923065a842d38eb4c7f1927e6fc6e6d
+  version: 0ed95abb35c445290478a5348a7b38bb154135fd
   subpackages:
   - context
 - package: golang.org/x/crypto
