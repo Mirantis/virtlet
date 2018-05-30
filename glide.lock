@@ -1,5 +1,5 @@
-hash: 7143f5f6fd8cbd7d465fe0be517bb010ea49fbe033bd2b13b6b41842145fc0e4
-updated: 2018-05-17T23:37:53.451149641+03:00
+hash: 0299cc3a4163c3278b4c6368e76df68645e3d0e7fe07c2cc8ced8424d0667be5
+updated: 2018-05-21T14:44:29.723738+03:00
 imports:
 - name: github.com/boltdb/bolt
   version: 583e8937c61f1af6513608ccc75c97b6abdf4ff9
@@ -230,7 +230,7 @@ imports:
   - ssh
   - ssh/terminal
 - name: golang.org/x/net
-  version: f2499483f923065a842d38eb4c7f1927e6fc6e6d
+  version: 0ed95abb35c445290478a5348a7b38bb154135fd
   subpackages:
   - bpf
   - context
@@ -238,7 +238,7 @@ imports:
   - http2/hpack
   - idna
   - internal/iana
-  - internal/netreflect
+  - internal/socket
   - internal/timeseries
   - ipv4
   - lex/httplex
@@ -254,6 +254,20 @@ imports:
   subpackages:
   - unix
   - windows
+- name: golang.org/x/text
+  version: b19bf474d317b857955b12035d2c5acb57ce8b01
+  subpackages:
+  - cases
+  - internal
+  - internal/tag
+  - language
+  - runes
+  - secure/bidirule
+  - secure/precis
+  - transform
+  - unicode/bidi
+  - unicode/norm
+  - width
 - name: google.golang.org/grpc
   version: 777daa17ff9b5daef1cfdf915088a2ada3332bf0
   subpackages:
