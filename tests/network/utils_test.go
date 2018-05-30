@@ -551,6 +551,7 @@ func (tc *tapConnector) Run(readyCh, stopCh chan struct{}) error {
 	<-stopCh
 	// TODO: use SetDeadline() when it's available for os.File
 	// (perhaps in Go 1.10): https://github.com/golang/go/issues/22114
+	// TODO: 1.10: Update
 	tc.tapA.Close()
 	tc.tapB.Close()
 	tc.wg.Wait()
