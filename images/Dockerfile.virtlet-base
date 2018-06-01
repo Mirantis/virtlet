@@ -1,6 +1,8 @@
 FROM ubuntu:16.04
 MAINTAINER Ivan Shvedunov <ishvedunov@mirantis.com>
 
+# BUMP 24.05.2018
+
 ENV DEBIAN_FRONTEND noninteractive
 
 RUN echo deb-src http://archive.ubuntu.com/ubuntu/ xenial main restricted >>/etc/apt/sources.list && \
