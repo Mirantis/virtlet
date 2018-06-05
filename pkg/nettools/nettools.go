@@ -642,14 +642,6 @@ func bindDeviceToVFIO(devIdentifier string) error {
 	)
 }
 
-func unbindDeviceFromVFIO(pciAddress string) error {
-	return ioutil.WriteFile(
-		"/sys/bus/pci/drivers/vfio-pci/unbind",
-		[]byte(pciAddress),
-		0200,
-	)
-}
-
 func getVirtFNNo(pciAddress string) (int, error) {
 	for i := 0; ; i++ {
 		dest, err := os.Readlink(
@@ -859,7 +851,6 @@ func RecoverContainerSideNetwork(csn *network.ContainerSideNetwork, nsPath strin
 		return fmt.Errorf("wrong cni configuration: no interfaces defined: %s", spew.Sdump(csn.Result))
 	}
 
-	// FIXME: this will not work with sr-iov device passed to VM
 	contLinks, err := GetContainerLinks(csn.Result)
 	if err != nil {
 		return err
@@ -877,24 +868,15 @@ func RecoverContainerSideNetwork(csn *network.ContainerSideNetwork, nsPath strin
 			glog.Warningf("Recovering container side network: missing description for interface %q", ifaceName)
 		}
 		delete(oldDescs, ifaceName)
-		pciAddress := ""
 		var ifaceType network.InterfaceType
 
 		if isSriovVf(link) {
 			ifaceType = network.InterfaceTypeVF
-			pciAddress, err = getPCIAddressOfVF(ifaceName)
-			if err != nil {
-				return err
-			}
-
-			if desc.PCIAddress != pciAddress {
-				return fmt.Errorf("PCI address mismatch for %q: %q instead of %q", ifaceName, desc.PCIAddress, pciAddress)
-			}
 
 			// device should be already unbound, but after machine reboot that can be necessary
-			unbindDriverFromDevice(pciAddress)
+			unbindDriverFromDevice(desc.PCIAddress)
 
-			devIdentifier, err := getDeviceIdentifier(pciAddress)
+			devIdentifier, err := getDeviceIdentifier(desc.PCIAddress)
 			if err != nil {
 				return err
 			}
@@ -1052,15 +1034,17 @@ func Teardown(csn *network.ContainerSideNetwork) error {
 }
 
 // ReconstructVFs iterates over stored PCI addresses, rebinding each
-// corresponding interface to its host driver, changing its MAC address
-// to the stored value and then moving it into the container namespace
-func ReconstructVFs(csn *network.ContainerSideNetwork, netns ns.NetNS) error {
+// corresponding interface to its host driver, changing its MAC address and name
+// to the values stored in csn and then moving it into the container namespace
+func ReconstructVFs(csn *network.ContainerSideNetwork, netns ns.NetNS, ignoreUnbind bool) error {
 	for _, iface := range csn.Interfaces {
 		if iface.Type != network.InterfaceTypeVF {
 			continue
 		}
-		if err := unbindDeviceFromVFIO(iface.PCIAddress); err != nil {
-			return err
+		if err := unbindDriverFromDevice(iface.PCIAddress); err != nil {
+			if ignoreUnbind != true {
+				return err
+			}
 		}
 		if err := rebindDriverToDevice(iface.PCIAddress); err != nil {
 			return err
