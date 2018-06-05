@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Mirantis/virtlet/pkg/api/types/v1"
+	"github.com/Mirantis/virtlet/pkg/api/virtlet.k8s/v1"
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
 

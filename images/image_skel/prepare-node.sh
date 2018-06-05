@@ -9,6 +9,13 @@ if [[ -f /dind/prepare-node.sh && ! ( ${0} =~ /dind/ ) ]]; then
     exec /dind/prepare-node.sh "$@"
 fi
 
+verbose=
+if [[ ${VIRTLET_LOGLEVEL:-} ]]; then
+    verbose="--v ${VIRTLET_LOGLEVEL}"
+fi
+/usr/local/bin/virtlet --dump-config ${verbose} >/var/lib/virtlet/config.sh
+. /var/lib/virtlet/config.sh
+
 PLUGIN_DIR=/kubelet-volume-plugins/virtlet~flexvolume_driver
 
 if [[ ! -d ${PLUGIN_DIR} ]]; then

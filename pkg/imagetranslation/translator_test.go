@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/Mirantis/virtlet/pkg/api/types/v1"
+	"github.com/Mirantis/virtlet/pkg/api/virtlet.k8s/v1"
 )
 
 // TestTranslations tests how image names are translated with various translation rules
@@ -56,9 +56,6 @@ func TestTranslations(t *testing.T) {
 			},
 		},
 	}
-
-	translator := NewImageNameTranslator().(*imageNameTranslator)
-	translator.LoadConfigs(context.Background(), NewFakeConfigSource(configs))
 
 	for _, tc := range []struct {
 		name        string
@@ -128,7 +125,8 @@ func TestTranslations(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			translator.AllowRegexp = tc.allowRegexp
+			translator := NewImageNameTranslator(tc.allowRegexp).(*imageNameTranslator)
+			translator.LoadConfigs(context.Background(), NewFakeConfigSource(configs))
 			endpoint := translator.Translate(tc.imageName)
 			if tc.expectedURL != endpoint.URL {
 				t.Errorf("expected URL %q, but got %q", tc.expectedURL, endpoint.URL)

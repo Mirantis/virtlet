@@ -18,7 +18,6 @@ package v1
 
 import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // TranslationRule represents a single translation rule from either name or regexp to Endpoint
@@ -85,68 +84,30 @@ type TLSCertificate struct {
 	Key string `yaml:"key,omitempty" json:"key,omitempty"`
 }
 
-// VirtletImageMapping represents an ImageTranslation wrapped in k8s object
+// +genclient
+// +genclient:noStatus
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// VirtletImageMapping represents an ImageTranslation wrapped in k8s object.
 type VirtletImageMapping struct {
 	meta_v1.TypeMeta   `json:",inline"`
 	meta_v1.ObjectMeta `json:"metadata"`
 	Spec               ImageTranslation `json:"spec"`
 }
 
-// DeepCopyObject implements DeepCopyObject method of runtime.Object interface
-func (vim *VirtletImageMapping) DeepCopyObject() runtime.Object {
-	if vim == nil {
-		return nil
-	}
-	r := *vim
-	if vim.Spec.Transports == nil {
-		return &r
-	}
+// ConfigName returns the name of the config.
+func (vim *VirtletImageMapping) ConfigName() string { return vim.Name }
 
-	transportMap := make(map[string]TransportProfile)
-	for k, tr := range vim.Spec.Transports {
-		if tr.MaxRedirects != nil {
-			redirs := *tr.MaxRedirects
-			tr.MaxRedirects = &redirs
-		}
-		if tr.TLS != nil {
-			tls := *tr.TLS
-			tr.TLS = &tls
-		}
-		transportMap[k] = tr
-	}
-	return &r
-}
-
-// Name implements TranslationConfig Name
-func (vim *VirtletImageMapping) Name() string {
-	return vim.ObjectMeta.Name
-}
-
-// Payload implements TranslationConfig Payload
+// Payload returns the actual translation for the mapping.
 func (vim *VirtletImageMapping) Payload() (ImageTranslation, error) {
 	return vim.Spec, nil
 }
 
-// VirtletImageMappingList is a k8s representation of list of translation configs
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// VirtletImageMappingList is a k8s representation of list of translation configs.
 type VirtletImageMappingList struct {
 	meta_v1.TypeMeta `json:",inline"`
 	meta_v1.ListMeta `json:"metadata"`
 	Items            []VirtletImageMapping `json:"items"`
 }
-
-// DeepCopyObject implements DeepCopyObject method of runtime.Object interface
-func (l *VirtletImageMappingList) DeepCopyObject() runtime.Object {
-	if l == nil {
-		return l
-	}
-	r := &VirtletImageMappingList{
-		TypeMeta: l.TypeMeta,
-		ListMeta: l.ListMeta,
-	}
-	for _, vim := range l.Items {
-		r.Items = append(r.Items, *vim.DeepCopyObject().(*VirtletImageMapping))
-	}
-	return r
-}
-
-// TODO: update '... implements ...' comments in this file

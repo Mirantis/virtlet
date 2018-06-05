@@ -44,7 +44,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/containernetworking/cni/pkg/ns"
@@ -67,9 +66,6 @@ const (
 
 	sizeOfIfReq = 40
 	ifnamsiz    = 16
-
-	calicoDefaultSubnet = 24
-	calicoSubnetVar     = "VIRTLET_CALICO_SUBNET"
 )
 
 // Had to duplicate ifReq here as it's not exported
@@ -727,7 +723,7 @@ func getVfVlanID(pciAddress string) (int, error) {
 // In case of SR-IOV VFs this function only sets up a device to be passed to VM.
 // The function should be called from within container namespace.
 // Returns container network struct and an error, if any.
-func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks []netlink.Link) (*network.ContainerSideNetwork, error) {
+func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks []netlink.Link, enableSriov bool) (*network.ContainerSideNetwork, error) {
 	contLinks, err := GetContainerLinks(info)
 	if err != nil {
 		return nil, err
@@ -749,7 +745,7 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 		}
 
 		if isSriovVf(link) {
-			if os.Getenv("VIRTLET_SRIOV_SUPPORT") == "" {
+			if !enableSriov {
 				return nil, fmt.Errorf("SR-IOV device configured in container network namespace while Virtlet is configured with disabled SR-IOV support")
 			}
 
@@ -1197,7 +1193,7 @@ func getDummyGateway(dummyNetwork *cnicurrent.Result) (net.IP, error) {
 // responses for VMs.
 // This function must be called from within the container network
 // namespace.
-func FixCalicoNetworking(netConfig *cnicurrent.Result, getDummyNetwork func() (*cnicurrent.Result, string, error)) error {
+func FixCalicoNetworking(netConfig *cnicurrent.Result, calicoSubnetSize int, getDummyNetwork func() (*cnicurrent.Result, string, error)) error {
 	for n, ipConfig := range netConfig.IPs {
 		link, err := getLinkForIPConfig(netConfig, n)
 		if err != nil {
@@ -1211,7 +1207,7 @@ func FixCalicoNetworking(netConfig *cnicurrent.Result, getDummyNetwork func() (*
 		if !haveCalico {
 			continue
 		}
-		ipConfig.Address.Mask = netmaskForCalico()
+		ipConfig.Address.Mask = net.CIDRMask(calicoSubnetSize, 32)
 		if haveCalicoGateway {
 			dummyNetwork, nsPath, err := getDummyNetwork()
 			if err != nil {
@@ -1261,18 +1257,4 @@ func FixCalicoNetworking(netConfig *cnicurrent.Result, getDummyNetwork func() (*
 		}
 	}
 	return nil
-}
-
-func netmaskForCalico() net.IPMask {
-	n := calicoDefaultSubnet
-	subnetStr := os.Getenv(calicoSubnetVar)
-	if subnetStr != "" {
-		var err error
-		n, err = strconv.Atoi(subnetStr)
-		if err != nil || n <= 0 || n > 30 {
-			glog.Warningf("bad calico subnet %q, using /%d", subnetStr, calicoDefaultSubnet)
-			n = calicoDefaultSubnet
-		}
-	}
-	return net.CIDRMask(n, 32)
 }

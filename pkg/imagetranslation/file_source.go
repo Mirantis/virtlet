@@ -24,7 +24,7 @@ import (
 
 	"github.com/ghodss/yaml"
 
-	"github.com/Mirantis/virtlet/pkg/api/types/v1"
+	"github.com/Mirantis/virtlet/pkg/api/virtlet.k8s/v1"
 )
 
 type fileConfigSource struct {
@@ -62,7 +62,7 @@ func (cs fileConfigSource) Description() string {
 }
 
 // Name implements TranslationConfig Name
-func (c fileConfig) Name() string {
+func (c fileConfig) ConfigName() string {
 	return c.name
 }
 

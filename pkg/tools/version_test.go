@@ -88,8 +88,8 @@ func TestVersionCommand(t *testing.T) {
 				"kube-node-2": "virtlet-bar42",
 			},
 			expectedCommands: map[string]string{
-				"virtlet-foo42/virtlet/kube-system: virtlet -version -version-format json": versionInfoToString(nodeVersionInfo),
-				"virtlet-bar42/virtlet/kube-system: virtlet -version -version-format json": versionInfoToString(nodeVersionInfo),
+				"virtlet-foo42/virtlet/kube-system: virtlet --version --version-format json": versionInfoToString(nodeVersionInfo),
+				"virtlet-bar42/virtlet/kube-system: virtlet --version --version-format json": versionInfoToString(nodeVersionInfo),
 			},
 		},
 		{
@@ -103,8 +103,8 @@ func TestVersionCommand(t *testing.T) {
 				"kube-node-2": "virtlet-bar42",
 			},
 			expectedCommands: map[string]string{
-				"virtlet-foo42/virtlet/kube-system: virtlet -version -version-format json": versionInfoToString(nodeVersionInfo),
-				"virtlet-bar42/virtlet/kube-system: virtlet -version -version-format json": versionInfoToString(nodeVersionInfo),
+				"virtlet-foo42/virtlet/kube-system: virtlet --version --version-format json": versionInfoToString(nodeVersionInfo),
+				"virtlet-bar42/virtlet/kube-system: virtlet --version --version-format json": versionInfoToString(nodeVersionInfo),
 			},
 		},
 		{
@@ -115,8 +115,8 @@ func TestVersionCommand(t *testing.T) {
 				"kube-node-2": "virtlet-bar42",
 			},
 			expectedCommands: map[string]string{
-				"virtlet-foo42/virtlet/kube-system: virtlet -version -version-format json": versionInfoToString(nodeVersionInfo),
-				"virtlet-bar42/virtlet/kube-system: virtlet -version -version-format json": versionInfoToString(nodeVersionInfo),
+				"virtlet-foo42/virtlet/kube-system: virtlet --version --version-format json": versionInfoToString(nodeVersionInfo),
+				"virtlet-bar42/virtlet/kube-system: virtlet --version --version-format json": versionInfoToString(nodeVersionInfo),
 			},
 			wrap: func(bs []byte) gm.Verifier { return gm.NewJSONVerifier(bs) },
 		},
@@ -128,8 +128,8 @@ func TestVersionCommand(t *testing.T) {
 				"kube-node-2": "virtlet-bar42",
 			},
 			expectedCommands: map[string]string{
-				"virtlet-foo42/virtlet/kube-system: virtlet -version -version-format json": versionInfoToString(nodeVersionInfo),
-				"virtlet-bar42/virtlet/kube-system: virtlet -version -version-format json": versionInfoToString(nodeVersionInfo),
+				"virtlet-foo42/virtlet/kube-system: virtlet --version --version-format json": versionInfoToString(nodeVersionInfo),
+				"virtlet-bar42/virtlet/kube-system: virtlet --version --version-format json": versionInfoToString(nodeVersionInfo),
 			},
 			wrap: func(bs []byte) gm.Verifier { return gm.NewYamlVerifier(bs) },
 		},
@@ -174,8 +174,8 @@ func TestVersionCommand(t *testing.T) {
 				"kube-node-2": "virtlet-bar42",
 			},
 			expectedCommands: map[string]string{
-				"virtlet-foo42/virtlet/kube-system: virtlet -version -version-format json": versionInfoToString(nodeVersionInfo),
-				"virtlet-bar42/virtlet/kube-system: virtlet -version -version-format json": versionInfoToString(nodeVersionInfo1),
+				"virtlet-foo42/virtlet/kube-system: virtlet --version --version-format json": versionInfoToString(nodeVersionInfo),
+				"virtlet-bar42/virtlet/kube-system: virtlet --version --version-format json": versionInfoToString(nodeVersionInfo1),
 			},
 			errSubstring: "some of the nodes have inconsistent Virtlet builds",
 		},

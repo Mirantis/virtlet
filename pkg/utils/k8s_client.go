@@ -17,13 +17,17 @@ limitations under the License.
 package utils
 
 import (
+	"flag"
 	"os"
+	"strings"
 
+	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 // GetK8sClientConfig returns config that is needed to access k8s
@@ -63,4 +67,42 @@ func GetK8sRestClient(cfg *rest.Config, scheme *runtime.Scheme, groupVersion *sc
 		return nil, err
 	}
 	return client, nil
+}
+
+// wordSepNormalizeFunc change "_" to "-" in the flags.
+func wordSepNormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedName {
+	if strings.Contains(name, "_") {
+		return pflag.NormalizedName(strings.Replace(name, "_", "-", -1))
+	}
+	return pflag.NormalizedName(name)
+}
+
+// defaultClientConfig builds a default Kubernetes client config based
+// on Cobra flags. It's based on kubelet code.
+func defaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	// use the standard defaults for this client command
+	// DEPRECATED: remove and replace with something more accurate
+	loadingRules.DefaultClientConfig = &clientcmd.DefaultClientConfig
+
+	flags.StringVar(&loadingRules.ExplicitPath, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
+
+	overrides := &clientcmd.ConfigOverrides{ClusterDefaults: clientcmd.ClusterDefaults}
+
+	flagNames := clientcmd.RecommendedConfigOverrideFlags("")
+	// short flagnames are disabled by default.  These are here for compatibility with existing scripts
+	flagNames.ClusterOverrideFlags.APIServer.ShortName = "s"
+
+	clientcmd.BindOverrideFlags(overrides, flags, flagNames)
+	clientConfig := clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, os.Stdin)
+
+	return clientConfig
+}
+
+// BindFlags applies standard Go flags and the flags used by kubeclient
+// to the specified FlagSet.
+func BindFlags(flags *pflag.FlagSet) clientcmd.ClientConfig {
+	flags.AddGoFlagSet(flag.CommandLine)
+	flags.SetNormalizeFunc(wordSepNormalizeFunc)
+	return defaultClientConfig(flags)
 }

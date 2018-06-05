@@ -1,0 +1,17 @@
+calicoSubnetSize: 24
+cniConfigDir: /etc/cni/net.d
+cniPluginDir: /opt/cni/bin
+criSocketPath: /run/virtlet.sock
+databasePath: /var/lib/virtlet/virtlet.db
+disableKVM: true
+disableLogging: false
+downloadProtocol: http
+enableRegexpImageTranslation: true
+enableSriov: false
+fdServerSocketPath: /var/lib/virtlet/tapfdserver.sock
+imageDir: /var/lib/virtlet/images
+imageTranslationConfigsDir: /etc/virtlet/images
+libvirtURI: qemu:///system
+logLevel: 1
+rawDevices: vd*
+skipImageTranslation: false

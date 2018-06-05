@@ -28,7 +28,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	virtlet_v1 "github.com/Mirantis/virtlet/pkg/api/types/v1"
+	virtlet_v1 "github.com/Mirantis/virtlet/pkg/api/virtlet.k8s/v1"
 )
 
 var ClusterURL = flag.String("cluster-url", "http://127.0.0.1:8080", "apiserver URL")

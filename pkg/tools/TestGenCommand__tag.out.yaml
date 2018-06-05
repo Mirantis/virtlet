@@ -25,19 +25,6 @@ spec:
       containers:
       - command:
         - /libvirt.sh
-        env:
-        - name: VIRTLET_SRIOV_SUPPORT
-          valueFrom:
-            configMapKeyRef:
-              key: sriov_support
-              name: virtlet-config
-              optional: true
-        - name: VIRTLET_DISABLE_KVM
-          valueFrom:
-            configMapKeyRef:
-              key: disable_kvm
-              name: virtlet-config
-              optional: true
         image: mirantis/virtlet:0.9.42
         imagePullPolicy: IfNotPresent
         name: libvirt
@@ -74,58 +61,7 @@ spec:
           name: libvirt-log
         - mountPath: /dev
           name: dev
-      - env:
-        - name: VIRTLET_DISABLE_KVM
-          valueFrom:
-            configMapKeyRef:
-              key: disable_kvm
-              name: virtlet-config
-              optional: true
-        - name: VIRTLET_DOWNLOAD_PROTOCOL
-          valueFrom:
-            configMapKeyRef:
-              key: download_protocol
-              name: virtlet-config
-              optional: true
-        - name: VIRTLET_LOGLEVEL
-          valueFrom:
-            configMapKeyRef:
-              key: loglevel
-              name: virtlet-config
-              optional: true
-        - name: VIRTLET_CALICO_SUBNET
-          valueFrom:
-            configMapKeyRef:
-              key: calico-subnet
-              name: virtlet-config
-              optional: true
-        - name: IMAGE_REGEXP_TRANSLATION
-          valueFrom:
-            configMapKeyRef:
-              key: image_regexp_translation
-              name: virtlet-config
-              optional: true
-        - name: VIRTLET_DISABLE_LOGGING
-          valueFrom:
-            configMapKeyRef:
-              key: disable_logging
-              name: virtlet-config
-              optional: true
-        - name: VIRTLET_SRIOV_SUPPORT
-          valueFrom:
-            configMapKeyRef:
-              key: sriov_support
-              name: virtlet-config
-              optional: true
-        - name: VIRTLET_RAW_DEVICES
-          valueFrom:
-            configMapKeyRef:
-              key: raw_devices
-              name: virtlet-config
-              optional: true
-        - name: IMAGE_TRANSLATIONS_DIR
-          value: /etc/virtlet/images
-        image: mirantis/virtlet:0.9.42
+      - image: mirantis/virtlet:0.9.42
         imagePullPolicy: IfNotPresent
         name: virtlet
         readinessProbe:
@@ -188,12 +124,61 @@ spec:
       - command:
         - /prepare-node.sh
         env:
+        - name: KUBE_NODE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
         - name: VIRTLET_DISABLE_KVM
           valueFrom:
             configMapKeyRef:
               key: disable_kvm
               name: virtlet-config
               optional: true
+        - name: VIRTLET_SRIOV_SUPPORT
+          valueFrom:
+            configMapKeyRef:
+              key: sriov_support
+              name: virtlet-config
+              optional: true
+        - name: VIRTLET_DOWNLOAD_PROTOCOL
+          valueFrom:
+            configMapKeyRef:
+              key: download_protocol
+              name: virtlet-config
+              optional: true
+        - name: VIRTLET_LOGLEVEL
+          valueFrom:
+            configMapKeyRef:
+              key: loglevel
+              name: virtlet-config
+              optional: true
+        - name: VIRTLET_CALICO_SUBNET
+          valueFrom:
+            configMapKeyRef:
+              key: calico-subnet
+              name: virtlet-config
+              optional: true
+        - name: IMAGE_REGEXP_TRANSLATION
+          valueFrom:
+            configMapKeyRef:
+              key: image_regexp_translation
+              name: virtlet-config
+              optional: true
+        - name: VIRTLET_RAW_DEVICES
+          valueFrom:
+            configMapKeyRef:
+              key: raw_devices
+              name: virtlet-config
+              optional: true
+        - name: VIRTLET_DISABLE_LOGGING
+          valueFrom:
+            configMapKeyRef:
+              key: disable_logging
+              name: virtlet-config
+              optional: true
+        - name: VIRTLET_IMAGE_TRANSLATIONS_DIR
+          value: /etc/virtlet/images
         image: mirantis/virtlet:0.9.42
         imagePullPolicy: IfNotPresent
         name: prepare-node
@@ -214,6 +199,8 @@ spec:
           name: var-lib
         - mountPath: /dev
           name: dev
+        - mountPath: /var/lib/virtlet
+          name: virtlet
       serviceAccountName: virtlet
       volumes:
       - hostPath:

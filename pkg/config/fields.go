@@ -1,0 +1,268 @@
+/*
+Copyright 2018 Mirantis
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or ≈git-agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package config
+
+import (
+	"bytes"
+	"fmt"
+	"os"
+	"strconv"
+
+	"github.com/golang/glog"
+	"github.com/kballard/go-shellquote"
+	flag "github.com/spf13/pflag"
+)
+
+type configField interface {
+	flagName() string
+	envName() string
+	applyDefault()
+	clear()
+	present() bool
+	addFlag(f *flag.FlagSet)
+	override(from configField)
+	setFromEnvValue(value string)
+	envValue() string
+}
+
+type fieldBase struct {
+	name      string
+	shorthand string
+	usage     string
+	env       string
+}
+
+func (f *fieldBase) flagName() string { return f.name }
+func (f *fieldBase) envName() string  { return f.env }
+
+type stringField struct {
+	fieldBase
+	defValue string
+	value    **string
+}
+
+var _ configField = &stringField{}
+
+func (sf *stringField) applyDefault() {
+	if *sf.value == nil {
+		*sf.value = &sf.defValue
+	}
+}
+
+func (sf *stringField) clear()        { *sf.value = nil }
+func (sf *stringField) present() bool { return *sf.value != nil }
+
+func (sf *stringField) addFlag(f *flag.FlagSet) {
+	f.StringVarP(*sf.value, sf.name, sf.shorthand, sf.defValue, sf.usage)
+}
+
+func (sf *stringField) override(from configField) {
+	fromValue := *from.(*stringField).value
+	if fromValue != nil {
+		v := *fromValue
+		*sf.value = &v
+	}
+}
+
+func (sf *stringField) setFromEnvValue(value string) {
+	*sf.value = &value
+}
+
+func (sf *stringField) envValue() string {
+	if *sf.value == nil {
+		return ""
+	}
+	return **sf.value
+}
+
+type boolField struct {
+	fieldBase
+	defValue bool
+	value    **bool
+}
+
+var _ configField = &boolField{}
+
+func (bf *boolField) applyDefault() {
+	if *bf.value == nil {
+		*bf.value = &bf.defValue
+	}
+}
+
+func (bf *boolField) clear()        { *bf.value = nil }
+func (bf *boolField) present() bool { return *bf.value != nil }
+
+func (bf *boolField) addFlag(f *flag.FlagSet) {
+	f.BoolVarP(*bf.value, bf.name, bf.shorthand, bf.defValue, bf.usage)
+}
+
+func (bf *boolField) override(from configField) {
+	fromValue := *from.(*boolField).value
+	if fromValue != nil {
+		v := *fromValue
+		*bf.value = &v
+	}
+}
+
+func (bf *boolField) setFromEnvValue(value string) {
+	v := value != ""
+	*bf.value = &v
+}
+
+func (bf *boolField) envValue() string {
+	if *bf.value == nil || !**bf.value {
+		return ""
+	}
+	return "1"
+}
+
+type intField struct {
+	fieldBase
+	defValue int
+	value    **int
+}
+
+var _ configField = &intField{}
+
+func (intf *intField) applyDefault() {
+	if *intf.value == nil {
+		*intf.value = &intf.defValue
+	}
+}
+
+func (intf *intField) clear()        { *intf.value = nil }
+func (intf *intField) present() bool { return *intf.value != nil }
+
+func (intf *intField) addFlag(f *flag.FlagSet) {
+	f.IntVarP(*intf.value, intf.name, intf.shorthand, intf.defValue, intf.usage)
+}
+
+func (intf *intField) override(from configField) {
+	fromValue := *from.(*intField).value
+	if fromValue != nil {
+		v := *fromValue
+		*intf.value = &v
+	}
+}
+
+func (intf *intField) setFromEnvValue(value string) {
+	if v, err := strconv.Atoi(value); err != nil {
+		glog.Warningf("bad value for int field %s: %q", intf.name, value)
+	} else {
+		*intf.value = &v
+	}
+}
+
+func (intf *intField) envValue() string {
+	if *intf.value == nil {
+		return ""
+	}
+	return strconv.Itoa(**intf.value)
+}
+
+type envLookup func(name string) (string, bool)
+
+type fieldSet struct {
+	fields []configField
+}
+
+func (fs *fieldSet) addStringField(name, shorthand, usage, env, defValue string, value **string) {
+	fs.addField(&stringField{
+		fieldBase{name, shorthand, usage, env},
+		defValue,
+		value,
+	})
+}
+
+func (fs *fieldSet) addBoolField(name, shorthand, usage, env string, defValue bool, value **bool) {
+	fs.addField(&boolField{
+		fieldBase{name, shorthand, usage, env},
+		defValue,
+		value,
+	})
+}
+
+func (fs *fieldSet) addIntField(name, shorthand, usage, env string, defValue int, value **int) {
+	fs.addField(&intField{
+		fieldBase{name, shorthand, usage, env},
+		defValue,
+		value,
+	})
+}
+
+func (fs *fieldSet) addField(cf configField) {
+	fs.fields = append(fs.fields, cf)
+}
+
+func (fs *fieldSet) applyDefaults() {
+	for _, f := range fs.fields {
+		f.applyDefault()
+	}
+}
+
+func (fs *fieldSet) addFlags(flagSet *flag.FlagSet) {
+	for _, f := range fs.fields {
+		if f.flagName() != "" {
+			f.addFlag(flagSet)
+		}
+	}
+}
+
+func (fs *fieldSet) override(from *fieldSet) {
+	for n, f := range fs.fields {
+		f.override(from.fields[n])
+	}
+}
+
+func (fs *fieldSet) copyFrom(from *fieldSet) {
+	for n, f := range fs.fields {
+		f.clear()
+		f.override(from.fields[n])
+	}
+}
+
+func (fs *fieldSet) clearFieldsNotInFlagSet(flagSet *flag.FlagSet) {
+	for _, f := range fs.fields {
+		if flagSet == nil || f.flagName() == "" || !flagSet.Changed(f.flagName()) {
+			f.clear()
+		}
+	}
+}
+
+func (fs *fieldSet) setFromEnv(lookupEnv envLookup) {
+	if lookupEnv == nil {
+		lookupEnv = os.LookupEnv
+	}
+	for _, f := range fs.fields {
+		if f.envName() == "" {
+			continue
+		}
+		if v, found := lookupEnv(f.envName()); found {
+			f.setFromEnvValue(v)
+		}
+	}
+}
+
+func (fs *fieldSet) dumpEnv() string {
+	var buf bytes.Buffer
+	for _, f := range fs.fields {
+		if f.envName() != "" && f.present() {
+			fmt.Fprintf(&buf, "export %s=%s\n", f.envName(), shellquote.Join(f.envValue()))
+		}
+	}
+	return buf.String()
+}

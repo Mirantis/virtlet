@@ -24,20 +24,18 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
-	"os"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
 
-	"github.com/Mirantis/virtlet/pkg/api/types/v1"
+	"github.com/Mirantis/virtlet/pkg/api/virtlet.k8s/v1"
 	"github.com/Mirantis/virtlet/pkg/image"
 )
 
 type imageNameTranslator struct {
-	AllowRegexp bool
-
+	allowRegexp  bool
 	translations map[string]*v1.ImageTranslation
 }
 
@@ -53,11 +51,11 @@ func (t *imageNameTranslator) LoadConfigs(ctx context.Context, sources ...Config
 		for _, cfg := range configs {
 			body, err := cfg.Payload()
 			if err != nil {
-				glog.V(2).Infof("cannot load image translation config %s from %s: %v", cfg.Name(), source.Description(), err)
+				glog.V(2).Infof("cannot load image translation config %s from %s: %v", cfg.ConfigName(), source.Description(), err)
 				continue
 			}
 
-			translations[cfg.Name()] = &body
+			translations[cfg.ConfigName()] = &body
 		}
 	}
 	t.translations = translations
@@ -172,7 +170,7 @@ func (t *imageNameTranslator) Translate(name string) image.Endpoint {
 				return convertEndpoint(r, translation)
 			}
 		}
-		if !t.AllowRegexp {
+		if !t.allowRegexp {
 			continue
 		}
 		for _, r := range translation.Rules {
@@ -196,23 +194,22 @@ func (t *imageNameTranslator) Translate(name string) image.Endpoint {
 }
 
 // NewImageNameTranslator creates an instance of ImageNameTranslator
-func NewImageNameTranslator() ImageNameTranslator {
-	env := strings.ToUpper(os.Getenv("IMAGE_REGEXP_TRANSLATION"))
+func NewImageNameTranslator(allowRegexp bool) ImageNameTranslator {
 	return &imageNameTranslator{
-		AllowRegexp: env != "",
+		allowRegexp: allowRegexp,
 	}
 }
 
 // GetDefaultImageTranslator returns a default image translation that
 // uses CRDs and a config directory
-func GetDefaultImageTranslator(imageTranslationConfigsDir string) image.Translator {
+func GetDefaultImageTranslator(imageTranslationConfigsDir string, allowRegexp bool) image.Translator {
 	var sources []ConfigSource
 	sources = append(sources, NewCRDSource("kube-system"))
 	if imageTranslationConfigsDir != "" {
 		sources = append(sources, NewFileConfigSource(imageTranslationConfigsDir))
 	}
 	return func(ctx context.Context, name string) image.Endpoint {
-		translator := NewImageNameTranslator()
+		translator := NewImageNameTranslator(allowRegexp)
 		translator.LoadConfigs(ctx, sources...)
 		return translator.Translate(name)
 	}
@@ -222,6 +219,6 @@ func GetDefaultImageTranslator(imageTranslationConfigsDir string) image.Translat
 // doesn't apply any translations
 func GetEmptyImageTranslator() image.Translator {
 	return func(ctx context.Context, name string) image.Endpoint {
-		return NewImageNameTranslator().Translate(name)
+		return NewImageNameTranslator(false).Translate(name)
 	}
 }

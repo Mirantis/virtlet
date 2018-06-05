@@ -17,12 +17,13 @@ limitations under the License.
 package tools
 
 import (
-	"flag"
 	"os"
+	"strings"
 
 	"github.com/spf13/pflag"
 	"k8s.io/client-go/tools/clientcmd"
-	"strings"
+
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 const (
@@ -32,36 +33,6 @@ const (
 var (
 	virtletRuntime = defaultVirtletRuntimeName
 )
-
-// wordSepNormalizeFunc change "_" to "-" in the flags.
-func wordSepNormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedName {
-	if strings.Contains(name, "_") {
-		return pflag.NormalizedName(strings.Replace(name, "_", "-", -1))
-	}
-	return pflag.NormalizedName(name)
-}
-
-// defaultClientConfig builds a default Kubernetes client config based
-// on Cobra flags. It's based on kubelet code.
-func defaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
-	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-	// use the standard defaults for this client command
-	// DEPRECATED: remove and replace with something more accurate
-	loadingRules.DefaultClientConfig = &clientcmd.DefaultClientConfig
-
-	flags.StringVar(&loadingRules.ExplicitPath, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
-
-	overrides := &clientcmd.ConfigOverrides{ClusterDefaults: clientcmd.ClusterDefaults}
-
-	flagNames := clientcmd.RecommendedConfigOverrideFlags("")
-	// short flagnames are disabled by default.  These are here for compatibility with existing scripts
-	flagNames.ClusterOverrideFlags.APIServer.ShortName = "s"
-
-	clientcmd.BindOverrideFlags(overrides, flags, flagNames)
-	clientConfig := clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, os.Stdin)
-
-	return clientConfig
-}
 
 // from k8s pkg/kubectl/plugins/env.go
 func flagToEnvName(flagName, prefix string) string {
@@ -76,9 +47,7 @@ func flagToEnvName(flagName, prefix string) string {
 // flag values from kubectl plugin environment variables in case if
 // virtletctl is running as a kubectl plugin.
 func BindFlags(flags *pflag.FlagSet) clientcmd.ClientConfig {
-	flags.AddGoFlagSet(flag.CommandLine)
-	flags.SetNormalizeFunc(wordSepNormalizeFunc)
-	clientConfig := defaultClientConfig(flags)
+	clientConfig := utils.BindFlags(flags)
 	flags.StringVar(&virtletRuntime, "virtlet-runtime", defaultVirtletRuntimeName, "the name of virtlet runtime used in kubernetes.io/target-runtime annotation")
 	if InPlugin() {
 		for _, flagName := range []string{

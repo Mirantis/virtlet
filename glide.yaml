@@ -60,7 +60,7 @@ import:
 - package: github.com/spf13/pflag
   version: 4c012f6dcd9546820e378d0bdda4d8fc772cdfea
 - package: k8s.io/client-go
-  version: ~6.0.0
+  version: kubernetes-1.10.2
 - package: k8s.io/api
   version: kubernetes-1.10.2
 - package: k8s.io/apimachinery
@@ -69,3 +69,13 @@ import:
   version: kubernetes-1.10.2
 - package: k8s.io/kubernetes
   version: v1.10.2
+- package: github.com/kballard/go-shellquote
+  version: 95032a82bc518f77982ea72343cc1ade730072f0
+- package: k8s.io/code-generator
+  version: kubernetes-1.10.2
+# glide fails to parse Godeps/Godeps.json in code-generator for some reason,
+# so some deps copied from there follow
+- package: k8s.io/gengo
+  version: 01a732e01d00cb9a81bb0ca050d3e6d2b947927b
+- package: golang.org/x/tools
+  version: 2382e3994d48b1d22acc2c86bcad0a2aff028e32

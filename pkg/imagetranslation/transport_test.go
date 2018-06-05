@@ -28,7 +28,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Mirantis/virtlet/pkg/api/types/v1"
+	"github.com/Mirantis/virtlet/pkg/api/virtlet.k8s/v1"
 	"github.com/Mirantis/virtlet/pkg/image"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 )
@@ -39,7 +39,7 @@ func translate(config v1.ImageTranslation, name string, server *httptest.Server)
 	}
 	configs := map[string]v1.ImageTranslation{"config": config}
 
-	translator := NewImageNameTranslator()
+	translator := NewImageNameTranslator(true)
 	translator.LoadConfigs(context.Background(), NewFakeConfigSource(configs))
 	return translator.Translate(name)
 }

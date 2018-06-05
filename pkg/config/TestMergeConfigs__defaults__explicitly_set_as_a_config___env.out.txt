@@ -1,0 +1,16 @@
+export VIRTLET_FD_SERVER_SOCKET_PATH=/var/lib/virtlet/tapfdserver.sock
+export VIRTLET_DATABASE_PATH=/var/lib/virtlet/virtlet.db
+export VIRTLET_DOWNLOAD_PROTOCOL=https
+export VIRTLET_IMAGE_DIR=/var/lib/virtlet/images
+export VIRTLET_IMAGE_TRANSLATIONS_DIR=/etc/virtlet/images
+export VIRTLET_LIBVIRT_URI=qemu:///system
+export VIRTLET_RAW_DEVICES=loop\*
+export VIRTLET_CRI_SOCKET_PATH=/run/virtlet.sock
+export VIRTLET_DISABLE_LOGGING=''
+export VIRTLET_DISABLE_KVM=''
+export VIRTLET_SRIOV_SUPPORT=''
+export VIRTLET_CNI_PLUGIN_DIR=/opt/cni/bin
+export VIRTLET_CNI_CONFIG_DIR=/etc/cni/net.d
+export VIRTLET_CALICO_SUBNET=24
+export IMAGE_REGEXP_TRANSLATION=1
+export VIRTLET_LOGLEVEL=1

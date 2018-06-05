@@ -19,7 +19,7 @@ package imagetranslation
 import (
 	"context"
 
-	"github.com/Mirantis/virtlet/pkg/api/types/v1"
+	"github.com/Mirantis/virtlet/pkg/api/virtlet.k8s/v1"
 )
 
 type objectConfig struct {
@@ -30,7 +30,7 @@ type objectConfig struct {
 var _ TranslationConfig = objectConfig{}
 
 // Name implements TranslationConfig Name
-func (c objectConfig) Name() string {
+func (c objectConfig) ConfigName() string {
 	return c.name
 }
 

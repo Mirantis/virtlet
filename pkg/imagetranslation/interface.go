@@ -19,14 +19,14 @@ package imagetranslation
 import (
 	"context"
 
-	"github.com/Mirantis/virtlet/pkg/api/types/v1"
+	"github.com/Mirantis/virtlet/pkg/api/virtlet.k8s/v1"
 	"github.com/Mirantis/virtlet/pkg/image"
 )
 
 // TranslationConfig represents a single config (prefix + rule list) in a config-set
 type TranslationConfig interface {
-	// Name returns the config name (any string identifier)
-	Name() string
+	// ConfigName returns the config name (any string identifier)
+	ConfigName() string
 
 	// Payload returns ImageTranslation object associated with the config
 	Payload() (v1.ImageTranslation, error)
