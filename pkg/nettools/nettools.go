@@ -565,10 +565,6 @@ func isSriovVf(link netlink.Link) bool {
 	return err == nil
 }
 
-func openVfConfigFile(devName string) (*os.File, error) {
-	return os.OpenFile(filepath.Join("/sys/bus/pci/devices", devName, "config"), os.O_RDWR, 0644)
-}
-
 func getPCIAddressOfVF(devName string) (string, error) {
 	linkDestination, err := os.Readlink(filepath.Join("/sys/class/net", devName, "device"))
 	if err != nil {
@@ -765,7 +761,10 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 				return nil, err
 			}
 
-			fo, err = openVfConfigFile(pciAddress)
+			// tapmanager protocol needs a file descriptor in Fo field
+			// but SR-IOV part is not using it at all, so set it to
+			// new file descriptor with /dev/null opened
+			fo, err = os.Open("/dev/null")
 			if err != nil {
 				return nil, err
 			}
