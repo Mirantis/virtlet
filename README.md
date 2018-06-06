@@ -67,7 +67,7 @@ VIRTLET_ON_MASTER=1 ./demo.sh
 
 The demo script will check for KVM support on the host and will make Virtlet use KVM if it's available on Docker host. If KVM is not available, plain QEMU will be used.
 
-The demo is based on [kubeadm-dind-cluster](https://github.com/Mirantis/kubeadm-dind-cluster) project. **Docker btrfs storage driver is currently unsupported.** Please refer to `kubeadm-dind-cluster` documentation for more info.
+The demo is based on [kubeadm-dind-cluster](https://github.com/kubernetes-sigs/kubeadm-dind-cluster) project. **Docker btrfs storage driver is currently unsupported.** Please refer to `kubeadm-dind-cluster` documentation for more info.
 
 You can remove the test cluster with `./dind-cluster-v1.9.sh clean` when you no longer need it.
 
