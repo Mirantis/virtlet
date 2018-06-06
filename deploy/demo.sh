@@ -104,7 +104,7 @@ function demo::get-dind-cluster {
   if [[ ${download} = "true" ]]; then
     demo::step "Will download ${dind_script} into current directory"
     demo::ask-before-continuing
-    wget "https://raw.githubusercontent.com/Mirantis/kubeadm-dind-cluster/master/fixed/${dind_script}"
+    wget "https://raw.githubusercontent.com/kubernetes-sigs/kubeadm-dind-cluster/master/fixed/${dind_script}"
     chmod +x "${dind_script}"
   fi
 }
@@ -361,7 +361,7 @@ cluster networking.
 
 To clean up the cluster, use './dind-cluster-v1.9.sh clean'
 [1] https://github.com/Mirantis/virtlet
-[2] https://github.com/Mirantis/kubeadm-dind-cluster
+[2] https://github.com/kubernetes-sigs/kubeadm-dind-cluster
 EOF
   exit 0
 fi

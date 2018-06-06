@@ -12,7 +12,7 @@ The steps described here are performed automatically by
 1. Start [kubeadm-dind-cluster](https://github.com/Mirants/kubeadm-dind-cluster)
    with Kubernetes version 1.9 (you're not required to download it to your home directory):
    ```
-   $ wget -O ~/dind-cluster-v1.9.sh https://cdn.rawgit.com/Mirantis/kubeadm-dind-cluster/master/fixed/dind-cluster-v1.9.sh
+   $ wget -O ~/dind-cluster-v1.9.sh https://cdn.rawgit.com/kubernetes-sigs/kubeadm-dind-cluster/master/fixed/dind-cluster-v1.9.sh
    $ chmod +x ~/dind-cluster-v1.9.sh
    $ ~/dind-cluster-v1.9.sh up
    $ export PATH="$HOME/.kubeadm-dind-cluster:$PATH"

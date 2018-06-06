@@ -7,10 +7,10 @@ At this stage Virtlet have following requirements:
 * SELinux/AppArmor disabled on host (to disable them - follow documentation from your host Linux distribution),
 * if host have libvirt installed - it should be stopped when working with Virtlet,
 * [docker](https://www.docker.com) should be installed on host and user account on which Virtlet will be built and run - should be properly configured to use this docker installation (possibly adding user's account into group in which docker deamon is running should be enough, but please follow docker documentation for your host Linux distribution),
-* [kubeadm-dind-cluster](https://github.com/Mirantis/kubeadm-dind-cluster) for version 1.9 (`dind-cluster-v1.9.sh`).
+* [kubeadm-dind-cluster](https://github.com/kubernetes-sigs/kubeadm-dind-cluster) for version 1.9 (`dind-cluster-v1.9.sh`).
   You can get the cluster startup script like this:
 ```
-$ wget -O ~/dind-cluster-v1.9.sh https://cdn.rawgit.com/Mirantis/kubeadm-dind-cluster/master/fixed/dind-cluster-v1.9.sh
+$ wget -O ~/dind-cluster-v1.9.sh https://cdn.rawgit.com/kubernetes-sigs/kubeadm-dind-cluster/master/fixed/dind-cluster-v1.9.sh
 $ chmod +x ~/dind-cluster-v1.9.sh
 ```
 

@@ -20,11 +20,11 @@ There are two ways to tell CNI Genie which CNI networks to use:
 ## Configuring networks
 CNI plugins should return result in at least 0.3.0 format. All config files should be updated.
 
-# Example deployment using [kdc](https://github.com/Mirantis/kubeadm-dind-cluster)
+# Example deployment using [kdc](https://github.com/kubernetes-sigs/kubeadm-dind-cluster)
 
 ## Start a Kubernetes 1.9 cluster with Flannel, Calico, and CNI-Genie
 ```
-wget https://cdn.rawgit.com/Mirantis/kubeadm-dind-cluster/master/fixed/dind-cluster-v1.9.sh
+wget https://cdn.rawgit.com/kubernetes-sigs/kubeadm-dind-cluster/master/fixed/dind-cluster-v1.9.sh
 chmod +x dind-cluster-v1.9.sh
 ```
 
