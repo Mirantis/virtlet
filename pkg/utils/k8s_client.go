@@ -22,9 +22,6 @@ import (
 	"strings"
 
 	"github.com/spf13/pflag"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -52,21 +49,6 @@ func GetK8sClientset(config *rest.Config) (*kubernetes.Clientset, error) {
 		}
 	}
 	return kubernetes.NewForConfig(config)
-}
-
-// GetK8sRestClient returns k8s ReST client that for the giver API group-version/subset
-func GetK8sRestClient(cfg *rest.Config, scheme *runtime.Scheme, groupVersion *schema.GroupVersion) (*rest.RESTClient, error) {
-	config := *cfg
-	config.GroupVersion = groupVersion
-	config.APIPath = "/apis"
-	config.ContentType = runtime.ContentTypeJSON
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: serializer.NewCodecFactory(scheme)}
-
-	client, err := rest.RESTClientFor(&config)
-	if err != nil {
-		return nil, err
-	}
-	return client, nil
 }
 
 // wordSepNormalizeFunc change "_" to "-" in the flags.

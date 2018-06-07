@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/Mirantis/virtlet/pkg/api/virtlet.k8s/v1"
 	"github.com/Mirantis/virtlet/pkg/image"
@@ -202,9 +203,11 @@ func NewImageNameTranslator(allowRegexp bool) ImageNameTranslator {
 
 // GetDefaultImageTranslator returns a default image translation that
 // uses CRDs and a config directory
-func GetDefaultImageTranslator(imageTranslationConfigsDir string, allowRegexp bool) image.Translator {
+func GetDefaultImageTranslator(imageTranslationConfigsDir string, allowRegexp bool, clientCfg clientcmd.ClientConfig) image.Translator {
 	var sources []ConfigSource
-	sources = append(sources, NewCRDSource("kube-system"))
+	if clientCfg != nil {
+		sources = append(sources, NewCRDSource("kube-system", clientCfg))
+	}
 	if imageTranslationConfigsDir != "" {
 		sources = append(sources, NewFileConfigSource(imageTranslationConfigsDir))
 	}

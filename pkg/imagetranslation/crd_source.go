@@ -20,54 +20,62 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Mirantis/virtlet/pkg/api/virtlet.k8s/v1"
-	"github.com/Mirantis/virtlet/pkg/utils"
+	"k8s.io/client-go/tools/clientcmd"
+
+	virtletclient "github.com/Mirantis/virtlet/pkg/client/clientset/versioned"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type crdConfigSource struct {
-	namespace string
+	clientCfg     clientcmd.ClientConfig
+	virtletClient virtletclient.Interface
+	namespace     string
 }
 
-var _ ConfigSource = crdConfigSource{}
+var _ ConfigSource = &crdConfigSource{}
+
+func (cs *crdConfigSource) setup() error {
+	if cs.virtletClient != nil {
+		return nil
+	}
+
+	config, err := cs.clientCfg.ClientConfig()
+	if err != nil {
+		return err
+	}
+
+	virtletClient, err := virtletclient.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("can't create Virtlet api client: %v", err)
+	}
+	cs.virtletClient = virtletClient
+	return nil
+}
 
 // Configs implements ConfigSource Configs
-func (cs crdConfigSource) Configs(ctx context.Context) ([]TranslationConfig, error) {
-	cfg, err := utils.GetK8sClientConfig("")
+func (cs *crdConfigSource) Configs(ctx context.Context) ([]TranslationConfig, error) {
+	if err := cs.setup(); err != nil {
+		return nil, err
+	}
+
+	list, err := cs.virtletClient.VirtletV1().VirtletImageMappings(cs.namespace).List(meta_v1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
 
-	if cfg.Host == "" {
-		return nil, nil
+	var r []TranslationConfig
+	for n := range list.Items {
+		r = append(r, &list.Items[n])
 	}
-
-	client, err := v1.GetCRDRestClient(cfg)
-	if err != nil {
-		return nil, err
-	}
-	var list v1.VirtletImageMappingList
-	err = client.Get().
-		Context(ctx).
-		Resource("virtletimagemappings").
-		Namespace(cs.namespace).
-		Do().Into(&list)
-	if err != nil {
-		return nil, err
-	}
-	result := make([]TranslationConfig, len(list.Items))
-	for i, v := range list.Items {
-		result[i] = &v
-	}
-
-	return result, nil
+	return r, nil
 }
 
 // Description implements ConfigSource Description
-func (cs crdConfigSource) Description() string {
+func (cs *crdConfigSource) Description() string {
 	return fmt.Sprintf("Kubernetes VirtletImageMapping resources in namespace %q", cs.namespace)
 }
 
 // NewCRDSource is a factory for CRD-based config source
-func NewCRDSource(namespace string) ConfigSource {
-	return crdConfigSource{namespace: namespace}
+func NewCRDSource(namespace string, clientCfg clientcmd.ClientConfig) ConfigSource {
+	return &crdConfigSource{namespace: namespace, clientCfg: clientCfg}
 }

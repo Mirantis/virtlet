@@ -24,6 +24,7 @@ import (
 
 	"github.com/golang/glog"
 	flag "github.com/spf13/pflag"
+	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/Mirantis/virtlet/pkg/api/virtlet.k8s/v1"
 	"github.com/Mirantis/virtlet/pkg/cni"
@@ -52,8 +53,8 @@ func configWithDefaults(cfg *v1.VirtletConfig) *v1.VirtletConfig {
 	return r
 }
 
-func runVirtlet(config *v1.VirtletConfig) {
-	manager := manager.NewVirtletManager(config, nil)
+func runVirtlet(config *v1.VirtletConfig, clientCfg clientcmd.ClientConfig) {
+	manager := manager.NewVirtletManager(config, nil, clientCfg)
 	if err := manager.Run(); err != nil {
 		glog.Errorf("Error: %v", err)
 		os.Exit(1)
@@ -141,6 +142,6 @@ func main() {
 	default:
 		localConfig = configWithDefaults(localConfig)
 		startTapManagerProcess(localConfig)
-		runVirtlet(localConfig)
+		runVirtlet(localConfig, clientCfg)
 	}
 }

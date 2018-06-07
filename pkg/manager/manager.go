@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/Mirantis/virtlet/pkg/api/virtlet.k8s/v1"
 	"github.com/Mirantis/virtlet/pkg/image"
@@ -45,6 +46,7 @@ type VirtletManager struct {
 	config         *v1.VirtletConfig
 	metadataStore  metadata.Store
 	fdManager      tapmanager.FDManager
+	clientCfg      clientcmd.ClientConfig
 	virtTool       *libvirttools.VirtualizationTool
 	imageStore     image.Store
 	runtimeService *VirtletRuntimeService
@@ -53,7 +55,7 @@ type VirtletManager struct {
 }
 
 // NewVirtletManager creates a new VirtletManager.
-func NewVirtletManager(config *v1.VirtletConfig, fdManager tapmanager.FDManager) *VirtletManager {
+func NewVirtletManager(config *v1.VirtletConfig, fdManager tapmanager.FDManager, clientCfg clientcmd.ClientConfig) *VirtletManager {
 	return &VirtletManager{config: config, fdManager: fdManager}
 }
 
@@ -90,7 +92,7 @@ func (v *VirtletManager) Run() error {
 		if err = v1.RegisterCustomResourceTypes(); err != nil {
 			return fmt.Errorf("failed to register image translation CRD: %v", err)
 		}
-		translator = imagetranslation.GetDefaultImageTranslator(*v.config.ImageTranslationConfigsDir, *v.config.EnableRegexpImageTranslation)
+		translator = imagetranslation.GetDefaultImageTranslator(*v.config.ImageTranslationConfigsDir, *v.config.EnableRegexpImageTranslation, v.clientCfg)
 	} else {
 		translator = imagetranslation.GetEmptyImageTranslator()
 	}

@@ -124,7 +124,7 @@ func (v *VirtletManager) Run() {
 		DisableLogging:       pbool(true),
 		DisableKVM:           pbool(os.Getenv(disableKvmEnvVar) != ""),
 	})
-	v.manager = manager.NewVirtletManager(cfg, &fakeFDManager{})
+	v.manager = manager.NewVirtletManager(cfg, &fakeFDManager{}, nil)
 	v.doneCh = make(chan struct{})
 	go func() {
 		if err := v.manager.Run(); err != nil {
