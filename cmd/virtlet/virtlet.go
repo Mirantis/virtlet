@@ -132,7 +132,7 @@ func main() {
 		nodeName := os.Getenv(nodeNameEnv)
 		cfg, err := nodeConfig.LoadConfig(localConfig, nodeName)
 		if err != nil {
-			glog.Warning("Failed to load per-node configs, using local config only: %v", err)
+			glog.Warningf("Failed to load per-node configs, using local config only: %v", err)
 			cfg = localConfig
 		}
 		if _, err := os.Stdout.Write([]byte(config.DumpEnv(cfg))); err != nil {

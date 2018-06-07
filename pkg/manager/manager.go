@@ -120,7 +120,7 @@ func (v *VirtletManager) Run() error {
 
 		err = s.Start()
 		if err != nil {
-			glog.Warning("Could not start stream server: %s", err)
+			glog.Warningf("Could not start stream server: %s", err)
 
 		}
 		streamServer = s

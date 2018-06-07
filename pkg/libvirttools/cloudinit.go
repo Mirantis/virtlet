@@ -191,7 +191,7 @@ func (g *CloudInitGenerator) generateNetworkConfigurationNoCloud() ([]byte, erro
 			continue
 		case len(gateways) > 1:
 			gw = gateways[0]
-			glog.Warning("cloud-init: got more than one gateway and a route with empty gateway, using the first gateway: %q", gw)
+			glog.Warningf("cloud-init: got more than one gateway and a route with empty gateway, using the first gateway: %q", gw)
 		default:
 			gw = gateways[0]
 		}
