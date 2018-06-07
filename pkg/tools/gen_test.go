@@ -49,6 +49,10 @@ func TestGenCommand(t *testing.T) {
 			name: "tag",
 			args: "--tag 0.9.42",
 		},
+		{
+			name: "crd",
+			args: "--crd",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var out bytes.Buffer

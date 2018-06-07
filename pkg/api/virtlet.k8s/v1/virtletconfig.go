@@ -87,5 +87,5 @@ type VirtletConfigMapping struct {
 type VirtletConfigMappingList struct {
 	meta_v1.TypeMeta `json:",inline"`
 	meta_v1.ListMeta `json:"metadata"`
-	Items            []VirtletConfigMapping `json:"mappings,omitempty"`
+	Items            []VirtletConfigMapping `json:"items,omitempty"`
 }
