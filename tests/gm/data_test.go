@@ -180,9 +180,21 @@ func TestData(t *testing.T) {
 			diff:        false,
 		},
 		{
+			name:        "yaml content (raw comparison, string, multiple docs)",
+			toWriteRaw:  "x: 42\n---\ny: 4242",
+			compareWith: NewYamlVerifier("x: 43\n---\ny: 4242"),
+			diff:        true,
+		},
+		{
 			name:        "yaml content with changes (raw comparison, string)",
 			toWriteRaw:  "x: 42",
 			compareWith: NewYamlVerifier("x: 43"),
+			diff:        true,
+		},
+		{
+			name:        "yaml content with changes (raw comparison, string, multiple docs)",
+			toWriteRaw:  "x: 42\n---\ny: 4242",
+			compareWith: NewYamlVerifier("x: 42\n---\ny: 4243"),
 			diff:        true,
 		},
 		{
