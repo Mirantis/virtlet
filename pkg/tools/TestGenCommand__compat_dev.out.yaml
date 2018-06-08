@@ -124,6 +124,12 @@ spec:
               key: raw_devices
               name: virtlet-config
               optional: true
+        - name: EXTRA_ARGS
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: extra_config
+              optional: true
         - name: IMAGE_TRANSLATIONS_DIR
           value: /etc/virtlet/images
         image: mirantis/virtlet

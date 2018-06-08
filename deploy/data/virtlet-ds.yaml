@@ -202,6 +202,12 @@ spec:
               name: virtlet-config
               key: raw_devices
               optional: true
+        - name: EXTRA_ARGS
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: extra_config
+              optional: true
         - name: IMAGE_TRANSLATIONS_DIR
           value: /etc/virtlet/images
         readinessProbe:

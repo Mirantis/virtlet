@@ -21,4 +21,4 @@ while [ ! -S /var/run/libvirt/libvirt-sock ] ; do
   sleep 0.3
 done
 
-/usr/local/bin/virtlet "${opts[@]}"
+/usr/local/bin/virtlet "${opts[@]}" "${EXTRA_ARGS:-}"
