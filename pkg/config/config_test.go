@@ -168,43 +168,58 @@ func TestMergeConfigs(t *testing.T) {
 
 const (
 	fullConfig = `
-config:
-  fdServerSocketPath: /some/fd/server.sock
-  databasePath: /some/file.db
-  downloadProtocol: http
-  imageTranslationConfigsDir: /some/translation/dir
-  libvirtURI: qemu:///foobar
-  rawDevices: sd*
-  criSocketPath: /some/cri.sock
-  disableLogging: true
-  disableKVM: true
-  enableSriov: true
-  cniPluginDir: /some/cni/bin/dir
-  cniConfigDir: /some/cni/conf/dir
-  calicoSubnetSize: 22
-  enableRegexpImageTranslation: false
-  logLevel: 3`
-	kubeNode1FullMapping = "nodeName: kube-node-1" + fullConfig
-	labelAFullMapping    = "label: label-a" + fullConfig
-	anotherMapping1      = `
-nodeName: kube-node-1
-config:
-  enableSriov: false
-  disableKVM: true`
+  config:
+    fdServerSocketPath: /some/fd/server.sock
+    databasePath: /some/file.db
+    downloadProtocol: http
+    imageTranslationConfigsDir: /some/translation/dir
+    libvirtURI: qemu:///foobar
+    rawDevices: sd*
+    criSocketPath: /some/cri.sock
+    disableLogging: true
+    disableKVM: true
+    enableSriov: true
+    cniPluginDir: /some/cni/bin/dir
+    cniConfigDir: /some/cni/conf/dir
+    calicoSubnetSize: 22
+    enableRegexpImageTranslation: false
+    logLevel: 3`
+	kubeNode1FullMapping = `
+spec:
+  nodeName: kube-node-1
+  priority: 10` + fullConfig
+	labelAFullMapping = `
+spec:
+  nodeSelector:
+    label-a: "1"` + fullConfig
+	anotherMapping1 = `
+spec:
+  nodeName: kube-node-1
+  priority: 10
+  config:
+    enableSriov: false
+    disableKVM: true`
 	anotherMapping2 = `
-label: label-b
-config:
+spec:
+  nodeSelector:
+    label-b: "1"
+  priority: 1
+  config:
     rawDevices: vd*
     downloadProtocol: http`
 	anotherMapping3 = `
-nodeName: kube-node-2
-config:
-  disableLogging: true`
+spec:
+  nodeName: kube-node-2
+  priority: 10
+  config:
+    disableLogging: true`
 	anotherMapping4 = `
-label: label-a
-config:
-  enableSriov: true
-  rawDevices: sd*`
+spec:
+  nodeSelector:
+    label-a: "1"
+  config:
+    enableSriov: true
+    rawDevices: sd*`
 	sampleLocalConfig = `
 disableKVM: false
 `
@@ -304,10 +319,12 @@ func TestLoadMappings(t *testing.T) {
 				Name:      "mapping-1",
 				Namespace: "kube-system",
 			},
-			NodeName: "kube-node-1",
-			Config: &virtlet_v1.VirtletConfig{
-				EnableSriov: pbool(true),
-				DisableKVM:  pbool(true),
+			Spec: virtlet_v1.VirtletConfigMappingSpec{
+				NodeName: "kube-node-1",
+				Config: &virtlet_v1.VirtletConfig{
+					EnableSriov: pbool(true),
+					DisableKVM:  pbool(true),
+				},
 			},
 		},
 		&virtlet_v1.VirtletConfigMapping{
@@ -315,9 +332,11 @@ func TestLoadMappings(t *testing.T) {
 				Name:      "mapping-2",
 				Namespace: "kube-system",
 			},
-			Label: "label-a",
-			Config: &virtlet_v1.VirtletConfig{
-				RawDevices: pstr("sd*"),
+			Spec: virtlet_v1.VirtletConfigMappingSpec{
+				NodeSelector: map[string]string{"label-a": "1"},
+				Config: &virtlet_v1.VirtletConfig{
+					RawDevices: pstr("sd*"),
+				},
 			},
 		})
 	cfg, err := nc.LoadConfig(&virtlet_v1.VirtletConfig{

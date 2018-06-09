@@ -115,14 +115,15 @@ func DumpEnv(c *virtlet_v1.VirtletConfig) string {
 }
 
 func mappingMatches(cm virtlet_v1.VirtletConfigMapping, nodeName string, nodeLabels map[string]string) bool {
-	if cm.Config == nil {
+	if cm.Spec.Config == nil {
 		return false
 	}
-	if cm.NodeName != "" && cm.NodeName != nodeName {
+	if cm.Spec.NodeName != "" && cm.Spec.NodeName != nodeName {
 		return false
 	}
-	if cm.Label != "" {
-		if _, found := nodeLabels[cm.Label]; !found {
+	for label, value := range cm.Spec.NodeSelector {
+		actual, found := nodeLabels[label]
+		if !found || actual != value {
 			return false
 		}
 	}
@@ -186,21 +187,13 @@ func configForNode(mappings []virtlet_v1.VirtletConfigMapping, localConfig *virt
 	}
 	sort.Slice(sortedMappings, func(i, j int) bool {
 		a, b := sortedMappings[i], sortedMappings[j]
-		if a.NodeName == b.NodeName {
-			// This also covers the case where both names are empty.
-			return a.Label < b.Label
-		} else {
-			// This will place unnamed items earlier in the list.
-			// The order of node names among the items doesn't
-			// really matter as just one such item can match
-			// a node, but let's keep it stable.
-			return a.NodeName < b.NodeName
-		}
+		// Iitems that go later in the list take precedence.
+		return a.Spec.Priority < b.Spec.Priority
 	})
 
 	configs := []*virtlet_v1.VirtletConfig{cfg}
 	for _, m := range sortedMappings {
-		configs = append(configs, m.Config)
+		configs = append(configs, m.Spec.Config)
 	}
 	if localConfig != nil {
 		configs = append(configs, localConfig)

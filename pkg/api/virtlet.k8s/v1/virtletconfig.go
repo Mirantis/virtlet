@@ -63,6 +63,21 @@ type VirtletConfig struct {
 	LogLevel *int `json:"logLevel,omitempty"`
 }
 
+// VirtletConfigMappingSpec is the contents of a VirtletConfigMapping.
+type VirtletConfigMappingSpec struct {
+	meta_v1.TypeMeta   `json:",inline"`
+	meta_v1.ObjectMeta `json:"metadata"`
+	// NodeSelector specifies the labels that must be matched for this
+	// mapping to apply to the node.
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+	// Node name to match.
+	NodeName string `json:"nodeName,omitempty"`
+	// Priority specifies the priority of this setting.
+	Priority int
+	// VirtletConfig to apply.
+	Config *VirtletConfig `json:"config,omitempty"`
+}
+
 // +genclient
 // +genclient:noStatus
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -72,12 +87,8 @@ type VirtletConfig struct {
 type VirtletConfigMapping struct {
 	meta_v1.TypeMeta   `json:",inline"`
 	meta_v1.ObjectMeta `json:"metadata"`
-	// Node name to match.
-	NodeName string `json:"nodeName,omitempty"`
-	// Node label to match.
-	Label string `json:"label,omitempty"`
-	// VirtletConfig to apply.
-	Config *VirtletConfig `json:"config,omitempty"`
+
+	Spec VirtletConfigMappingSpec `json:"spec,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
