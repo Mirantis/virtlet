@@ -18,6 +18,7 @@ package config
 
 import (
 	"fmt"
+	"math"
 	"sort"
 
 	virtletclient "github.com/Mirantis/virtlet/pkg/client/clientset/versioned"
@@ -73,25 +74,25 @@ const (
 
 func configFieldSet(c *virtlet_v1.VirtletConfig) *fieldSet {
 	var fs fieldSet
-	fs.addStringField("fd-server-socket-path", "", "Path to fd server socket", fdServerSocketPathEnv, defaultFDServerSocketPath, &c.FDServerSocketPath)
-	fs.addStringField("database-path", "", "Path to the virtlet database", databasePathEnv, defaultDatabasePath, &c.DatabasePath)
-	fs.addStringField("image-download-protocol", "", "Image download protocol. Can be https or http", imageDownloadProtocolEnv, defaultDownloadProtocol, &c.DownloadProtocol)
-	fs.addStringField("image-dir", "", "Image directory", imageDirEnv, defaultImageDir, &c.ImageDir)
-	fs.addStringField("image-translation-configs-dir", "", "Image name translation configs directory", imageTranslationsConfigDirEnv, defaultImageTranslationConfigsDir, &c.ImageTranslationConfigsDir)
+	fs.addStringField("fdServerSocketPath", "fd-server-socket-path", "", "Path to fd server socket", fdServerSocketPathEnv, defaultFDServerSocketPath, &c.FDServerSocketPath)
+	fs.addStringField("databasePath", "database-path", "", "Path to the virtlet database", databasePathEnv, defaultDatabasePath, &c.DatabasePath)
+	fs.addStringFieldWithPattern("downloadProtocol", "image-download-protocol", "", "Image download protocol. Can be https or http", imageDownloadProtocolEnv, defaultDownloadProtocol, "^https?$", &c.DownloadProtocol)
+	fs.addStringField("imageDir", "image-dir", "", "Image directory", imageDirEnv, defaultImageDir, &c.ImageDir)
+	fs.addStringField("imageTranslationConfigsDir", "image-translation-configs-dir", "", "Image name translation configs directory", imageTranslationsConfigDirEnv, defaultImageTranslationConfigsDir, &c.ImageTranslationConfigsDir)
 	// SkipImageTranslation doesn't have corresponding flag or env var as it's only used by tests
-	fs.addBoolField("", "", "", "", false, &c.SkipImageTranslation)
-	fs.addStringField("libvirt-uri", "", "Libvirt connection URI", libvirtURIEnv, defaultLibvirtURI, &c.LibvirtURI)
-	fs.addStringField("raw-devices", "", "Comma separated list of raw device glob patterns which VMs can access (without '/dev/' prefix)", rawDevicesEnv, defaultRawDevices, &c.RawDevices)
-	fs.addStringField("listen", "", "The path to UNIX domain socket for CRI service to listen on", criSocketPathEnv, defaultCRISocketPath, &c.CRISocketPath)
-	fs.addBoolField("disable-logging", "", "Display logging and the streamer", disableLoggingEnv, false, &c.DisableLogging)
-	fs.addBoolField("disable-kvm", "", "Forcibly disable KVM support", disableKVMEnv, false, &c.DisableKVM)
-	fs.addBoolField("enable-sriov", "", "Enable SR-IOV support", enableSriovEnv, false, &c.EnableSriov)
-	fs.addStringField("cni-bin-dir", "", "Path to CNI plugin binaries", cniPluginDirEnv, defaultCNIPluginDir, &c.CNIPluginDir)
-	fs.addStringField("cni-conf-dir", "", "Path to the CNI configuration directory", cniConfigDirEnv, defaultCNIConfigDir, &c.CNIConfigDir)
-	fs.addIntField("calico-subnet-size", "", "Calico subnet size to use", calicoSubnetEnv, defaultCalicoSubnet, &c.CalicoSubnetSize)
-	fs.addBoolField("enable-regexp-image-translation", "", "Enable regexp image name translation", enableRegexpImageTranslationEnv, true, &c.EnableRegexpImageTranslation)
+	fs.addBoolField("skipImageTranslation", "", "", "", "", false, &c.SkipImageTranslation)
+	fs.addStringField("libvirtURI", "libvirt-uri", "", "Libvirt connection URI", libvirtURIEnv, defaultLibvirtURI, &c.LibvirtURI)
+	fs.addStringField("rawDevices", "raw-devices", "", "Comma separated list of raw device glob patterns which VMs can access (without '/dev/' prefix)", rawDevicesEnv, defaultRawDevices, &c.RawDevices)
+	fs.addStringField("criSocketPath", "listen", "", "The path to UNIX domain socket for CRI service to listen on", criSocketPathEnv, defaultCRISocketPath, &c.CRISocketPath)
+	fs.addBoolField("disableLogging", "disable-logging", "", "Display logging and the streamer", disableLoggingEnv, false, &c.DisableLogging)
+	fs.addBoolField("disableKVM", "disable-kvm", "", "Forcibly disable KVM support", disableKVMEnv, false, &c.DisableKVM)
+	fs.addBoolField("enableSriov", "enable-sriov", "", "Enable SR-IOV support", enableSriovEnv, false, &c.EnableSriov)
+	fs.addStringField("cniPluginDir", "cni-bin-dir", "", "Path to CNI plugin binaries", cniPluginDirEnv, defaultCNIPluginDir, &c.CNIPluginDir)
+	fs.addStringField("cniConfigDir", "cni-conf-dir", "", "Path to the CNI configuration directory", cniConfigDirEnv, defaultCNIConfigDir, &c.CNIConfigDir)
+	fs.addIntField("calicoSubnetSize", "calico-subnet-size", "", "Calico subnet size to use", calicoSubnetEnv, defaultCalicoSubnet, 0, 32, &c.CalicoSubnetSize)
+	fs.addBoolField("enableRegexpImageTranslation", "enable-regexp-image-translation", "", "Enable regexp image name translation", enableRegexpImageTranslationEnv, true, &c.EnableRegexpImageTranslation)
 	// this field duplicates glog's --v, so no option for it
-	fs.addIntField("", "", "", logLevelEnv, 1, &c.LogLevel)
+	fs.addIntField("logLevel", "", "", "", logLevelEnv, 1, 0, math.MaxInt32, &c.LogLevel)
 	return &fs
 }
 

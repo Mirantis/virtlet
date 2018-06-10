@@ -439,6 +439,58 @@ spec:
     - vcm
     singular: virtletconfigmapping
   scope: Namespaced
+  validation:
+    openAPIV3Schema:
+      properties:
+        spec:
+          properties:
+            config:
+              properties:
+                calicoSubnetSize:
+                  maximum: 32
+                  minimum: 0
+                  type: integer
+                cniConfigDir:
+                  type: string
+                cniPluginDir:
+                  type: string
+                criSocketPath:
+                  type: string
+                databasePath:
+                  type: string
+                disableKVM:
+                  type: boolean
+                disableLogging:
+                  type: boolean
+                downloadProtocol:
+                  pattern: ^https?$
+                  type: string
+                enableRegexpImageTranslation:
+                  type: boolean
+                enableSriov:
+                  type: boolean
+                fdServerSocketPath:
+                  type: string
+                imageDir:
+                  type: string
+                imageTranslationConfigsDir:
+                  type: string
+                libvirtURI:
+                  type: string
+                logLevel:
+                  maximum: 2147483647
+                  minimum: 0
+                  type: integer
+                rawDevices:
+                  type: string
+                skipImageTranslation:
+                  type: boolean
+            nodeName:
+              type: string
+            nodeSelector:
+              type: object
+            priority:
+              type: integer
   version: v1
 status:
   acceptedNames:

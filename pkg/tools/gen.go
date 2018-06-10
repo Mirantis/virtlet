@@ -25,7 +25,7 @@ import (
 	ext "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	virtlet_v1 "github.com/Mirantis/virtlet/pkg/api/virtlet.k8s/v1"
+	"github.com/Mirantis/virtlet/pkg/config"
 	"github.com/Mirantis/virtlet/pkg/version"
 )
 
@@ -95,7 +95,7 @@ func (g *genCommand) getYaml() ([]byte, error) {
 		}
 	}
 
-	objs = append(objs, virtlet_v1.GetCRDDefinitions()...)
+	objs = append(objs, config.GetCRDDefinitions()...)
 	return ToYaml(objs)
 }
 

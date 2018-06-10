@@ -25,9 +25,11 @@ import (
 	"github.com/golang/glog"
 	"github.com/kballard/go-shellquote"
 	flag "github.com/spf13/pflag"
+	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 )
 
 type configField interface {
+	fieldName() string
 	flagName() string
 	envName() string
 	applyDefault()
@@ -37,21 +39,25 @@ type configField interface {
 	override(from configField)
 	setFromEnvValue(value string)
 	envValue() string
+	schemaProps() (string, apiext.JSONSchemaProps)
 }
 
 type fieldBase struct {
-	name      string
+	field     string
+	flag      string
 	shorthand string
 	usage     string
 	env       string
 }
 
-func (f *fieldBase) flagName() string { return f.name }
-func (f *fieldBase) envName() string  { return f.env }
+func (f *fieldBase) fieldName() string { return f.field }
+func (f *fieldBase) flagName() string  { return f.flag }
+func (f *fieldBase) envName() string   { return f.env }
 
 type stringField struct {
 	fieldBase
 	defValue string
+	pattern  string
 	value    **string
 }
 
@@ -67,7 +73,7 @@ func (sf *stringField) clear()        { *sf.value = nil }
 func (sf *stringField) present() bool { return *sf.value != nil }
 
 func (sf *stringField) addFlag(f *flag.FlagSet) {
-	f.StringVarP(*sf.value, sf.name, sf.shorthand, sf.defValue, sf.usage)
+	f.StringVarP(*sf.value, sf.flag, sf.shorthand, sf.defValue, sf.usage)
 }
 
 func (sf *stringField) override(from configField) {
@@ -89,6 +95,13 @@ func (sf *stringField) envValue() string {
 	return **sf.value
 }
 
+func (sf *stringField) schemaProps() (string, apiext.JSONSchemaProps) {
+	return sf.field, apiext.JSONSchemaProps{
+		Type:    "string",
+		Pattern: sf.pattern,
+	}
+}
+
 type boolField struct {
 	fieldBase
 	defValue bool
@@ -107,7 +120,7 @@ func (bf *boolField) clear()        { *bf.value = nil }
 func (bf *boolField) present() bool { return *bf.value != nil }
 
 func (bf *boolField) addFlag(f *flag.FlagSet) {
-	f.BoolVarP(*bf.value, bf.name, bf.shorthand, bf.defValue, bf.usage)
+	f.BoolVarP(*bf.value, bf.flag, bf.shorthand, bf.defValue, bf.usage)
 }
 
 func (bf *boolField) override(from configField) {
@@ -130,9 +143,17 @@ func (bf *boolField) envValue() string {
 	return "1"
 }
 
+func (bf *boolField) schemaProps() (string, apiext.JSONSchemaProps) {
+	return bf.field, apiext.JSONSchemaProps{
+		Type: "boolean",
+	}
+}
+
 type intField struct {
 	fieldBase
 	defValue int
+	min      int
+	max      int
 	value    **int
 }
 
@@ -148,7 +169,7 @@ func (intf *intField) clear()        { *intf.value = nil }
 func (intf *intField) present() bool { return *intf.value != nil }
 
 func (intf *intField) addFlag(f *flag.FlagSet) {
-	f.IntVarP(*intf.value, intf.name, intf.shorthand, intf.defValue, intf.usage)
+	f.IntVarP(*intf.value, intf.flag, intf.shorthand, intf.defValue, intf.usage)
 }
 
 func (intf *intField) override(from configField) {
@@ -161,7 +182,7 @@ func (intf *intField) override(from configField) {
 
 func (intf *intField) setFromEnvValue(value string) {
 	if v, err := strconv.Atoi(value); err != nil {
-		glog.Warningf("bad value for int field %s: %q", intf.name, value)
+		glog.Warningf("bad value for int field %s: %q", intf.field, value)
 	} else {
 		*intf.value = &v
 	}
@@ -174,32 +195,49 @@ func (intf *intField) envValue() string {
 	return strconv.Itoa(**intf.value)
 }
 
+func (intf *intField) schemaProps() (string, apiext.JSONSchemaProps) {
+	min := float64(intf.min)
+	max := float64(intf.max)
+	return intf.field, apiext.JSONSchemaProps{
+		Type:    "integer",
+		Minimum: &min,
+		Maximum: &max,
+	}
+}
+
 type envLookup func(name string) (string, bool)
 
 type fieldSet struct {
 	fields []configField
 }
 
-func (fs *fieldSet) addStringField(name, shorthand, usage, env, defValue string, value **string) {
+func (fs *fieldSet) addStringFieldWithPattern(field, flag, shorthand, usage, env, defValue, pattern string, value **string) {
 	fs.addField(&stringField{
-		fieldBase{name, shorthand, usage, env},
+		fieldBase{field, flag, shorthand, usage, env},
 		defValue,
+		pattern,
 		value,
 	})
 }
 
-func (fs *fieldSet) addBoolField(name, shorthand, usage, env string, defValue bool, value **bool) {
+func (fs *fieldSet) addStringField(field, flag, shorthand, usage, env, defValue string, value **string) {
+	fs.addStringFieldWithPattern(field, flag, shorthand, usage, env, defValue, "", value)
+}
+
+func (fs *fieldSet) addBoolField(field, flag, shorthand, usage, env string, defValue bool, value **bool) {
 	fs.addField(&boolField{
-		fieldBase{name, shorthand, usage, env},
+		fieldBase{field, flag, shorthand, usage, env},
 		defValue,
 		value,
 	})
 }
 
-func (fs *fieldSet) addIntField(name, shorthand, usage, env string, defValue int, value **int) {
+func (fs *fieldSet) addIntField(field, flag, shorthand, usage, env string, defValue, min, max int, value **int) {
 	fs.addField(&intField{
-		fieldBase{name, shorthand, usage, env},
+		fieldBase{field, flag, shorthand, usage, env},
 		defValue,
+		min,
+		max,
 		value,
 	})
 }
@@ -265,4 +303,13 @@ func (fs *fieldSet) dumpEnv() string {
 		}
 	}
 	return buf.String()
+}
+
+func (fs *fieldSet) schemaProps() map[string]apiext.JSONSchemaProps {
+	r := make(map[string]apiext.JSONSchemaProps)
+	for _, f := range fs.fields {
+		field, props := f.schemaProps()
+		r[field] = props
+	}
+	return r
 }
