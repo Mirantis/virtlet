@@ -17,6 +17,8 @@ limitations under the License.
 package main
 
 import (
+	goflag "flag"
+	"fmt"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -112,6 +114,13 @@ func printVersion() {
 	}
 }
 
+func setLogLevel(config *v1.VirtletConfig) {
+	goflag.CommandLine.Parse([]string{
+		fmt.Sprintf("-v=%d", config.LogLevel),
+		"-logtostderr=true",
+	})
+}
+
 func main() {
 	utils.HandleNsFixReexec()
 	clientCfg := utils.BindFlags(flag.CommandLine)
@@ -121,6 +130,7 @@ func main() {
 	localConfig := cb.GetConfig()
 
 	rand.Seed(time.Now().UnixNano())
+	setLogLevel(configWithDefaults(localConfig))
 	switch {
 	case os.Getenv(wantTapManagerEnv) != "":
 		localConfig = configWithDefaults(localConfig)
