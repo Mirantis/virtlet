@@ -1053,12 +1053,12 @@ func ReconstructVFs(csn *network.ContainerSideNetwork, netns ns.NetNS, ignoreUnb
 		if err != nil {
 			return err
 		}
+		if err := SetMacAndVlanOnVf(iface.PCIAddress, iface.VLanID, iface.HardwareAddr); err != nil {
+			return err
+		}
 		link, err := netlink.LinkByName(devName)
 		if err != nil {
 			return fmt.Errorf("can't find link with name %q: %v", devName, err)
-		}
-		if err := netlink.LinkSetHardwareAddr(link, iface.HardwareAddr); err != nil {
-			return fmt.Errorf("can't set hwaddr %q on device %q: %v", iface.HardwareAddr, devName, err)
 		}
 		tmpName, err := RandomVethName()
 		if err != nil {
