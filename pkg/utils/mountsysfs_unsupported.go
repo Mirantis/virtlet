@@ -22,10 +22,12 @@ import (
 	"errors"
 )
 
+// MountSysfs dummy for non linux systems
 func MountSysfs() error {
 	return errors.New("not implemented")
 }
 
+// UnmountSysfs dummy for non linux systems
 func UnmountSysfs() error {
 	return errors.New("not implemented")
 }

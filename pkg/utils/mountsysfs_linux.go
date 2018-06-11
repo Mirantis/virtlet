@@ -22,10 +22,12 @@ import (
 	"syscall"
 )
 
+// MountSysfs moutns sysfs to /sys
 func MountSysfs() error {
 	return syscall.Mount("none", "/sys", "sysfs", 0, "")
 }
 
+// UnmountSysfs unmount actual mount on /sys
 func UnmountSysfs() error {
 	return syscall.Unmount("/sys", syscall.MNT_DETACH)
 }

@@ -1260,11 +1260,14 @@ func netmaskForCalico() net.IPMask {
 	return net.CIDRMask(n, 32)
 }
 
+// VfInfo contains information about vlan id of SR-IOV VF on particular pci address
 type VfInfo struct {
 	PCIAddress string
 	Vlan       int
 }
 
+// GetVfInfos looks for VFs in container namespace returning them with
+// theirs vlan ids readed from theirs master devices residuing in host namespace
 func GetVfInfos(nspath string) ([]*VfInfo, error) {
 	vmNS, err := ns.GetNS(nspath)
 	if err != nil {
@@ -1317,6 +1320,8 @@ func GetVfInfos(nspath string) ([]*VfInfo, error) {
 	return vfInfos, err
 }
 
+// UpdateVfsInInterfaces using vfInfos sets correct vlan id for each vf
+// found in interfaces of csn
 func UpdateVfsInInterfaces(ifaces []*network.InterfaceDescription, vfInfos []*VfInfo) error {
 OUTER:
 	for _, iface := range ifaces {
