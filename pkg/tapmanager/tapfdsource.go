@@ -35,6 +35,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/dhcp"
 	"github.com/Mirantis/virtlet/pkg/nettools"
 	"github.com/Mirantis/virtlet/pkg/network"
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 const (
@@ -164,6 +165,11 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 		netConfig.DNS.Options = pnd.DNS.Options
 	}
 
+	var vfInfos []*nettools.VfInfo
+	if vfInfos, err = nettools.GetVfInfos(pnd.PodNs); err != nil {
+		return nil, nil, err
+	}
+
 	var fds []int
 	var respData []byte
 	var csn *network.ContainerSideNetwork
@@ -193,6 +199,10 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 		return csn, nil
 	}); err != nil {
 		gotError = true
+		return nil, nil, err
+	}
+
+	if err := nettools.UpdateVfsInInterfaces(csn.Interfaces, vfInfos); err != nil {
 		return nil, nil, err
 	}
 
@@ -351,11 +361,11 @@ func (s *TapFDSource) setupNetNS(key string, pnd *PodNetworkDesc, initNet func(n
 	if err := vmNS.Do(func(ns.NetNS) error {
 		// switch /sys to corresponding one in netns
 		// to have the correct items under /sys/class/net
-		if err := mountSysfs(); err != nil {
+		if err := utils.MountSysfs(); err != nil {
 			return err
 		}
 		defer func() {
-			if err := unmountSysfs(); err != nil {
+			if err := utils.UnmountSysfs(); err != nil {
 				glog.V(3).Infof("Warning, error during umount of /sys: %v", err)
 			}
 		}()
