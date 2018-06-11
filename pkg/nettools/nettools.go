@@ -565,10 +565,6 @@ func isSriovVf(link netlink.Link) bool {
 	return err == nil
 }
 
-func openVfConfigFile(devName string) (*os.File, error) {
-	return os.OpenFile(filepath.Join("/sys/bus/pci/devices", devName, "config"), os.O_RDWR, 0644)
-}
-
 func getPCIAddressOfVF(devName string) (string, error) {
 	linkDestination, err := os.Readlink(filepath.Join("/sys/class/net", devName, "device"))
 	if err != nil {
@@ -642,14 +638,6 @@ func bindDeviceToVFIO(devIdentifier string) error {
 	return ioutil.WriteFile(
 		"/sys/bus/pci/drivers/vfio-pci/new_id",
 		[]byte(devIdentifier),
-		0200,
-	)
-}
-
-func unbindDeviceFromVFIO(pciAddress string) error {
-	return ioutil.WriteFile(
-		"/sys/bus/pci/drivers/vfio-pci/unbind",
-		[]byte(pciAddress),
 		0200,
 	)
 }
@@ -765,7 +753,10 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 				return nil, err
 			}
 
-			fo, err = openVfConfigFile(pciAddress)
+			// tapmanager protocol needs a file descriptor in Fo field
+			// but SR-IOV part is not using it at all, so set it to
+			// new file descriptor with /dev/null opened
+			fo, err = os.Open("/dev/null")
 			if err != nil {
 				return nil, err
 			}
@@ -860,7 +851,6 @@ func RecoverContainerSideNetwork(csn *network.ContainerSideNetwork, nsPath strin
 		return fmt.Errorf("wrong cni configuration: no interfaces defined: %s", spew.Sdump(csn.Result))
 	}
 
-	// FIXME: this will not work with sr-iov device passed to VM
 	contLinks, err := GetContainerLinks(csn.Result)
 	if err != nil {
 		return err
@@ -878,24 +868,15 @@ func RecoverContainerSideNetwork(csn *network.ContainerSideNetwork, nsPath strin
 			glog.Warningf("Recovering container side network: missing description for interface %q", ifaceName)
 		}
 		delete(oldDescs, ifaceName)
-		pciAddress := ""
 		var ifaceType network.InterfaceType
 
 		if isSriovVf(link) {
 			ifaceType = network.InterfaceTypeVF
-			pciAddress, err = getPCIAddressOfVF(ifaceName)
-			if err != nil {
-				return err
-			}
-
-			if desc.PCIAddress != pciAddress {
-				return fmt.Errorf("PCI address mismatch for %q: %q instead of %q", ifaceName, desc.PCIAddress, pciAddress)
-			}
 
 			// device should be already unbound, but after machine reboot that can be necessary
-			unbindDriverFromDevice(pciAddress)
+			unbindDriverFromDevice(desc.PCIAddress)
 
-			devIdentifier, err := getDeviceIdentifier(pciAddress)
+			devIdentifier, err := getDeviceIdentifier(desc.PCIAddress)
 			if err != nil {
 				return err
 			}
@@ -1053,15 +1034,17 @@ func Teardown(csn *network.ContainerSideNetwork) error {
 }
 
 // ReconstructVFs iterates over stored PCI addresses, rebinding each
-// corresponding interface to its host driver, changing its MAC address
-// to the stored value and then moving it into the container namespace
-func ReconstructVFs(csn *network.ContainerSideNetwork, netns ns.NetNS) error {
+// corresponding interface to its host driver, changing its MAC address and name
+// to the values stored in csn and then moving it into the container namespace
+func ReconstructVFs(csn *network.ContainerSideNetwork, netns ns.NetNS, ignoreUnbind bool) error {
 	for _, iface := range csn.Interfaces {
 		if iface.Type != network.InterfaceTypeVF {
 			continue
 		}
-		if err := unbindDeviceFromVFIO(iface.PCIAddress); err != nil {
-			return err
+		if err := unbindDriverFromDevice(iface.PCIAddress); err != nil {
+			if ignoreUnbind != true {
+				return err
+			}
 		}
 		if err := rebindDriverToDevice(iface.PCIAddress); err != nil {
 			return err

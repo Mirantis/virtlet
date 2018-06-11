@@ -234,7 +234,7 @@ func (s *TapFDSource) Release(key string) error {
 		}
 	}()
 
-	if err := nettools.ReconstructVFs(pn.csn, vmNS); err != nil {
+	if err := nettools.ReconstructVFs(pn.csn, vmNS, false); err != nil {
 		return fmt.Errorf("failed to reconstruct SR-IOV devices: %v", err)
 	}
 
@@ -318,6 +318,17 @@ func (s *TapFDSource) Recover(key string, data []byte) error {
 	}
 	if csn.Result == nil {
 		csn.Result = &cnicurrent.Result{}
+	}
+	netNSPath := cni.PodNetNSPath(pnd.PodID)
+	vmNS, err := ns.GetNS(netNSPath)
+	if err != nil {
+		return fmt.Errorf("failed to open network namespace at %q: %v", netNSPath, err)
+	}
+	// Ignore errors from unbinding as VFs can be already unbound if only virtlet was restarted
+	// while unbinding is still necessary if there was a whole node restart
+	// FIXME: that can fail if there is qemu holding pci device (virlet restart while vms are running).
+	if err := nettools.ReconstructVFs(csn, vmNS, true); err != nil {
+		return err
 	}
 	return s.setupNetNS(key, pnd, func(netNSPath string, allLinks []netlink.Link) (*network.ContainerSideNetwork, error) {
 		if err := nettools.RecoverContainerSideNetwork(csn, netNSPath, allLinks); err != nil {
