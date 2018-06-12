@@ -192,7 +192,8 @@ spec:
 spec:
   nodeSelector:
     label-a: "1"` + fullConfig
-	anotherMapping1 = `
+	globalFullMapping = "spec:" + fullConfig
+	anotherMapping1   = `
 spec:
   nodeName: kube-node-1
   priority: 10
@@ -259,6 +260,12 @@ func TestConfigForNode(t *testing.T) {
 			nodeName:   "kube-node-1",
 			nodeLabels: map[string]string{"label-x": "1"},
 			mappings:   []string{labelAFullMapping},
+		},
+		{
+			name:       "global mapping",
+			nodeName:   "kube-node-1",
+			nodeLabels: map[string]string{"label-a": "1"},
+			mappings:   []string{globalFullMapping},
 		},
 		{
 			name:       "mapping by node name and multiple labels",
