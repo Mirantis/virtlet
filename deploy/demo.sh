@@ -16,6 +16,7 @@ RELEASE_LOCATION="${RELEASE_LOCATION:-https://github.com/Mirantis/virtlet/releas
 VIRTLET_DEMO_RELEASE="${VIRTLET_DEMO_RELEASE:-}"
 VIRTLET_DEMO_BRANCH="${VIRTLET_DEMO_BRANCH:-}"
 VIRTLET_ON_MASTER="${VIRTLET_ON_MASTER:-}"
+VIRTLET_MULTI_NODE="${VIRTLET_MULTI_NODE:-}"
 IMAGE_REGEXP_TRANSLATION="${IMAGE_REGEXP_TRANSLATION:-1}"
 # Convenience setting for local testing:
 # BASE_LOCATION="${HOME}/work/kubernetes/src/github.com/Mirantis/virtlet"
@@ -24,11 +25,16 @@ cirros_key="demo-cirros-private-key"
 declare virtlet_release
 declare virtlet_docker_tag
 
-virtlet_node=kube-node-1
+virtlet_nodes=()
 if [[ ${VIRTLET_ON_MASTER} ]]; then
-  virtlet_node=kube-master
+  virtlet_nodes+=(kube-master)
 fi
-
+if [[ !${VIRTLET_ON_MASTER} || ${VIRTLET_MULTI_NODE} ]]; then
+  virtlet_nodes+=(kube-node-1)
+fi
+if [[ ${VIRTLET_MULTI_NODE} ]]; then
+  virtlet_nodes+=(kube-node-2)
+fi
 
 # In case of linuxkit / moby linux, -v will not work so we can't
 # mount /lib/modules and /boot.
@@ -130,11 +136,13 @@ function demo::start-dind-cluster {
 }
 
 function demo::install-cri-proxy {
+  local virtlet_node="${1}"
   demo::step "Installing CRI proxy package on ${virtlet_node} container"
   docker exec "${virtlet_node}" /bin/bash -c "curl -sSL '${CRIPROXY_DEB_URL}' >/criproxy.deb && dpkg -i /criproxy.deb && rm /criproxy.deb"
 }
 
 function demo::fix-mounts {
+  local virtlet_node="${1}"
   demo::step "Marking mounts used by virtlet as shared in ${virtlet_node} container"
   docker exec "${virtlet_node}" mount --make-shared /dind
   docker exec "${virtlet_node}" mount --make-shared /dev
@@ -145,11 +153,13 @@ function demo::fix-mounts {
 }
 
 function demo::inject-local-image {
+  local virtlet_node="${1}"
   demo::step "Copying local mirantis/virtlet image into ${virtlet_node} container"
   docker save mirantis/virtlet | docker exec -i "${virtlet_node}" docker load
 }
 
 function demo::label-and-untaint-node {
+  local virtlet_node="${1}"
   demo::step "Applying label to ${virtlet_node}:" "extraRuntime=virtlet"
   "${kubectl}" label node "${virtlet_node}" extraRuntime=virtlet
   if [[ ${VIRTLET_ON_MASTER} ]]; then
@@ -265,7 +275,8 @@ function demo::kvm-ok {
   if [[ ${using_linuxkit} ]]; then
     return 1
   fi
-  if ! docker exec "${virtlet_node}" docker run --privileged --rm -v /lib/modules:/lib/modules "mirantis/virtlet:${virtlet_docker_tag}" kvm-ok; then
+  # use kube-master node as all of the DIND nodes in the cluster are similar
+  if ! docker exec kube-master docker run --privileged --rm -v /lib/modules:/lib/modules "mirantis/virtlet:${virtlet_docker_tag}" kvm-ok; then
     return 1
   fi
 }
@@ -368,12 +379,14 @@ fi
 
 demo::get-dind-cluster
 demo::start-dind-cluster
-demo::fix-mounts
-demo::install-cri-proxy
-if [[ ${INJECT_LOCAL_IMAGE:-} ]]; then
-  demo::inject-local-image
-fi
-demo::label-and-untaint-node
+for virtlet_node in "${virtlet_nodes[@]}"; do
+  demo::fix-mounts "${virtlet_node}"
+  demo::install-cri-proxy "${virtlet_node}"
+  if [[ ${INJECT_LOCAL_IMAGE:-} ]]; then
+    demo::inject-local-image "${virtlet_node}"
+  fi
+  demo::label-and-untaint-node "${virtlet_node}"
+done
 demo::start-virtlet
 demo::start-nginx
 demo::start-vm

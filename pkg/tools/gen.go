@@ -23,7 +23,9 @@ import (
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
 	ext "k8s.io/api/extensions/v1beta1"
+	"k8s.io/apimachinery/pkg/runtime"
 
+	"github.com/Mirantis/virtlet/pkg/config"
 	"github.com/Mirantis/virtlet/pkg/version"
 )
 
@@ -37,6 +39,7 @@ type genCommand struct {
 	out    io.Writer
 	dev    bool
 	compat bool
+	crd    bool
 	tag    string
 }
 
@@ -57,46 +60,50 @@ func NewGenCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&g.dev, "dev", false, "Development mode for use with kubeadm-dind-cluster")
 	cmd.Flags().BoolVar(&g.compat, "compat", false, "Produce YAML that's compatible with older Kubernetes versions")
+	cmd.Flags().BoolVar(&g.crd, "crd", false, "Dump CRD definitions only")
 	cmd.Flags().StringVar(&g.tag, "tag", version.Get().ImageTag, "Set virtlet image tag")
 	return cmd
 }
 
-func (g *genCommand) transform(data []byte) ([]byte, error) {
-	objs, err := LoadYaml(data)
-	if err != nil {
-		return nil, err
-	}
-	if len(objs) == 0 {
-		return nil, errors.New("source yaml is empty")
-	}
-	ds, ok := objs[0].(*ext.DaemonSet)
-	if !ok {
-		return nil, errors.New("the first object is not a DaemonSet")
+func (g *genCommand) getYaml() ([]byte, error) {
+	var objs []runtime.Object
+	if !g.crd {
+		bs, err := Asset(sourceYamlFile)
+		if err != nil {
+			return bs, err
+		}
+
+		if objs, err = LoadYaml(bs); err != nil {
+			return nil, err
+		}
+		if len(objs) == 0 {
+			return nil, errors.New("source yaml is empty")
+		}
+
+		ds, ok := objs[0].(*ext.DaemonSet)
+		if !ok {
+			return nil, errors.New("the first object is not a DaemonSet")
+		}
+		if g.dev {
+			applyDev(ds)
+		}
+		if g.compat {
+			applyCompat(ds)
+		}
+		if g.tag != "" {
+			applyTag(ds, g.tag)
+		}
 	}
 
-	if g.dev {
-		applyDev(ds)
-	}
-	if g.compat {
-		applyCompat(ds)
-	}
-	if g.tag != "" {
-		applyTag(ds, g.tag)
-	}
-
+	objs = append(objs, config.GetCRDDefinitions()...)
 	return ToYaml(objs)
 }
 
 // Run executes the command.
 func (g *genCommand) Run() error {
-	bs, err := Asset(sourceYamlFile)
+	bs, err := g.getYaml()
 	if err != nil {
 		return err
-	}
-	if g.dev || g.compat || g.tag != "" {
-		if bs, err = g.transform(bs); err != nil {
-			return err
-		}
 	}
 	if _, err := g.out.Write(bs); err != nil {
 		return err

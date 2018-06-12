@@ -20,190 +20,62 @@ import (
 	"context"
 	"fmt"
 
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/client-go/tools/clientcmd"
+
+	virtletclient "github.com/Mirantis/virtlet/pkg/client/clientset/versioned"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/rest"
-
-	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
-const groupName = "virtlet.k8s"
-const version = "v1"
-
-var (
-	schemeBuilder      = runtime.NewSchemeBuilder(addKnownTypes)
-	scheme             = runtime.NewScheme()
-	schemeGroupVersion = schema.GroupVersion{Group: groupName, Version: version}
-)
-
-// VirtletImageMapping represents an ImageTranslation wrapped in k8s object
-type VirtletImageMapping struct {
-	meta_v1.TypeMeta   `json:",inline"`
-	meta_v1.ObjectMeta `json:"metadata"`
-	Spec               ImageTranslation `json:"spec"`
+type crdConfigSource struct {
+	clientCfg     clientcmd.ClientConfig
+	virtletClient virtletclient.Interface
+	namespace     string
 }
 
-// DeepCopyObject implements DeepCopyObject method of runtime.Object interface
-func (vim *VirtletImageMapping) DeepCopyObject() runtime.Object {
-	if vim == nil {
+var _ ConfigSource = &crdConfigSource{}
+
+func (cs *crdConfigSource) setup() error {
+	if cs.virtletClient != nil {
 		return nil
 	}
-	r := *vim
-	if vim.Spec.Transports == nil {
-		return &r
+
+	config, err := cs.clientCfg.ClientConfig()
+	if err != nil {
+		return err
 	}
 
-	transportMap := make(map[string]TransportProfile)
-	for k, tr := range vim.Spec.Transports {
-		if tr.MaxRedirects != nil {
-			redirs := *tr.MaxRedirects
-			tr.MaxRedirects = &redirs
-		}
-		if tr.TLS != nil {
-			tls := *tr.TLS
-			tr.TLS = &tls
-		}
-		transportMap[k] = tr
+	virtletClient, err := virtletclient.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("can't create Virtlet api client: %v", err)
 	}
-	return &r
-}
-
-var _ TranslationConfig = VirtletImageMapping{}
-
-// VirtletImageMappingList is a k8s representation of list of translation configs
-type VirtletImageMappingList struct {
-	meta_v1.TypeMeta `json:",inline"`
-	meta_v1.ListMeta `json:"metadata"`
-	Items            []VirtletImageMapping `json:"items"`
-}
-
-// DeepCopyObject implements DeepCopyObject method of runtime.Object interface
-func (l *VirtletImageMappingList) DeepCopyObject() runtime.Object {
-	if l == nil {
-		return l
-	}
-	r := &VirtletImageMappingList{
-		TypeMeta: l.TypeMeta,
-		ListMeta: l.ListMeta,
-	}
-	for _, vim := range l.Items {
-		r.Items = append(r.Items, *vim.DeepCopyObject().(*VirtletImageMapping))
-	}
-	return r
-}
-
-func addKnownTypes(scheme *runtime.Scheme) error {
-	scheme.AddKnownTypes(schemeGroupVersion,
-		&VirtletImageMapping{},
-		&VirtletImageMappingList{},
-	)
-	meta_v1.AddToGroupVersion(scheme, schemeGroupVersion)
+	cs.virtletClient = virtletClient
 	return nil
 }
 
-func init() {
-	if err := schemeBuilder.AddToScheme(scheme); err != nil {
-		panic(err)
-	}
-}
-
-// RegisterCustomResourceType registers custom resource definition for VirtletImageMapping kind in k8s
-func RegisterCustomResourceType() error {
-	crd := apiextensionsv1beta1.CustomResourceDefinition{
-		ObjectMeta: meta_v1.ObjectMeta{
-			Name: "virtletimagemappings." + groupName,
-		},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   groupName,
-			Version: version,
-			Scope:   apiextensionsv1beta1.NamespaceScoped,
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-				Plural:     "virtletimagemappings",
-				Singular:   "virtletimagemapping",
-				Kind:       "VirtletImageMapping",
-				ShortNames: []string{"vim"},
-			},
-		},
-	}
-	cfg, err := utils.GetK8sClientConfig("")
-	if err != nil || cfg.Host == "" {
-		return err
-	}
-	extensionsClientSet, err := apiextensionsclient.NewForConfig(cfg)
-	if err != nil {
-		panic(err)
-	}
-
-	_, err = extensionsClientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(&crd)
-	if err == nil || errors.IsAlreadyExists(err) {
-		return nil
-	}
-	return err
-}
-
-// Name implements TranslationConfig Name
-func (vim VirtletImageMapping) Name() string {
-	return vim.ObjectMeta.Name
-}
-
-// Payload implements TranslationConfig Payload
-func (vim VirtletImageMapping) Payload() (ImageTranslation, error) {
-	return vim.Spec, nil
-}
-
-type crdConfigSource struct {
-	namespace string
-}
-
-var _ ConfigSource = crdConfigSource{}
-
 // Configs implements ConfigSource Configs
-func (cs crdConfigSource) Configs(ctx context.Context) ([]TranslationConfig, error) {
-	cfg, err := utils.GetK8sClientConfig("")
+func (cs *crdConfigSource) Configs(ctx context.Context) ([]TranslationConfig, error) {
+	if err := cs.setup(); err != nil {
+		return nil, err
+	}
+
+	list, err := cs.virtletClient.VirtletV1().VirtletImageMappings(cs.namespace).List(meta_v1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
 
-	if cfg.Host == "" {
-		return nil, nil
+	var r []TranslationConfig
+	for n := range list.Items {
+		r = append(r, &list.Items[n])
 	}
-
-	client, err := GetCRDRestClient(cfg)
-	if err != nil {
-		return nil, err
-	}
-	var list VirtletImageMappingList
-	err = client.Get().
-		Context(ctx).
-		Resource("virtletimagemappings").
-		Namespace(cs.namespace).
-		Do().Into(&list)
-	if err != nil {
-		return nil, err
-	}
-	result := make([]TranslationConfig, len(list.Items))
-	for i, v := range list.Items {
-		result[i] = v
-	}
-
-	return result, nil
-}
-
-// GetCRDRestClient returns ReST client that can be used to work with virtlet CRDs
-func GetCRDRestClient(cfg *rest.Config) (*rest.RESTClient, error) {
-	return utils.GetK8sRestClient(cfg, scheme, &schemeGroupVersion)
+	return r, nil
 }
 
 // Description implements ConfigSource Description
-func (cs crdConfigSource) Description() string {
+func (cs *crdConfigSource) Description() string {
 	return fmt.Sprintf("Kubernetes VirtletImageMapping resources in namespace %q", cs.namespace)
 }
 
 // NewCRDSource is a factory for CRD-based config source
-func NewCRDSource(namespace string) ConfigSource {
-	return crdConfigSource{namespace: namespace}
+func NewCRDSource(namespace string, clientCfg clientcmd.ClientConfig) ConfigSource {
+	return &crdConfigSource{namespace: namespace, clientCfg: clientCfg}
 }

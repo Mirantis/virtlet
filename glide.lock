@@ -1,5 +1,5 @@
-hash: 7143f5f6fd8cbd7d465fe0be517bb010ea49fbe033bd2b13b6b41842145fc0e4
-updated: 2018-05-17T23:37:53.451149641+03:00
+hash: e779019b616d563bb6ca86c655b1e4c6a88bc62c4b4f7aa357d5d48debe73fe2
+updated: 2018-06-05T12:01:20.9782965+03:00
 imports:
 - name: github.com/boltdb/bolt
   version: 583e8937c61f1af6513608ccc75c97b6abdf4ff9
@@ -116,8 +116,6 @@ imports:
   - ptypes/any
   - ptypes/duration
   - ptypes/timestamp
-- name: github.com/google/btree
-  version: 7d79101e329e5a3adf994758c578dab82b90c017
 - name: github.com/google/gofuzz
   version: 44d81051d367757e1c7c6a5a86423ece9afcf63c
 - name: github.com/googleapis/gnostic
@@ -126,10 +124,6 @@ imports:
   - OpenAPIv2
   - compiler
   - extensions
-- name: github.com/gregjones/httpcache
-  version: 787624de3eb7bd915c329cba748687a3b22666a6
-  subpackages:
-  - diskcache
 - name: github.com/hashicorp/golang-lru
   version: a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4
   subpackages:
@@ -144,8 +138,8 @@ imports:
   version: bcac9884e7502bb2b474c0339d889cb981a2f27f
 - name: github.com/json-iterator/go
   version: 13f86432b882000a51c6e610c620974462691a97
-- name: github.com/juju/ratelimit
-  version: 5b9ff866471762aa2ab2dced63c9fb6f53921342
+- name: github.com/kballard/go-shellquote
+  version: 95032a82bc518f77982ea72343cc1ade730072f0
 - name: github.com/kr/pty
   version: f7ee69f31298ecbe5d2b349c711e2547a617d398
 - name: github.com/libvirt/libvirt-go
@@ -189,8 +183,6 @@ imports:
   - types
 - name: github.com/opencontainers/go-digest
   version: a6d0ee40d4207ea02364bd3b9e8e77b9159ba1eb
-- name: github.com/peterbourgon/diskv
-  version: 5f041e8faa004a95c88a202771f4cc3e991971e6
 - name: github.com/pkg/errors
   version: 645ef00459ed84a119197bfb8d8205042c6df63d
 - name: github.com/pmezard/go-difflib
@@ -254,6 +246,12 @@ imports:
   subpackages:
   - unix
   - windows
+- name: golang.org/x/time
+  version: f51c12702a4d776e4c1fa9b0fabab841babae631
+  subpackages:
+  - rate
+- name: golang.org/x/tools
+  version: 2382e3994d48b1d22acc2c86bcad0a2aff028e32
 - name: google.golang.org/grpc
   version: 777daa17ff9b5daef1cfdf915088a2ada3332bf0
   subpackages:
@@ -274,7 +272,7 @@ imports:
   - json
   - jwt
 - name: gopkg.in/yaml.v2
-  version: 86f5ed62f8a0ee96bd888d2efdfd6d4fb100a4eb
+  version: 670d4cfef0544295bc27a114dbac37980d83185a
 - name: k8s.io/api
   version: 73d903622b7391f3312dcbac6483fed484e185f8
   subpackages:
@@ -467,7 +465,7 @@ imports:
   - plugin/pkg/authenticator/token/webhook
   - plugin/pkg/authorizer/webhook
 - name: k8s.io/client-go
-  version: 78700dec6369ba22221b72770783300f143df150
+  version: 33f2870a2b83179c823ddc90e5513f9e5fe43b38
   subpackages:
   - discovery
   - discovery/fake
@@ -595,7 +593,10 @@ imports:
   - listers/storage/v1
   - listers/storage/v1alpha1
   - listers/storage/v1beta1
+  - pkg/apis/clientauthentication
+  - pkg/apis/clientauthentication/v1alpha1
   - pkg/version
+  - plugin/pkg/client/auth/exec
   - rest
   - rest/fake
   - rest/watch
@@ -621,6 +622,10 @@ imports:
   - util/homedir
   - util/integer
   - util/retry
+- name: k8s.io/code-generator
+  version: 7ead8f38b01cf8653249f5af80ce7b2c8aba12e2
+- name: k8s.io/gengo
+  version: 01a732e01d00cb9a81bb0ca050d3e6d2b947927b
 - name: k8s.io/kube-openapi
   version: 50ae88d24ede7b8bad68e23c805b5d3da5c8abaf
   subpackages:

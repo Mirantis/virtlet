@@ -29,12 +29,15 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/Mirantis/virtlet/pkg/api/virtlet.k8s/v1"
+	"github.com/Mirantis/virtlet/pkg/config"
 	"github.com/Mirantis/virtlet/pkg/manager"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
 )
 
 const (
-	virtletSocket = "/tmp/virtlet.sock"
+	virtletSocket    = "/tmp/virtlet.sock"
+	disableKvmEnvVar = "VIRTLET_DISABLE_KVM"
 )
 
 type fakeFDManager struct{}
@@ -107,17 +110,21 @@ func (v *VirtletManager) Run() {
 	}
 
 	os.Setenv("KUBERNETES_CLUSTER_URL", "")
-	v.manager = manager.NewVirtletManager(&manager.VirtletConfig{
-		FDManager:            &fakeFDManager{},
-		DatabasePath:         filepath.Join(v.tempDir, "virtlet.db"),
-		DownloadProtocol:     "http",
-		ImageDir:             filepath.Join(v.tempDir, "images"),
-		SkipImageTranslation: true,
-		LibvirtURI:           libvirtURI,
-		RawDevices:           "loop*",
-		CRISocketPath:        virtletSocket,
-		DisableLogging:       true,
+	pstr := func(s string) *string { return &s }
+	pbool := func(b bool) *bool { return &b }
+	cfg := config.GetDefaultConfig()
+	config.Override(cfg, &v1.VirtletConfig{
+		DatabasePath:         pstr(filepath.Join(v.tempDir, "virtlet.db")),
+		DownloadProtocol:     pstr("http"),
+		ImageDir:             pstr(filepath.Join(v.tempDir, "images")),
+		SkipImageTranslation: pbool(true),
+		LibvirtURI:           pstr(libvirtURI),
+		RawDevices:           pstr("loop*"),
+		CRISocketPath:        pstr(virtletSocket),
+		DisableLogging:       pbool(true),
+		DisableKVM:           pbool(os.Getenv(disableKvmEnvVar) != ""),
 	})
+	v.manager = manager.NewVirtletManager(cfg, &fakeFDManager{}, nil)
 	v.doneCh = make(chan struct{})
 	go func() {
 		if err := v.manager.Run(); err != nil {

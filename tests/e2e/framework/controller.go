@@ -28,7 +28,8 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/Mirantis/virtlet/pkg/imagetranslation"
+	virtlet_v1 "github.com/Mirantis/virtlet/pkg/api/virtlet.k8s/v1"
+	virtletclientv1 "github.com/Mirantis/virtlet/pkg/client/clientset/versioned/typed/virtlet.k8s/v1"
 )
 
 var ClusterURL = flag.String("cluster-url", "http://127.0.0.1:8080", "apiserver URL")
@@ -37,9 +38,10 @@ var ClusterURL = flag.String("cluster-url", "http://127.0.0.1:8080", "apiserver 
 type Controller struct {
 	fixedNs bool
 
-	client     *typedv1.CoreV1Client
-	namespace  *v1.Namespace
-	restConfig *restclient.Config
+	client        typedv1.CoreV1Interface
+	virtletClient virtletclientv1.VirtletV1Interface
+	namespace     *v1.Namespace
+	restConfig    *restclient.Config
 }
 
 // NewController creates instance of controller for specified k8s namespace.
@@ -55,6 +57,11 @@ func NewController(namespace string) (*Controller, error) {
 		return nil, err
 	}
 
+	virtletClient, err := virtletclientv1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
 	var ns *v1.Namespace
 	if namespace != "" {
 		ns, err = clientset.Namespaces().Get(namespace, metav1.GetOptions{})
@@ -66,10 +73,11 @@ func NewController(namespace string) (*Controller, error) {
 	}
 
 	return &Controller{
-		client:     clientset,
-		namespace:  ns,
-		restConfig: config,
-		fixedNs:    namespace != "",
+		client:        clientset,
+		virtletClient: virtletClient,
+		namespace:     ns,
+		restConfig:    config,
+		fixedNs:       namespace != "",
 	}, nil
 }
 
@@ -91,33 +99,12 @@ func (c *Controller) Finalize() error {
 	return c.client.Namespaces().Delete(c.namespace.Name, nil)
 }
 
-func (c *Controller) CreateVirtletImageMapping(mapping imagetranslation.VirtletImageMapping) (*imagetranslation.VirtletImageMapping, error) {
-	client, err := imagetranslation.GetCRDRestClient(c.restConfig)
-	if err != nil {
-		return nil, err
-	}
-	var result imagetranslation.VirtletImageMapping
-	err = client.Post().
-		Resource("virtletimagemappings").
-		Namespace("kube-system").
-		Body(&mapping).
-		Do().Into(&result)
-	if err != nil {
-		return nil, err
-	}
-	return &result, nil
+func (c *Controller) CreateVirtletImageMapping(mapping virtlet_v1.VirtletImageMapping) (*virtlet_v1.VirtletImageMapping, error) {
+	return c.virtletClient.VirtletImageMappings("kube-system").Create(&mapping)
 }
 
 func (c *Controller) DeleteVirtletImageMapping(name string) error {
-	client, err := imagetranslation.GetCRDRestClient(c.restConfig)
-	if err != nil {
-		return err
-	}
-	return client.Delete().
-		Resource("virtletimagemappings").
-		Namespace("kube-system").
-		Name(name).
-		Do().Error()
+	return c.virtletClient.VirtletImageMappings("kube-system").Delete(name, &metav1.DeleteOptions{})
 }
 
 // PersistentVolumesClient returns interface for PVs

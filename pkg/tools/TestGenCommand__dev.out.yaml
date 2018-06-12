@@ -25,19 +25,6 @@ spec:
       containers:
       - command:
         - /libvirt.sh
-        env:
-        - name: VIRTLET_SRIOV_SUPPORT
-          valueFrom:
-            configMapKeyRef:
-              key: sriov_support
-              name: virtlet-config
-              optional: true
-        - name: VIRTLET_DISABLE_KVM
-          valueFrom:
-            configMapKeyRef:
-              key: disable_kvm
-              name: virtlet-config
-              optional: true
         image: mirantis/virtlet
         imagePullPolicy: IfNotPresent
         name: libvirt
@@ -76,58 +63,7 @@ spec:
           name: dev
         - mountPath: /dind
           name: dind
-      - env:
-        - name: VIRTLET_DISABLE_KVM
-          valueFrom:
-            configMapKeyRef:
-              key: disable_kvm
-              name: virtlet-config
-              optional: true
-        - name: VIRTLET_DOWNLOAD_PROTOCOL
-          valueFrom:
-            configMapKeyRef:
-              key: download_protocol
-              name: virtlet-config
-              optional: true
-        - name: VIRTLET_LOGLEVEL
-          valueFrom:
-            configMapKeyRef:
-              key: loglevel
-              name: virtlet-config
-              optional: true
-        - name: VIRTLET_CALICO_SUBNET
-          valueFrom:
-            configMapKeyRef:
-              key: calico-subnet
-              name: virtlet-config
-              optional: true
-        - name: IMAGE_REGEXP_TRANSLATION
-          valueFrom:
-            configMapKeyRef:
-              key: image_regexp_translation
-              name: virtlet-config
-              optional: true
-        - name: VIRTLET_DISABLE_LOGGING
-          valueFrom:
-            configMapKeyRef:
-              key: disable_logging
-              name: virtlet-config
-              optional: true
-        - name: VIRTLET_SRIOV_SUPPORT
-          valueFrom:
-            configMapKeyRef:
-              key: sriov_support
-              name: virtlet-config
-              optional: true
-        - name: VIRTLET_RAW_DEVICES
-          valueFrom:
-            configMapKeyRef:
-              key: raw_devices
-              name: virtlet-config
-              optional: true
-        - name: IMAGE_TRANSLATIONS_DIR
-          value: /etc/virtlet/images
-        image: mirantis/virtlet
+      - image: mirantis/virtlet
         imagePullPolicy: IfNotPresent
         name: virtlet
         readinessProbe:
@@ -194,12 +130,61 @@ spec:
       - command:
         - /prepare-node.sh
         env:
+        - name: KUBE_NODE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
         - name: VIRTLET_DISABLE_KVM
           valueFrom:
             configMapKeyRef:
               key: disable_kvm
               name: virtlet-config
               optional: true
+        - name: VIRTLET_SRIOV_SUPPORT
+          valueFrom:
+            configMapKeyRef:
+              key: sriov_support
+              name: virtlet-config
+              optional: true
+        - name: VIRTLET_DOWNLOAD_PROTOCOL
+          valueFrom:
+            configMapKeyRef:
+              key: download_protocol
+              name: virtlet-config
+              optional: true
+        - name: VIRTLET_LOGLEVEL
+          valueFrom:
+            configMapKeyRef:
+              key: loglevel
+              name: virtlet-config
+              optional: true
+        - name: VIRTLET_CALICO_SUBNET
+          valueFrom:
+            configMapKeyRef:
+              key: calico-subnet
+              name: virtlet-config
+              optional: true
+        - name: IMAGE_REGEXP_TRANSLATION
+          valueFrom:
+            configMapKeyRef:
+              key: image_regexp_translation
+              name: virtlet-config
+              optional: true
+        - name: VIRTLET_RAW_DEVICES
+          valueFrom:
+            configMapKeyRef:
+              key: raw_devices
+              name: virtlet-config
+              optional: true
+        - name: VIRTLET_DISABLE_LOGGING
+          valueFrom:
+            configMapKeyRef:
+              key: disable_logging
+              name: virtlet-config
+              optional: true
+        - name: VIRTLET_IMAGE_TRANSLATIONS_DIR
+          value: /etc/virtlet/images
         image: mirantis/virtlet
         imagePullPolicy: IfNotPresent
         name: prepare-node
@@ -220,6 +205,8 @@ spec:
           name: var-lib
         - mountPath: /dev
           name: dev
+        - mountPath: /var/lib/virtlet
+          name: virtlet
         - mountPath: /dind
           name: dind
       serviceAccountName: virtlet
@@ -315,8 +302,10 @@ rules:
   - ""
   resources:
   - configmaps
+  - nodes
   verbs:
   - create
+  - get
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
@@ -396,6 +385,7 @@ rules:
   - virtlet.k8s
   resources:
   - virtletimagemappings
+  - virtletconfigmappings
   verbs:
   - list
   - get
@@ -422,4 +412,104 @@ metadata:
   creationTimestamp: null
   name: virtlet
   namespace: kube-system
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
+  labels:
+    virtlet.cloud: ""
+  name: virtletimagemappings.virtlet.k8s
+spec:
+  group: virtlet.k8s
+  names:
+    kind: VirtletImageMapping
+    plural: virtletimagemappings
+    shortNames:
+    - vim
+    singular: virtletimagemapping
+  scope: Namespaced
+  version: v1
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: null
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
+  labels:
+    virtlet.cloud: ""
+  name: virtletconfigmappings.virtlet.k8s
+spec:
+  group: virtlet.k8s
+  names:
+    kind: VirtletConfigMapping
+    plural: virtletconfigmappings
+    shortNames:
+    - vcm
+    singular: virtletconfigmapping
+  scope: Namespaced
+  validation:
+    openAPIV3Schema:
+      properties:
+        spec:
+          properties:
+            config:
+              properties:
+                calicoSubnetSize:
+                  maximum: 32
+                  minimum: 0
+                  type: integer
+                cniConfigDir:
+                  type: string
+                cniPluginDir:
+                  type: string
+                criSocketPath:
+                  type: string
+                databasePath:
+                  type: string
+                disableKVM:
+                  type: boolean
+                disableLogging:
+                  type: boolean
+                downloadProtocol:
+                  pattern: ^https?$
+                  type: string
+                enableRegexpImageTranslation:
+                  type: boolean
+                enableSriov:
+                  type: boolean
+                fdServerSocketPath:
+                  type: string
+                imageDir:
+                  type: string
+                imageTranslationConfigsDir:
+                  type: string
+                libvirtURI:
+                  type: string
+                logLevel:
+                  maximum: 2147483647
+                  minimum: 0
+                  type: integer
+                rawDevices:
+                  type: string
+                skipImageTranslation:
+                  type: boolean
+            nodeName:
+              type: string
+            nodeSelector:
+              type: object
+            priority:
+              type: integer
+  version: v1
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: null
 

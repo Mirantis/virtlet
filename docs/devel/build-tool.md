@@ -112,6 +112,15 @@ by CI.
 Starts the build container. This is done automatically by other
 `build/cmd.sh` commands that need the build container.
 
+### update-bindata
+
+Updates the generated bindata. Run this command if you modify
+anything under `deploy/data`.
+
+### update-docs
+
+Updates the documentation on virtletctl an the Virtlet config.
+
 ### e2e
 
 Runs Virtlet e2e tests against the currently running DIND cluster.

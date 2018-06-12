@@ -1,0 +1,18 @@
+| Description | Config field | Default value | Type | Command line flag / Env |
+| --- | --- | --- | --- | --- |
+| Path to fd server socket | `fdServerSocketPath` | `/var/lib/virtlet/tapfdserver.sock` | string | `--fd-server-socket-path` / `VIRTLET_FD_SERVER_SOCKET_PATH` |
+| Path to the virtlet database | `databasePath` | `/var/lib/virtlet/virtlet.db` | string | `--database-path` / `VIRTLET_DATABASE_PATH` |
+| Image download protocol. Can be https or http | `downloadProtocol` | `https` | string | `--image-download-protocol` / `VIRTLET_DOWNLOAD_PROTOCOL` |
+| Image directory | `imageDir` | `/var/lib/virtlet/images` | string | `--image-dir` / `VIRTLET_IMAGE_DIR` |
+| Image name translation configs directory | `imageTranslationConfigsDir` | `/etc/virtlet/images` | string | `--image-translation-configs-dir` / `VIRTLET_IMAGE_TRANSLATIONS_DIR` |
+| Libvirt connection URI | `libvirtURI` | `qemu:///system` | string | `--libvirt-uri` / `VIRTLET_LIBVIRT_URI` |
+| Comma separated list of raw device glob patterns which VMs can access (without '/dev/' prefix) | `rawDevices` | `loop*` | string | `--raw-devices` / `VIRTLET_RAW_DEVICES` |
+| The path to UNIX domain socket for CRI service to listen on | `criSocketPath` | `/run/virtlet.sock` | string | `--listen` / `VIRTLET_CRI_SOCKET_PATH` |
+| Display logging and the streamer | `disableLogging` | `false` | boolean | `--disable-logging` / `VIRTLET_DISABLE_LOGGING` |
+| Forcibly disable KVM support | `disableKVM` | `false` | boolean | `--disable-kvm` / `VIRTLET_DISABLE_KVM` |
+| Enable SR-IOV support | `enableSriov` | `false` | boolean | `--enable-sriov` / `VIRTLET_SRIOV_SUPPORT` |
+| Path to CNI plugin binaries | `cniPluginDir` | `/opt/cni/bin` | string | `--cni-bin-dir` / `VIRTLET_CNI_PLUGIN_DIR` |
+| Path to the CNI configuration directory | `cniConfigDir` | `/etc/cni/net.d` | string | `--cni-conf-dir` / `VIRTLET_CNI_CONFIG_DIR` |
+| Calico subnet size to use | `calicoSubnetSize` | `24` | integer | `--calico-subnet-size` / `VIRTLET_CALICO_SUBNET` |
+| Enable regexp image name translation | `enableRegexpImageTranslation` | `true` | boolean | `--enable-regexp-image-translation` / `IMAGE_REGEXP_TRANSLATION` |
+| Log level to use | `logLevel` | `1` | integer | `--v` / `VIRTLET_LOGLEVEL` |

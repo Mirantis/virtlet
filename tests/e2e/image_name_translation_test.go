@@ -22,7 +22,7 @@ import (
 	. "github.com/onsi/gomega"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/Mirantis/virtlet/pkg/imagetranslation"
+	virtlet_v1 "github.com/Mirantis/virtlet/pkg/api/virtlet.k8s/v1"
 	. "github.com/Mirantis/virtlet/tests/e2e/ginkgo-ext"
 )
 
@@ -30,12 +30,12 @@ var _ = Describe("Image URL", func() {
 	var vimName string
 
 	BeforeAll(func() {
-		vim, err := controller.CreateVirtletImageMapping(imagetranslation.VirtletImageMapping{
+		vim, err := controller.CreateVirtletImageMapping(virtlet_v1.VirtletImageMapping{
 			ObjectMeta: meta_v1.ObjectMeta{
 				GenerateName: "virtlet-e2e-",
 			},
-			Spec: imagetranslation.ImageTranslation{
-				Rules: []imagetranslation.TranslationRule{
+			Spec: virtlet_v1.ImageTranslation{
+				Rules: []virtlet_v1.TranslationRule{
 					{
 						Name: "test-image",
 						URL:  *vmImageLocation,
@@ -45,7 +45,7 @@ var _ = Describe("Image URL", func() {
 		})
 
 		Expect(err).NotTo(HaveOccurred())
-		vimName = vim.Name()
+		vimName = vim.Name
 	})
 
 	AfterAll(func() {

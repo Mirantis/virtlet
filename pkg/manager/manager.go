@@ -22,7 +22,9 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/client-go/tools/clientcmd"
 
+	"github.com/Mirantis/virtlet/pkg/api/virtlet.k8s/v1"
 	"github.com/Mirantis/virtlet/pkg/image"
 	"github.com/Mirantis/virtlet/pkg/imagetranslation"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
@@ -32,64 +34,19 @@ import (
 )
 
 const (
-	defaultDownloadProtocol   = "https"
 	tapManagerConnectInterval = 200 * time.Millisecond
 	tapManagerAttemptCount    = 50
-	defaultLibvirtURI         = "qemu:///system"
 	streamerSocketPath        = "/var/lib/libvirt/streamer.sock"
-	defaultCRISocketPath      = "/run/virtlet.sock"
+	volumePoolName            = "volumes"
 )
-
-// VirtletConfig denotes a configuration for VirtletManager.
-type VirtletConfig struct {
-	// FdServerSocketPath specifies the path to fdServer socket.
-	FDServerSocketPath string
-	// FDManager specifies an FDManager to use to set up
-	// the pod networking. If it's set, FDServerSocketPath is ignored.
-	FDManager tapmanager.FDManager
-	// DatabasePath specifies the path to Virtlet database.
-	DatabasePath string
-	// DownloadProtocol specifies the download protocol to use.
-	// It defaults to "https"
-	DownloadProtocol string
-	// ImageDir specifies the image store directory.
-	ImageDir string
-	// ImageTranslationConfigsDir specifies the directory with
-	// image translation configuration files. Empty string means
-	// such directory is not used.
-	ImageTranslationConfigsDir string
-	// SkipImageTranslation disables image translations
-	SkipImageTranslation bool
-	// LibvirtURI specifies the libvirt connnection URI
-	LibvirtURI string
-	// RawDevices specifies a comma-separated list of raw device
-	// glob patterns which VMs can access
-	RawDevices string
-	// CRISocketPath specifies the socket path for the gRPC endpoint.
-	CRISocketPath string
-	// DisableLogging disables the streaming server
-	DisableLogging bool
-}
-
-// ApplyDefaults applies default settings to VirtletConfig
-func (c *VirtletConfig) applyDefaults() {
-	if c.LibvirtURI == "" {
-		c.LibvirtURI = defaultLibvirtURI
-	}
-	if c.DownloadProtocol == "" {
-		c.DownloadProtocol = defaultDownloadProtocol
-	}
-	if c.CRISocketPath == "" {
-		c.CRISocketPath = defaultCRISocketPath
-	}
-}
 
 // VirtletManager wraps the Virtlet's Runtime and Image CRI services,
 // as well as a gRPC server that provides access to them.
 type VirtletManager struct {
-	config         *VirtletConfig
+	config         *v1.VirtletConfig
 	metadataStore  metadata.Store
 	fdManager      tapmanager.FDManager
+	clientCfg      clientcmd.ClientConfig
 	virtTool       *libvirttools.VirtualizationTool
 	imageStore     image.Store
 	runtimeService *VirtletRuntimeService
@@ -98,20 +55,17 @@ type VirtletManager struct {
 }
 
 // NewVirtletManager creates a new VirtletManager.
-func NewVirtletManager(config *VirtletConfig) *VirtletManager {
-	return &VirtletManager{config: config}
+func NewVirtletManager(config *v1.VirtletConfig, fdManager tapmanager.FDManager, clientCfg clientcmd.ClientConfig) *VirtletManager {
+	return &VirtletManager{config: config, fdManager: fdManager}
 }
 
 // Run sets up the environment for the runtime and image services and
 // starts the gRPC listener. It doesn't return until the server is
 // stopped or an error occurs.
 func (v *VirtletManager) Run() error {
-	v.config.applyDefaults()
 	var err error
-	if v.config.FDManager != nil {
-		v.fdManager = v.config.FDManager
-	} else {
-		client := tapmanager.NewFDClient(v.config.FDServerSocketPath)
+	if v.fdManager == nil {
+		client := tapmanager.NewFDClient(*v.config.FDServerSocketPath)
 		for i := 0; i < tapManagerAttemptCount; i++ {
 			time.Sleep(tapManagerConnectInterval)
 			if err = client.Connect(); err == nil {
@@ -124,35 +78,38 @@ func (v *VirtletManager) Run() error {
 		v.fdManager = client
 	}
 
-	v.metadataStore, err = metadata.NewStore(v.config.DatabasePath)
+	v.metadataStore, err = metadata.NewStore(*v.config.DatabasePath)
 	if err != nil {
 		return fmt.Errorf("failed to create metadata store: %v", err)
 	}
 
-	downloader := image.NewDownloader(v.config.DownloadProtocol)
-	v.imageStore = image.NewFileStore(v.config.ImageDir, downloader, nil)
+	downloader := image.NewDownloader(*v.config.DownloadProtocol)
+	v.imageStore = image.NewFileStore(*v.config.ImageDir, downloader, nil)
 	v.imageStore.SetRefGetter(v.metadataStore.ImagesInUse)
 
 	var translator image.Translator
-	if !v.config.SkipImageTranslation {
-		if err = imagetranslation.RegisterCustomResourceType(); err != nil {
-			return fmt.Errorf("failed to register image translation CRD: %v", err)
-		}
-		translator = imagetranslation.GetDefaultImageTranslator(v.config.ImageTranslationConfigsDir)
+	if !*v.config.SkipImageTranslation {
+		translator = imagetranslation.GetDefaultImageTranslator(*v.config.ImageTranslationConfigsDir, *v.config.EnableRegexpImageTranslation, v.clientCfg)
 	} else {
 		translator = imagetranslation.GetEmptyImageTranslator()
 	}
 
-	conn, err := libvirttools.NewConnection(v.config.LibvirtURI)
+	conn, err := libvirttools.NewConnection(*v.config.LibvirtURI)
 	if err != nil {
 		return fmt.Errorf("error establishing libvirt connection: %v", err)
 	}
 
-	volSrc := libvirttools.GetDefaultVolumeSource()
-	v.virtTool = libvirttools.NewVirtualizationTool(conn, conn, v.imageStore, v.metadataStore, "volumes", v.config.RawDevices, volSrc)
+	virtConfig := libvirttools.VirtualizationConfig{
+		DisableKVM:     *v.config.DisableKVM,
+		EnableSriov:    *v.config.EnableSriov,
+		VolumePoolName: volumePoolName,
+	}
+	if *v.config.RawDevices != "" {
+		virtConfig.RawDevices = strings.Split(*v.config.RawDevices, ",")
+	}
 
 	var streamServer StreamServer
-	if !v.config.DisableLogging {
+	if !*v.config.DisableLogging {
 		s, err := stream.NewServer(streamerSocketPath, v.metadataStore)
 		if err != nil {
 			return fmt.Errorf("couldn't create stream server: %v", err)
@@ -160,12 +117,15 @@ func (v *VirtletManager) Run() error {
 
 		err = s.Start()
 		if err != nil {
-			glog.Warning("Could not start stream server: %s", err)
+			glog.Warningf("Could not start stream server: %s", err)
 
 		}
 		streamServer = s
-		v.virtTool.SetStreamerSocketPath(streamerSocketPath)
+		virtConfig.StreamerSocketPath = streamerSocketPath
 	}
+
+	volSrc := libvirttools.GetDefaultVolumeSource()
+	v.virtTool = libvirttools.NewVirtualizationTool(conn, conn, v.imageStore, v.metadataStore, volSrc, virtConfig)
 
 	runtimeService := NewVirtletRuntimeService(v.virtTool, v.metadataStore, v.fdManager, streamServer, v.imageStore, nil)
 	imageService := NewVirtletImageService(v.imageStore, translator)
@@ -179,7 +139,7 @@ func (v *VirtletManager) Run() error {
 	}
 
 	glog.V(1).Infof("Starting server on socket %s", v.config.CRISocketPath)
-	if err = v.server.Serve(v.config.CRISocketPath); err != nil {
+	if err = v.server.Serve(*v.config.CRISocketPath); err != nil {
 		return fmt.Errorf("serving failed: %v", err)
 	}
 
