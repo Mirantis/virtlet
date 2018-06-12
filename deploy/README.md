@@ -75,6 +75,9 @@ by Virtlet when it's deployed using k8s yaml produced by `virtletctl gen`:
   * `image_regexp_translation` - enables regexp syntax for the image name translation rules.
   * `disable_logging` - disables log streaming from VMs. Use "1" to disable.
 
+It's also possible to set [per-node configuration](../docs/config.md)
+for Virtlet using CRDs.
+
 ## Removing Virtlet
 
 In order to remove Virtlet, first you need to delete all the VM pods.
