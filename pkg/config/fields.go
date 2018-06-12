@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/golang/glog"
 	"github.com/kballard/go-shellquote"
@@ -29,9 +30,11 @@ import (
 )
 
 type configField interface {
+	typeName() string
 	fieldName() string
 	flagName() string
 	envName() string
+	defaultStr() string
 	applyDefault()
 	clear()
 	present() bool
@@ -40,19 +43,21 @@ type configField interface {
 	setFromEnvValue(value string)
 	envValue() string
 	schemaProps() (string, apiext.JSONSchemaProps)
+	description() string
 }
 
 type fieldBase struct {
 	field     string
 	flag      string
 	shorthand string
-	usage     string
+	desc      string
 	env       string
 }
 
-func (f *fieldBase) fieldName() string { return f.field }
-func (f *fieldBase) flagName() string  { return f.flag }
-func (f *fieldBase) envName() string   { return f.env }
+func (f *fieldBase) fieldName() string   { return f.field }
+func (f *fieldBase) flagName() string    { return f.flag }
+func (f *fieldBase) envName() string     { return f.env }
+func (f *fieldBase) description() string { return f.desc }
 
 type stringField struct {
 	fieldBase
@@ -63,6 +68,8 @@ type stringField struct {
 
 var _ configField = &stringField{}
 
+func (sf *stringField) typeName() string   { return "string" }
+func (sf *stringField) defaultStr() string { return sf.defValue }
 func (sf *stringField) applyDefault() {
 	if *sf.value == nil {
 		*sf.value = &sf.defValue
@@ -73,7 +80,7 @@ func (sf *stringField) clear()        { *sf.value = nil }
 func (sf *stringField) present() bool { return *sf.value != nil }
 
 func (sf *stringField) addFlag(f *flag.FlagSet) {
-	f.StringVarP(*sf.value, sf.flag, sf.shorthand, sf.defValue, sf.usage)
+	f.StringVarP(*sf.value, sf.flag, sf.shorthand, sf.defValue, sf.desc)
 }
 
 func (sf *stringField) override(from configField) {
@@ -110,6 +117,8 @@ type boolField struct {
 
 var _ configField = &boolField{}
 
+func (bf *boolField) typeName() string   { return "boolean" }
+func (bf *boolField) defaultStr() string { return strconv.FormatBool(bf.defValue) }
 func (bf *boolField) applyDefault() {
 	if *bf.value == nil {
 		*bf.value = &bf.defValue
@@ -120,7 +129,7 @@ func (bf *boolField) clear()        { *bf.value = nil }
 func (bf *boolField) present() bool { return *bf.value != nil }
 
 func (bf *boolField) addFlag(f *flag.FlagSet) {
-	f.BoolVarP(*bf.value, bf.flag, bf.shorthand, bf.defValue, bf.usage)
+	f.BoolVarP(*bf.value, bf.flag, bf.shorthand, bf.defValue, bf.desc)
 }
 
 func (bf *boolField) override(from configField) {
@@ -159,6 +168,8 @@ type intField struct {
 
 var _ configField = &intField{}
 
+func (intf *intField) typeName() string   { return "integer" }
+func (intf *intField) defaultStr() string { return strconv.Itoa(intf.defValue) }
 func (intf *intField) applyDefault() {
 	if *intf.value == nil {
 		*intf.value = &intf.defValue
@@ -169,7 +180,7 @@ func (intf *intField) clear()        { *intf.value = nil }
 func (intf *intField) present() bool { return *intf.value != nil }
 
 func (intf *intField) addFlag(f *flag.FlagSet) {
-	f.IntVarP(*intf.value, intf.flag, intf.shorthand, intf.defValue, intf.usage)
+	f.IntVarP(*intf.value, intf.flag, intf.shorthand, intf.defValue, intf.desc)
 }
 
 func (intf *intField) override(from configField) {
@@ -208,33 +219,35 @@ func (intf *intField) schemaProps() (string, apiext.JSONSchemaProps) {
 type envLookup func(name string) (string, bool)
 
 type fieldSet struct {
-	fields []configField
+	fields   []configField
+	docTitle string
+	desc     string
 }
 
-func (fs *fieldSet) addStringFieldWithPattern(field, flag, shorthand, usage, env, defValue, pattern string, value **string) {
+func (fs *fieldSet) addStringFieldWithPattern(field, flag, shorthand, desc, env, defValue, pattern string, value **string) {
 	fs.addField(&stringField{
-		fieldBase{field, flag, shorthand, usage, env},
+		fieldBase{field, flag, shorthand, desc, env},
 		defValue,
 		pattern,
 		value,
 	})
 }
 
-func (fs *fieldSet) addStringField(field, flag, shorthand, usage, env, defValue string, value **string) {
-	fs.addStringFieldWithPattern(field, flag, shorthand, usage, env, defValue, "", value)
+func (fs *fieldSet) addStringField(field, flag, shorthand, desc, env, defValue string, value **string) {
+	fs.addStringFieldWithPattern(field, flag, shorthand, desc, env, defValue, "", value)
 }
 
-func (fs *fieldSet) addBoolField(field, flag, shorthand, usage, env string, defValue bool, value **bool) {
+func (fs *fieldSet) addBoolField(field, flag, shorthand, desc, env string, defValue bool, value **bool) {
 	fs.addField(&boolField{
-		fieldBase{field, flag, shorthand, usage, env},
+		fieldBase{field, flag, shorthand, desc, env},
 		defValue,
 		value,
 	})
 }
 
-func (fs *fieldSet) addIntField(field, flag, shorthand, usage, env string, defValue, min, max int, value **int) {
+func (fs *fieldSet) addIntField(field, flag, shorthand, desc, env string, defValue, min, max int, value **int) {
 	fs.addField(&intField{
-		fieldBase{field, flag, shorthand, usage, env},
+		fieldBase{field, flag, shorthand, desc, env},
 		defValue,
 		min,
 		max,
@@ -254,7 +267,7 @@ func (fs *fieldSet) applyDefaults() {
 
 func (fs *fieldSet) addFlags(flagSet *flag.FlagSet) {
 	for _, f := range fs.fields {
-		if f.flagName() != "" {
+		if f.flagName() != "" && !strings.Contains("+", f.flagName()) {
 			f.addFlag(flagSet)
 		}
 	}
@@ -312,4 +325,37 @@ func (fs *fieldSet) schemaProps() map[string]apiext.JSONSchemaProps {
 		r[field] = props
 	}
 	return r
+}
+
+func (fs *fieldSet) generateDoc() string {
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf,
+		"| Description | Config field | Default value | Type | Command line flag / Env |\n"+
+			"| --- | --- | --- | --- | --- |\n")
+	esc := func(s string) string { return strings.Replace(s, "|", "\\|", -1) }
+	code := func(s string) string {
+		if s == "" {
+			return ""
+		}
+		return fmt.Sprintf("`%s`", esc(s))
+	}
+	for _, f := range fs.fields {
+		if f.description() == "" {
+			continue
+		}
+		var flagEnv []string
+		if f.flagName() != "" {
+			flagEnv = append(flagEnv, code("--"+strings.Replace(f.flagName(), "+", "", -1)))
+		}
+		if f.envName() != "" {
+			flagEnv = append(flagEnv, code(f.envName()))
+		}
+		fmt.Fprintf(&buf, "| %s | %s | %s | %s | %s |\n",
+			esc(f.description()),
+			code(f.fieldName()),
+			code(f.defaultStr()),
+			f.typeName(),
+			strings.Join(flagEnv, " / "))
+	}
+	return buf.String()
 }

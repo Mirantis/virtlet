@@ -48,7 +48,7 @@ func newRootCmd() *cobra.Command {
 	cmd.AddCommand(tools.NewSSHCmd(client, os.Stdout, ""))
 	cmd.AddCommand(tools.NewVNCCmd(client, os.Stdout, true))
 	cmd.AddCommand(tools.NewInstallCmd(cmd, "", ""))
-	cmd.AddCommand(tools.NewGenDocCmd(cmd))
+	cmd.AddCommand(tools.NewGenDocCmd(cmd, os.Stdout))
 	cmd.AddCommand(tools.NewGenCmd(os.Stdout))
 	cmd.AddCommand(tools.NewVersionCommand(client, os.Stdout, nil))
 

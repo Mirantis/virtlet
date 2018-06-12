@@ -347,3 +347,7 @@ func TestLoadMappings(t *testing.T) {
 	}
 	gm.Verify(t, gm.NewYamlVerifier(cfg))
 }
+
+func TestGenerateDoc(t *testing.T) {
+	gm.Verify(t, GenerateDoc())
+}

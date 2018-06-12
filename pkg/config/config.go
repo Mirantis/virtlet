@@ -91,8 +91,9 @@ func configFieldSet(c *virtlet_v1.VirtletConfig) *fieldSet {
 	fs.addStringField("cniConfigDir", "cni-conf-dir", "", "Path to the CNI configuration directory", cniConfigDirEnv, defaultCNIConfigDir, &c.CNIConfigDir)
 	fs.addIntField("calicoSubnetSize", "calico-subnet-size", "", "Calico subnet size to use", calicoSubnetEnv, defaultCalicoSubnet, 0, 32, &c.CalicoSubnetSize)
 	fs.addBoolField("enableRegexpImageTranslation", "enable-regexp-image-translation", "", "Enable regexp image name translation", enableRegexpImageTranslationEnv, true, &c.EnableRegexpImageTranslation)
-	// this field duplicates glog's --v, so no option for it
-	fs.addIntField("logLevel", "", "", "", logLevelEnv, 1, 0, math.MaxInt32, &c.LogLevel)
+	// this field duplicates glog's --v, so no option for it, which is signified
+	// by "+" here (it's only for doc)
+	fs.addIntField("logLevel", "+v", "", "Log level to use", logLevelEnv, 1, 0, math.MaxInt32, &c.LogLevel)
 	return &fs
 }
 
@@ -113,6 +114,12 @@ func Override(target, other *virtlet_v1.VirtletConfig) {
 // corresponding to the VirtletConfig.
 func DumpEnv(c *virtlet_v1.VirtletConfig) string {
 	return configFieldSet(c).dumpEnv()
+}
+
+// GenerateDoc generates a markdown document with a table describing
+// all the configuration settings.
+func GenerateDoc() string {
+	return configFieldSet(&virtlet_v1.VirtletConfig{}).generateDoc()
 }
 
 func mappingMatches(cm virtlet_v1.VirtletConfigMapping, nodeName string, nodeLabels map[string]string) bool {

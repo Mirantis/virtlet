@@ -34,7 +34,7 @@ func TestGenDocCommand(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	cmd := NewGenDocCmd(fakeCobraCommand())
+	cmd := NewGenDocCmd(fakeCobraCommand(), nil)
 	cmd.SilenceUsage = true
 	cmd.SilenceErrors = true
 	cmd.SetArgs([]string{tmpDir})
@@ -58,6 +58,18 @@ func TestGenDocCommand(t *testing.T) {
 				t.Errorf("failed to write file content: %v", err)
 			}
 		}
+	}
+	gm.Verify(t, buf.Bytes())
+}
+
+func TestGenDocForConfig(t *testing.T) {
+	var buf bytes.Buffer
+	cmd := NewGenDocCmd(nil, &buf)
+	cmd.SilenceUsage = true
+	cmd.SilenceErrors = true
+	cmd.SetArgs([]string{"--config"})
+	if err := cmd.Execute(); err != nil {
+		t.Errorf("Error running gendoc command: %v", err)
 	}
 	gm.Verify(t, buf.Bytes())
 }
