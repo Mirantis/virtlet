@@ -124,8 +124,8 @@ func setLogLevel(config *v1.VirtletConfig) {
 func main() {
 	utils.HandleNsFixReexec()
 	clientCfg := utils.BindFlags(flag.CommandLine)
-	var cb *config.ConfigBinder
-	cb = config.NewConfigBinder(flag.CommandLine)
+	var cb *config.Binder
+	cb = config.NewBinder(flag.CommandLine)
 	flag.Parse()
 	localConfig := cb.GetConfig()
 

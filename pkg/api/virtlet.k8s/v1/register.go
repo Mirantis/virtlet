@@ -28,10 +28,12 @@ const (
 )
 
 var (
-	schemeBuilder      = runtime.NewSchemeBuilder(addKnownTypes)
-	scheme             = runtime.NewScheme()
+	schemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	scheme        = runtime.NewScheme()
+	// SchemeGroupVersion is group version used to register the objects
 	SchemeGroupVersion = schema.GroupVersion{Group: groupName, Version: version}
-	AddToScheme        = schemeBuilder.AddToScheme
+	// AddToScheme adds the objects to the scheme
+	AddToScheme = schemeBuilder.AddToScheme
 )
 
 // Resource takes an unqualified resource and returns a Group qualified GroupResource.

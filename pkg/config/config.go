@@ -138,7 +138,7 @@ func mappingMatches(cm virtlet_v1.VirtletConfigMapping, nodeName string, nodeLab
 	return true
 }
 
-// MergeConfig merges several Virtlet configs together, with
+// MergeConfigs merges several Virtlet configs together, with
 // configs going later taking precedence.
 func MergeConfigs(configs []*virtlet_v1.VirtletConfig) *virtlet_v1.VirtletConfig {
 	var cfg *virtlet_v1.VirtletConfig
@@ -152,23 +152,23 @@ func MergeConfigs(configs []*virtlet_v1.VirtletConfig) *virtlet_v1.VirtletConfig
 	return cfg
 }
 
-// ConfigBinder is used to extract Virtlet config from a FlagSet.
-type ConfigBinder struct {
+// Binder is used to extract Virtlet config from a FlagSet.
+type Binder struct {
 	flagSet   *flag.FlagSet
 	config    *virtlet_v1.VirtletConfig
 	fieldSet  *fieldSet
 	lookupEnv envLookup
 }
 
-// NewConfigBinder returns a new ConfigBinder.
-func NewConfigBinder(flagSet *flag.FlagSet) *ConfigBinder {
+// NewBinder returns a new Binder.
+func NewBinder(flagSet *flag.FlagSet) *Binder {
 	config := &virtlet_v1.VirtletConfig{}
 	fs := configFieldSet(config)
 	fs.applyDefaults()
 	if flagSet != nil {
 		fs.addFlags(flagSet)
 	}
-	return &ConfigBinder{
+	return &Binder{
 		flagSet:  flagSet,
 		config:   config,
 		fieldSet: fs,
@@ -178,10 +178,10 @@ func NewConfigBinder(flagSet *flag.FlagSet) *ConfigBinder {
 // GetConfig returns the config that only includes the fields that
 // were explicitly set in the flags. It should be called after parsing
 // the flags.
-func (cb *ConfigBinder) GetConfig() *virtlet_v1.VirtletConfig {
-	cb.fieldSet.clearFieldsNotInFlagSet(cb.flagSet)
-	cb.fieldSet.setFromEnv(cb.lookupEnv)
-	return cb.config
+func (b *Binder) GetConfig() *virtlet_v1.VirtletConfig {
+	b.fieldSet.clearFieldsNotInFlagSet(b.flagSet)
+	b.fieldSet.setFromEnv(b.lookupEnv)
+	return b.config
 }
 
 // configForNode gets virtlet_v1.VirtletConfig for the specified node name and labels.

@@ -18,5 +18,4 @@ limitations under the License.
 
 // Package v1 is the v1 version of the API.
 // +groupName=virtlet.k8s
-
 package v1

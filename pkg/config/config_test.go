@@ -61,7 +61,7 @@ func verifyEnv(t *testing.T, c *virtlet_v1.VirtletConfig) {
 			fakeEnv[parts[1]] = subparts[0]
 		}
 	}
-	binder := NewConfigBinder(nil)
+	binder := NewBinder(nil)
 	binder.lookupEnv = func(name string) (string, bool) {
 		r, found := fakeEnv[name]
 		return r, found
@@ -153,7 +153,7 @@ func TestMergeConfigs(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			flags := flag.NewFlagSet("virtlet", flag.ContinueOnError)
-			configBinder := NewConfigBinder(flags)
+			configBinder := NewBinder(flags)
 			if err := flags.Parse(strings.Split(tc.args, " ")); err != nil {
 				t.Fatalf("error parsing flags: %v", err)
 			}

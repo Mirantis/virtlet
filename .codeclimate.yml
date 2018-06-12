@@ -50,3 +50,5 @@ exclude_patterns:
   # CRI fields / consts, but make CodeClimate unhappy due to
   # underscores and "Id" instead of "ID"
   - "pkg/metadata/types/types.go"
+  # gofmt issue in the generated code
+  - "pkg/client/clientset/versioned/clientset.go"
