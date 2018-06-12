@@ -488,6 +488,20 @@ function update_bindata_internal {
     go-bindata -modtime "${bindata_modtime}" -o "${bindata_out}" -pkg "${bindata_pkg}" "${bindata_dir}"
 }
 
+function update_docs_internal {
+  if [[ ! -f _output/virtletctl ]]; then
+    echo >&2 "Please run build/cmd.sh build first"
+  fi
+  _output/virtletctl gendoc docs/virtletctl
+  tempfile="$(tempfile)"
+  _output/virtletctl gendoc --config >"${tempfile}"
+  sed -i "/<!-- begin -->/,/<!-- end -->/{
+//!d
+/begin/r ${tempfile}
+}" docs/config.md
+  rm -f "${tempfile}"
+}
+
 function usage {
     echo >&2 "Usage:"
     echo >&2 "  $0 build"
@@ -498,6 +512,8 @@ function usage {
     echo >&2 "  $0 vsh"
     echo >&2 "  $0 stop"
     echo >&2 "  $0 clean"
+    echo >&2 "  $0 update-bindata"
+    echo >&2 "  $0 update-docs"
     echo >&2 "  $0 gotest [TEST_ARGS...]"
     echo >&2 "  $0 gobuild [BUILD_ARGS...]"
     echo >&2 "  $0 run CMD..."
@@ -550,6 +566,14 @@ case "${cmd}" in
         ;;
     update-bindata-internal)
         update_bindata_internal
+        ;;
+    update-docs)
+        vcmd "build/cmd.sh update-docs-internal"
+        rm -rf "${project_dir}/docs/virtletctl"
+        docker exec virtlet-build tar -C "${remote_project_dir}" -c docs/config.md docs/virtletctl | tar -C "${project_dir}" -xv
+        ;;
+    update-docs-internal)
+        update_docs_internal
         ;;
     run)
         vcmd "$*"
