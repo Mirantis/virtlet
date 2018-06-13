@@ -56,6 +56,7 @@ import (
 
 	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/network"
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 const (
@@ -733,7 +734,6 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 		pciAddress := ""
 		var ifaceType network.InterfaceType
 		var fo *os.File
-		var vlanID int
 
 		mtu := link.Attrs().MTU
 
@@ -758,10 +758,6 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 			// new file descriptor with /dev/null opened
 			fo, err = os.Open("/dev/null")
 			if err != nil {
-				return nil, err
-			}
-
-			if vlanID, err = getVfVlanID(pciAddress); err != nil {
 				return nil, err
 			}
 
@@ -837,7 +833,6 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 			HardwareAddr: hwAddr,
 			PCIAddress:   pciAddress,
 			MTU:          uint16(mtu),
-			VLanID:       vlanID,
 		})
 	}
 
@@ -1263,4 +1258,82 @@ func netmaskForCalico() net.IPMask {
 		}
 	}
 	return net.CIDRMask(n, 32)
+}
+
+// VfInfo contains information about vlan id of SR-IOV VF on particular pci address
+type VfInfo struct {
+	PCIAddress string
+	Vlan       int
+}
+
+// GetVfInfos looks for VFs in container namespace returning them with
+// theirs vlan ids readed from theirs master devices residuing in host namespace
+func GetVfInfos(nspath string) ([]*VfInfo, error) {
+	vmNS, err := ns.GetNS(nspath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open network namespace at %q: %v", nspath, err)
+	}
+
+	var vfInfos []*VfInfo
+	if err := vmNS.Do(func(ns.NetNS) error {
+		// enter container namespace
+		if err := utils.MountSysfs(); err != nil {
+			return err
+		}
+		defer func() {
+			if err := utils.UnmountSysfs(); err != nil {
+				glog.V(3).Infof("Warning, error during umount of /sys: %v", err)
+			}
+		}()
+
+		allLinks, err := netlink.LinkList()
+		if err != nil {
+			return err
+		}
+		for _, link := range allLinks {
+			// find all VFs
+			if isSriovVf(link) {
+				pciAddress, err := getPCIAddressOfVF(link.Attrs().Name)
+				if err != nil {
+					return err
+				}
+				vfInfos = append(vfInfos, &VfInfo{
+					PCIAddress: pciAddress,
+				})
+			}
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	// update vlan id for each vf looking on it's master device
+	// in host namespace
+	for _, vf := range vfInfos {
+		vlan, err := getVfVlanID(vf.PCIAddress)
+		if err != nil {
+			return nil, err
+		}
+		vf.Vlan = vlan
+	}
+
+	return vfInfos, err
+}
+
+// UpdateVfsInInterfaces using vfInfos sets correct vlan id for each vf
+// found in interfaces of csn
+func UpdateVfsInInterfaces(ifaces []*network.InterfaceDescription, vfInfos []*VfInfo) error {
+OUTER:
+	for _, iface := range ifaces {
+		if iface.Type == network.InterfaceTypeVF {
+			for _, info := range vfInfos {
+				if iface.PCIAddress == info.PCIAddress {
+					iface.VLanID = info.Vlan
+					continue OUTER
+				}
+			}
+			return fmt.Errorf("didn't found %s in vfinfos", iface.PCIAddress)
+		}
+	}
+	return nil
 }
