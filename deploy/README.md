@@ -9,7 +9,7 @@ See [this document](real-cluster.md) for instructions.
 The steps described here are performed automatically by
 [demo.sh](demo.sh) script.
 
-1. Start [kubeadm-dind-cluster](https://github.com/Mirants/kubeadm-dind-cluster)
+1. Start [kubeadm-dind-cluster](https://github.com/kubernetes-sigs/kubeadm-dind-cluster)
    with Kubernetes version 1.9 (you're not required to download it to your home directory):
    ```
    $ wget -O ~/dind-cluster-v1.9.sh https://cdn.rawgit.com/kubernetes-sigs/kubeadm-dind-cluster/master/fixed/dind-cluster-v1.9.sh
