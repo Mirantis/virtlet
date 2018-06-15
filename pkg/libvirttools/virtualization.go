@@ -75,6 +75,7 @@ type domainSettings struct {
 	rootDiskFilepath string
 	netFdKey         string
 	enableSriov      bool
+	cpuModel         string
 }
 
 func (ds *domainSettings) createDomain(config *types.VMConfig) *libvirtxml.Domain {
@@ -109,23 +110,6 @@ func (ds *domainSettings) createDomain(config *types.VMConfig) *libvirtxml.Domai
 				{Dev: "hd"},
 			},
 		},
-
-		// The following enables nested virtualization.
-		// The plan is to enable it via an annotation at some point.
-		// It commonly requires kvm_intel module to be loaded like this:
-		// modprobe kvm_intel nested=1
-		// CPU: &libvirtxml.DomainCPU{
-		// 	Mode: "host-model",
-		// 	Model: &libvirtxml.DomainCPUModel{
-		// 		Fallback: "forbid",
-		// 	},
-		// 	Features: []libvirtxml.DomainCPUFeature{
-		// 		{
-		// 			Policy: "require",
-		// 			Name:   "vmx",
-		// 		},
-		// 	},
-		// },
 
 		Features: &libvirtxml.DomainFeatureList{ACPI: &libvirtxml.DomainFeature{}},
 
@@ -164,6 +148,30 @@ func (ds *domainSettings) createDomain(config *types.VMConfig) *libvirtxml.Domai
 		},
 	}
 
+	// The following enables nested virtualization.
+	// In case of intel processors it requires nested=1 option
+	// for kvm_intel module. That can be passed like this:
+	// modprobe kvm_intel nested=1
+	switch ds.cpuModel {
+	case types.CPUModelHostModel:
+		domain.CPU = &libvirtxml.DomainCPU{
+			Mode: types.CPUModelHostModel,
+			Model: &libvirtxml.DomainCPUModel{
+				Fallback: "forbid",
+			},
+			Features: []libvirtxml.DomainCPUFeature{
+				{
+					Policy: "require",
+					Name:   "vmx",
+				},
+			},
+		}
+	case "":
+		// leave it empty
+	default:
+		glog.Warningf("Unknown value set in VIRTLET_CPU_MODEL: %q", ds.cpuModel)
+	}
+
 	if ds.enableSriov {
 		domain.QEMUCommandline.Envs = append(domain.QEMUCommandline.Envs,
 			libvirtxml.DomainQEMUCommandlineEnv{Name: "VMWRAPPER_KEEP_PRIVS", Value: "1"})
@@ -192,6 +200,10 @@ type VirtualizationConfig struct {
 	StreamerSocketPath string
 	// The name of libvirt volume pool to use for the VMs.
 	VolumePoolName string
+	// CPUModel contains type (can be overloaded by pod annotation)
+	// of cpu model to be passed in libvirt domain definition.
+	// Empty value denotes libvirt defaults usage.
+	CPUModel string
 }
 
 func (c *VirtualizationConfig) applyDefaults() {
@@ -281,6 +293,10 @@ func (v *VirtualizationTool) CreateContainer(config *types.VMConfig, netFdKey st
 	domainUUID := utils.NewUUID5(ContainerNsUUID, config.PodSandboxID)
 	// FIXME: this field should be moved to VMStatus struct (to be added)
 	config.DomainUUID = domainUUID
+	cpuModel := v.config.CPUModel
+	if config.ParsedAnnotations.CPUModel != "" {
+		cpuModel = string(config.ParsedAnnotations.CPUModel)
+	}
 	settings := domainSettings{
 		domainUUID: domainUUID,
 		// Note: using only first 13 characters because libvirt has an issue with handling
@@ -299,6 +315,7 @@ func (v *VirtualizationTool) CreateContainer(config *types.VMConfig, netFdKey st
 		cpuQuota:   config.CPUQuota / int64(config.ParsedAnnotations.VCPUCount),
 		memoryUnit: "b",
 		useKvm:     !v.config.DisableKVM,
+		cpuModel:   cpuModel,
 	}
 	if settings.memory == 0 {
 		settings.memory = defaultMemory
