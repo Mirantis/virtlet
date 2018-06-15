@@ -1,4 +1,10 @@
 # Resource management
+
+## CPU Model
+By default libvirt configures qemu to use cpu model which does not allow to work nested virtualization
+in VMs controlled by it. To change that you have to add annotation `VirtletCPUModel` in VM-Pod definition
+with value `host-model`.
+
 ## Resource monitoring on the node
 As Kubelet uses cAdvisor to collect metrics about running containers and Virtlet doesn't create container per each VM, and instead spawns VMs inside Virtlet container. This leads to all the resource usage being lumped together and ascribed to Virtlet pod.
 
