@@ -1,0 +1,15 @@
+calicoSubnetSize: 22
+cniConfigDir: /some/cni/conf/dir
+cniPluginDir: /some/cni/bin/dir
+criSocketPath: /some/cri.sock
+databasePath: /some/file.db
+disableKVM: true
+disableLogging: true
+downloadProtocol: http
+enableRegexpImageTranslation: false
+enableSriov: true
+fdServerSocketPath: /some/fd/server.sock
+imageDir: /some/image/dir
+imageTranslationConfigsDir: /some/translation/dir
+libvirtURI: qemu:///foobar
+rawDevices: sd*

@@ -1,0 +1,5 @@
+calicoSubnetSize: 22
+disableKVM: true
+enableSriov: true
+libvirtURI: qemu:///foobar
+rawDevices: sd*

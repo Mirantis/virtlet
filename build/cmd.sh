@@ -9,6 +9,7 @@ VIRTLET_IMAGE="${VIRTLET_IMAGE:-mirantis/virtlet}"
 VIRTLET_SKIP_RSYNC="${VIRTLET_SKIP_RSYNC:-}"
 VIRTLET_RSYNC_PORT="${VIRTLET_RSYNC_PORT:-18730}"
 VIRTLET_ON_MASTER="${VIRTLET_ON_MASTER:-}"
+VIRTLET_MULTI_NODE="${VIRTLET_MULTI_NODE:-}"
 # XXX: try to extract the docker socket path from DOCKER_HOST if it's set to unix://...
 DOCKER_SOCKET_PATH="${DOCKER_SOCKET_PATH:-/var/run/docker.sock}"
 FORCE_UPDATE_IMAGE="${FORCE_UPDATE_IMAGE:-}"
@@ -32,9 +33,15 @@ exclude=(
 )
 rsync_pw_file="${project_dir}/_output/rsync.password"
 busybox_image=busybox:1.27.2
-virtlet_node=kube-node-1
+virtlet_nodes=()
 if [[ ${VIRTLET_ON_MASTER} ]]; then
-  virtlet_node=kube-master
+  virtlet_nodes+=(kube-master)
+fi
+if [[ !${VIRTLET_ON_MASTER} || ${VIRTLET_MULTI_NODE} ]]; then
+  virtlet_nodes+=(kube-node-1)
+fi
+if [[ ${VIRTLET_MULTI_NODE} ]]; then
+  virtlet_nodes+=(kube-node-2)
 fi
 bindata_modtime=1522279343
 bindata_out="pkg/tools/bindata.go"
@@ -169,6 +176,7 @@ function ensure_build_container {
                -e CIRCLE_PULL_REQUEST="${CIRCLE_PULL_REQUEST:-}" \
                -e CIRCLE_BRANCH="${CIRCLE_PULL_REQUEST:-}" \
                -e VIRTLET_ON_MASTER="${VIRTLET_ON_MASTER:-}" \
+               -e VIRTLET_MULTI_NODE="${VIRTLET_MULTI_NODE:-}" \
                -e GITHUB_TOKEN="${GITHUB_TOKEN:-}" \
                ${docker_cert_args[@]+"${docker_cert_args[@]}"} \
                --name virtlet-build \
@@ -244,6 +252,7 @@ function copy_back {
 }
 
 function copy_dind_internal {
+    local virtlet_node="${1}"
     if ! docker volume ls -q | grep -q "^kubeadm-dind-${virtlet_node}$"; then
         echo "No active or snapshotted kubeadm-dind-cluster" >&2
         exit 1
@@ -260,12 +269,14 @@ function kvm_ok {
     # The check is done inside the virtlet node container because it
     # has proper /lib/modules from the docker host. Also, it'll have
     # to use the virtlet image later anyway.
-    if ! docker exec "${virtlet_node}" docker run --privileged --rm -v /lib/modules:/lib/modules "${VIRTLET_IMAGE}" kvm-ok; then
+    # Use kube-master node as all of the DIND nodes in the cluster are similar
+    if ! docker exec kube-master docker run --privileged --rm -v /lib/modules:/lib/modules "${VIRTLET_IMAGE}" kvm-ok; then
         return 1
     fi
 }
 
-function start_dind {
+function prepare_node {
+    local virtlet_node="${1}"
     ensure_build_container
     if ! docker exec "${virtlet_node}" dpkg-query -W criproxy-nodeps >&/dev/null; then
         echo >&2 "Installing CRI proxy package the node container..."
@@ -286,11 +297,14 @@ function start_dind {
         echo >&2 "Propagating Virtlet image to the node container..."
         vcmd "docker save '${virtlet_image}' | docker exec -i '${virtlet_node}' docker load"
     fi
+    kubectl label node --overwrite "${virtlet_node}" extraRuntime=virtlet
+}
+
+function start_dind {
     local -a virtlet_config=(--from-literal=image_regexp_translation="${IMAGE_REGEXP_TRANSLATION}")
     if ! kvm_ok || [[ ${VIRTLET_DISABLE_KVM:-} ]]; then
         virtlet_config+=(--from-literal=disable_kvm=y)
     fi
-    kubectl label node --overwrite "${virtlet_node}" extraRuntime=virtlet
     kubectl create configmap -n kube-system virtlet-config "${virtlet_config[@]}"
     kubectl create configmap -n kube-system virtlet-image-translations --from-file "${project_dir}/deploy/images.yaml"
     start_virtlet
@@ -474,6 +488,20 @@ function update_bindata_internal {
     go-bindata -modtime "${bindata_modtime}" -o "${bindata_out}" -pkg "${bindata_pkg}" "${bindata_dir}"
 }
 
+function update_docs_internal {
+  if [[ ! -f _output/virtletctl ]]; then
+    echo >&2 "Please run build/cmd.sh build first"
+  fi
+  _output/virtletctl gendoc docs/virtletctl
+  tempfile="$(tempfile)"
+  _output/virtletctl gendoc --config >"${tempfile}"
+  sed -i "/<!-- begin -->/,/<!-- end -->/{
+//!d
+/begin/r ${tempfile}
+}" docs/config.md
+  rm -f "${tempfile}"
+}
+
 function usage {
     echo >&2 "Usage:"
     echo >&2 "  $0 build"
@@ -484,6 +512,8 @@ function usage {
     echo >&2 "  $0 vsh"
     echo >&2 "  $0 stop"
     echo >&2 "  $0 clean"
+    echo >&2 "  $0 update-bindata"
+    echo >&2 "  $0 update-docs"
     echo >&2 "  $0 gotest [TEST_ARGS...]"
     echo >&2 "  $0 gobuild [BUILD_ARGS...]"
     echo >&2 "  $0 run CMD..."
@@ -537,6 +567,14 @@ case "${cmd}" in
     update-bindata-internal)
         update_bindata_internal
         ;;
+    update-docs)
+        vcmd "build/cmd.sh update-docs-internal"
+        rm -rf "${project_dir}/docs/virtletctl"
+        docker exec virtlet-build tar -C "${remote_project_dir}" -c docs/config.md docs/virtletctl | tar -C "${project_dir}" -xv
+        ;;
+    update-docs-internal)
+        update_docs_internal
+        ;;
     run)
         vcmd "$*"
         ;;
@@ -562,9 +600,14 @@ case "${cmd}" in
         e2e "$@"
         ;;
     copy-dind-internal)
-        copy_dind_internal
+        for virtlet_node in "${virtlet_nodes[@]}"; do
+          copy_dind_internal "${virtlet_node}"
+        done
         ;;
     start-dind)
+        for virtlet_node in "${virtlet_nodes[@]}"; do
+          prepare_node "${virtlet_node}"
+        done
         start_dind
         ;;
     start-build-container)

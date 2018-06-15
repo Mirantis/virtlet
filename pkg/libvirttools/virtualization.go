@@ -18,9 +18,7 @@ package libvirttools
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -76,6 +74,7 @@ type domainSettings struct {
 	cpuQuota         int64
 	rootDiskFilepath string
 	netFdKey         string
+	enableSriov      bool
 }
 
 func (ds *domainSettings) createDomain(config *types.VMConfig) *libvirtxml.Domain {
@@ -165,62 +164,71 @@ func (ds *domainSettings) createDomain(config *types.VMConfig) *libvirtxml.Domai
 		},
 	}
 
-	if os.Getenv("VIRTLET_SRIOV_SUPPORT") != "" {
+	if ds.enableSriov {
 		domain.QEMUCommandline.Envs = append(domain.QEMUCommandline.Envs,
 			libvirtxml.DomainQEMUCommandlineEnv{Name: "VMWRAPPER_KEEP_PRIVS", Value: "1"})
 	}
+
 	return domain
 }
 
-func canUseKvm() bool {
-	if os.Getenv("VIRTLET_DISABLE_KVM") != "" {
-		glog.V(0).Infof("VIRTLET_DISABLE_KVM env var not empty, using plain qemu")
-		return false
+// VirtualizationConfig specifies configuration options for VirtualizationTool.
+type VirtualizationConfig struct {
+	// True if KVM should be disabled
+	DisableKVM bool
+	// True if SR-IOV support needs to be enabled
+	EnableSriov bool
+	// List of raw devices that can be accessed by the VM.
+	RawDevices []string
+	// Kubelet's root dir
+	// FIXME: kubelet's --root-dir may be something other than /var/lib/kubelet
+	// Need to remove it from daemonset mounts (both dev and non-dev)
+	// Use 'nsenter -t 1 -m -- tar ...' or something to grab the path
+	// from root namespace
+	KubeletRootDir string
+	// The path of streamer socket used for
+	// logging. By default, the path is empty. When the path is empty,
+	// logging is disabled for the VMs.
+	StreamerSocketPath string
+	// The name of libvirt volume pool to use for the VMs.
+	VolumePoolName string
+}
+
+func (c *VirtualizationConfig) applyDefaults() {
+	if c.KubeletRootDir == "" {
+		c.KubeletRootDir = defaultKubeletRootDir
 	}
-	return true
 }
 
 // VirtualizationTool provides methods to operate on libvirt.
 type VirtualizationTool struct {
-	domainConn         virt.DomainConnection
-	storageConn        virt.StorageConnection
-	volumePoolName     string
-	imageManager       ImageManager
-	metadataStore      metadata.Store
-	clock              clockwork.Clock
-	forceKVM           bool
-	kubeletRootDir     string
-	rawDevices         []string
-	volumeSource       VMVolumeSource
-	streamerSocketPath string
+	domainConn    virt.DomainConnection
+	storageConn   virt.StorageConnection
+	imageManager  ImageManager
+	metadataStore metadata.Store
+	clock         clockwork.Clock
+	volumeSource  VMVolumeSource
+	config        VirtualizationConfig
 }
 
 var _ volumeOwner = &VirtualizationTool{}
 
 // NewVirtualizationTool verifies existence of volumes pool in libvirt store
 // and returns initialized VirtualizationTool.
-func NewVirtualizationTool(domainConn virt.DomainConnection, storageConn virt.StorageConnection, imageManager ImageManager,
-	metadataStore metadata.Store, volumePoolName, rawDevices string, volumeSource VMVolumeSource) *VirtualizationTool {
+func NewVirtualizationTool(domainConn virt.DomainConnection,
+	storageConn virt.StorageConnection, imageManager ImageManager,
+	metadataStore metadata.Store, volumeSource VMVolumeSource,
+	config VirtualizationConfig) *VirtualizationTool {
+	config.applyDefaults()
 	return &VirtualizationTool{
-		domainConn:     domainConn,
-		storageConn:    storageConn,
-		volumePoolName: volumePoolName,
-		imageManager:   imageManager,
-		metadataStore:  metadataStore,
-		clock:          clockwork.NewRealClock(),
-		// FIXME: kubelet's --root-dir may be something other than /var/lib/kubelet
-		// Need to remove it from daemonset mounts (both dev and non-dev)
-		// Use 'nsenter -t 1 -m -- tar ...' or something to grab the path
-		// from root namespace
-		kubeletRootDir: defaultKubeletRootDir,
-		rawDevices:     strings.Split(rawDevices, ","),
-		volumeSource:   volumeSource,
+		domainConn:    domainConn,
+		storageConn:   storageConn,
+		imageManager:  imageManager,
+		metadataStore: metadataStore,
+		clock:         clockwork.NewRealClock(),
+		volumeSource:  volumeSource,
+		config:        config,
 	}
-}
-
-// SetForceKVM forces VirtualizationTool to use KVM (used in tests)
-func (v *VirtualizationTool) SetForceKVM(forceKVM bool) {
-	v.forceKVM = forceKVM
 }
 
 // SetClock sets the clock to use (used in tests)
@@ -228,28 +236,16 @@ func (v *VirtualizationTool) SetClock(clock clockwork.Clock) {
 	v.clock = clock
 }
 
-// SetKubeletRootDir sets kubelet root dir for VirtualizationTool
-func (v *VirtualizationTool) SetKubeletRootDir(kubeletRootDir string) {
-	v.kubeletRootDir = kubeletRootDir
-}
-
-// SetStreamerSocketPath sets the path of streamer socket used for
-// logging. By default, the path is empty. When the path is empty,
-// logging is disabled for the VMs.
-func (v *VirtualizationTool) SetStreamerSocketPath(streamerSocketPath string) {
-	v.streamerSocketPath = streamerSocketPath
-}
-
 func (v *VirtualizationTool) addSerialDevicesToDomain(domain *libvirtxml.Domain) error {
 	port := uint(0)
 	timeout := uint(1)
-	if v.streamerSocketPath != "" {
+	if v.config.StreamerSocketPath != "" {
 		domain.Devices.Serials = []libvirtxml.DomainSerial{
 			{
 				Source: &libvirtxml.DomainChardevSource{
 					UNIX: &libvirtxml.DomainChardevSourceUNIX{
 						Mode: "connect",
-						Path: v.streamerSocketPath,
+						Path: v.config.StreamerSocketPath,
 						Reconnect: &libvirtxml.DomainChardevSourceReconnect{
 							Enabled: "yes",
 							Timeout: &timeout,
@@ -289,24 +285,26 @@ func (v *VirtualizationTool) CreateContainer(config *types.VMConfig, netFdKey st
 		domainUUID: domainUUID,
 		// Note: using only first 13 characters because libvirt has an issue with handling
 		// long path names for qemu monitor socket
-		domainName: "virtlet-" + domainUUID[:13] + "-" + config.Name,
-		netFdKey:   netFdKey,
+		domainName:  "virtlet-" + domainUUID[:13] + "-" + config.Name,
+		netFdKey:    netFdKey,
+		vcpuNum:     config.ParsedAnnotations.VCPUCount,
+		memory:      int(config.MemoryLimitInBytes),
+		cpuShares:   uint(config.CPUShares),
+		cpuPeriod:   uint64(config.CPUPeriod),
+		enableSriov: v.config.EnableSriov,
+		// CPU bandwidth limits for domains are actually set equal per
+		// each vCPU by libvirt. Thus, to limit overall VM's CPU
+		// threads consumption by the value from the pod definition
+		// we need to perform this division
+		cpuQuota:   config.CPUQuota / int64(config.ParsedAnnotations.VCPUCount),
+		memoryUnit: "b",
+		useKvm:     !v.config.DisableKVM,
 	}
-
-	settings.vcpuNum = config.ParsedAnnotations.VCPUCount
-	settings.memory = int(config.MemoryLimitInBytes)
-	settings.cpuShares = uint(config.CPUShares)
-	settings.cpuPeriod = uint64(config.CPUPeriod)
-	// Specified cpu bandwidth limits for domains actually are set equal per each vCPU by libvirt
-	// Thus, to limit overall VM's cpu threads consumption by set value in pod definition need to perform division
-	settings.cpuQuota = config.CPUQuota / int64(settings.vcpuNum)
-	settings.memoryUnit = "b"
 	if settings.memory == 0 {
 		settings.memory = defaultMemory
 		settings.memoryUnit = defaultMemoryUnit
 	}
 
-	settings.useKvm = v.forceKVM || canUseKvm()
 	domainDef := settings.createDomain(config)
 
 	diskList, err := newDiskList(config, v.volumeSource, v)
@@ -796,7 +794,7 @@ func (v *VirtualizationTool) ContainerInfo(containerID string) (*types.Container
 
 // StoragePool implements volumeOwner StoragePool method
 func (v *VirtualizationTool) StoragePool() (virt.StoragePool, error) {
-	return ensureStoragePool(v.storageConn, v.volumePoolName)
+	return ensureStoragePool(v.storageConn, v.config.VolumePoolName)
 }
 
 // DomainConnection implements volumeOwner DomainConnection method
@@ -806,10 +804,10 @@ func (v *VirtualizationTool) DomainConnection() virt.DomainConnection { return v
 func (v *VirtualizationTool) ImageManager() ImageManager { return v.imageManager }
 
 // RawDevices implements volumeOwner RawDevices method
-func (v *VirtualizationTool) RawDevices() []string { return v.rawDevices }
+func (v *VirtualizationTool) RawDevices() []string { return v.config.RawDevices }
 
 // KubeletRootDir implements volumeOwner KubeletRootDir method
-func (v *VirtualizationTool) KubeletRootDir() string { return v.kubeletRootDir }
+func (v *VirtualizationTool) KubeletRootDir() string { return v.config.KubeletRootDir }
 
 func filterContainer(containerInfo *types.ContainerInfo, filter types.ContainerFilter) bool {
 	if filter.Id != "" && containerInfo.Id != filter.Id {

@@ -229,13 +229,15 @@ func makeVirtletCRITester(t *testing.T) *virtletCRITester {
 	domainConn := fakevirt.NewFakeDomainConnection(rec.Child("domain conn"))
 	storageConn := fakevirt.NewFakeStorageConnection(rec.Child("storage"))
 	clock := clockwork.NewFakeClockAt(time.Unix(0, podTimestap))
-	virtTool := libvirttools.NewVirtualizationTool(domainConn, storageConn, imageStore, metadataStore, "volumes", "loop*", libvirttools.GetDefaultVolumeSource())
-	virtTool.SetClock(clock)
-	// avoid unneeded diffs in the golden master data
-	virtTool.SetForceKVM(true)
 	kubeletRootDir := filepath.Join(tmpDir, "kubelet-root")
-	virtTool.SetKubeletRootDir(kubeletRootDir)
-	virtTool.SetStreamerSocketPath(streamerSocketPath)
+	virtConfig := libvirttools.VirtualizationConfig{
+		VolumePoolName:     "volumes",
+		RawDevices:         []string{"loop*"},
+		KubeletRootDir:     kubeletRootDir,
+		StreamerSocketPath: streamerSocketPath,
+	}
+	virtTool := libvirttools.NewVirtualizationTool(domainConn, storageConn, imageStore, metadataStore, libvirttools.GetDefaultVolumeSource(), virtConfig)
+	virtTool.SetClock(clock)
 	streamServer := newFakeStreamServer(rec.Child("streamServer"))
 	criHandler := &criHandler{
 		VirtletRuntimeService: NewVirtletRuntimeService(virtTool, metadataStore, fdManager, streamServer, imageStore, clock),
@@ -655,7 +657,4 @@ func TestCRIAttachPortForward(t *testing.T) {
 	tst.verify()
 }
 
-// TODO: use interceptor for logging in the manager
-//       (apply it only if glog level is high enough)
-// TODO: make sure non-default namespace settings cause pod startup to fail.
-// TODO: don't use criapi, convert test objects from metadata instead
+// TODO: make sure non-default Linux namespace settings cause pod startup to fail.

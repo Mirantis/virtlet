@@ -19,13 +19,15 @@ package imagetranslation
 import (
 	"context"
 	"testing"
+
+	"github.com/Mirantis/virtlet/pkg/api/virtlet.k8s/v1"
 )
 
 // TestTranslations tests how image names are translated with various translation rules
 func TestTranslations(t *testing.T) {
-	configs := map[string]ImageTranslation{
+	configs := map[string]v1.ImageTranslation{
 		"config1": {
-			Rules: []TranslationRule{
+			Rules: []v1.TranslationRule{
 				{
 					Regex: `^image(\d+)`,
 					URL:   "http://example.net/image_$1.qcow2",
@@ -42,7 +44,7 @@ func TestTranslations(t *testing.T) {
 		},
 		"config2": {
 			Prefix: "prod",
-			Rules: []TranslationRule{
+			Rules: []v1.TranslationRule{
 				{
 					Regex: `^linux/(\d+\.\d+)`,
 					URL:   "http://acme.org/linux_$1.qcow2",
@@ -54,9 +56,6 @@ func TestTranslations(t *testing.T) {
 			},
 		},
 	}
-
-	translator := NewImageNameTranslator().(*imageNameTranslator)
-	translator.LoadConfigs(context.Background(), NewFakeConfigSource(configs))
 
 	for _, tc := range []struct {
 		name        string
@@ -126,7 +125,8 @@ func TestTranslations(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			translator.AllowRegexp = tc.allowRegexp
+			translator := NewImageNameTranslator(tc.allowRegexp).(*imageNameTranslator)
+			translator.LoadConfigs(context.Background(), NewFakeConfigSource(configs))
 			endpoint := translator.Translate(tc.imageName)
 			if tc.expectedURL != endpoint.URL {
 				t.Errorf("expected URL %q, but got %q", tc.expectedURL, endpoint.URL)

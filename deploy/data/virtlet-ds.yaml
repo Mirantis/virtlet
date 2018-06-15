@@ -54,15 +54,66 @@ spec:
           mountPath: /host-var-lib
         - name: dev
           mountPath: /dev
+        - mountPath: /var/lib/virtlet
+          name: virtlet
         securityContext:
           privileged: true
         env:
+        - name: KUBE_NODE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
         - name: VIRTLET_DISABLE_KVM
           valueFrom:
             configMapKeyRef:
               name: virtlet-config
               key: disable_kvm
               optional: true
+        - name: VIRTLET_SRIOV_SUPPORT
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: sriov_support
+              optional: true
+        - name: VIRTLET_DOWNLOAD_PROTOCOL
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: download_protocol
+              optional: true
+        - name: VIRTLET_LOGLEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: loglevel
+              optional: true
+        - name: VIRTLET_CALICO_SUBNET
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: calico-subnet
+              optional: true
+        - name: IMAGE_REGEXP_TRANSLATION
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: image_regexp_translation
+              optional: true
+        - name: VIRTLET_RAW_DEVICES
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: raw_devices
+              optional: true
+        - name: VIRTLET_DISABLE_LOGGING
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: disable_logging
+              optional: true
+        - name: VIRTLET_IMAGE_TRANSLATIONS_DIR
+          value: /etc/virtlet/images
 
       containers:
       - name: libvirt
@@ -100,19 +151,6 @@ spec:
           mountPath: /dev
         securityContext:
           privileged: true
-        env:
-        - name: VIRTLET_SRIOV_SUPPORT
-          valueFrom:
-            configMapKeyRef:
-              name: virtlet-config
-              key: sriov_support
-              optional: true
-        - name: VIRTLET_DISABLE_KVM
-          valueFrom:
-            configMapKeyRef:
-              name: virtlet-config
-              key: disable_kvm
-              optional: true
         readinessProbe:
           exec:
             command:
@@ -153,57 +191,6 @@ spec:
           mountPath: /var/log/pods
         securityContext:
           privileged: true
-        env:
-        - name: VIRTLET_DISABLE_KVM
-          valueFrom:
-            configMapKeyRef:
-              name: virtlet-config
-              key: disable_kvm
-              optional: true
-        - name: VIRTLET_DOWNLOAD_PROTOCOL
-          valueFrom:
-            configMapKeyRef:
-              name: virtlet-config
-              key: download_protocol
-              optional: true
-        - name: VIRTLET_LOGLEVEL
-          valueFrom:
-            configMapKeyRef:
-              name: virtlet-config
-              key: loglevel
-              optional: true
-        - name: VIRTLET_CALICO_SUBNET
-          valueFrom:
-            configMapKeyRef:
-              name: virtlet-config
-              key: calico-subnet
-              optional: true
-        - name: IMAGE_REGEXP_TRANSLATION
-          valueFrom:
-            configMapKeyRef:
-              name: virtlet-config
-              key: image_regexp_translation
-              optional: true
-        - name: VIRTLET_DISABLE_LOGGING
-          valueFrom:
-            configMapKeyRef:
-              name: virtlet-config
-              key: disable_logging
-              optional: true
-        - name: VIRTLET_SRIOV_SUPPORT
-          valueFrom:
-            configMapKeyRef:
-              name: virtlet-config
-              key: sriov_support
-              optional: true
-        - name: VIRTLET_RAW_DEVICES
-          valueFrom:
-            configMapKeyRef:
-              name: virtlet-config
-              key: raw_devices
-              optional: true
-        - name: IMAGE_TRANSLATIONS_DIR
-          value: /etc/virtlet/images
         readinessProbe:
           exec:
             command:
@@ -306,11 +293,13 @@ metadata:
   namespace: kube-system
 rules:
   - apiGroups:
-      - ""
+    - ""
     resources:
-      - configmaps
+    - configmaps
+    - nodes
     verbs:
-      - create
+    - create
+    - get
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRole
@@ -370,19 +359,20 @@ apiVersion: rbac.authorization.k8s.io/v1beta1
 metadata:
   name: virtlet-crd
 rules:
-  - apiGroups:
-      - "apiextensions.k8s.io"
-    resources:
-      - customresourcedefinitions
-    verbs:
-      - create
-  - apiGroups:
-      - "virtlet.k8s"
-    resources:
-      - virtletimagemappings
-    verbs:
-      - list
-      - get
+- apiGroups:
+  - "apiextensions.k8s.io"
+  resources:
+  - customresourcedefinitions
+  verbs:
+  - create
+- apiGroups:
+  - "virtlet.k8s"
+  resources:
+  - virtletimagemappings
+  - virtletconfigmappings
+  verbs:
+  - list
+  - get
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding

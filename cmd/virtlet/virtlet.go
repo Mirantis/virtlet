@@ -17,15 +17,20 @@ limitations under the License.
 package main
 
 import (
-	"flag"
+	goflag "flag"
+	"fmt"
 	"math/rand"
 	"os"
 	"os/exec"
 	"time"
 
 	"github.com/golang/glog"
+	flag "github.com/spf13/pflag"
+	"k8s.io/client-go/tools/clientcmd"
 
+	"github.com/Mirantis/virtlet/pkg/api/virtlet.k8s/v1"
 	"github.com/Mirantis/virtlet/pkg/cni"
+	"github.com/Mirantis/virtlet/pkg/config"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
 	"github.com/Mirantis/virtlet/pkg/manager"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
@@ -33,71 +38,49 @@ import (
 	"github.com/Mirantis/virtlet/pkg/version"
 )
 
+const (
+	wantTapManagerEnv = "WANT_TAP_MANAGER"
+	nodeNameEnv       = "KUBE_NODE_NAME"
+)
+
 var (
-	libvirtURI = flag.String("libvirt-uri", "qemu:///system",
-		"Libvirt connection URI")
-	imageDir = flag.String("image dir", "/var/lib/virtlet/images",
-		"Image directory")
-	boltPath = flag.String("bolt-path", "/var/lib/virtlet/virtlet.db",
-		"Path to the bolt database file")
-	listen = flag.String("listen", "/run/virtlet.sock",
-		"The unix socket to listen on, e.g. /run/virtlet.sock")
-	cniPluginsDir = flag.String("cni-bin-dir", "/opt/cni/bin",
-		"Path to CNI plugin binaries")
-	cniConfigsDir = flag.String("cni-conf-dir", "/etc/cni/net.d",
-		"Location of CNI configurations (first file name in lexicographic order will be chosen)")
-	imageDownloadProtocol = flag.String("image-download-protocol", "https",
-		"Image download protocol. Can be https (default) or http.")
-	rawDevices = flag.String("raw-devices", "loop*",
-		"Comma separated list of raw device glob patterns to which VM can have an access (with skipped /dev/ prefix)")
-	fdServerSocketPath = flag.String("fd-server-socket-path", "/var/lib/virtlet/tapfdserver.sock",
-		"Path to fd server socket")
-	imageTranslationConfigsDir = flag.String("image-translations-dir", "",
-		"Image name translation configs directory")
+	dumpConfig     = flag.Bool("dump-config", false, "Dump node-specific Virtlet config as a shell script and exit")
 	displayVersion = flag.Bool("version", false, "Display version and exit")
 	versionFormat  = flag.String("version-format", "text", "Version format to use (text, short, json, yaml)")
 )
 
-const (
-	WantTapManagerEnv = "WANT_TAP_MANAGER"
-)
+func configWithDefaults(cfg *v1.VirtletConfig) *v1.VirtletConfig {
+	r := config.GetDefaultConfig()
+	config.Override(r, cfg)
+	return r
+}
 
-func runVirtlet() {
-	manager := manager.NewVirtletManager(&manager.VirtletConfig{
-		FDServerSocketPath:         *fdServerSocketPath,
-		DatabasePath:               *boltPath,
-		DownloadProtocol:           *imageDownloadProtocol,
-		ImageDir:                   *imageDir,
-		ImageTranslationConfigsDir: *imageTranslationConfigsDir,
-		LibvirtURI:                 *libvirtURI,
-		RawDevices:                 *rawDevices,
-		CRISocketPath:              *listen,
-		DisableLogging:             os.Getenv("VIRTLET_DISABLE_LOGGING") != "",
-	})
+func runVirtlet(config *v1.VirtletConfig, clientCfg clientcmd.ClientConfig) {
+	manager := manager.NewVirtletManager(config, nil, clientCfg)
 	if err := manager.Run(); err != nil {
 		glog.Errorf("Error: %v", err)
 		os.Exit(1)
 	}
 }
 
-func runTapManager() {
-	cniClient, err := cni.NewClient(*cniPluginsDir, *cniConfigsDir)
+func runTapManager(config *v1.VirtletConfig) {
+	cniClient, err := cni.NewClient(*config.CNIPluginDir, *config.CNIConfigDir)
 	if err != nil {
 		glog.Errorf("Error initializing CNI client: %v", err)
 		os.Exit(1)
 	}
-	src, err := tapmanager.NewTapFDSource(cniClient)
+	src, err := tapmanager.NewTapFDSource(cniClient, *config.EnableSriov, *config.CalicoSubnetSize)
 	if err != nil {
 		glog.Errorf("Error creating tap fd source: %v", err)
 		os.Exit(1)
 	}
-	os.Remove(*fdServerSocketPath) // FIXME
-	s := tapmanager.NewFDServer(*fdServerSocketPath, src)
+	os.Remove(*config.FDServerSocketPath) // FIXME
+	s := tapmanager.NewFDServer(*config.FDServerSocketPath, src)
 	if err = s.Serve(); err != nil {
 		glog.Errorf("FD server returned error: %v", err)
 		os.Exit(1)
 	}
-	if err := libvirttools.ChownForEmulator(*fdServerSocketPath); err != nil {
+	if err := libvirttools.ChownForEmulator(*config.FDServerSocketPath); err != nil {
 		glog.Warningf("Couldn't set tapmanager socket permissions: %v", err)
 	}
 	for {
@@ -105,9 +88,9 @@ func runTapManager() {
 	}
 }
 
-func startTapManagerProcess() {
+func startTapManagerProcess(config *v1.VirtletConfig) {
 	cmd := exec.Command(os.Args[0], os.Args[1:]...)
-	cmd.Env = append(os.Environ(), WantTapManagerEnv+"=1")
+	cmd.Env = append(os.Environ(), wantTapManagerEnv+"=1")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	// Here we make this process die with the main Virtlet process.
@@ -131,19 +114,44 @@ func printVersion() {
 	}
 }
 
+func setLogLevel(config *v1.VirtletConfig) {
+	goflag.CommandLine.Parse([]string{
+		fmt.Sprintf("-v=%d", config.LogLevel),
+		"-logtostderr=true",
+	})
+}
+
 func main() {
 	utils.HandleNsFixReexec()
+	clientCfg := utils.BindFlags(flag.CommandLine)
+	var cb *config.Binder
+	cb = config.NewBinder(flag.CommandLine)
 	flag.Parse()
-	if *displayVersion {
-		printVersion()
-		os.Exit(0)
-	}
+	localConfig := cb.GetConfig()
 
 	rand.Seed(time.Now().UnixNano())
-	if os.Getenv(WantTapManagerEnv) == "" {
-		startTapManagerProcess()
-		runVirtlet()
-	} else {
-		runTapManager()
+	setLogLevel(configWithDefaults(localConfig))
+	switch {
+	case os.Getenv(wantTapManagerEnv) != "":
+		localConfig = configWithDefaults(localConfig)
+		runTapManager(localConfig)
+	case *displayVersion:
+		printVersion()
+	case *dumpConfig:
+		nodeConfig := config.NewNodeConfig(clientCfg)
+		nodeName := os.Getenv(nodeNameEnv)
+		cfg, err := nodeConfig.LoadConfig(localConfig, nodeName)
+		if err != nil {
+			glog.Warningf("Failed to load per-node configs, using local config only: %v", err)
+			cfg = localConfig
+		}
+		if _, err := os.Stdout.Write([]byte(config.DumpEnv(cfg))); err != nil {
+			glog.Errorf("Error writing config: %v", err)
+			os.Exit(1)
+		}
+	default:
+		localConfig = configWithDefaults(localConfig)
+		startTapManagerProcess(localConfig)
+		runVirtlet(localConfig, clientCfg)
 	}
 }

@@ -536,7 +536,7 @@ func (tc *tapConnector) copyFrames(from, to *os.File) {
 			break
 		}
 		if nWritten < nRead {
-			glog.Warning("copyFrames(): short Write(): %d bytes instead of %d", nWritten, nRead)
+			glog.Warningf("copyFrames(): short Write(): %d bytes instead of %d", nWritten, nRead)
 		}
 	}
 	tc.wg.Done()

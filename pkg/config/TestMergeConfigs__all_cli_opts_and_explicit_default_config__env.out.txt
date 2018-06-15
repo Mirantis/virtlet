@@ -1,0 +1,16 @@
+export VIRTLET_FD_SERVER_SOCKET_PATH=/some/fd/server.sock
+export VIRTLET_DATABASE_PATH=/some/file.db
+export VIRTLET_DOWNLOAD_PROTOCOL=http
+export VIRTLET_IMAGE_DIR=/some/image/dir
+export VIRTLET_IMAGE_TRANSLATIONS_DIR=/some/translation/dir
+export VIRTLET_LIBVIRT_URI=qemu:///foobar
+export VIRTLET_RAW_DEVICES=sd\*
+export VIRTLET_CRI_SOCKET_PATH=/some/cri.sock
+export VIRTLET_DISABLE_LOGGING=1
+export VIRTLET_DISABLE_KVM=1
+export VIRTLET_SRIOV_SUPPORT=1
+export VIRTLET_CNI_PLUGIN_DIR=/some/cni/bin/dir
+export VIRTLET_CNI_CONFIG_DIR=/some/cni/conf/dir
+export VIRTLET_CALICO_SUBNET=22
+export IMAGE_REGEXP_TRANSLATION=''
+export VIRTLET_LOGLEVEL=1

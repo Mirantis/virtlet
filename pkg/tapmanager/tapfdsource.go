@@ -92,16 +92,19 @@ type TapFDSource struct {
 	dummyNetwork       *cnicurrent.Result
 	dummyNetworkNsPath string
 	fdMap              map[string]*podNetwork
+	enableSriov        bool
+	calicoSubnetSize   int
 }
 
 var _ FDSource = &TapFDSource{}
 
 // NewTapFDSource returns a TapFDSource for the specified CNI plugin &
 // config dir
-func NewTapFDSource(cniClient cni.Client) (*TapFDSource, error) {
+func NewTapFDSource(cniClient cni.Client, enableSriov bool, calicoSubnetSize int) (*TapFDSource, error) {
 	s := &TapFDSource{
-		cniClient: cniClient,
-		fdMap:     make(map[string]*podNetwork),
+		cniClient:        cniClient,
+		fdMap:            make(map[string]*podNetwork),
+		calicoSubnetSize: calicoSubnetSize,
 	}
 
 	return s, nil
@@ -172,14 +175,14 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 			gotError = true
 			return nil, fmt.Errorf("error fixing cni configuration: %v", err)
 		}
-		if err := nettools.FixCalicoNetworking(netConfig, s.getDummyNetwork); err != nil {
+		if err := nettools.FixCalicoNetworking(netConfig, s.calicoSubnetSize, s.getDummyNetwork); err != nil {
 			// don't fail in this case because there may be even no Calico
 			glog.Warningf("Calico detection/fix didn't work: %v", err)
 		}
 		glog.V(3).Infof("CNI Result after fix:\n%s", spew.Sdump(netConfig))
 
 		var err error
-		if csn, err = nettools.SetupContainerSideNetwork(netConfig, netNSPath, allLinks); err != nil {
+		if csn, err = nettools.SetupContainerSideNetwork(netConfig, netNSPath, allLinks, s.enableSriov); err != nil {
 			return nil, err
 		}
 

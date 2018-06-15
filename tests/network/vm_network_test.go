@@ -252,7 +252,7 @@ func TestVmNetwork(t *testing.T) {
 		if err != nil {
 			return fmt.Errorf("LinkList() failed: %v", err)
 		}
-		csn, err = nettools.SetupContainerSideNetwork(info, contNS.Path(), allLinks)
+		csn, err = nettools.SetupContainerSideNetwork(info, contNS.Path(), allLinks, false)
 		if err != nil {
 			return fmt.Errorf("failed to set up container side network: %v", err)
 		}
@@ -338,7 +338,7 @@ func (tst *tapFDSourceTester) setupServerAndConnectToFDServer() *tapmanager.FDCl
 		tst.t.Fatalf("the server and/or the client is already present")
 	}
 
-	src, err := tapmanager.NewTapFDSource(tst.cniClient)
+	src, err := tapmanager.NewTapFDSource(tst.cniClient, false, 24)
 	if err != nil {
 		tst.t.Fatalf("Error creating tap fd source: %v", err)
 	}

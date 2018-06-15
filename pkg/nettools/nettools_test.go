@@ -398,7 +398,7 @@ func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, contNsP
 
 	origHwAddr := origContVeth.Attrs().HardwareAddr
 	expectedInfo := expectedExtractedLinkInfo(contNsPath)
-	csn, err := SetupContainerSideNetwork(expectedInfo, contNsPath, allLinks)
+	csn, err := SetupContainerSideNetwork(expectedInfo, contNsPath, allLinks, false)
 	if err != nil {
 		log.Panicf("failed to set up container side network: %v", err)
 	}
@@ -535,7 +535,7 @@ func TestTeardownContainerSideNetwork(t *testing.T) {
 			log.Panicf("error listing links: %v", err)
 		}
 
-		csn, err := SetupContainerSideNetwork(expectedExtractedLinkInfo(contNS.Path()), contNS.Path(), allLinks)
+		csn, err := SetupContainerSideNetwork(expectedExtractedLinkInfo(contNS.Path()), contNS.Path(), allLinks, false)
 		if err != nil {
 			log.Panicf("failed to set up container side network: %v", err)
 		}
@@ -763,7 +763,7 @@ func TestFixCalicoNetworking(t *testing.T) {
 				log.Panicf("failed to grab interface info: %v", err)
 			}
 			// reuse 2nd copy of the CNI result as the dummy network config
-			if err := FixCalicoNetworking(info, func() (*cnicurrent.Result, string, error) {
+			if err := FixCalicoNetworking(info, 24, func() (*cnicurrent.Result, string, error) {
 				return dummyInfo, dummyNS.Path(), nil
 			}); err != nil {
 				log.Panicf("FixCalicoNetworking(): %v", err)

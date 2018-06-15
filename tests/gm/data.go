@@ -136,8 +136,63 @@ func (v YamlVerifier) Suffix() string {
 	return ".yaml"
 }
 
+func marshalMultiple(data []interface{}) ([]byte, error) {
+	var out bytes.Buffer
+	for _, v := range data {
+		bs, err := yaml.Marshal(v)
+		if err != nil {
+			return nil, err
+		}
+		fmt.Fprintf(&out, "---\n%s", bs)
+	}
+	return out.Bytes(), nil
+}
+
+func unmarshalMultiple(in []byte) ([]interface{}, error) {
+	var r []interface{}
+	for _, part := range bytes.Split(in, []byte("---\n")) {
+		if len(bytes.TrimSpace(part)) == 0 {
+			continue
+		}
+		var data interface{}
+		if err := yaml.Unmarshal(part, &data); err != nil {
+			return nil, err
+		}
+		r = append(r, data)
+	}
+	return r, nil
+}
+
+func (v YamlVerifier) verifyMultiple(content []byte) (bool, error) {
+	curData, err := unmarshalMultiple(content)
+	if err != nil {
+		glog.Warningf("Failed to unmarshal to YAML: %v:\n%s", err, content)
+		return false, nil
+	}
+
+	out, err := v.Marshal()
+	if err != nil {
+		return false, err
+	}
+
+	newData, err := unmarshalMultiple(out)
+	if err != nil {
+		return false, fmt.Errorf("failed to unmarshal back marshalled value: %v. YAML:\n%s\nOriginal data:\n%s",
+			err, string(out), content)
+	}
+
+	return reflect.DeepEqual(curData, newData), nil
+}
+
 // Verify implements Verify method of the Verifier interface.
 func (v YamlVerifier) Verify(content []byte) (bool, error) {
+	switch v.data.(type) {
+	case []byte:
+		return v.verifyMultiple(content)
+	case string:
+		return v.verifyMultiple(content)
+	}
+
 	var curData interface{}
 	if err := yaml.Unmarshal(content, &curData); err != nil {
 		glog.Warningf("Failed to unmarshal to YAML: %v:\n%s", err, content)

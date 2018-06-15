@@ -23,6 +23,8 @@ import (
 	"path"
 
 	"github.com/ghodss/yaml"
+
+	"github.com/Mirantis/virtlet/pkg/api/virtlet.k8s/v1"
 )
 
 type fileConfigSource struct {
@@ -60,14 +62,14 @@ func (cs fileConfigSource) Description() string {
 }
 
 // Name implements TranslationConfig Name
-func (c fileConfig) Name() string {
+func (c fileConfig) ConfigName() string {
 	return c.name
 }
 
 // Payload implements TranslationConfig Payload
-func (c fileConfig) Payload() (ImageTranslation, error) {
+func (c fileConfig) Payload() (v1.ImageTranslation, error) {
 	data, err := ioutil.ReadFile(path.Join(c.cs.configsDirectory, c.name))
-	var tr ImageTranslation
+	var tr v1.ImageTranslation
 	if err != nil {
 		return tr, err
 	}

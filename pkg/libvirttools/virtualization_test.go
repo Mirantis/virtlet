@@ -84,13 +84,15 @@ func newContainerTester(t *testing.T, rec *testutils.TopLevelRecorder) *containe
 	}
 
 	imageManager := NewFakeImageManager(ct.rec)
-	ct.virtTool = NewVirtualizationTool(ct.domainConn, ct.storageConn, imageManager, ct.metadataStore, "volumes", "loop*", GetDefaultVolumeSource())
-	ct.virtTool.SetClock(ct.clock)
-	// avoid unneeded diffs in the golden master data
-	ct.virtTool.SetForceKVM(true)
 	ct.kubeletRootDir = filepath.Join(ct.tmpDir, "kubelet-root")
-	ct.virtTool.SetKubeletRootDir(ct.kubeletRootDir)
-	ct.virtTool.SetStreamerSocketPath("/var/lib/libvirt/streamer.sock")
+	virtConfig := VirtualizationConfig{
+		VolumePoolName:     "volumes",
+		RawDevices:         []string{"loop*"},
+		KubeletRootDir:     ct.kubeletRootDir,
+		StreamerSocketPath: "/var/lib/libvirt/streamer.sock",
+	}
+	ct.virtTool = NewVirtualizationTool(ct.domainConn, ct.storageConn, imageManager, ct.metadataStore, GetDefaultVolumeSource(), virtConfig)
+	ct.virtTool.SetClock(ct.clock)
 
 	return ct
 }

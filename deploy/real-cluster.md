@@ -154,3 +154,8 @@ changes in Kubelet flags, e.g. by removing
 kubeadm scenario described above. After this you need to restart
 kubelet and remove the CRI Proxy binary (`/usr/local/bin/criproxy`)
 and its node configuration file (`/etc/criproxy/node.conf`).
+
+## Customizing Virtlet per-node configuration
+
+It's possible to specify per-node configuration options for Virtlet.
+See [this document](../docs/config.md) for more information.

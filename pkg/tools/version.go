@@ -82,7 +82,7 @@ func (v *versionCommand) getVersions() (version.ClusterVersionInfo, error) {
 		exitCode, err := v.client.ExecInContainer(
 			podName, "virtlet", "kube-system",
 			nil, &buf, os.Stderr,
-			[]string{"virtlet", "-version", "-version-format", "json"})
+			[]string{"virtlet", "--version", "--version-format", "json"})
 		switch {
 		case err != nil:
 			errors = append(errors, fmt.Sprintf("node %q: error getting version from Virtlet pod %q: %v", nodeName, podName, err))

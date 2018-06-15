@@ -220,7 +220,7 @@ func (c *RealKubeClient) setup() error {
 
 	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return fmt.Errorf("Can't create kubernetes api client: %v", err)
+		return fmt.Errorf("can't create kubernetes api client: %v", err)
 	}
 
 	ns, _, err := c.clientCfg.Namespace()
