@@ -111,23 +111,6 @@ func (ds *domainSettings) createDomain(config *types.VMConfig) *libvirtxml.Domai
 			},
 		},
 
-		// The following enables nested virtualization.
-		// The plan is to enable it via an annotation at some point.
-		// It commonly requires kvm_intel module to be loaded like this:
-		// modprobe kvm_intel nested=1
-		// CPU: &libvirtxml.DomainCPU{
-		// 	Mode: "host-model",
-		// 	Model: &libvirtxml.DomainCPUModel{
-		// 		Fallback: "forbid",
-		// 	},
-		// 	Features: []libvirtxml.DomainCPUFeature{
-		// 		{
-		// 			Policy: "require",
-		// 			Name:   "vmx",
-		// 		},
-		// 	},
-		// },
-
 		Features: &libvirtxml.DomainFeatureList{ACPI: &libvirtxml.DomainFeature{}},
 
 		OnPoweroff: "destroy",
@@ -169,6 +152,35 @@ func (ds *domainSettings) createDomain(config *types.VMConfig) *libvirtxml.Domai
 		domain.QEMUCommandline.Envs = append(domain.QEMUCommandline.Envs,
 			libvirtxml.DomainQEMUCommandlineEnv{Name: "VMWRAPPER_KEEP_PRIVS", Value: "1"})
 	}
+
+	// The following enables nested virtualization.
+	// In case of intel processors it requires nested=1 option
+	// for kvm_intel module. That can be passed like this:
+	// modprobe kvm_intel nested=1
+	cpuModel := os.Getenv("VIRTLET_CPU_MODEL")
+	if config.ParsedAnnotations.CPUModel != "" {
+		cpuMode = string(config.ParsedAnnotations.CPUModel)
+	}
+	switch cpuModel {
+	case types.CPUModelHostModel:
+		domain.CPU = &libvirtxml.DomainCPU{
+			Mode: types.CPUModelHostModel,
+			Model: &libvirtxml.DomainCPUModel{
+				Fallback: "forbid",
+			},
+			Features: []libvirtxml.DomainCPUFeature{
+				{
+					Policy: "require",
+					Name:   "vmx",
+				},
+			},
+		}
+	case "":
+		// leave it empty
+	default:
+		glog.Warningf("Unknown value set in VIRTLET_CPU_MODE: %q", cpuModel)
+	}
+
 	return domain
 }
 

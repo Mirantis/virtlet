@@ -154,6 +154,12 @@ spec:
         securityContext:
           privileged: true
         env:
+        - name: VIRTLET_CPU_MODEL
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: cpu_model
+              optional: true
         - name: VIRTLET_DISABLE_KVM
           valueFrom:
             configMapKeyRef:
