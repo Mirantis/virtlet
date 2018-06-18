@@ -1,6 +1,7 @@
 calicoSubnetSize: 22
 cniConfigDir: /some/cni/conf/dir
 cniPluginDir: /some/cni/bin/dir
+cpuModel: ""
 criSocketPath: /some/cri.sock
 databasePath: /some/file.db
 disableKVM: true
