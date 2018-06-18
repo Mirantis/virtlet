@@ -177,6 +177,12 @@ spec:
               key: disable_logging
               name: virtlet-config
               optional: true
+        - name: VIRTLET_CPU_MODEL
+          valueFrom:
+            configMapKeyRef:
+              key: cpu-model
+              name: virtlet-config
+              optional: true
         - name: VIRTLET_IMAGE_TRANSLATIONS_DIR
           value: /etc/virtlet/images
         image: mirantis/virtlet:0.9.42
@@ -457,6 +463,8 @@ spec:
                 cniConfigDir:
                   type: string
                 cniPluginDir:
+                  type: string
+                cpuModel:
                   type: string
                 criSocketPath:
                   type: string

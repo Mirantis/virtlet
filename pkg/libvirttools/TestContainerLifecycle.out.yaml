@@ -112,6 +112,7 @@
       Name: container1
       ParsedAnnotations:
         CDImageType: nocloud
+        CPUModel: ""
         DiskDriver: scsi
         MetaData: null
         SSHKeys: null
@@ -163,6 +164,7 @@
       Name: container1
       ParsedAnnotations:
         CDImageType: nocloud
+        CPUModel: ""
         DiskDriver: scsi
         MetaData: null
         SSHKeys: null
@@ -209,6 +211,7 @@
       Name: container1
       ParsedAnnotations:
         CDImageType: nocloud
+        CPUModel: ""
         DiskDriver: scsi
         MetaData: null
         SSHKeys: null

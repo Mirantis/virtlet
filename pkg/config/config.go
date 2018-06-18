@@ -94,7 +94,7 @@ func configFieldSet(c *virtlet_v1.VirtletConfig) *fieldSet {
 	fs.addStringField("cniConfigDir", "cni-conf-dir", "", "Path to the CNI configuration directory", cniConfigDirEnv, defaultCNIConfigDir, &c.CNIConfigDir)
 	fs.addIntField("calicoSubnetSize", "calico-subnet-size", "", "Calico subnet size to use", calicoSubnetEnv, defaultCalicoSubnet, 0, 32, &c.CalicoSubnetSize)
 	fs.addBoolField("enableRegexpImageTranslation", "enable-regexp-image-translation", "", "Enable regexp image name translation", enableRegexpImageTranslationEnv, true, &c.EnableRegexpImageTranslation)
-	fs.addStringField("cpuModel", "cpu-model", "", "CPU model to set in libvirt domain definition (lack of it means libvirt defaults)", cpuModelEnv, defaultCPUModel, &c.CPUModel)
+	fs.addStringField("cpuModel", "cpu-model", "", "CPU model to use in libvirt domain definition (libvirt's default value will be used if not set)", cpuModelEnv, defaultCPUModel, &c.CPUModel)
 	// this field duplicates glog's --v, so no option for it, which is signified
 	// by "+" here (it's only for doc)
 	fs.addIntField("logLevel", "+v", "", "Log level to use", logLevelEnv, 1, 0, math.MaxInt32, &c.LogLevel)

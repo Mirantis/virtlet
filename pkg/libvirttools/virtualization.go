@@ -148,12 +148,12 @@ func (ds *domainSettings) createDomain(config *types.VMConfig) *libvirtxml.Domai
 		},
 	}
 
-	// The following enables nested virtualization.
-	// In case of intel processors it requires nested=1 option
-	// for kvm_intel module. That can be passed like this:
-	// modprobe kvm_intel nested=1
 	switch ds.cpuModel {
 	case types.CPUModelHostModel:
+		// The following enables nested virtualization.
+		// In case of intel processors it requires nested=1 option
+		// for kvm_intel module. That can be passed like this:
+		// modprobe kvm_intel nested=1
 		domain.CPU = &libvirtxml.DomainCPU{
 			Mode: types.CPUModelHostModel,
 			Model: &libvirtxml.DomainCPUModel{

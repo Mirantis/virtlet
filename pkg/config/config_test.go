@@ -115,6 +115,7 @@ func TestMergeConfigs(t *testing.T) {
 				" --cni-bin-dir /some/cni/bin/dir" +
 				" --cni-conf-dir /some/cni/conf/dir" +
 				" --calico-subnet-size 22" +
+				" --cpu-model host-model" +
 				" --enable-regexp-image-translation=false",
 		},
 		{
@@ -133,6 +134,7 @@ func TestMergeConfigs(t *testing.T) {
 				" --cni-bin-dir /some/cni/bin/dir" +
 				" --cni-conf-dir /some/cni/conf/dir" +
 				" --calico-subnet-size 22" +
+				" --cpu-model host-model" +
 				" --enable-regexp-image-translation=false",
 			configs: []*virtlet_v1.VirtletConfig{GetDefaultConfig()},
 		},
@@ -182,6 +184,7 @@ const (
     cniPluginDir: /some/cni/bin/dir
     cniConfigDir: /some/cni/conf/dir
     calicoSubnetSize: 22
+    cpuModel: host-model
     enableRegexpImageTranslation: false
     logLevel: 3`
 	kubeNode1FullMapping = `
