@@ -419,7 +419,7 @@ function get_ldflags {
 function build_internal {
     # we don't just always generate the bindata right there because we
     # want to keep the source buildable outside this build container.
-    go-bindata -o /tmp/bindata.go -modtime "${bindata_modtime}" -pkg "${bindata_pkg}" "${bindata_dir}"
+    go-bindata -mode 0644 -o /tmp/bindata.go -modtime "${bindata_modtime}" -pkg "${bindata_pkg}" "${bindata_dir}"
     if ! cmp /tmp/bindata.go "${bindata_out}"; then
         echo >&2 "${bindata_dir} changed, please re-run ${0} update-bindata"
         exit 1
@@ -485,7 +485,7 @@ function e2e {
 function update_bindata_internal {
     # set fixed modtime to avoid unwanted differences during the checks
     # that are done by build/cmd.sh build
-    go-bindata -modtime "${bindata_modtime}" -o "${bindata_out}" -pkg "${bindata_pkg}" "${bindata_dir}"
+    go-bindata -mode 0644 -modtime "${bindata_modtime}" -o "${bindata_out}" -pkg "${bindata_pkg}" "${bindata_dir}"
 }
 
 function update_docs_internal {
