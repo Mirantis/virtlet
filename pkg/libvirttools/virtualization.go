@@ -164,6 +164,19 @@ func (ds *domainSettings) createDomain(config *types.VMConfig) *libvirtxml.Domai
 		},
 	}
 
+	if len(config.ParsedAnnotations.HugePagesSettings) > 0 {
+		domain.MemoryBacking = &libvirtxml.DomainMemoryBacking{
+			MemoryHugePages: &libvirtxml.DomainMemoryHugepages{},
+		}
+		for _, el := range config.ParsedAnnotations.HugePagesSettings {
+			domain.MemoryBacking.MemoryHugePages.Hugepages = append(domain.MemoryBacking.MemoryHugePages.Hugepages, libvirtxml.DomainMemoryHugepage{
+				Size:    el.Size,
+				Unit:    el.Unit,
+				Nodeset: el.NodeSet,
+			})
+		}
+	}
+
 	if ds.enableSriov {
 		domain.QEMUCommandline.Envs = append(domain.QEMUCommandline.Envs,
 			libvirtxml.DomainQEMUCommandlineEnv{Name: "VMWRAPPER_KEEP_PRIVS", Value: "1"})
