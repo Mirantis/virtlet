@@ -35,6 +35,7 @@ const (
 	cloudInitUserDataKeyName          = "VirtletCloudInitUserData"
 	cloudInitUserDataScriptKeyName    = "VirtletCloudInitUserDataScript"
 	cloudInitImageType                = "VirtletCloudInitImageType"
+	hugePagesSetupKeyName             = "VirtletHugePages"
 	sshKeysKeyName                    = "VirtletSSHKeys"
 	// CloudInitUserDataSourceKeyName is the name of user data source key in the pod annotations.
 	CloudInitUserDataSourceKeyName = "VirtletCloudInitUserDataSource"
@@ -62,6 +63,12 @@ const (
 	DiskDriverScsi DiskDriverName = "scsi"
 )
 
+type HugePagesEntry struct {
+	Size    uint
+	Unit    string
+	NodeSet string
+}
+
 // VirtletAnnotations contains parsed values for pod annotations supported
 // by Virtlet.
 type VirtletAnnotations struct {
@@ -80,7 +87,8 @@ type VirtletAnnotations struct {
 	// SSHKets specifies ssh public keys to use.
 	SSHKeys []string
 	// DiskDriver specifies the disk driver to use.
-	DiskDriver DiskDriverName
+	DiskDriver        DiskDriverName
+	HugePagesSettings []HugePagesEntry
 }
 
 // ExternalDataLoader is a function that loads external data that's specified
@@ -196,6 +204,36 @@ func (va *VirtletAnnotations) parsePodAnnotations(ns string, podAnnotations map[
 
 	va.CDImageType = CloudInitImageType(strings.ToLower(podAnnotations[cloudInitImageType]))
 	va.DiskDriver = DiskDriverName(podAnnotations[diskDriverKeyName])
+
+	if hpEntryStr, found := podAnnotations[hugePagesSetupKeyName]; found {
+		for _, el := range strings.Split(hpEntryStr, ";") {
+			entry := strings.Split(el, " ")
+			if len(entry) != 3 {
+				return fmt.Errorf("huge pages entry expected to have 3 fields has incorrect number of them: %v", entry)
+			}
+
+			size := 0
+			var err error
+			if size, err = strconv.Atoi(entry[0]); err != nil {
+				return fmt.Errorf("huge pages entry has %q as size while expected int: %v", entry[0], err)
+			}
+
+			switch entry[1] {
+			case "K":
+			case "M":
+			case "G":
+			default:
+				return fmt.Errorf("huge pages entry have %q as unit while expected 'K', 'M', or 'G'", entry[1])
+			}
+
+			// TODO: nodeset validation (string contains only digits, minus sign or comma character)
+			va.HugePagesSettings = append(va.HugePagesSettings, HugePagesEntry{
+				Size:    uint(size),
+				Unit:    entry[1],
+				NodeSet: entry[2],
+			})
+		}
+	}
 
 	return nil
 }
