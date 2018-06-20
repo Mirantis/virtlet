@@ -35,6 +35,7 @@ const (
 	cloudInitUserDataKeyName          = "VirtletCloudInitUserData"
 	cloudInitUserDataScriptKeyName    = "VirtletCloudInitUserDataScript"
 	cloudInitImageType                = "VirtletCloudInitImageType"
+	cpuModel                          = "VirtletCPUModel"
 	sshKeysKeyName                    = "VirtletSSHKeys"
 	// CloudInitUserDataSourceKeyName is the name of user data source key in the pod annotations.
 	CloudInitUserDataSourceKeyName = "VirtletCloudInitUserDataSource"
@@ -45,11 +46,16 @@ const (
 // CloudInitImageType specifies the image type used for cloud-init
 type CloudInitImageType string
 
+// CPUModelType specifies cpu model in libvirt domain definition
+type CPUModelType string
+
 const (
 	// CloudInitImageTypeNoCloud specified nocloud cloud-init image type.
 	CloudInitImageTypeNoCloud CloudInitImageType = "nocloud"
 	// CloudInitImageTypeConfigDrive specified configdrive cloud-init image type.
 	CloudInitImageTypeConfigDrive CloudInitImageType = "configdrive"
+	// CPUModelHostModel specifies cpu model needed for nested virtualization
+	CPUModelHostModel = "host-model"
 )
 
 // DiskDriverName specifies disk driver name supported by Virtlet.
@@ -67,6 +73,8 @@ const (
 type VirtletAnnotations struct {
 	// Number of virtual CPUs.
 	VCPUCount int
+	// CPU model.
+	CPUModel CPUModelType
 	// Cloud-Init image type to use.
 	CDImageType CloudInitImageType
 	// Cloud-Init metadata.
@@ -121,6 +129,10 @@ func (va *VirtletAnnotations) validate() error {
 
 	if va.CDImageType != CloudInitImageTypeNoCloud && va.CDImageType != CloudInitImageTypeConfigDrive {
 		errs = append(errs, fmt.Sprintf("unknown config image type %q. Must be either %q or %q", va.CDImageType, CloudInitImageTypeNoCloud, CloudInitImageTypeConfigDrive))
+	}
+
+	if va.CPUModel != "" && va.CPUModel != CPUModelHostModel {
+		errs = append(errs, fmt.Sprintf("unknown cpu model type %q. Must be empty or %q", va.CPUModel, CPUModelHostModel))
 	}
 
 	if errs != nil {

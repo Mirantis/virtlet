@@ -54,6 +54,8 @@ spec:
                   type: string
                 cniPluginDir:
                   type: string
+                cpuModel:
+                  type: string
                 criSocketPath:
                   type: string
                 databasePath:

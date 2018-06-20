@@ -102,6 +102,7 @@ func (v *VirtletManager) Run() error {
 	virtConfig := libvirttools.VirtualizationConfig{
 		DisableKVM:     *v.config.DisableKVM,
 		EnableSriov:    *v.config.EnableSriov,
+		CPUModel:       *v.config.CPUModel,
 		VolumePoolName: volumePoolName,
 	}
 	if *v.config.RawDevices != "" {

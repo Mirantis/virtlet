@@ -59,6 +59,9 @@ type VirtletConfig struct {
 	// EnableRegexpImageTranslation is true if regexp-based image
 	// translations are enabled.
 	EnableRegexpImageTranslation *bool `json:"enableRegexpImageTranslation,omitempty"`
+	// CPUModel specifies the default CPU model to use in the libvirt domain definition.
+	// It can be overridden using VirtletCPUModel pod annotation.
+	CPUModel *string `json:"cpuModel,omitempty"`
 	// LogLevel specifies the log level to use
 	LogLevel *int `json:"logLevel,omitempty"`
 }

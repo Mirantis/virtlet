@@ -288,6 +288,15 @@ func (in *VirtletConfig) DeepCopyInto(out *VirtletConfig) {
 			**out = **in
 		}
 	}
+	if in.CPUModel != nil {
+		in, out := &in.CPUModel, &out.CPUModel
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(string)
+			**out = **in
+		}
+	}
 	if in.LogLevel != nil {
 		in, out := &in.LogLevel, &out.LogLevel
 		if *in == nil {
