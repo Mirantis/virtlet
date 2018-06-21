@@ -32,6 +32,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/config"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
 	"github.com/Mirantis/virtlet/pkg/manager"
+	"github.com/Mirantis/virtlet/pkg/nsfix"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/Mirantis/virtlet/pkg/version"
@@ -106,7 +107,7 @@ func setLogLevel(config *v1.VirtletConfig) {
 }
 
 func main() {
-	utils.HandleNsFixReexec()
+	nsfix.HandleNsFixReexec()
 	clientCfg := utils.BindFlags(flag.CommandLine)
 	var cb *config.Binder
 	cb = config.NewBinder(flag.CommandLine)
