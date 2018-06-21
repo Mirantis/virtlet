@@ -52,8 +52,8 @@ func handleReexec(arg interface{}) (interface{}, error) {
 }
 
 func main() {
-	nsfix.RegisterNsFixReexec("vmwrapper", handleReexec, reexecArg{})
-	nsfix.HandleNsFixReexec()
+	nsfix.RegisterReexec("vmwrapper", handleReexec, reexecArg{})
+	nsfix.HandleReexec()
 
 	// configure glog (apparently no better way to do it ...)
 	flag.CommandLine.Parse([]string{"-v=3", "-logtostderr=true"})
@@ -131,7 +131,7 @@ func main() {
 	args = append(args, netArgs...)
 	env := os.Environ()
 	if runInAnotherContainer {
-		nsFixCall := nsfix.NewNsFixCall("vmwrapper").
+		nsFixCall := nsfix.NewCall("vmwrapper").
 			TargetPid(pid).
 			Arg(&reexecArg{args}).
 			RemountSys()

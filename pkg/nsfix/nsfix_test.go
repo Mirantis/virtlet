@@ -26,6 +26,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/golang/glog"
 
@@ -142,7 +143,7 @@ func verifyNsFix(t *testing.T, toRun func(tmpDir string, dirs map[string]string,
 func TestNsFix(t *testing.T) {
 	verifyNsFix(t, func(tmpDir string, dirs map[string]string, pids []int) {
 		var r nsFixTestRet
-		if err := NewNsFixCall("nsFixTest1").
+		if err := NewCall("nsFixTest1").
 			TargetPid(pids[0]).
 			Arg(nsFixTestArg{dirs["b"]}).
 			SpawnInNamespaces(&r); err != nil {
@@ -157,7 +158,7 @@ func TestNsFix(t *testing.T) {
 			t.Errorf("SpawnInNamespaces dropped privs when not requested to do so")
 		}
 
-		if err := NewNsFixCall("nsFixTest1").
+		if err := NewCall("nsFixTest1").
 			TargetPid(pids[1]).
 			Arg(nsFixTestArg{dirs["b"]}).
 			DropPrivs().
@@ -201,7 +202,7 @@ func TestNsFix(t *testing.T) {
 func TestNsFixWithNilArg(t *testing.T) {
 	verifyNsFix(t, func(tmpDir string, dirs map[string]string, pids []int) {
 		var r int
-		if err := NewNsFixCall("nsFixTestNilArg").
+		if err := NewCall("nsFixTestNilArg").
 			TargetPid(pids[0]).
 			SpawnInNamespaces(&r); err != nil {
 			t.Fatalf("SpawnInNamespaces(): %v", err)
@@ -215,7 +216,7 @@ func TestNsFixWithNilArg(t *testing.T) {
 
 func TestNsFixWithNilResult(t *testing.T) {
 	verifyNsFix(t, func(tmpDir string, dirs map[string]string, pids []int) {
-		if err := NewNsFixCall("nsFixTestNilResult").
+		if err := NewCall("nsFixTestNilResult").
 			TargetPid(pids[0]).
 			Arg(dirs["b"]).
 			SpawnInNamespaces(nil); err != nil {
@@ -239,20 +240,20 @@ func init() {
 		if err != nil {
 			glog.Fatalf("bad TEST_NSFIX_SWITCH: %q", switchStr)
 		}
-		if err := NewNsFixCall("nsFixTest2").
+		if err := NewCall("nsFixTest2").
 			TargetPid(pid).
 			Arg(nsFixTestArg{parts[1]}).
 			SwitchToNamespaces(); err != nil {
 			glog.Fatalf("SwitchToNamespaces(): %v", err)
 		}
 	}
-	RegisterNsFixReexec("nsFixTest1", handleNsFixTest1, nsFixTestArg{})
-	RegisterNsFixReexec("nsFixTest2", handleNsFixTest2, nsFixTestArg{})
-	RegisterNsFixReexec("nsFixTestNilArg", handleNsFixWithNilArg, nil)
-	RegisterNsFixReexec("nsFixTestNilResult", handleNsFixWithNilResult, "")
+	RegisterReexec("nsFixTest1", handleNsFixTest1, nsFixTestArg{})
+	RegisterReexec("nsFixTest2", handleNsFixTest2, nsFixTestArg{})
+	RegisterReexec("nsFixTestNilArg", handleNsFixWithNilArg, nil)
+	RegisterReexec("nsFixTestNilResult", handleNsFixWithNilResult, "")
 	if os.Getenv("TEST_NSFIX") != "" {
 		// NOTE: this is not a recommended way to invoke
 		// reexec, but may be the easiest one for testing
-		HandleNsFixReexec()
+		HandleReexec()
 	}
 }

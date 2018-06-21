@@ -77,7 +77,7 @@ func (c *client) GetDummyNetwork() (*cnicurrent.Result, string, error) {
 // AddSandboxToNetwork implements AddSandboxToNetwork method of Client interface.
 func (c *client) AddSandboxToNetwork(podID, podName, podNs string) (*cnicurrent.Result, error) {
 	var r cnicurrent.Result
-	if err := nsfix.NewNsFixCall("cniAddSandboxToNetwork").
+	if err := nsfix.NewCall("cniAddSandboxToNetwork").
 		Arg(cniRequest{
 			PluginsDir: c.pluginsDir,
 			ConfigsDir: c.configsDir,
@@ -93,7 +93,7 @@ func (c *client) AddSandboxToNetwork(podID, podName, podNs string) (*cnicurrent.
 
 // RemoveSandboxFromNetwork implements RemoveSandboxFromNetwork method of Client interface.
 func (c *client) RemoveSandboxFromNetwork(podID, podName, podNs string) error {
-	return nsfix.NewNsFixCall("cniRemoveSandboxFromNetwork").
+	return nsfix.NewCall("cniRemoveSandboxFromNetwork").
 		Arg(cniRequest{
 			PluginsDir: c.pluginsDir,
 			ConfigsDir: c.configsDir,
@@ -197,6 +197,6 @@ func handleRemoveSandboxFromNetwork(arg interface{}) (interface{}, error) {
 }
 
 func init() {
-	nsfix.RegisterNsFixReexec("cniAddSandboxToNetwork", handleAddSandboxToNetwork, cniRequest{})
-	nsfix.RegisterNsFixReexec("cniRemoveSandboxFromNetwork", handleRemoveSandboxFromNetwork, cniRequest{})
+	nsfix.RegisterReexec("cniAddSandboxToNetwork", handleAddSandboxToNetwork, cniRequest{})
+	nsfix.RegisterReexec("cniRemoveSandboxFromNetwork", handleRemoveSandboxFromNetwork, cniRequest{})
 }

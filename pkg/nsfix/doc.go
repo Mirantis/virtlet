@@ -14,13 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// This package helps to deal with switching to other process
+// Package nsfix helps to deal with switching to other process
 // namespaces to execute some particular piece of code.  While
 // starting from Go 1.10 it's possible to switch to different non-mnt
 // namespaces without the danger of corrupting other goroutines'
 // state, there's still a problem of not being able to switch to
 // another mount namespace from a Go program without the "constructor"
-// hack. For more info, see
-// https://stackoverflow.com/a/25707007/40846
+// hack. For more info, see https://stackoverflow.com/a/25707007/40846
 // https://github.com/golang/go/issues/8676
 package nsfix

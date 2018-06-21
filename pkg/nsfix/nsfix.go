@@ -30,20 +30,20 @@ import (
 	"github.com/golang/glog"
 )
 
-// NsFixReexecHandler is a function that can be passed to
-// RegisterNsFixReexec to be executed my nsfix mechanism after
+// ReexecHandler is a function that can be passed to
+// RegisterReexec to be executed my nsfix mechanism after
 // self-reexec. arg can be safely casted to the type of arg
-// passed to RegisterNsFixReexec plus one level of pointer
-// inderection, i.e. if you pass somestruct{} to RegisterNsFixReexec
+// passed to RegisterReexec plus one level of pointer
+// inderection, i.e. if you pass somestruct{} to RegisterReexec
 // you may cast arg safely to *somestruct.
-type NsFixReexecHandler func(arg interface{}) (interface{}, error)
+type ReexecHandler func(arg interface{}) (interface{}, error)
 
-type nsFixHandlerEntry struct {
-	handler NsFixReexecHandler
+type handlerEntry struct {
+	handler ReexecHandler
 	argType reflect.Type
 }
 
-var reexecMap = map[string]nsFixHandlerEntry{}
+var reexecMap = map[string]handlerEntry{}
 
 type retStruct struct {
 	Success bool
@@ -51,12 +51,12 @@ type retStruct struct {
 	Error   string
 }
 
-// RegisterNsFixReexec registers the specified function as a reexec handler.
+// RegisterReexec registers the specified function as a reexec handler.
 // arg specifies the argument type to pass. Note that if you pass somestruct{}
 // as arg, the handler will receive *somestruct as its argument (i.e. a level
 // of pointer indirection is added).
-func RegisterNsFixReexec(name string, handler NsFixReexecHandler, arg interface{}) {
-	reexecMap[name] = nsFixHandlerEntry{handler, reflect.TypeOf(arg)}
+func RegisterReexec(name string, handler ReexecHandler, arg interface{}) {
+	reexecMap[name] = handlerEntry{handler, reflect.TypeOf(arg)}
 }
 
 func getGlogLevel() int {
@@ -115,10 +115,10 @@ func unmarshalResult(retBytes []byte, ret interface{}) error {
 	return nil
 }
 
-// HandleNsFixReexec handles executing the code in another namespace.
+// HandleReexec handles executing the code in another namespace.
 // If reexcution is requested, the function calls os.Exit() after
 // handling it.
-func HandleNsFixReexec() {
+func HandleReexec() {
 	if os.Getenv("NSFIX_NS_PID") == "" {
 		return
 	}
@@ -160,9 +160,9 @@ func HandleNsFixReexec() {
 	}
 }
 
-// NsFixCall describes a call to be executed in network, mount, UTS
+// Call describes a call to be executed in network, mount, UTS
 // and IPC namespaces of another process.
-type NsFixCall struct {
+type Call struct {
 	targetPid   int
 	handlerName string
 	arg         interface{}
@@ -170,40 +170,40 @@ type NsFixCall struct {
 	dropPrivs   bool
 }
 
-// NewNsFixCall makes a new NsFixCall structure with specified
+// NewCall makes a new Call structure with specified
 // handlerName using PID 1.
-func NewNsFixCall(handlerName string) *NsFixCall {
-	return &NsFixCall{
+func NewCall(handlerName string) *Call {
+	return &Call{
 		targetPid:   1,
 		handlerName: handlerName,
 	}
 }
 
-// TargetPid sets target PID value for NsFixCall
-func (c *NsFixCall) TargetPid(targetPid int) *NsFixCall {
+// TargetPid sets target PID value for Call
+func (c *Call) TargetPid(targetPid int) *Call {
 	c.targetPid = targetPid
 	return c
 }
 
-// Arg sets argument for NsFixCall
-func (c *NsFixCall) Arg(arg interface{}) *NsFixCall {
+// Arg sets argument for Call
+func (c *Call) Arg(arg interface{}) *Call {
 	c.arg = arg
 	return c
 }
 
-// RemountSys instructs NsFixCall to remount /sys in the new process
-func (c *NsFixCall) RemountSys() *NsFixCall {
+// RemountSys instructs Call to remount /sys in the new process
+func (c *Call) RemountSys() *Call {
 	c.remountSys = true
 	return c
 }
 
-// DropPrivs instructs NsFixCall to drop privileges in the new process
-func (c *NsFixCall) DropPrivs() *NsFixCall {
+// DropPrivs instructs Call to drop privileges in the new process
+func (c *Call) DropPrivs() *Call {
 	c.dropPrivs = true
 	return c
 }
 
-func (c *NsFixCall) getEnvForExec(spawn bool) ([]string, error) {
+func (c *Call) getEnvForExec(spawn bool) ([]string, error) {
 	env := os.Environ()
 	filteredEnv := []string{}
 	for _, envItem := range env {
@@ -244,7 +244,7 @@ func (c *NsFixCall) getEnvForExec(spawn bool) ([]string, error) {
 // process gets replaced by the new one. If dropPrivs is true, the new
 // process will execute using non-root uid/gid (using real uid/gid of
 // the process if they're non-zero or 65534 which is nobody/nogroup)
-func (c *NsFixCall) SwitchToNamespaces() error {
+func (c *Call) SwitchToNamespaces() error {
 	env, err := c.getEnvForExec(false)
 	if err != nil {
 		return err
@@ -259,7 +259,7 @@ func (c *NsFixCall) SwitchToNamespaces() error {
 // serialization + deserialization). If dropPrivs is true, the new
 // process will execute using non-root uid/gid (using real uid/gid of
 // the process if they're non-zero or 65534 which is nobody/nogroup)
-func (c *NsFixCall) SpawnInNamespaces(ret interface{}) error {
+func (c *Call) SpawnInNamespaces(ret interface{}) error {
 	env, err := c.getEnvForExec(true)
 	if err != nil {
 		return err
