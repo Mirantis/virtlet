@@ -502,6 +502,18 @@ function update_docs_internal {
   rm -f "${tempfile}"
 }
 
+function update_generated_internal {
+  vendor/k8s.io/code-generator/generate-groups.sh all \
+    github.com/Mirantis/virtlet/pkg/client github.com/Mirantis/virtlet/pkg/api \
+    virtlet.k8s:v1 \
+    --go-header-file "build/custom-boilerplate.go.txt"
+  # fix import url case issues
+  find pkg/client \
+       -name '*.go' \
+       -exec sed -i 's@github\.com/mirantis/virtlet@github\.com/Mirantis/virtlet@g' \
+       '{}' \;
+}
+
 function usage {
     echo >&2 "Usage:"
     echo >&2 "  $0 build"
@@ -566,6 +578,16 @@ case "${cmd}" in
         ;;
     update-bindata-internal)
         update_bindata_internal
+        ;;
+    update-generated)
+        vcmd "build/cmd.sh update-generated-internal"
+        docker exec virtlet-build \
+               /bin/bash -c \
+               "tar -C '${remote_project_dir}' -c $(find pkg/ -name 'zz_generated.*') pkg/client" |
+            tar -C "${project_dir}" -xv
+        ;;
+    update-generated-internal)
+        update_generated_internal
         ;;
     update-docs)
         vcmd "build/cmd.sh update-docs-internal"

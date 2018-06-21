@@ -117,6 +117,11 @@ Starts the build container. This is done automatically by other
 Updates the generated bindata. Run this command if you modify
 anything under `deploy/data`.
 
+### update-generated
+
+Updates the generated Go files except for bindata. Run this command if
+you modify Virtlet CRD structs.
+
 ### update-docs
 
 Updates the documentation on virtletctl an the Virtlet config.
