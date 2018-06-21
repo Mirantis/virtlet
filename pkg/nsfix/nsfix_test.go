@@ -30,6 +30,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"github.com/Mirantis/virtlet/pkg/utils"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 )
 
@@ -125,16 +126,35 @@ func verifyNsFix(t *testing.T, toRun func(tmpDir string, dirs map[string]string,
 		}
 	}
 
+	doneFiles := []string{
+		filepath.Join(tmpDir, "done1"),
+		filepath.Join(tmpDir, "done2"),
+	}
 	var pids []int
 	for _, cmd := range []string{
-		fmt.Sprintf("mount --bind %q %q && sleep 10000", dirs["a"], dirs["b"]),
-		fmt.Sprintf("mount --bind %q %q && sleep 10000", dirs["d"], dirs["b"]),
+		fmt.Sprintf("mount --bind %q %q && touch %q && sleep 10000", dirs["a"], dirs["b"], doneFiles[0]),
+		fmt.Sprintf("mount --bind %q %q && touch %q && sleep 10000", dirs["d"], dirs["b"], doneFiles[1]),
 	} {
 		tc := testutils.RunProcess(t, "unshare", []string{
 			"-m", "/bin/bash", "-c", cmd,
 		}, nil)
 		defer tc.Stop()
 		pids = append(pids, tc.Pid())
+	}
+	if err := utils.WaitLoop(func() (bool, error) {
+		for _, fileName := range doneFiles {
+			switch _, err := os.Stat(fileName); {
+			case err == nil:
+				// ok
+			case os.IsNotExist(err):
+				return false, nil
+			default:
+				return false, err
+			}
+		}
+		return true, nil
+	}, 50*time.Millisecond, 10*time.Second, nil); err != nil {
+		t.Fatal(err)
 	}
 
 	toRun(tmpDir, dirs, pids)
