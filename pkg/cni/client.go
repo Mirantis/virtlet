@@ -24,6 +24,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 
+	"github.com/Mirantis/virtlet/pkg/nsfix"
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
@@ -76,7 +77,7 @@ func (c *client) GetDummyNetwork() (*cnicurrent.Result, string, error) {
 // AddSandboxToNetwork implements AddSandboxToNetwork method of Client interface.
 func (c *client) AddSandboxToNetwork(podID, podName, podNs string) (*cnicurrent.Result, error) {
 	var r cnicurrent.Result
-	if err := utils.NewNsFixCall("cniAddSandboxToNetwork").
+	if err := nsfix.NewCall("cniAddSandboxToNetwork").
 		Arg(cniRequest{
 			PluginsDir: c.pluginsDir,
 			ConfigsDir: c.configsDir,
@@ -92,7 +93,7 @@ func (c *client) AddSandboxToNetwork(podID, podName, podNs string) (*cnicurrent.
 
 // RemoveSandboxFromNetwork implements RemoveSandboxFromNetwork method of Client interface.
 func (c *client) RemoveSandboxFromNetwork(podID, podName, podNs string) error {
-	return utils.NewNsFixCall("cniRemoveSandboxFromNetwork").
+	return nsfix.NewCall("cniRemoveSandboxFromNetwork").
 		Arg(cniRequest{
 			PluginsDir: c.pluginsDir,
 			ConfigsDir: c.configsDir,
@@ -196,6 +197,6 @@ func handleRemoveSandboxFromNetwork(arg interface{}) (interface{}, error) {
 }
 
 func init() {
-	utils.RegisterNsFixReexec("cniAddSandboxToNetwork", handleAddSandboxToNetwork, cniRequest{})
-	utils.RegisterNsFixReexec("cniRemoveSandboxFromNetwork", handleRemoveSandboxFromNetwork, cniRequest{})
+	nsfix.RegisterReexec("cniAddSandboxToNetwork", handleAddSandboxToNetwork, cniRequest{})
+	nsfix.RegisterReexec("cniRemoveSandboxFromNetwork", handleRemoveSandboxFromNetwork, cniRequest{})
 }

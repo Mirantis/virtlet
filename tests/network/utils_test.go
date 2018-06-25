@@ -549,8 +549,14 @@ func (tc *tapConnector) Run(readyCh, stopCh chan struct{}) error {
 	go tc.copyFrames(tc.tapB, tc.tapA)
 	close(readyCh)
 	<-stopCh
-	// TODO: use SetDeadline() when it's available for os.File
-	// (perhaps in Go 1.10): https://github.com/golang/go/issues/22114
+	// It would be nice to use SetDeadline() instead of this Close()
+	// hack. SetDeadline() was added for os.File in Go 1.10:
+	// https://github.com/golang/go/issues/22114
+	// The problem is that trying to actually use it is causing
+	// the problems like this: "file type does not support deadline"
+	// Some related issues:
+	// https://github.com/golang/go/issues/24842
+	// https://github.com/golang/go/issues/24331
 	tc.tapA.Close()
 	tc.tapB.Close()
 	tc.wg.Wait()

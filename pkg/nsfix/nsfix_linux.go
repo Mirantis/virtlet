@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+package nsfix
 
 // Here we use cgo constructor trick to avoid threading-related problems
 // (not being able to enter the mount namespace)

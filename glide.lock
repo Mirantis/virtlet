@@ -1,5 +1,5 @@
-hash: e779019b616d563bb6ca86c655b1e4c6a88bc62c4b4f7aa357d5d48debe73fe2
-updated: 2018-06-05T12:01:20.9782965+03:00
+hash: 56045aeed24fa36a2b560f87ff6a4af024361a241066d81b5173b885659060f4
+updated: 2018-06-19T21:10:27.123795189+03:00
 imports:
 - name: github.com/boltdb/bolt
   version: 583e8937c61f1af6513608ccc75c97b6abdf4ff9
@@ -222,7 +222,7 @@ imports:
   - ssh
   - ssh/terminal
 - name: golang.org/x/net
-  version: f2499483f923065a842d38eb4c7f1927e6fc6e6d
+  version: 0ed95abb35c445290478a5348a7b38bb154135fd
   subpackages:
   - bpf
   - context
@@ -230,7 +230,7 @@ imports:
   - http2/hpack
   - idna
   - internal/iana
-  - internal/netreflect
+  - internal/socket
   - internal/timeseries
   - ipv4
   - lex/httplex
@@ -246,6 +246,13 @@ imports:
   subpackages:
   - unix
   - windows
+- name: golang.org/x/text
+  version: b19bf474d317b857955b12035d2c5acb57ce8b01
+  subpackages:
+  - secure/bidirule
+  - transform
+  - unicode/bidi
+  - unicode/norm
 - name: golang.org/x/time
   version: f51c12702a4d776e4c1fa9b0fabab841babae631
   subpackages:
@@ -309,9 +316,6 @@ imports:
   subpackages:
   - pkg/apis/apiextensions
   - pkg/apis/apiextensions/v1beta1
-  - pkg/client/clientset/clientset
-  - pkg/client/clientset/clientset/scheme
-  - pkg/client/clientset/clientset/typed/apiextensions/v1beta1
   - pkg/features
 - name: k8s.io/apimachinery
   version: 302974c03f7e50f16561ba237db776ab93594ef6
@@ -629,10 +633,6 @@ imports:
 - name: k8s.io/kube-openapi
   version: 50ae88d24ede7b8bad68e23c805b5d3da5c8abaf
   subpackages:
-  - pkg/builder
-  - pkg/common
-  - pkg/handler
-  - pkg/util
   - pkg/util/proto
 - name: k8s.io/kubernetes
   version: 81753b10df112992bf51bbc2c2f85208aad78335

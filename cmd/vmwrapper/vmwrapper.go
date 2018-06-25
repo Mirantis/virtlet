@@ -26,6 +26,7 @@ import (
 	"github.com/golang/glog"
 
 	"github.com/Mirantis/virtlet/pkg/network"
+	"github.com/Mirantis/virtlet/pkg/nsfix"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
@@ -51,8 +52,8 @@ func handleReexec(arg interface{}) (interface{}, error) {
 }
 
 func main() {
-	utils.RegisterNsFixReexec("vmwrapper", handleReexec, reexecArg{})
-	utils.HandleNsFixReexec()
+	nsfix.RegisterReexec("vmwrapper", handleReexec, reexecArg{})
+	nsfix.HandleReexec()
 
 	// configure glog (apparently no better way to do it ...)
 	flag.CommandLine.Parse([]string{"-v=3", "-logtostderr=true"})
@@ -130,7 +131,7 @@ func main() {
 	args = append(args, netArgs...)
 	env := os.Environ()
 	if runInAnotherContainer {
-		nsFixCall := utils.NewNsFixCall("vmwrapper").
+		nsFixCall := nsfix.NewCall("vmwrapper").
 			TargetPid(pid).
 			Arg(&reexecArg{args}).
 			RemountSys()

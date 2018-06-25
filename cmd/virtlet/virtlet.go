@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"os/exec"
 	"time"
 
 	"github.com/golang/glog"
@@ -33,6 +32,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/config"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
 	"github.com/Mirantis/virtlet/pkg/manager"
+	"github.com/Mirantis/virtlet/pkg/nsfix"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/Mirantis/virtlet/pkg/version"
@@ -88,21 +88,6 @@ func runTapManager(config *v1.VirtletConfig) {
 	}
 }
 
-func startTapManagerProcess(config *v1.VirtletConfig) {
-	cmd := exec.Command(os.Args[0], os.Args[1:]...)
-	cmd.Env = append(os.Environ(), wantTapManagerEnv+"=1")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	// Here we make this process die with the main Virtlet process.
-	// Note that this is Linux-specific, and also it may fail if virtlet is PID 1:
-	// https://github.com/golang/go/issues/9263
-	setPdeathsig(cmd)
-	if err := cmd.Start(); err != nil {
-		glog.Errorf("Error starting tapmanager process: %v", err)
-		os.Exit(1)
-	}
-}
-
 func printVersion() {
 	out, err := version.Get().ToBytes(*versionFormat)
 	if err == nil {
@@ -122,7 +107,7 @@ func setLogLevel(config *v1.VirtletConfig) {
 }
 
 func main() {
-	utils.HandleNsFixReexec()
+	nsfix.HandleReexec()
 	clientCfg := utils.BindFlags(flag.CommandLine)
 	var cb *config.Binder
 	cb = config.NewBinder(flag.CommandLine)
@@ -132,9 +117,6 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 	setLogLevel(configWithDefaults(localConfig))
 	switch {
-	case os.Getenv(wantTapManagerEnv) != "":
-		localConfig = configWithDefaults(localConfig)
-		runTapManager(localConfig)
 	case *displayVersion:
 		printVersion()
 	case *dumpConfig:
@@ -151,7 +133,7 @@ func main() {
 		}
 	default:
 		localConfig = configWithDefaults(localConfig)
-		startTapManagerProcess(localConfig)
+		go runTapManager(localConfig)
 		runVirtlet(localConfig, clientCfg)
 	}
 }

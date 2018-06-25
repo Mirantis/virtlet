@@ -250,6 +250,17 @@ jobs:
         <<: *restore_images_and_vendor
 
     - run:
+        name: Verify that the generated code for CRDs is up to date
+        command: |
+          build/portforward.sh 18730&
+          build/cmd.sh update-generated
+          if [[ $(git status --porcelain) ]]; then
+            git status
+            echo >&2 "Generated files out of sync, please run build/cmd.sh update-generated"
+            exit 1
+          fi
+
+    - run:
         name: Build virtlet
         command: |
           build/portforward.sh 18730&
