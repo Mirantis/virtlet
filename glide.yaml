@@ -22,7 +22,7 @@ import:
 - package: github.com/containernetworking/cni
   version: v0.5.2
 - package: github.com/vishvananda/netlink
-  version: 769bb84935352fee05c1390d5301ed39b95208d2
+  version: fe3b5664d23a11b52ba59bece4ff29c52772a56b
 - package: github.com/pmezard/go-difflib
   version: ~1.0.0
   subpackages:
