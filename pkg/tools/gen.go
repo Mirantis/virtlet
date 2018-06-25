@@ -21,8 +21,8 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
+	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	ext "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/Mirantis/virtlet/pkg/config"
@@ -80,7 +80,7 @@ func (g *genCommand) getYaml() ([]byte, error) {
 			return nil, errors.New("source yaml is empty")
 		}
 
-		ds, ok := objs[0].(*ext.DaemonSet)
+		ds, ok := objs[0].(*apps.DaemonSet)
 		if !ok {
 			return nil, errors.New("the first object is not a DaemonSet")
 		}
@@ -111,7 +111,7 @@ func (g *genCommand) Run() error {
 	return nil
 }
 
-func walkContainers(ds *ext.DaemonSet, toCall func(c *v1.Container)) {
+func walkContainers(ds *apps.DaemonSet, toCall func(c *v1.Container)) {
 	initContainers := ds.Spec.Template.Spec.InitContainers
 	for n := range initContainers {
 		toCall(&initContainers[n])
@@ -122,7 +122,7 @@ func walkContainers(ds *ext.DaemonSet, toCall func(c *v1.Container)) {
 	}
 }
 
-func walkMounts(ds *ext.DaemonSet, toCall func(m *v1.VolumeMount)) {
+func walkMounts(ds *apps.DaemonSet, toCall func(m *v1.VolumeMount)) {
 	walkContainers(ds, func(c *v1.Container) {
 		for i := range c.VolumeMounts {
 			toCall(&c.VolumeMounts[i])
@@ -130,7 +130,7 @@ func walkMounts(ds *ext.DaemonSet, toCall func(m *v1.VolumeMount)) {
 	})
 }
 
-func applyDev(ds *ext.DaemonSet) {
+func applyDev(ds *apps.DaemonSet) {
 	ds.Spec.Template.Spec.Volumes = append(ds.Spec.Template.Spec.Volumes, v1.Volume{
 		Name: "dind",
 		VolumeSource: v1.VolumeSource{
@@ -148,7 +148,7 @@ func applyDev(ds *ext.DaemonSet) {
 	})
 }
 
-func applyCompat(ds *ext.DaemonSet) {
+func applyCompat(ds *apps.DaemonSet) {
 	walkMounts(ds, func(v *v1.VolumeMount) {
 		if v.Name == "run" || v.Name == "k8s-pods-dir" {
 			v.MountPath += ":shared"
@@ -157,7 +157,7 @@ func applyCompat(ds *ext.DaemonSet) {
 	})
 }
 
-func applyTag(ds *ext.DaemonSet, tag string) {
+func applyTag(ds *apps.DaemonSet, tag string) {
 	walkContainers(ds, func(c *v1.Container) {
 		if c.Image == virtletImage {
 			c.Image += ":" + tag
