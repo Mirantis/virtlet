@@ -276,28 +276,39 @@ function kvm_ok {
 }
 
 function prepare_node {
-    local virtlet_node="${1}"
-    ensure_build_container
-    if ! docker exec "${virtlet_node}" dpkg-query -W criproxy-nodeps >&/dev/null; then
-        echo >&2 "Installing CRI proxy package the node container..."
-        docker exec "${virtlet_node}" /bin/bash -c "curl -sSL '${CRIPROXY_DEB_URL}' >/criproxy.deb && dpkg -i /criproxy.deb && rm /criproxy.deb"
+    local node="${1}"
+    if docker exec "${node}" dpkg-query -W criproxy-nodeps >&/dev/null; then
+        return 0
     fi
+    ensure_build_container
+    echo >&2 "Installing CRI proxy package in the node container (${node})..."
+    docker exec "${node}" /bin/bash -c "curl -sSL '${CRIPROXY_DEB_URL}' >/criproxy.deb && dpkg -i /criproxy.deb && rm /criproxy.deb"
 
-    docker exec "${virtlet_node}" mount --make-shared /dind
-    docker exec "${virtlet_node}" mount --make-shared /dev
-    docker exec "${virtlet_node}" mount --make-shared /boot
-    docker exec "${virtlet_node}" mount --make-shared /sys/fs/cgroup
+    docker exec "${node}" mount --make-shared /dind
+    docker exec "${node}" mount --make-shared /dev
+    docker exec "${node}" mount --make-shared /boot
+    docker exec "${node}" mount --make-shared /sys/fs/cgroup
 
     if [[ ${VIRTLET_ON_MASTER} ]]; then
         if [[ $(kubectl get node kube-master -o jsonpath='{.spec.taints[?(@.key=="node-role.kubernetes.io/master")]}') ]]; then
             kubectl taint nodes kube-master node-role.kubernetes.io/master-
         fi
     fi
-    if [[ ${FORCE_UPDATE_IMAGE} ]] || ! docker exec "${virtlet_node}" docker history -q mirantis/virtlet:latest >&/dev/null; then
+    if [[ ${FORCE_UPDATE_IMAGE} ]] || ! docker exec "${node}" docker history -q mirantis/virtlet:latest >&/dev/null; then
         echo >&2 "Propagating Virtlet image to the node container..."
-        vcmd "docker save '${virtlet_image}' | docker exec -i '${virtlet_node}' docker load"
+        vcmd "docker save '${virtlet_image}' | docker exec -i '${node}' docker load"
     fi
-    kubectl label node --overwrite "${virtlet_node}" extraRuntime=virtlet
+}
+
+function prepare_all_nodes {
+    for node in $(kubectl get nodes -o jsonpath='{.items[?(@.metadata.name!="kube-master")].metadata.name}'); do
+        prepare_node "${node}"
+    done
+}
+
+function apply_runtime_label {
+    local node="${1}"
+    kubectl label node --overwrite "${node}" extraRuntime=virtlet
 }
 
 function start_dind {
@@ -623,12 +634,16 @@ case "${cmd}" in
         ;;
     copy-dind-internal)
         for virtlet_node in "${virtlet_nodes[@]}"; do
-          copy_dind_internal "${virtlet_node}"
+            copy_dind_internal "${virtlet_node}"
         done
+        ;;
+    prepare-all-nodes)
+        prepare_all_nodes
         ;;
     start-dind)
         for virtlet_node in "${virtlet_nodes[@]}"; do
-          prepare_node "${virtlet_node}"
+            prepare_node "${virtlet_node}"
+            apply_runtime_label "${virtlet_node}"
         done
         start_dind
         ;;

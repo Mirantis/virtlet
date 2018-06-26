@@ -104,6 +104,9 @@ func (pi *PodInterface) Wait(timing ...time.Duration) error {
 			if cs.State.Running == nil {
 				return fmt.Errorf("container %s in pod %s is not running: %s", cs.Name, podUpdated.Name, spew.Sdump(cs.State))
 			}
+			if !cs.Ready {
+				return fmt.Errorf("container %s in pod %s in not ready", cs.Name, podUpdated.Name)
+			}
 		}
 		return nil
 	}, timeout, pollPeriond, consistencyPeriod)
