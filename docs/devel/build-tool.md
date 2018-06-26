@@ -74,6 +74,14 @@ the DIND node that will run Virtlet if it doesn't exist there
 or if `FORCE_UPDATE_IMAGE` is set to a non-empty value.
 This command requires `kubectl`.
 
+### prepare-all-nodes
+
+Makes all the worker nodes in the `kubeadm-dind-cluster` ready for
+Virtlet pod, but doesn't start Virtlet pod on them (it doesn't apply
+`extraRuntime=virtlet` label). This is done automatically for the
+Virtlet node during `start-dind`, but it's necessary to do so for all
+the worker nodes for Virtlet e2e config test to pass.
+
 ### vsh
 
 Starts an interactive shell using build container. Useful for debugging.
