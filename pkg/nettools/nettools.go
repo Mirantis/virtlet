@@ -44,7 +44,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
-	"strings"
 
 	"github.com/containernetworking/cni/pkg/ns"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
@@ -362,7 +361,7 @@ func ValidateAndFixCNIResult(netConfig *cnicurrent.Result, nsPath string, allLin
 
 // GetContainerLinks finds links that correspond to interfaces in the current
 // network namespace
-func GetContainerLinks(info *cnicurrent.Result) ([]netlink.Link, error) {
+func GetContainerLinks(info *cnicurrent.Result) []netlink.Link {
 	// info.Interfaces is omitted by some CNI implementations and
 	// the order may not be correct there after Virtlet adds the
 	// missing ones, so we use interface indexes from info.IPs for
@@ -383,13 +382,13 @@ func GetContainerLinks(info *cnicurrent.Result) ([]netlink.Link, error) {
 		if iface.Sandbox == "" {
 			continue
 		}
-		link, err := netlink.LinkByName(iface.Name)
-		if err != nil {
-			return nil, err
-		}
+		// Skip error checking. If link is unavailable - simply add
+		// nil to slice
+		// TODO: differentiate missing link from other possible errors
+		link, _ := netlink.LinkByName(iface.Name)
 		links = append(links, link)
 	}
-	return links, nil
+	return links
 }
 
 // StripLink removes addresses from the link
@@ -697,13 +696,14 @@ func SetMacOnVf(pciAddress string, mac net.HardwareAddr) error {
 // The function should be called from within container namespace.
 // Returns container network struct and an error, if any.
 func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks []netlink.Link, enableSriov bool) (*network.ContainerSideNetwork, error) {
-	contLinks, err := GetContainerLinks(info)
-	if err != nil {
-		return nil, err
-	}
+	contLinks := GetContainerLinks(info)
 
 	var interfaces []*network.InterfaceDescription
 	for i, link := range contLinks {
+		if link == nil {
+			return nil, fmt.Errorf("have missing %d interface in list of container links what should be possible only during recovery after virtlet pod restart", i)
+		}
+
 		hwAddr := link.Attrs().HardwareAddr
 		ifaceName := link.Attrs().Name
 		pciAddress := ""
@@ -723,6 +723,7 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 
 			ifaceType = network.InterfaceTypeVF
 
+			var err error
 			pciAddress, err = getPCIAddressOfVF(ifaceName)
 			if err != nil {
 				return nil, err
@@ -821,10 +822,7 @@ func RecoverContainerSideNetwork(csn *network.ContainerSideNetwork, nsPath strin
 		return fmt.Errorf("wrong cni configuration: no interfaces defined: %s", spew.Sdump(csn.Result))
 	}
 
-	contLinks, err := GetContainerLinks(csn.Result)
-	if err != nil {
-		return err
-	}
+	contLinks := GetContainerLinks(csn.Result)
 
 	oldDescs := map[string]*network.InterfaceDescription{}
 	for _, desc := range csn.Interfaces {
@@ -832,6 +830,10 @@ func RecoverContainerSideNetwork(csn *network.ContainerSideNetwork, nsPath strin
 	}
 
 	for _, link := range contLinks {
+		// Skip missing link which is already used by running VM
+		if link == nil {
+			continue
+		}
 		ifaceName := link.Attrs().Name
 		desc, found := oldDescs[ifaceName]
 		if !found {
@@ -864,14 +866,6 @@ func RecoverContainerSideNetwork(csn *network.ContainerSideNetwork, nsPath strin
 		if desc.Type != ifaceType {
 			return fmt.Errorf("bad interface type for %q", desc.Name)
 		}
-	}
-
-	if len(oldDescs) != 0 {
-		var notFound []string
-		for ifaceName := range oldDescs {
-			notFound = append(notFound, ifaceName)
-		}
-		return fmt.Errorf("interface(s) not found: %s", strings.Join(notFound, ", "))
 	}
 
 	return nil
@@ -942,12 +936,13 @@ func Teardown(csn *network.ContainerSideNetwork) error {
 		i.Fo.Close()
 	}
 
-	contLinks, err := GetContainerLinks(csn.Result)
-	if err != nil {
-		return err
-	}
+	contLinks := GetContainerLinks(csn.Result)
 
 	for i, contLink := range contLinks {
+		if contLink == nil {
+			return fmt.Errorf("missing %d link during teardown", i)
+		}
+
 		// Remove ebtables DHCP rules
 		if err := updateEbTables(csn.NsPath, contLink.Attrs().Name, "-D"); err != nil {
 			return nil

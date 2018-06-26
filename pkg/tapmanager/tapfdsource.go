@@ -65,15 +65,26 @@ type PodNetworkDesc struct {
 }
 
 // GetFDPayload contains the data that are required by TapFDSource
-// to recover the tap device that was already configured, or create a new one
-// if CNIConfig is nil
+// to create the tap device
 type GetFDPayload struct {
+	// Description specifies pod network description for already
+	// prepared network configuration
+	Description *PodNetworkDesc `json:"podNetworkDesc"`
+}
+
+// RecoverPayload contains the data that are required by TapFDSource
+// to recover the tap device that was already configured
+type RecoverPayload struct {
 	// Description specifies pod network description for already
 	// prepared network configuration
 	Description *PodNetworkDesc `json:"podNetworkDesc"`
 	// ContainerSideNetwork specifies configuration used to configure retaken
 	// environment
 	ContainerSideNetwork *network.ContainerSideNetwork `json:"csn"`
+	// HaveRunningContainers contains the information about running
+	// containers (domains). If there is one - VF reconfiguration
+	// has to be skipped.
+	HaveRunningContainers bool
 }
 
 type podNetwork struct {
@@ -310,7 +321,7 @@ func (s *TapFDSource) Stop() error {
 
 // Recover recovers the state for the netns after Virtlet restart
 func (s *TapFDSource) Recover(key string, data []byte) error {
-	var payload GetFDPayload
+	var payload RecoverPayload
 	if err := json.Unmarshal(data, &payload); err != nil {
 		return fmt.Errorf("error unmarshalling GetFD payload: %v", err)
 	}
@@ -327,11 +338,10 @@ func (s *TapFDSource) Recover(key string, data []byte) error {
 	if err != nil {
 		return fmt.Errorf("failed to open network namespace at %q: %v", netNSPath, err)
 	}
-	// Ignore errors from unbinding as VFs can be already unbound if only virtlet was restarted
-	// while unbinding is still necessary if there was a whole node restart
-	// FIXME: that can fail if there is qemu holding pci device (virlet restart while vms are running).
-	if err := nettools.ReconstructVFs(csn, vmNS, true); err != nil {
-		return err
+	if !payload.HaveRunningContainers {
+		if err := nettools.ReconstructVFs(csn, vmNS, true); err != nil {
+			return err
+		}
 	}
 	return s.setupNetNS(key, pnd, func(netNSPath string, allLinks []netlink.Link) (*network.ContainerSideNetwork, error) {
 		if err := nettools.RecoverContainerSideNetwork(csn, netNSPath, allLinks); err != nil {

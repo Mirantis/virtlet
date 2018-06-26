@@ -1034,13 +1034,14 @@ func TestTapFDSource(t *testing.T) {
 
 					tst.stop()
 					c = tst.setupServerAndConnectToFDServer()
-					if err = c.Recover(fdKey, &tapmanager.GetFDPayload{
+					if err = c.Recover(fdKey, &tapmanager.RecoverPayload{
 						ContainerSideNetwork: csn,
 						Description: &tapmanager.PodNetworkDesc{
 							PodID:   tst.podId,
 							PodNs:   samplePodNS,
 							PodName: samplePodName,
 						},
+						HaveRunningContainers: false,
 					}); err != nil {
 						t.Fatalf("Recover(): %v", err)
 					}
