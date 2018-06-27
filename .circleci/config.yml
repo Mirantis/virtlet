@@ -168,11 +168,16 @@ e2e: &e2e
           BASE_LOCATION="$PWD" \
           deploy/demo.sh
   - run:
-      name: install kubectl
+      name: Install kubectl
       command: |
         curl -L https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl -o /usr/local/bin/kubectl
         echo ${KUBECTL_SHA1} /usr/local/bin/kubectl |sha1sum -c
         chmod +x /usr/local/bin/kubectl
+
+  - run:
+      name: Prepare all of the nodes for Virtlet pod
+      command: |
+        build/cmd.sh prepare-all-nodes
 
   - run:
       name: Run e2e tests
