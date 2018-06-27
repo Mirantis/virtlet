@@ -202,7 +202,7 @@ imports:
 - name: github.com/spf13/pflag
   version: 4c012f6dcd9546820e378d0bdda4d8fc772cdfea
 - name: github.com/vishvananda/netlink
-  version: fe3b5664d23a11b52ba59bece4ff29c52772a56b
+  version: 028453c77ce572d3554b3873c654663283ac42a3
   subpackages:
   - nl
 - name: github.com/vishvananda/netns
