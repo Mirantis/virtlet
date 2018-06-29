@@ -18,14 +18,14 @@ package e2e
 
 const (
 	defaultVMImageLocation = "download.cirros-cloud.net/0.3.5/cirros-0.3.5-x86_64-disk.img"
-	defaultSSHUser         = "cirros"
+	DefaultSSHUser         = "cirros"
 
-	sshPublicKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCaJEcFDXEK2ZbX0ZLS1EIYFZRbDAcRfuVjpstSc0De8+sV1aiu+deP" +
+	SshPublicKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCaJEcFDXEK2ZbX0ZLS1EIYFZRbDAcRfuVjpstSc0De8+sV1aiu+deP" +
 		"xdkuDRwqFtCyk6dEZkssjOkBXtri00MECLkir6FcH3kKOJtbJ6vy3uaJc9w1ERo+wyl6SkAh/+JTJkp7QRXj8oylW5E20LsbnA/dIwW" +
 		"zAF51PPwF7A7FtNg9DnwPqMkxFo1Th/buOMKbP5ZA1mmNNtmzbMpMfJATvVyiv3ccsSJKOiyQr6UG+j7sc/7jMVz5Xk34Vd0l8GwcB0" +
 		"334MchHckmqDB142h/NCWTr8oLakDNvkfC1YneAfAO41hDkUbxPtVBG5M/o7P4fxoqiHEX+ZLfRxDtHB53 me@localhost"
 
-	sshPrivateKey = `
+	SshPrivateKey = `
 		-----BEGIN RSA PRIVATE KEY-----
 		MIIEpAIBAAKCAQEAmiRHBQ1xCtmW19GS0tRCGBWUWwwHEX7lY6bLUnNA3vPrFdWo
 		rvnXj8XZLg0cKhbQspOnRGZLLIzpAV7a4tNDBAi5Iq+hXB95CjibWyer8t7miXPc

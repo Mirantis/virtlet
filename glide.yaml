@@ -35,6 +35,7 @@ import:
   version: bcac9884e7502bb2b474c0339d889cb981a2f27f
 - package: github.com/onsi/ginkgo
 - package: github.com/onsi/gomega
+  version: v1.4.0
 - package: golang.org/x/sync
   subpackages:
   - syncmap
@@ -55,6 +56,8 @@ import:
   version: edc3ab29cdff8694dd6feb85cfeb4b5f1b38ed9c
   subpackages:
   - reference
+- package: github.com/docker/engine-api
+  version: dea108d3aa0c67d7162a3fd8aa65f38a430019fd
 - package: github.com/opencontainers/go-digest
   version: a6d0ee40d4207ea02364bd3b9e8e77b9159ba1eb  
 - package: github.com/spf13/pflag

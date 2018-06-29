@@ -177,7 +177,7 @@ var _ = Describe("Container volume mounts", func() {
 				})
 			}
 
-			Expect(vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, podCustomization)).To(Succeed())
+			Expect(vm.Create(VMOptions{}.ApplyDefaults(), time.Minute*5, podCustomization)).To(Succeed())
 		})
 
 		AfterAll(func() {
@@ -236,7 +236,7 @@ var _ = Describe("Container volume mounts", func() {
 				})
 			}
 
-			Expect(vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, podCustomization)).To(Succeed())
+			Expect(vm.Create(VMOptions{}.ApplyDefaults(), time.Minute*5, podCustomization)).To(Succeed())
 		})
 
 		AfterAll(func() {
@@ -276,7 +276,7 @@ func makeVolumeMountVM(nodeName string, podCustomization func(*framework.PodInte
 		// ubuntu image with volumes mounted using cloud-init
 		// userdata 'mounts' section
 		UserDataScript: "@virtlet-mount-script@",
-	}.applyDefaults(), time.Minute*5, podCustomization)).To(Succeed())
+	}.ApplyDefaults(), time.Minute*5, podCustomization)).To(Succeed())
 	_, err := vm.Pod()
 	Expect(err).NotTo(HaveOccurred())
 	return vm
