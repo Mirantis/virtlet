@@ -1,13 +1,13 @@
-#!/bin/bash
+#!/bin/bash -x
 set -o errexit
 set -o nounset
 set -o pipefail
 set -o errtrace
 
 # make debugging this script easier
-if [[ -f /dind/prepare-node.sh && ! ( ${0} =~ /dind/ ) ]]; then
-    exec /dind/prepare-node.sh "$@"
-fi
+# if [[ -f /dind/prepare-node.sh && ! ( ${0} =~ /dind/ ) ]]; then
+#     exec /dind/prepare-node.sh "$@"
+# fi
 
 verbose=
 if [[ ${VIRTLET_LOGLEVEL:-} ]]; then
@@ -33,23 +33,23 @@ fi
 mkdir -p /host-var-lib/libvirt/images /hostlog/virtlet/vms /host-var-lib/virtlet/volumes
 
 # set up KVM
-if [[ ! ${VIRTLET_DISABLE_KVM:-} ]]; then
-  if ! kvm-ok >&/dev/null; then
-    # try to fix the environment by loading appropriate modules
-    modprobe kvm || (echo "Missing kvm module on the host" >&2 && exit 1)
-    if grep vmx /proc/cpuinfo &>/dev/null; then
-      modprobe kvm_intel || (echo "Missing kvm_intel module on the host" >&2 && exit 1)
-    elif grep svm /proc/cpuinfo &>/dev/null; then
-      modprobe kvm_amd || (echo "Missing kvm_amd module on the host" >&2 && exit 1)
-    fi
-  fi
-  if [[ ! -e /dev/kvm ]] && ! mknod /dev/kvm c 10 $(grep '\<kvm\>' /proc/misc | cut -d" " -f1); then
-    echo "Can't create /dev/kvm" >&2
-  fi
-  if ! kvm-ok; then
-    echo "*** VIRTLET_DISABLE_KVM is not set but KVM extensions are not available ***" >&2
-    echo "*** Virtlet startup failed ***" >&2
-    exit 1
-  fi
-  chown libvirt-qemu.kvm /dev/kvm
-fi
+# if [[ ! ${VIRTLET_DISABLE_KVM:-} ]]; then
+#   if ! kvm-ok >&/dev/null; then
+#     # try to fix the environment by loading appropriate modules
+#     modprobe kvm || (echo "Missing kvm module on the host" >&2 && exit 1)
+#     if grep vmx /proc/cpuinfo &>/dev/null; then
+#       modprobe kvm_intel || (echo "Missing kvm_intel module on the host" >&2 && exit 1)
+#     elif grep svm /proc/cpuinfo &>/dev/null; then
+#       modprobe kvm_amd || (echo "Missing kvm_amd module on the host" >&2 && exit 1)
+#     fi
+#   fi
+#   if [[ ! -e /dev/kvm ]] && ! mknod /dev/kvm c 10 $(grep '\<kvm\>' /proc/misc | cut -d" " -f1); then
+#     echo "Can't create /dev/kvm" >&2
+#   fi
+#   if ! kvm-ok; then
+#     echo "*** VIRTLET_DISABLE_KVM is not set but KVM extensions are not available ***" >&2
+#     echo "*** Virtlet startup failed ***" >&2
+#     exit 1
+#   fi
+#   chown libvirt-qemu.kvm /dev/kvm
+# fi
