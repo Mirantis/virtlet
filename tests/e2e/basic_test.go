@@ -38,7 +38,7 @@ var _ = Describe("Virtlet [Basic cirros tests]", func() {
 
 	BeforeAll(func() {
 		vm = controller.VM("cirros-vm")
-		Expect(vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, nil)).To(Succeed())
+		Expect(vm.Create(VMOptions{}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
 		var err error
 		vmPod, err = vm.Pod()
 		Expect(err).NotTo(HaveOccurred())
@@ -50,7 +50,7 @@ var _ = Describe("Virtlet [Basic cirros tests]", func() {
 
 	Context("VM guest OS", func() {
 		var ssh framework.Executor
-		scheduleWaitSSH(&vm, &ssh)
+		schedulewaitSSH(&vm, &ssh)
 
 		It("Should have default route [Conformance]", func() {
 			Expect(framework.RunSimple(ssh, "ip r")).To(SatisfyAll(
@@ -213,6 +213,6 @@ var _ = Describe("Virtlet [Disruptive]", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		vm = controller.VM("cirros-vm")
-		Expect(vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, nil)).To(Succeed())
+		Expect(vm.Create(VMOptions{}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
 	})
 })

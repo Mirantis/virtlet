@@ -444,6 +444,7 @@ function build_internal {
     go build -i -o "${project_dir}/_output/vmwrapper" ./cmd/vmwrapper
     go build -i -o "${project_dir}/_output/flexvolume_driver" ./cmd/flexvolume_driver
     go test -i -c -o "${project_dir}/_output/virtlet-e2e-tests" ./tests/e2e
+    go build -i -o "${project_dir}/_output/virtlet-longevity-tests" -ldflags "${ldflags}" ./cmd/longevity
 }
 
 function release_description {

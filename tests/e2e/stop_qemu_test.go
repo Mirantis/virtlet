@@ -37,7 +37,7 @@ var _ = Describe("QEMU Process", func() {
 
 	BeforeAll(func() {
 		vm = controller.VM("kill-qemu-vm")
-		Expect(vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, nil)).To(Succeed())
+		Expect(vm.Create(VMOptions{}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
 		var err error
 		vmPod, err := vm.Pod()
 		Expect(err).NotTo(HaveOccurred())
@@ -57,7 +57,7 @@ var _ = Describe("QEMU Process", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	scheduleWaitSSH(&vm, &ssh)
+	schedulewaitSSH(&vm, &ssh)
 
 	It("Must be active while VM is running and gone after it's deleted [Conformance]", func() {
 		qemuRunning := func() bool {

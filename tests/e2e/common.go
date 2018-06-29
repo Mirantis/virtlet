@@ -34,15 +34,15 @@ import (
 
 var (
 	vmImageLocation       = flag.String("image", defaultVMImageLocation, "VM image URL (*without http(s)://*")
-	sshUser               = flag.String("sshuser", defaultSSHUser, "default SSH user for VMs")
+	sshUser               = flag.String("sshuser", DefaultSSHUser, "default SSH user for VMs")
 	includeCloudInitTests = flag.Bool("include-cloud-init-tests", false, "include Cloud-Init tests")
 	includeUnsafeTests    = flag.Bool("include-unsafe-tests", false, "include tests that can be unsafe if they're run outside the build container")
 	memoryLimit           = flag.Int("memoryLimit", 160, "default VM memory limit (in MiB)")
 	junitOutput           = flag.String("junitOutput", "", "JUnit XML output file")
 )
 
-// scheduleWaitSSH schedules SSH interface initialization before the test context starts
-func scheduleWaitSSH(vm **framework.VMInterface, ssh *framework.Executor) {
+// schedulewaitSSH schedules SSH interface initialization before the test context starts
+func schedulewaitSSH(vm **framework.VMInterface, ssh *framework.Executor) {
 	BeforeAll(func() {
 		*ssh = waitSSH(*vm)
 	})
@@ -57,7 +57,7 @@ func waitSSH(vm *framework.VMInterface) framework.Executor {
 	Eventually(
 		func() error {
 			var err error
-			ssh, err = vm.SSH(*sshUser, sshPrivateKey)
+			ssh, err = vm.SSH(*sshUser, SshPrivateKey)
 			if err != nil {
 				return err
 			}
@@ -139,13 +139,13 @@ func do(value interface{}, extra ...interface{}) interface{} {
 
 type VMOptions framework.VMOptions
 
-func (o VMOptions) applyDefaults() framework.VMOptions {
+func (o VMOptions) ApplyDefaults() framework.VMOptions {
 	res := framework.VMOptions(o)
 	if res.Image == "" {
 		res.Image = *vmImageLocation
 	}
 	if res.SSHKey == "" && res.SSHKeySource == "" {
-		res.SSHKey = sshPublicKey
+		res.SSHKey = SshPublicKey
 	}
 	if res.VCPUCount == 0 {
 		res.VCPUCount = 1
