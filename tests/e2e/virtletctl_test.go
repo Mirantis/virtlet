@@ -59,7 +59,7 @@ var _ = Describe("virtletctl", func() {
 					Name: "sshkey",
 				},
 				Data: map[string]string{
-					"authorized_keys": sshPublicKey,
+					"authorized_keys": SshPublicKey,
 				},
 			}
 			_, err := controller.ConfigMaps().Create(cm)
@@ -68,7 +68,7 @@ var _ = Describe("virtletctl", func() {
 			vm = controller.VM("virtletctl-cirros-vm")
 			Expect(vm.Create(VMOptions{
 				SSHKeySource: "configmap/sshkey",
-			}.applyDefaults(), time.Minute*5, nil)).To(Succeed())
+			}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
 
 			waitSSH(vm)
 
@@ -77,7 +77,7 @@ var _ = Describe("virtletctl", func() {
 			defer tempfile.Close()
 			tempfileName = tempfile.Name()
 
-			strippedKey := strings.Replace(sshPrivateKey, "\t", "", -1)
+			strippedKey := strings.Replace(SshPrivateKey, "\t", "", -1)
 			_, err = tempfile.Write([]byte(strippedKey))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(os.Chmod(tempfileName, 0600)).To(Succeed())
