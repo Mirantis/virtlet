@@ -19,7 +19,6 @@
 - name: 'fdManager: AddFDs'
   value:
     data:
-      csn: null
       podNetworkDesc:
         DNS: null
         podId: should-fail-cni

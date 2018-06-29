@@ -29,6 +29,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/imagetranslation"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
 	"github.com/Mirantis/virtlet/pkg/metadata"
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	"github.com/Mirantis/virtlet/pkg/stream"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
 )
@@ -188,6 +189,7 @@ func (v *VirtletManager) recoverNetworkNamespaces() (allErrors []error) {
 		return
 	}
 
+OUTER:
 	for _, s := range sandboxes {
 		psi, err := s.Retrieve()
 		if err != nil {
@@ -199,15 +201,33 @@ func (v *VirtletManager) recoverNetworkNamespaces() (allErrors []error) {
 			continue
 		}
 
+		haveRunningContainers := false
+		containers, err := v.metadataStore.ListPodContainers(s.GetID())
+		if err != nil {
+			allErrors = append(allErrors, fmt.Errorf("can't retrieve ContainerMetadata list for pod %q: %v", s.GetID(), err))
+			continue
+		}
+		for _, c := range containers {
+			ci, err := v.virtTool.ContainerInfo(c.GetID())
+			if err != nil {
+				allErrors = append(allErrors, fmt.Errorf("can't verify container status for container %q in pod %q: %v", c.GetID(), s.GetID(), err))
+				continue OUTER
+			}
+			if ci.State == types.ContainerState_CONTAINER_RUNNING {
+				haveRunningContainers = true
+			}
+		}
+
 		if err := v.fdManager.Recover(
 			s.GetID(),
-			tapmanager.GetFDPayload{
-				ContainerSideNetwork: psi.ContainerSideNetwork,
+			tapmanager.RecoverPayload{
 				Description: &tapmanager.PodNetworkDesc{
 					PodID:   s.GetID(),
 					PodNs:   psi.Config.Namespace,
 					PodName: psi.Config.Name,
 				},
+				ContainerSideNetwork:  psi.ContainerSideNetwork,
+				HaveRunningContainers: haveRunningContainers,
 			},
 		); err != nil {
 			allErrors = append(allErrors, fmt.Errorf("error recovering netns for %q pod: %v", s.GetID(), err))
