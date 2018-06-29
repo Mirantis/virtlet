@@ -1,8 +1,8 @@
-hash: 56045aeed24fa36a2b560f87ff6a4af024361a241066d81b5173b885659060f4
-updated: 2018-06-19T21:10:27.123795189+03:00
+hash: b30bbdd1f282c28a740a7fc85d9090ffab31476f58d507fcddbd92e3c1ab1ff8
+updated: 2018-06-29T00:59:01.939551306+02:00
 imports:
 - name: github.com/boltdb/bolt
-  version: 583e8937c61f1af6513608ccc75c97b6abdf4ff9
+  version: fd01fc79c553a8e99d512a07e8e0c63d4a3ccfc5
 - name: github.com/containernetworking/cni
   version: 137b4975ecab6e1f0c24c1e3c228a50a3cfba75e
   subpackages:
@@ -16,7 +16,7 @@ imports:
 - name: github.com/coreos/go-systemd
   version: 4484981625c1a6a2ecb40a390fcb6a9bcfee76e3
 - name: github.com/cpuguy83/go-md2man
-  version: 48d8747a2ca13185e7cc8efe6e9fc196a83f71a5
+  version: 691ee98543af2f262f35fbb54bdd42f00b9b9cc5
   subpackages:
   - md2man
 - name: github.com/davecgh/go-spew
@@ -168,7 +168,7 @@ imports:
   - reporters/stenographer
   - types
 - name: github.com/onsi/gomega
-  version: 2152b45fa28a361beba9aab0885972323a444e28
+  version: 62bff4df71bdbc266561a0caee19f0594b17c240
   subpackages:
   - format
   - internal/assertion
@@ -226,6 +226,9 @@ imports:
   subpackages:
   - bpf
   - context
+  - html
+  - html/atom
+  - html/charset
   - http2
   - http2/hpack
   - idna
@@ -249,6 +252,20 @@ imports:
 - name: golang.org/x/text
   version: b19bf474d317b857955b12035d2c5acb57ce8b01
   subpackages:
+  - encoding
+  - encoding/charmap
+  - encoding/htmlindex
+  - encoding/internal
+  - encoding/internal/identifier
+  - encoding/japanese
+  - encoding/korean
+  - encoding/simplifiedchinese
+  - encoding/traditionalchinese
+  - encoding/unicode
+  - internal/tag
+  - internal/utf8internal
+  - language
+  - runes
   - secure/bidirule
   - transform
   - unicode/bidi

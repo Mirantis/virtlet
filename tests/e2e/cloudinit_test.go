@@ -37,7 +37,7 @@ var _ = Describe("Cloud-init related tests", func() {
 					Name: "cm-ssh-key-impl",
 				},
 				Data: map[string]string{
-					"authorized_keys": sshPublicKey,
+					"authorized_keys": SshPublicKey,
 				},
 			}
 			_, err := controller.ConfigMaps().Create(cm)
@@ -46,7 +46,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			vm = controller.VM("ssh-from-cm-impl")
 			Expect(vm.Create(VMOptions{
 				SSHKeySource: "configmap/cm-ssh-key-impl",
-			}.applyDefaults(), time.Minute*5, nil)).To(Succeed())
+			}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
 		})
 
 		AfterAll(func() {
@@ -68,7 +68,7 @@ var _ = Describe("Cloud-init related tests", func() {
 					Name: "cm-ssh-key-expl",
 				},
 				Data: map[string]string{
-					"myKey": sshPublicKey,
+					"myKey": SshPublicKey,
 				},
 			}
 			_, err := controller.ConfigMaps().Create(cm)
@@ -77,7 +77,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			vm = controller.VM("ssh-from-cm-expl")
 			Expect(vm.Create(VMOptions{
 				SSHKeySource: "configmap/cm-ssh-key-expl/myKey",
-			}.applyDefaults(), time.Minute*5, nil)).To(Succeed())
+			}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
 		})
 
 		AfterAll(func() {
@@ -99,7 +99,7 @@ var _ = Describe("Cloud-init related tests", func() {
 					Name: "secret-ssh-key-impl",
 				},
 				StringData: map[string]string{
-					"authorized_keys": sshPublicKey,
+					"authorized_keys": SshPublicKey,
 				},
 			}
 			_, err := controller.Secrets().Create(secret)
@@ -108,7 +108,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			vm = controller.VM("ssh-from-secret-impl")
 			Expect(vm.Create(VMOptions{
 				SSHKeySource: "secret/secret-ssh-key-impl",
-			}.applyDefaults(), time.Minute*5, nil)).To(Succeed())
+			}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
 		})
 
 		AfterAll(func() {
@@ -130,7 +130,7 @@ var _ = Describe("Cloud-init related tests", func() {
 					Name: "secret-ssh-key-expl",
 				},
 				StringData: map[string]string{
-					"myKey": sshPublicKey,
+					"myKey": SshPublicKey,
 				},
 			}
 			_, err := controller.Secrets().Create(secret)
@@ -139,7 +139,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			vm = controller.VM("ssh-from-secret-expl")
 			Expect(vm.Create(VMOptions{
 				SSHKeySource: "secret/secret-ssh-key-expl/myKey",
-			}.applyDefaults(), time.Minute*5, nil)).To(Succeed())
+			}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
 		})
 
 		AfterAll(func() {
@@ -173,7 +173,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			vm = controller.VM("userdata-cm")
 			Expect(vm.Create(VMOptions{
 				UserDataSource: "configmap/cm-userdata",
-			}.applyDefaults(), time.Minute*5, nil)).To(Succeed())
+			}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
 		})
 
 		AfterAll(func() {
@@ -208,7 +208,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			vm = controller.VM("userdata-secret")
 			Expect(vm.Create(VMOptions{
 				UserDataSource: "secret/secret-userdata",
-			}.applyDefaults(), time.Minute*5, nil)).To(Succeed())
+			}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
 		})
 
 		AfterAll(func() {
@@ -245,7 +245,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			Expect(vm.Create(VMOptions{
 				UserDataSource: "configmap/cm-userdata",
 				UserData:       userData,
-			}.applyDefaults(), time.Minute*5, nil)).To(Succeed())
+			}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
 		})
 
 		AfterAll(func() {

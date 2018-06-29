@@ -67,7 +67,7 @@ func RunSimple(executor Executor, command ...string) (string, error) {
 	if err != nil {
 		if ce, ok := err.(CommandError); ok {
 			if ce.ExitCode != 0 {
-				return "", fmt.Errorf("command exited with code %d, stderr: %s", ce.ExitCode, strings.TrimSpace(stderr))
+				return "", fmt.Errorf("command exited with code %d, stderr: %s", ce.ExitCode, strings.TrimSpace(stderr)+strings.TrimSpace(stdout))
 			}
 			return strings.TrimSpace(stdout), nil
 		}
