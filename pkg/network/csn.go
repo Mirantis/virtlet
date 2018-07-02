@@ -52,6 +52,8 @@ type InterfaceDescription struct {
 	PCIAddress string
 	// MTU contains max transfer unit value for interface.
 	MTU uint16
+	// VlanID contains vlan id of sr-iov vf interface.
+	VlanID int
 }
 
 // ContainerSideNetwork struct describes the container (VM) network
