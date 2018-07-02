@@ -18,6 +18,7 @@ VIRTLET_DEMO_BRANCH="${VIRTLET_DEMO_BRANCH:-}"
 VIRTLET_ON_MASTER="${VIRTLET_ON_MASTER:-}"
 VIRTLET_MULTI_NODE="${VIRTLET_MULTI_NODE:-}"
 IMAGE_REGEXP_TRANSLATION="${IMAGE_REGEXP_TRANSLATION:-1}"
+MULTI_CNI="${MULTI_CNI:-}"
 # Convenience setting for local testing:
 # BASE_LOCATION="${HOME}/work/kubernetes/src/github.com/Mirantis/virtlet"
 cirros_key="demo-cirros-private-key"
@@ -133,6 +134,25 @@ function demo::start-dind-cluster {
   demo::ask-before-continuing
   "./${dind_script}" clean
   "./${dind_script}" up
+}
+
+function demo::jq-patch {
+  local node="${1}"
+  local expr="${2}"
+  local filename="${3}"
+  docker exec "${node}" \
+         bash -c "jq '${expr}' '${filename}' >/tmp/jqpatch.tmp && mv /tmp/jqpatch.tmp '${filename}'"
+}
+
+function demo::install-cni-genie {
+  "${kubectl}" apply -f https://docs.projectcalico.org/v2.6/getting-started/kubernetes/installation/hosted/kubeadm/1.6/calico.yaml
+  demo::wait-for "Calico etcd" demo::pods-ready k8s-app=calico-etcd
+  demo::wait-for "Calico node" demo::pods-ready k8s-app=calico-node
+  "${kubectl}" apply -f https://raw.githubusercontent.com/Mirantis/CNI-Genie/mymaster/conf/1.8/genie.yaml
+  demo::wait-for "CNI Genie" demo::pods-ready k8s-app=genie
+  demo::jq-patch kube-node-1 '.cniVersion="0.3.0"|.default_plugin="calico,flannel"' /etc/cni/net.d/00-genie.conf
+  demo::jq-patch kube-node-1 '.cniVersion="0.3.0"' /etc/cni/net.d/10-calico.conf
+  demo::jq-patch kube-node-1 '.cniVersion="0.3.0"' /etc/cni/net.d/10-flannel.conflist
 }
 
 function demo::install-cri-proxy {
@@ -378,7 +398,14 @@ EOF
 fi
 
 demo::get-dind-cluster
+if [[ ${MULTI_CNI} ]]; then
+  export NUM_NODES=1
+  export CNI_PLUGIN=flannel
+fi
 demo::start-dind-cluster
+if [[ ${MULTI_CNI} ]]; then
+  demo::install-cni-genie
+fi
 for virtlet_node in "${virtlet_nodes[@]}"; do
   demo::fix-mounts "${virtlet_node}"
   demo::install-cri-proxy "${virtlet_node}"

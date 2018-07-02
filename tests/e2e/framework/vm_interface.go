@@ -51,6 +51,7 @@ type VMOptions struct {
 	UserDataScript    string
 	UserDataSource    string
 	NodeName          string
+	MultiCNI          string
 }
 
 func newVMInterface(controller *Controller, name string) *VMInterface {
@@ -153,6 +154,9 @@ func (vmi *VMInterface) buildVMPod(options VMOptions) *v1.Pod {
 	}
 	if options.VCPUCount > 0 {
 		annotations["VirtletVCPUCount"] = strconv.Itoa(options.VCPUCount)
+	}
+	if options.MultiCNI != "" {
+		annotations["cni"] = options.MultiCNI
 	}
 
 	limits := v1.ResourceList{}

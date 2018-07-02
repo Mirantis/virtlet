@@ -52,41 +52,9 @@ var _ = Describe("Virtlet [Basic cirros tests]", func() {
 		var ssh framework.Executor
 		scheduleWaitSSH(&vm, &ssh)
 
-		It("Should have default route [Conformance]", func() {
-			Expect(framework.RunSimple(ssh, "ip r")).To(SatisfyAll(
-				ContainSubstring("default via"),
-				ContainSubstring("src "+vmPod.Pod.Status.PodIP),
-			))
-		})
-
-		It("Should have internet connectivity [Conformance]", func(done Done) {
-			defer close(done)
-			Expect(framework.RunSimple(ssh, "ping -c1 8.8.8.8")).To(MatchRegexp(
-				"1 .*transmitted, 1 .*received, 0% .*loss"))
-		}, 5)
-
-		Context("With nginx server", func() {
-			var nginxPod *framework.PodInterface
-
-			BeforeAll(func() {
-				p, err := controller.RunPod("nginx", "nginx", nil, time.Minute*4, 80)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(p).NotTo(BeNil())
-				nginxPod = p
-			})
-
-			AfterAll(func() {
-				Expect(nginxPod.Delete()).To(Succeed())
-			})
-
-			It("Should be able to access another k8s endpoint [Conformance]", func(done Done) {
-				defer close(done)
-				cmd := fmt.Sprintf("curl -s --connect-timeout 5 http://nginx.%s.svc.cluster.local", controller.Namespace())
-				Eventually(func() (string, error) {
-					return framework.RunSimple(ssh, cmd)
-				}, 60).Should(ContainSubstring("Thank you for using nginx."))
-			}, 60*5)
-		})
+		itShouldHaveNetworkConnectivity(
+			func() *framework.PodInterface { return vmPod },
+			func() framework.Executor { return ssh })
 
 		It("Should have hostname equal to the pod name [Conformance]", func() {
 			Expect(framework.RunSimple(ssh, "hostname")).To(Equal(vmPod.Pod.Name))
@@ -216,3 +184,41 @@ var _ = Describe("Virtlet [Disruptive]", func() {
 		Expect(vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, nil)).To(Succeed())
 	})
 })
+
+func itShouldHaveNetworkConnectivity(podIface func() *framework.PodInterface, ssh func() framework.Executor) {
+	It("Should have default route [Conformance]", func() {
+		Expect(framework.RunSimple(ssh(), "ip r")).To(SatisfyAll(
+			ContainSubstring("default via"),
+			ContainSubstring("src "+podIface().Pod.Status.PodIP),
+		))
+	})
+
+	It("Should have internet connectivity [Conformance]", func(done Done) {
+		defer close(done)
+		Expect(framework.RunSimple(ssh(), "ping -c1 8.8.8.8")).To(MatchRegexp(
+			"1 .*transmitted, 1 .*received, 0% .*loss"))
+	}, 5)
+
+	Context("With nginx server", func() {
+		var nginxPod *framework.PodInterface
+
+		BeforeAll(func() {
+			p, err := controller.RunPod("nginx", "nginx", nil, time.Minute*4, 80)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(p).NotTo(BeNil())
+			nginxPod = p
+		})
+
+		AfterAll(func() {
+			Expect(nginxPod.Delete()).To(Succeed())
+		})
+
+		It("Should be able to access another k8s endpoint [Conformance]", func(done Done) {
+			defer close(done)
+			cmd := fmt.Sprintf("curl -s --connect-timeout 5 http://nginx.%s.svc.cluster.local", controller.Namespace())
+			Eventually(func() (string, error) {
+				return framework.RunSimple(ssh(), cmd)
+			}, 60).Should(ContainSubstring("Thank you for using nginx."))
+		}, 60*5)
+	})
+}

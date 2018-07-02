@@ -159,6 +159,9 @@ e2e: &e2e
         elif [[ ${CIRCLE_JOB} = e2e_weave ]]; then
           export CNI_PLUGIN=weave
           echo >&2 "*** Using Weave CNI"
+        elif [[ ${CIRCLE_JOB} = e2e_multi_cni ]]; then
+          export MULTI_CNI=1
+          echo >&2 "*** Using multiple CNIs (flannel + calico)"
         fi
         SKIP_SNAPSHOT=1 \
           NONINTERACTIVE=1 \
@@ -184,7 +187,12 @@ e2e: &e2e
       command: |
         build/portforward.sh 8080&
         mkdir -p ~/junit
-        _output/virtlet-e2e-tests -test.v -ginkgo.skip="\[Heavy\]" -ginkgo.skip="\[Disruptive\]" -junitOutput ~/junit/junit.xml -include-unsafe-tests=true
+        skip="-ginkgo.skip=\[Heavy\]|\[MultiCNI\]|\[Disruptive\]"
+        if [[ ${CIRCLE_JOB} = e2e_multi_cni ]]; then
+          # per-node config test requires an additional worker node
+          skip="-ginkgo.skip=\[Heavy\]|\[Disruptive\]|Per-node configuration"
+        fi
+        _output/virtlet-e2e-tests -test.v "${skip}" -junitOutput ~/junit/junit.xml -include-unsafe-tests=true
 
   - store_test_results:
       path: ~/junit
@@ -348,6 +356,9 @@ jobs:
   e2e_weave:
     <<: *e2e
 
+  e2e_multi_cni:
+    <<: *e2e
+
   push_branch:
     <<: *push_images
 
@@ -439,6 +450,15 @@ workflows:
           tags:
             only:
               - /^v[0-9].*/
+    - e2e_multi_cni:
+        requires:
+        - build
+        filters:
+          branches:
+            only: /^master$|^.*-net$/
+          tags:
+            only:
+              - /^v[0-9].*/
     - push_branch:
         requires:
         - build
@@ -453,6 +473,7 @@ workflows:
         - e2e_calico
         - e2e_flannel
         - e2e_weave
+        - e2e_multi_cni
         - integration
         filters:
           branches:
