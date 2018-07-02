@@ -678,16 +678,20 @@ func getMasterLinkOfVf(pciAddress string) (netlink.Link, error) {
 func setMacAndVlanOnVf(pciAddress string, mac net.HardwareAddr, vlanID int) error {
 	virtFNNo, err := getVirtFNNo(pciAddress)
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot find VF number for device with pci address %q: %v", pciAddress, err)
 	}
 	masterLink, err := getMasterLinkOfVf(pciAddress)
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot get link for PF of VF with pci address %q: %v", pciAddress, err)
 	}
 	if err := netlink.LinkSetVfHardwareAddr(masterLink, virtFNNo, mac); err != nil {
-		return err
+		return fmt.Errorf("cannot set mac address of VF with pci address %q: %v", pciAddress, err)
 	}
-	return netlink.LinkSetVfVlan(masterLink, virtFNNo, vlanID)
+	err = netlink.LinkSetVfVlan(masterLink, virtFNNo, vlanID)
+	if err != nil {
+		return fmt.Errorf("cannot set vlan of VF with pci address %q: %v", pciAddress, err)
+	}
+	return nil
 }
 
 func getVfVlanID(pciAddress string) (int, error) {
