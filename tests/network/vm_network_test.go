@@ -246,13 +246,13 @@ func TestVmNetwork(t *testing.T) {
 	clientMac, _ := net.ParseMAC(clientMacAddrs[0])
 
 	var csn *network.ContainerSideNetwork
-	if err := contNS.Do(func(ns.NetNS) error {
+	if err := contNS.Do(func(hostNS ns.NetNS) error {
 		netlink.LinkSetHardwareAddr(clientVeth, clientMac)
 		allLinks, err := netlink.LinkList()
 		if err != nil {
 			return fmt.Errorf("LinkList() failed: %v", err)
 		}
-		csn, err = nettools.SetupContainerSideNetwork(info, contNS.Path(), allLinks, false)
+		csn, err = nettools.SetupContainerSideNetwork(info, contNS.Path(), allLinks, false, hostNS)
 		if err != nil {
 			return fmt.Errorf("failed to set up container side network: %v", err)
 		}

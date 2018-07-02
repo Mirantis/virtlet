@@ -390,7 +390,7 @@ func TestExtractLinkInfo(t *testing.T) {
 	})
 }
 
-func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, contNsPath string) {
+func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, contNsPath string, hostNS ns.NetNS) {
 	allLinks, err := netlink.LinkList()
 	if err != nil {
 		log.Panicf("error listing links: %v", err)
@@ -398,7 +398,7 @@ func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, contNsP
 
 	origHwAddr := origContVeth.Attrs().HardwareAddr
 	expectedInfo := expectedExtractedLinkInfo(contNsPath)
-	csn, err := SetupContainerSideNetwork(expectedInfo, contNsPath, allLinks, false)
+	csn, err := SetupContainerSideNetwork(expectedInfo, contNsPath, allLinks, false, hostNS)
 	if err != nil {
 		log.Panicf("failed to set up container side network: %v", err)
 	}
@@ -445,13 +445,13 @@ func TestSetUpContainerSideNetworkWithInfo(t *testing.T) {
 		if err := StripLink(origContVeth); err != nil {
 			log.Panicf("StripLink() failed: %v", err)
 		}
-		verifyContainerSideNetwork(t, origContVeth, contNS.Path())
+		verifyContainerSideNetwork(t, origContVeth, contNS.Path(), hostNS)
 	})
 }
 
 func TestLoopbackInterface(t *testing.T) {
 	withFakeCNIVethAndGateway(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
-		verifyContainerSideNetwork(t, origContVeth, contNS.Path())
+		verifyContainerSideNetwork(t, origContVeth, contNS.Path(), hostNS)
 		if out, err := exec.Command("ping", "-c", "1", "127.0.0.1").CombinedOutput(); err != nil {
 			log.Panicf("ping 127.0.0.1 failed:\n%s", out)
 		}
@@ -535,7 +535,7 @@ func TestTeardownContainerSideNetwork(t *testing.T) {
 			log.Panicf("error listing links: %v", err)
 		}
 
-		csn, err := SetupContainerSideNetwork(expectedExtractedLinkInfo(contNS.Path()), contNS.Path(), allLinks, false)
+		csn, err := SetupContainerSideNetwork(expectedExtractedLinkInfo(contNS.Path()), contNS.Path(), allLinks, false, hostNS)
 		if err != nil {
 			log.Panicf("failed to set up container side network: %v", err)
 		}
