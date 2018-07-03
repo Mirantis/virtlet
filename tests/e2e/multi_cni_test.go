@@ -82,7 +82,8 @@ func describeMultiCNI(what string, addCNIAnnotation bool) {
 
 		itShouldHaveNetworkConnectivity(
 			func() *framework.PodInterface { return vms[0].vmPod },
-			func() framework.Executor { return vms[0].ssh })
+			func() framework.Executor { return vms[0].ssh },
+			false)
 	})
 }
 
