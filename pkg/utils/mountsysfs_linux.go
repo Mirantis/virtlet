@@ -1,4 +1,4 @@
-// +build !linux
+// +build linux
 
 /*
 Copyright 2018 Mirantis
@@ -16,16 +16,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package tapmanager
+package utils
 
 import (
-	"errors"
+	"syscall"
 )
 
-func mountSysfs() error {
-	return errors.New("not implemented")
+// MountSysfs adds new mount of sysfs on /sys to have a correct view
+// in current netns on /sys/class/net
+func MountSysfs() error {
+	return syscall.Mount("none", "/sys", "sysfs", 0, "")
 }
 
-func unmountSysfs() error {
-	return errors.New("not implemented")
+// UnmountSysfs unmounts current fs bound to /sys
+func UnmountSysfs() error {
+	return syscall.Unmount("/sys", syscall.MNT_DETACH)
 }

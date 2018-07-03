@@ -54,6 +54,7 @@ import (
 
 	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/network"
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 const (
@@ -770,6 +771,16 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 			// Jump into host netns to get vlan id of VF using its
 			// master device.
 			if err := hostNS.Do(func(ns.NetNS) error {
+				// switch /sys to corresponding one in netns
+				// to have the correct items under /sys/class/net
+				if err := utils.MountSysfs(); err != nil {
+					return err
+				}
+				defer func() {
+					if err := utils.UnmountSysfs(); err != nil {
+						glog.V(3).Infof("Warning, error during umount of /sys: %v", err)
+					}
+				}()
 				var err error
 				vlanID, err = getVfVlanID(pciAddress)
 				return err
@@ -793,6 +804,16 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 			// Jump into host netns to set mac address and vlan id
 			// of VF using its master device.
 			if err := hostNS.Do(func(ns.NetNS) error {
+				// switch /sys to corresponding one in netns
+				// to have the correct items under /sys/class/net
+				if err := utils.MountSysfs(); err != nil {
+					return err
+				}
+				defer func() {
+					if err := utils.UnmountSysfs(); err != nil {
+						glog.V(3).Infof("Warning, error during umount of /sys: %v", err)
+					}
+				}()
 				return setMacAndVlanOnVf(pciAddress, hwAddr, vlanID)
 			}); err != nil {
 				return nil, err

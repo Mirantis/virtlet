@@ -1,4 +1,4 @@
-// +build linux
+// +build !linux
 
 /*
 Copyright 2018 Mirantis
@@ -16,16 +16,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package tapmanager
+package utils
 
 import (
-	"syscall"
+	"errors"
 )
 
-func mountSysfs() error {
-	return syscall.Mount("none", "/sys", "sysfs", 0, "")
+// MountSysfs is a placeholder for unsupported systems
+func MountSysfs() error {
+	return errors.New("not implemented")
 }
 
-func unmountSysfs() error {
-	return syscall.Unmount("/sys", syscall.MNT_DETACH)
+// UnmountSysfs is a placeholder for unsupported systems
+func UnmountSysfs() error {
+	return errors.New("not implemented")
 }
