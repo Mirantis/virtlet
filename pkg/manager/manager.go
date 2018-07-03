@@ -140,7 +140,7 @@ func (v *VirtletManager) Run() error {
 		glog.Warning(err)
 	}
 
-	glog.V(1).Infof("Starting server on socket %s", v.config.CRISocketPath)
+	glog.V(1).Infof("Starting server on socket %s", *v.config.CRISocketPath)
 	if err = v.server.Serve(*v.config.CRISocketPath); err != nil {
 		return fmt.Errorf("serving failed: %v", err)
 	}
