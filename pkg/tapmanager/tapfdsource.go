@@ -113,6 +113,7 @@ func NewTapFDSource(cniClient cni.Client, enableSriov bool, calicoSubnetSize int
 		cniClient:        cniClient,
 		fdMap:            make(map[string]*podNetwork),
 		calicoSubnetSize: calicoSubnetSize,
+		enableSriov:      enableSriov,
 	}
 
 	return s, nil
