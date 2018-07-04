@@ -704,9 +704,18 @@ func getVfVlanID(pciAddress string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	for _, vfInfo := range masterLink.Attrs().Vfs {
+	iplinkOutput, err := exec.Command("ip", "link", "show", masterLink.Attrs().Name).CombinedOutput()
+	if err != nil {
+		return 0, fmt.Errorf("error during execution of ip link show: %q\nOutput:%s", err, iplinkOutput)
+	}
+	vfinfos, err := utils.ParseIPLinkOutput(iplinkOutput)
+	if err != nil {
+		return 0, fmt.Errorf("error during parsing ip link output for device %q: %v",
+			masterLink.Attrs().Name, err)
+	}
+	for _, vfInfo := range vfinfos {
 		if vfInfo.ID == virtFNNo {
-			return int(vfInfo.Vlan), nil
+			return int(vfInfo.VLanID), nil
 		}
 	}
 	return 0, fmt.Errorf("vlan info for %d vf on %s not found", virtFNNo, masterLink.Attrs().Name)
