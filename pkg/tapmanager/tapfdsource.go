@@ -351,18 +351,7 @@ func (s *TapFDSource) setupNetNS(key string, pnd *PodNetworkDesc, initNet func(n
 	var csn *network.ContainerSideNetwork
 	var dhcpServer *dhcp.Server
 	doneCh := make(chan error)
-	if err := vmNS.Do(func(hostNS ns.NetNS) error {
-		// switch /sys to corresponding one in netns
-		// to have the correct items under /sys/class/net
-		if err := utils.MountSysfs(); err != nil {
-			return err
-		}
-		defer func() {
-			if err := utils.UnmountSysfs(); err != nil {
-				glog.V(3).Infof("Warning, error during umount of /sys: %v", err)
-			}
-		}()
-
+	if err := utils.CallInNetNSWithSysfsRemounted(vmNS, func(hostNS ns.NetNS) error {
 		allLinks, err := netlink.LinkList()
 		if err != nil {
 			return fmt.Errorf("error listing the links: %v", err)

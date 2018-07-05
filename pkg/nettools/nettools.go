@@ -675,7 +675,7 @@ func getMasterLinkOfVf(pciAddress string) (netlink.Link, error) {
 }
 
 // setMacAndVlanOnVf uses VF pci address to locate its parent device and uses
-// it to set mac address and Vlan id on VF.  It needs to be called from host netns.
+// it to set mac address and VLAN id on VF.  It needs to be called from the host netns.
 func setMacAndVlanOnVf(pciAddress string, mac net.HardwareAddr, vlanID int) error {
 	virtFNNo, err := getVirtFNNo(pciAddress)
 	if err != nil {
@@ -704,6 +704,9 @@ func getVfVlanID(pciAddress string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+
+	// vfinfos are gathered using `ip link show` because of failure in vishvananda/netlink
+	// which is occuring for bigger netlink queries like one asking for list ov VFs of an interface.
 	iplinkOutput, err := exec.Command("ip", "link", "show", masterLink.Attrs().Name).CombinedOutput()
 	if err != nil {
 		return 0, fmt.Errorf("error during execution of ip link show: %q\nOutput:%s", err, iplinkOutput)
@@ -713,6 +716,7 @@ func getVfVlanID(pciAddress string) (int, error) {
 		return 0, fmt.Errorf("error during parsing ip link output for device %q: %v",
 			masterLink.Attrs().Name, err)
 	}
+
 	for _, vfInfo := range vfinfos {
 		if vfInfo.ID == virtFNNo {
 			return int(vfInfo.VLanID), nil
@@ -777,19 +781,8 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 				return nil, err
 			}
 
-			// Jump into host netns to get vlan id of VF using its
-			// master device.
-			if err := hostNS.Do(func(ns.NetNS) error {
-				// switch /sys to corresponding one in netns
-				// to have the correct items under /sys/class/net
-				if err := utils.MountSysfs(); err != nil {
-					return err
-				}
-				defer func() {
-					if err := utils.UnmountSysfs(); err != nil {
-						glog.V(3).Infof("Warning, error during umount of /sys: %v", err)
-					}
-				}()
+			// Switch to the host netns to get VLAN ID of the VF using its master device.
+			if err := utils.CallInNetNSWithSysfsRemounted(hostNS, func(ns.NetNS) error {
 				var err error
 				vlanID, err = getVfVlanID(pciAddress)
 				return err
@@ -810,19 +803,9 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 				return nil, err
 			}
 
-			// Jump into host netns to set mac address and vlan id
+			// Switch to the host netns to set mac address and VLAN id
 			// of VF using its master device.
-			if err := hostNS.Do(func(ns.NetNS) error {
-				// switch /sys to corresponding one in netns
-				// to have the correct items under /sys/class/net
-				if err := utils.MountSysfs(); err != nil {
-					return err
-				}
-				defer func() {
-					if err := utils.UnmountSysfs(); err != nil {
-						glog.V(3).Infof("Warning, error during umount of /sys: %v", err)
-					}
-				}()
+			if err := utils.CallInNetNSWithSysfsRemounted(hostNS, func(ns.NetNS) error {
 				return setMacAndVlanOnVf(pciAddress, hwAddr, vlanID)
 			}); err != nil {
 				return nil, err
@@ -938,7 +921,7 @@ func RecoverContainerSideNetwork(csn *network.ContainerSideNetwork, nsPath strin
 			// this can be problematic in case of machine reboot - we are trying to use the same
 			// devices as was used before reboot, but in meantime there is small chance that they
 			// were used already by sriov cni plugin (for which reboot means it's starting everything
-			// from clean situation) by other containers, before even virtlet was started
+			// from clean situation) for some other pods, before even virtlet was started
 			// also in case of virtlet pod restart - device can be already bound to vfio-pci, so we
 			// are ignoring any error there)
 			bindDeviceToVFIO(devIdentifier)

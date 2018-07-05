@@ -20,14 +20,11 @@ package utils
 
 import (
 	"errors"
+
+	"github.com/containernetworking/cni/pkg/ns"
 )
 
-// MountSysfs is a placeholder for unsupported systems
-func MountSysfs() error {
-	return errors.New("not implemented")
-}
-
-// UnmountSysfs is a placeholder for unsupported systems
-func UnmountSysfs() error {
+// CallInNetNSWithSysfsRemounted is a placeholder for unsupported systems
+func CallInNetNSWithSysfsRemounted(innerNS ns.NetNS, toCall func(ns.NetNS) error) error {
 	return errors.New("not implemented")
 }
