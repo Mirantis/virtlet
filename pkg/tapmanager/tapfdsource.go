@@ -35,6 +35,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/dhcp"
 	"github.com/Mirantis/virtlet/pkg/nettools"
 	"github.com/Mirantis/virtlet/pkg/network"
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 const (
@@ -113,6 +114,7 @@ func NewTapFDSource(cniClient cni.Client, enableSriov bool, calicoSubnetSize int
 		cniClient:        cniClient,
 		fdMap:            make(map[string]*podNetwork),
 		calicoSubnetSize: calicoSubnetSize,
+		enableSriov:      enableSriov,
 	}
 
 	return s, nil
@@ -178,7 +180,7 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 	var fds []int
 	var respData []byte
 	var csn *network.ContainerSideNetwork
-	if err := s.setupNetNS(key, pnd, func(netNSPath string, allLinks []netlink.Link) (*network.ContainerSideNetwork, error) {
+	if err := s.setupNetNS(key, pnd, func(netNSPath string, allLinks []netlink.Link, hostNS ns.NetNS) (*network.ContainerSideNetwork, error) {
 		if netConfig, err = nettools.ValidateAndFixCNIResult(netConfig, netNSPath, allLinks); err != nil {
 			gotError = true
 			return nil, fmt.Errorf("error fixing cni configuration: %v", err)
@@ -190,7 +192,7 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 		glog.V(3).Infof("CNI Result after fix:\n%s", spew.Sdump(netConfig))
 
 		var err error
-		if csn, err = nettools.SetupContainerSideNetwork(netConfig, netNSPath, allLinks, s.enableSriov); err != nil {
+		if csn, err = nettools.SetupContainerSideNetwork(netConfig, netNSPath, allLinks, s.enableSriov, hostNS); err != nil {
 			return nil, err
 		}
 
@@ -205,15 +207,6 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 	}); err != nil {
 		gotError = true
 		return nil, nil, err
-	}
-
-	for _, iface := range csn.Interfaces {
-		if iface.Type == network.InterfaceTypeVF {
-			if err := nettools.SetMacOnVf(iface.PCIAddress, iface.HardwareAddr); err != nil {
-				gotError = true
-				return nil, nil, err
-			}
-		}
 	}
 
 	return fds, respData, nil
@@ -340,15 +333,15 @@ func (s *TapFDSource) Recover(key string, data []byte) error {
 			return err
 		}
 	}
-	return s.setupNetNS(key, pnd, func(netNSPath string, allLinks []netlink.Link) (*network.ContainerSideNetwork, error) {
-		if err := nettools.RecoverContainerSideNetwork(csn, netNSPath, allLinks); err != nil {
+	return s.setupNetNS(key, pnd, func(netNSPath string, allLinks []netlink.Link, hostNS ns.NetNS) (*network.ContainerSideNetwork, error) {
+		if err := nettools.RecoverContainerSideNetwork(csn, netNSPath, allLinks, hostNS); err != nil {
 			return nil, err
 		}
 		return csn, nil
 	})
 }
 
-func (s *TapFDSource) setupNetNS(key string, pnd *PodNetworkDesc, initNet func(netNSPath string, allLinks []netlink.Link) (*network.ContainerSideNetwork, error)) error {
+func (s *TapFDSource) setupNetNS(key string, pnd *PodNetworkDesc, initNet func(netNSPath string, allLinks []netlink.Link, hostNS ns.NetNS) (*network.ContainerSideNetwork, error)) error {
 	netNSPath := cni.PodNetNSPath(pnd.PodID)
 	vmNS, err := ns.GetNS(netNSPath)
 	if err != nil {
@@ -358,24 +351,13 @@ func (s *TapFDSource) setupNetNS(key string, pnd *PodNetworkDesc, initNet func(n
 	var csn *network.ContainerSideNetwork
 	var dhcpServer *dhcp.Server
 	doneCh := make(chan error)
-	if err := vmNS.Do(func(ns.NetNS) error {
-		// switch /sys to corresponding one in netns
-		// to have the correct items under /sys/class/net
-		if err := mountSysfs(); err != nil {
-			return err
-		}
-		defer func() {
-			if err := unmountSysfs(); err != nil {
-				glog.V(3).Infof("Warning, error during umount of /sys: %v", err)
-			}
-		}()
-
+	if err := utils.CallInNetNSWithSysfsRemounted(vmNS, func(hostNS ns.NetNS) error {
 		allLinks, err := netlink.LinkList()
 		if err != nil {
 			return fmt.Errorf("error listing the links: %v", err)
 		}
 
-		if csn, err = initNet(netNSPath, allLinks); err != nil {
+		if csn, err = initNet(netNSPath, allLinks, hostNS); err != nil {
 			return err
 		}
 

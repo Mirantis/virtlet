@@ -1,4 +1,4 @@
-// +build linux
+// +build !linux
 
 /*
 Copyright 2018 Mirantis
@@ -16,16 +16,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package tapmanager
+package utils
 
 import (
-	"syscall"
+	"errors"
+
+	"github.com/containernetworking/cni/pkg/ns"
 )
 
-func mountSysfs() error {
-	return syscall.Mount("none", "/sys", "sysfs", 0, "")
-}
-
-func unmountSysfs() error {
-	return syscall.Unmount("/sys", syscall.MNT_DETACH)
+// CallInNetNSWithSysfsRemounted is a placeholder for unsupported systems
+func CallInNetNSWithSysfsRemounted(innerNS ns.NetNS, toCall func(ns.NetNS) error) error {
+	return errors.New("not implemented")
 }

@@ -4,6 +4,10 @@ set -o nounset
 set -o pipefail
 set -o errtrace
 
+if [[ -f /var/lib/virtlet/config.sh ]]; then
+  . /var/lib/virtlet/config.sh
+fi
+
 testmode=
 if [[ ${1:-} == -testmode ]]; then
   testmode=1

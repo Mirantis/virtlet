@@ -54,6 +54,7 @@ import (
 
 	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/network"
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 const (
@@ -673,18 +674,55 @@ func getMasterLinkOfVf(pciAddress string) (netlink.Link, error) {
 	return masterLink, nil
 }
 
-// SetMacOnVf uses VF pci address to locate its parent device and uses
-// it to set mac address on VF.  It needs to be called from host netns.
-func SetMacOnVf(pciAddress string, mac net.HardwareAddr) error {
+// setMacAndVlanOnVf uses VF pci address to locate its parent device and uses
+// it to set mac address and VLAN id on VF.  It needs to be called from the host netns.
+func setMacAndVlanOnVf(pciAddress string, mac net.HardwareAddr, vlanID int) error {
 	virtFNNo, err := getVirtFNNo(pciAddress)
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot find VF number for device with pci address %q: %v", pciAddress, err)
 	}
 	masterLink, err := getMasterLinkOfVf(pciAddress)
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot get link for PF of VF with pci address %q: %v", pciAddress, err)
 	}
-	return netlink.LinkSetVfHardwareAddr(masterLink, virtFNNo, mac)
+	if err := netlink.LinkSetVfHardwareAddr(masterLink, virtFNNo, mac); err != nil {
+		return fmt.Errorf("cannot set mac address of VF with pci address %q: %v", pciAddress, err)
+	}
+	err = netlink.LinkSetVfVlan(masterLink, virtFNNo, vlanID)
+	if err != nil {
+		return fmt.Errorf("cannot set vlan of VF with pci address %q: %v", pciAddress, err)
+	}
+	return nil
+}
+
+func getVfVlanID(pciAddress string) (int, error) {
+	virtFNNo, err := getVirtFNNo(pciAddress)
+	if err != nil {
+		return 0, err
+	}
+	masterLink, err := getMasterLinkOfVf(pciAddress)
+	if err != nil {
+		return 0, err
+	}
+
+	// vfinfos are gathered using `ip link show` because of failure in vishvananda/netlink
+	// which is occuring for bigger netlink queries like one asking for list ov VFs of an interface.
+	iplinkOutput, err := exec.Command("ip", "link", "show", masterLink.Attrs().Name).CombinedOutput()
+	if err != nil {
+		return 0, fmt.Errorf("error during execution of ip link show: %q\nOutput:%s", err, iplinkOutput)
+	}
+	vfinfos, err := utils.ParseIPLinkOutput(iplinkOutput)
+	if err != nil {
+		return 0, fmt.Errorf("error during parsing ip link output for device %q: %v",
+			masterLink.Attrs().Name, err)
+	}
+
+	for _, vfInfo := range vfinfos {
+		if vfInfo.ID == virtFNNo {
+			return int(vfInfo.VLanID), nil
+		}
+	}
+	return 0, fmt.Errorf("vlan info for %d vf on %s not found", virtFNNo, masterLink.Attrs().Name)
 }
 
 // SetupContainerSideNetwork sets up networking in container
@@ -698,7 +736,7 @@ func SetMacOnVf(pciAddress string, mac net.HardwareAddr) error {
 // In case of SR-IOV VFs this function only sets up a device to be passed to VM.
 // The function should be called from within container namespace.
 // Returns container network struct and an error, if any.
-func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks []netlink.Link, enableSriov bool) (*network.ContainerSideNetwork, error) {
+func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks []netlink.Link, enableSriov bool, hostNS ns.NetNS) (*network.ContainerSideNetwork, error) {
 	contLinks, err := getContainerLinks(info)
 	if err != nil {
 		return nil, err
@@ -713,6 +751,7 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 		hwAddr := link.Attrs().HardwareAddr
 		ifaceName := link.Attrs().Name
 		pciAddress := ""
+		vlanID := 0
 		var ifaceType network.InterfaceType
 		var fo *os.File
 
@@ -742,6 +781,15 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 				return nil, err
 			}
 
+			// Switch to the host netns to get VLAN ID of the VF using its master device.
+			if err := utils.CallInNetNSWithSysfsRemounted(hostNS, func(ns.NetNS) error {
+				var err error
+				vlanID, err = getVfVlanID(pciAddress)
+				return err
+			}); err != nil {
+				return nil, err
+			}
+
 			if err := unbindDriverFromDevice(pciAddress); err != nil {
 				return nil, err
 			}
@@ -752,6 +800,14 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 			}
 
 			if err := bindDeviceToVFIO(devIdentifier); err != nil {
+				return nil, err
+			}
+
+			// Switch to the host netns to set mac address and VLAN id
+			// of VF using its master device.
+			if err := utils.CallInNetNSWithSysfsRemounted(hostNS, func(ns.NetNS) error {
+				return setMacAndVlanOnVf(pciAddress, hwAddr, vlanID)
+			}); err != nil {
 				return nil, err
 			}
 
@@ -814,6 +870,7 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 			HardwareAddr: hwAddr,
 			PCIAddress:   pciAddress,
 			MTU:          uint16(mtu),
+			VlanID:       vlanID,
 		})
 	}
 
@@ -822,7 +879,7 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 
 // RecoverContainerSideNetwork tries to populate ContainerSideNetwork
 // structure based on a network namespace that was already adjusted for Virtlet
-func RecoverContainerSideNetwork(csn *network.ContainerSideNetwork, nsPath string, allLinks []netlink.Link) error {
+func RecoverContainerSideNetwork(csn *network.ContainerSideNetwork, nsPath string, allLinks []netlink.Link, hostNS ns.NetNS) error {
 	if len(csn.Result.Interfaces) == 0 {
 		return fmt.Errorf("wrong cni configuration: no interfaces defined: %s", spew.Sdump(csn.Result))
 	}
@@ -864,7 +921,7 @@ func RecoverContainerSideNetwork(csn *network.ContainerSideNetwork, nsPath strin
 			// this can be problematic in case of machine reboot - we are trying to use the same
 			// devices as was used before reboot, but in meantime there is small chance that they
 			// were used already by sriov cni plugin (for which reboot means it's starting everything
-			// from clean situation) to other containers, before even virtlet was started
+			// from clean situation) for some other pods, before even virtlet was started
 			// also in case of virtlet pod restart - device can be already bound to vfio-pci, so we
 			// are ignoring any error there)
 			bindDeviceToVFIO(devIdentifier)
@@ -1029,7 +1086,7 @@ func ReconstructVFs(csn *network.ContainerSideNetwork, netns ns.NetNS, ignoreUnb
 		if err != nil {
 			return err
 		}
-		if err := SetMacOnVf(iface.PCIAddress, iface.HardwareAddr); err != nil {
+		if err := setMacAndVlanOnVf(iface.PCIAddress, iface.HardwareAddr, iface.VlanID); err != nil {
 			return err
 		}
 		link, err := netlink.LinkByName(devName)
