@@ -44,11 +44,12 @@ func mustMarshal(d libvirtxml.Document) string {
 
 // FakeDomainConnection is a fake implementation of DomainConnection interface.
 type FakeDomainConnection struct {
-	rec                testutils.Recorder
-	domains            map[string]*FakeDomain
-	domainsByUuid      map[string]*FakeDomain
-	secretsByUsageName map[string]*FakeSecret
-	ignoreShutdown     bool
+	rec                     testutils.Recorder
+	domains                 map[string]*FakeDomain
+	domainsByUuid           map[string]*FakeDomain
+	secretsByUsageName      map[string]*FakeSecret
+	ignoreShutdown          bool
+	useNonVolatileDomainDef bool
 }
 
 var _ virt.DomainConnection = &FakeDomainConnection{}
@@ -65,6 +66,12 @@ func NewFakeDomainConnection(rec testutils.Recorder) *FakeDomainConnection {
 		domainsByUuid:      make(map[string]*FakeDomain),
 		secretsByUsageName: make(map[string]*FakeSecret),
 	}
+}
+
+// UseNonVolatileDomainDef instructs the domains to fix volatile paths
+// in the domain definitions returned by domains' XML() method.
+func (dc *FakeDomainConnection) UseNonVolatileDomainDef() {
+	dc.useNonVolatileDomainDef = true
 }
 
 // SetIgnoreShutdown implements SetIgnoreShutdown method of DomainConnection interface.
@@ -111,18 +118,7 @@ func (dc *FakeDomainConnection) DefineDomain(def *libvirtxml.Domain) (virt.Domai
 	dc.domainsByUuid[def.UUID] = d
 
 	updatedDef := copyDomain(def)
-	if updatedDef.Devices != nil {
-		for _, disk := range updatedDef.Devices.Disks {
-			if disk.Source == nil || disk.Source.File == nil {
-				continue
-			}
-			p := strings.Index(disk.Source.File.File, configPathHint)
-			if p >= 0 {
-				disk.Source.File.File = configPathReplacement + disk.Source.File.File[p+len(configPathHint):]
-			}
-		}
-	}
-
+	removeVolatilePathsFromDomainDef(updatedDef)
 	dc.rec.Rec("DefineDomain", mustMarshal(updatedDef))
 	return d, nil
 }
@@ -302,6 +298,11 @@ func (d *FakeDomain) Name() (string, error) {
 
 // XML implements XML method of Domain interface.
 func (d *FakeDomain) XML() (*libvirtxml.Domain, error) {
+	if d.dc.useNonVolatileDomainDef {
+		def := copyDomain(d.def)
+		removeVolatilePathsFromDomainDef(def)
+		return def, nil
+	}
 	return d.def, nil
 }
 
@@ -382,6 +383,22 @@ func assignFakePCIAddressesToControllers(def *libvirtxml.Domain) {
 				Slot:     &slot,
 				Function: &function,
 			},
+		}
+	}
+}
+
+func removeVolatilePathsFromDomainDef(def *libvirtxml.Domain) {
+	if def.Devices == nil {
+		return
+	}
+
+	for _, disk := range def.Devices.Disks {
+		if disk.Source == nil || disk.Source.File == nil {
+			continue
+		}
+		p := strings.Index(disk.Source.File.File, configPathHint)
+		if p >= 0 {
+			disk.Source.File.File = configPathReplacement + disk.Source.File.File[p+len(configPathHint):]
 		}
 	}
 }

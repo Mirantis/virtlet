@@ -477,6 +477,3 @@ var DefaultDiagSet = NewDiagSet()
 func init() {
 	DefaultDiagSet.RegisterDiagSource("stack", StackDumpSource)
 }
-
-// TODO: metadata dumper
-// TODO: virtlet command to retrieve the diagnostics
