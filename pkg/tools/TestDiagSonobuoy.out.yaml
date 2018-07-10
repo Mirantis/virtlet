@@ -1,0 +1,59 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    component: sonobuoy
+    run: sonobuoy-master
+  name: sonobuoy-master
+  namespace: heptio-sonobuoy
+spec:
+  ports:
+  - port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    run: sonobuoy-master
+  type: ClusterIP
+status:
+  loadBalancer: {}
+
+---
+apiVersion: v1
+data:
+  e2e.yaml: |-
+    sonobuoy-config:
+      driver: Job
+      plugin-name: e2e
+      result-type: e2e
+    spec:
+      name: e2e
+  virtlet.yaml: |
+    sonobuoy-config:
+      driver: Job
+      plugin-name: virtlet
+      result-type: virtlet
+    spec:
+      command:
+      - /bin/bash
+      - -c
+      - /sonobuoy.sh && sleep 3600
+      env:
+      - name: RESULTS_DIR
+        value: /tmp/results
+      image: mirantis/virtlet
+      imagePullPolicy: Never
+      name: sonobuoy-virtlet
+      volumeMounts:
+      - mountPath: /tmp/results
+        name: results
+        readOnly: false
+kind: ConfigMap
+metadata:
+  creationTimestamp: null
+  labels:
+    component: sonobuoy
+  name: sonobuoy-plugins-cm
+  namespace: heptio-sonobuoy
+

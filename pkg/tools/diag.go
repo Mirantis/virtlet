@@ -24,8 +24,35 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/Mirantis/virtlet/pkg/diag"
 	"github.com/spf13/cobra"
+	v1 "k8s.io/api/core/v1"
+
+	"github.com/Mirantis/virtlet/pkg/diag"
+)
+
+const (
+	sonobuoyPluginsConfigMapName  = "sonobuoy-plugins-cm"
+	virtletSonobuoyPluginFileName = "virtlet.yaml"
+	sonobuoyPluginYaml            = `sonobuoy-config:
+  driver: Job
+  plugin-name: virtlet
+  result-type: virtlet
+spec:
+  command:
+  - /bin/bash
+  - -c
+  - /sonobuoy.sh && sleep 3600
+  env:
+  - name: RESULTS_DIR
+    value: /tmp/results
+  image: mirantis/virtlet
+  imagePullPolicy: Never
+  name: sonobuoy-virtlet
+  volumeMounts:
+  - mountPath: /tmp/results
+    name: results
+    readOnly: false
+`
 )
 
 type diagDumpCommand struct {
@@ -164,6 +191,69 @@ func (d *diagUnpackCommand) Run() error {
 	return dr.Unpack(d.outDir)
 }
 
+type diagSonobuoyCommand struct {
+	in  io.Reader
+	out io.Writer
+}
+
+// NewDiagSonobuoyCommand returns a new cobra.Command that adds
+// Virtlet plugin to sonobuoy-generated yaml
+func NewDiagSonobuoyCommand(in io.Reader, out io.Writer) *cobra.Command {
+	d := &diagSonobuoyCommand{in: in, out: out}
+	return &cobra.Command{
+		Use:   "sonobuoy",
+		Short: "Add Virtlet sonobuoy plugin to the sonobuoy output",
+		Long:  "Find and patch sonobuoy configmap in the yaml that's read from stdin to include Virtlet sonobuoy plugin",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) != 0 {
+				return errors.New("This command does not accept arguments")
+			}
+			return d.Run()
+		},
+	}
+}
+
+func (d *diagSonobuoyCommand) getYaml() ([]byte, error) {
+	bs, err := ioutil.ReadAll(d.in)
+	if err != nil {
+		return nil, err
+	}
+	objs, err := LoadYaml(bs)
+	if err != nil {
+		return nil, err
+	}
+	if len(objs) == 0 {
+		return nil, errors.New("source yaml is empty")
+	}
+	found := false
+	for _, o := range objs {
+		cfgMap, ok := o.(*v1.ConfigMap)
+		if !ok {
+			continue
+		}
+		if cfgMap.Name != sonobuoyPluginsConfigMapName {
+			continue
+		}
+		found = true
+		cfgMap.Data[virtletSonobuoyPluginFileName] = sonobuoyPluginYaml
+	}
+	if !found {
+		return nil, fmt.Errorf("ConfigMap not found: %q", sonobuoyPluginsConfigMapName)
+	}
+	return ToYaml(objs)
+}
+
+func (d *diagSonobuoyCommand) Run() error {
+	bs, err := d.getYaml()
+	if err != nil {
+		return err
+	}
+	if _, err := d.out.Write(bs); err != nil {
+		return err
+	}
+	return nil
+}
+
 // NewDiagCommand returns a new cobra.Command that handles Virtlet
 // diagnostics.
 func NewDiagCommand(client KubeClient, in io.Reader, out io.Writer) *cobra.Command {
@@ -174,5 +264,6 @@ func NewDiagCommand(client KubeClient, in io.Reader, out io.Writer) *cobra.Comma
 	}
 	cmd.AddCommand(NewDiagDumpCommand(client, out))
 	cmd.AddCommand(NewDiagUnpackCommand(in))
+	cmd.AddCommand(NewDiagSonobuoyCommand(in, out))
 	return cmd
 }

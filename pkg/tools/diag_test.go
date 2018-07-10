@@ -27,6 +27,7 @@ import (
 
 	"github.com/Mirantis/virtlet/pkg/diag"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
+	"github.com/Mirantis/virtlet/tests/gm"
 )
 
 var (
@@ -91,6 +92,41 @@ var (
 			},
 		},
 	}
+	fakeSonobuoyYaml = `
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    component: sonobuoy
+    run: sonobuoy-master
+  name: sonobuoy-master
+  namespace: heptio-sonobuoy
+spec:
+  ports:
+  - port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    run: sonobuoy-master
+  type: ClusterIP
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  labels:
+    component: sonobuoy
+  name: sonobuoy-plugins-cm
+  namespace: heptio-sonobuoy
+data:
+  e2e.yaml: |
+    sonobuoy-config:
+      driver: Job
+      plugin-name: e2e
+      result-type: e2e
+    spec:
+      name: e2e
+`
 )
 
 func runDiagDumpCommand(t *testing.T, input string, args ...string) []byte {
@@ -112,7 +148,7 @@ func runDiagDumpCommand(t *testing.T, input string, args ...string) []byte {
 	cmd.SilenceUsage = true
 	cmd.SilenceErrors = true
 	if err := cmd.Execute(); err != nil {
-		t.Fatalf("diag dump: %v", err)
+		t.Fatalf("diag: %v", err)
 	}
 	return out.Bytes()
 }
@@ -151,4 +187,17 @@ func TestDiagDump(t *testing.T) {
 
 func TestDiagUnpack(t *testing.T) {
 	verifyDiagFiles(t, string(expectedDiagResult.ToJSON()), "unpack")
+}
+
+func TestDiagSonobuoy(t *testing.T) {
+	in := bytes.NewBuffer([]byte(fakeSonobuoyYaml))
+	var out bytes.Buffer
+	cmd := NewDiagCommand(nil, in, &out)
+	cmd.SetArgs([]string{"sonobuoy"})
+	cmd.SilenceUsage = true
+	cmd.SilenceErrors = true
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("diag dump: %v", err)
+	}
+	gm.Verify(t, gm.NewYamlVerifier(out.Bytes()))
 }
