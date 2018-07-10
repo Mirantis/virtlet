@@ -28,6 +28,7 @@ drwxr-xr-x  3 user  wheel       96 Jul 11 01:56 libvirt-logs
 drwxr-xr-x  5 user  wheel      160 Jul 11 01:56 libvirt-xml
 -rwxr-xr-x  1 user  wheel     9964 Jul 11 01:56 metadata.txt
 -rwxr-xr-x  1 user  wheel     1443 Jul 11 01:56 netns.txt
+-rwxr-xr-x  1 user  wheel     9217 Jul 11 02:56 psaux.txt
 -rwxr-xr-x  1 user  wheel    18214 Jul 11 01:56 stack.log
 -rwxr-xr-x  1 user  wheel    64314 Jul 11 01:56 virtlet-pod-libvirt.log
 -rwxr-xr-x  1 user  wheel  1349763 Jul 11 01:56 virtlet-pod-virtlet.log
@@ -51,6 +52,7 @@ node that runs Virtlet:
 * `metadata.txt` - the contents of Virtlet's internal metadata db in a text form
 * `netns.txt` - the output of `ip a` and `ip r` for each network
   namespace that's managed by Virtlet
+* `psaux.txt` - the output of `ps aux` command on the node
 * `stack.log` - the dump of Go stack of Virtlet process
 * `virtlet-pod-libvirt.log` - the log of Virtlet pod's libvirt container
 * `virtlet-pod-virtlet.log` - the log of Virtlet pod's virtlet container

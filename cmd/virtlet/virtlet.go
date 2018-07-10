@@ -116,6 +116,7 @@ func runDiagServer() *diag.Set {
 	diagSet := diag.NewDiagSet()
 	diagSet.RegisterDiagSource("ip-a", diag.NewCommandSource("txt", []string{"ip", "a"}))
 	diagSet.RegisterDiagSource("ip-r", diag.NewCommandSource("txt", []string{"ip", "r"}))
+	diagSet.RegisterDiagSource("psaux", diag.NewCommandSource("txt", []string{"ps", "aux"}))
 	diagSet.RegisterDiagSource("netns", diag.NewCommandSource("txt", []string{"/bin/bash", "-c", netnsDiagCommand}))
 	diagSet.RegisterDiagSource("criproxy", diag.NewCommandSource("log", []string{"/bin/bash", "-c", criproxyLogCommand}))
 	diagSet.RegisterDiagSource("libvirt-logs", diag.NewLogDirSource(qemuLogDir))
