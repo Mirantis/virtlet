@@ -25,6 +25,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/jonboulle/clockwork"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
+	uuid "github.com/nu7hatch/gouuid"
 	"k8s.io/apimachinery/pkg/fields"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 
@@ -77,6 +78,7 @@ type domainSettings struct {
 	netFdKey         string
 	enableSriov      bool
 	cpuModel         string
+	systemUUID       *uuid.UUID
 }
 
 func (ds *domainSettings) createDomain(config *types.VMConfig) *libvirtxml.Domain {
@@ -178,6 +180,20 @@ func (ds *domainSettings) createDomain(config *types.VMConfig) *libvirtxml.Domai
 			// leave it empty
 		default:
 			glog.Warningf("Unknown value set in VIRTLET_CPU_MODEL: %q", ds.cpuModel)
+		}
+	}
+
+	if ds.systemUUID != nil {
+		domain.SysInfo = &libvirtxml.DomainSysInfo{
+			Type: "smbios",
+			System: &libvirtxml.DomainSysInfoSystem{
+				Entry: []libvirtxml.DomainSysInfoEntry{
+					{
+						Name:  "uuid",
+						Value: ds.systemUUID.String(),
+					},
+				},
+			},
 		}
 	}
 
@@ -302,7 +318,12 @@ func (v *VirtualizationTool) CreateContainer(config *types.VMConfig, netFdKey st
 		return "", err
 	}
 
-	domainUUID := utils.NewUUID5(ContainerNsUUID, config.PodSandboxID)
+	var domainUUID string
+	if config.ParsedAnnotations.SystemUUID != nil {
+		domainUUID = config.ParsedAnnotations.SystemUUID.String()
+	} else {
+		domainUUID = utils.NewUUID5(ContainerNsUUID, config.PodSandboxID)
+	}
 	// FIXME: this field should be moved to VMStatus struct (to be added)
 	config.DomainUUID = domainUUID
 	cpuModel := v.config.CPUModel
@@ -328,6 +349,7 @@ func (v *VirtualizationTool) CreateContainer(config *types.VMConfig, netFdKey st
 		memoryUnit: "b",
 		useKvm:     !v.config.DisableKVM,
 		cpuModel:   cpuModel,
+		systemUUID: config.ParsedAnnotations.SystemUUID,
 	}
 	if settings.memory == 0 {
 		settings.memory = defaultMemory

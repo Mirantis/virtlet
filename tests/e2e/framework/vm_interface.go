@@ -72,6 +72,8 @@ type VMOptions struct {
 	PVCs []PVCSpec
 	// ConfigMap or Secret to inject into the rootfs
 	InjectFilesToRootfsFrom string
+	// SystemUUID to set
+	SystemUUID string
 }
 
 func newVMInterface(controller *Controller, name string) *VMInterface {
@@ -214,6 +216,9 @@ func (vmi *VMInterface) buildVMPod(options VMOptions) *v1.Pod {
 	}
 	if options.InjectFilesToRootfsFrom != "" {
 		annotations["VirtletFilesFromDataSource"] = options.InjectFilesToRootfsFrom
+	}
+	if options.SystemUUID != "" {
+		annotations["VirtletSystemUUID"] = options.SystemUUID
 	}
 
 	limits := v1.ResourceList{}
