@@ -56,7 +56,7 @@ var ErrSecretNotFound = errors.New("secret not found")
 type DomainConnection interface {
 	// Define creates and returns a new domain based on the specified definition
 	DefineDomain(def *libvirtxml.Domain) (Domain, error)
-	// ListAll lists all the domains available on the system
+	// ListDomains lists all the domains available on the system
 	ListDomains() ([]Domain, error)
 	// LookupByName tries to locate the domain by name. In case if the
 	// domain cannot be found but no other error occurred, it returns
