@@ -19,6 +19,8 @@ package libvirttools
 import (
 	"testing"
 
+	libvirtxml "github.com/libvirt/libvirt-go-xml"
+
 	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 	"github.com/Mirantis/virtlet/pkg/virt"
@@ -66,7 +68,10 @@ func TestRootVolumeLifeCycle(t *testing.T) {
 
 	volumesPoolPath := "/fake/volumes/pool"
 	expectedRootVolumePath := volumesPoolPath + "/virtlet_root_" + testUUID
-	spool := fake.NewFakeStoragePool(rec.Child("volumes"), "volumes", volumesPoolPath)
+	spool := fake.NewFakeStoragePool(rec.Child("volumes"), &libvirtxml.StoragePool{
+		Name:   "volumes",
+		Target: &libvirtxml.StoragePoolTarget{Path: volumesPoolPath},
+	})
 
 	im := NewFakeImageManager(rec.Child("image"))
 

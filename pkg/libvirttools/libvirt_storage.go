@@ -72,6 +72,20 @@ func (sc *libvirtStorageConnection) LookupStoragePoolByName(name string) (virt.S
 	return &libvirtStoragePool{Mutex: &sc.Mutex, conn: sc.conn, p: p.(*libvirt.StoragePool)}, nil
 }
 
+func (sc *libvirtStorageConnection) ListPools() ([]virt.StoragePool, error) {
+	pools, err := sc.conn.invoke(func(c *libvirt.Connect) (interface{}, error) {
+		return c.ListAllStoragePools(0)
+	})
+	if err != nil {
+		return nil, err
+	}
+	var r []virt.StoragePool
+	for _, p := range pools.([]libvirt.StoragePool) {
+		r = append(r, &libvirtStoragePool{Mutex: &sc.Mutex, conn: sc.conn, p: &p})
+	}
+	return r, nil
+}
+
 type libvirtStoragePool struct {
 	*sync.Mutex
 	conn libvirtConnection
@@ -102,7 +116,7 @@ func (pool *libvirtStoragePool) CreateStorageVol(def *libvirtxml.StorageVolume) 
 	return &libvirtStorageVolume{Mutex: pool.Mutex, name: def.Name, v: v}, nil
 }
 
-func (pool *libvirtStoragePool) ListAllVolumes() ([]virt.StorageVolume, error) {
+func (pool *libvirtStoragePool) ListVolumes() ([]virt.StorageVolume, error) {
 	pool.Lock()
 	defer pool.Unlock()
 	volumes, err := pool.p.ListAllStorageVolumes(0)
@@ -148,6 +162,18 @@ func (pool *libvirtStoragePool) RemoveVolumeByName(name string) error {
 	}
 }
 
+func (pool *libvirtStoragePool) XML() (*libvirtxml.StoragePool, error) {
+	desc, err := pool.p.GetXMLDesc(libvirt.STORAGE_XML_INACTIVE)
+	if err != nil {
+		return nil, err
+	}
+	var p libvirtxml.StoragePool
+	if err := p.Unmarshal(desc); err != nil {
+		return nil, fmt.Errorf("error unmarshalling storage pool definition: %v", err)
+	}
+	return &p, nil
+}
+
 type libvirtStorageVolume struct {
 	*sync.Mutex
 	name string
@@ -190,4 +216,16 @@ func (volume *libvirtStorageVolume) Format() error {
 		return fmt.Errorf("can't get volume path: %v", err)
 	}
 	return diskimage.FormatDisk(volPath)
+}
+
+func (volume *libvirtStorageVolume) XML() (*libvirtxml.StorageVolume, error) {
+	desc, err := volume.v.GetXMLDesc(0)
+	if err != nil {
+		return nil, err
+	}
+	var v libvirtxml.StorageVolume
+	if err := v.Unmarshal(desc); err != nil {
+		return nil, fmt.Errorf("error unmarshalling storage volume definition: %v", err)
+	}
+	return &v, nil
 }
