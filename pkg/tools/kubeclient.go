@@ -144,6 +144,9 @@ type KubeClient interface {
 	// The function returns when the ports are ready for use or if/when an error occurs.
 	// Close stopCh to stop the port forwarder.
 	ForwardPorts(podName, namespace string, ports []*ForwardedPort) (stopCh chan struct{}, err error)
+	// Retrieves the logs for the specified pod. If tailLines is
+	// non-zero, it limits the numer of lines to be retrieved.
+	PodLogs(podName, containerName, namespace string, tailLines int64) ([]byte, error)
 }
 
 type remoteExecutor interface {
@@ -423,4 +426,19 @@ func (c *RealKubeClient) ForwardPorts(podName, namespace string, ports []*Forwar
 		}
 	}
 	return stopCh, nil
+}
+
+// PodLogs retrieves the logs of the specified container in the pod.
+// limitBytes of zero specifies no size limit for the logs.
+// limitSeconds of zero specifies no time limit for the logs.
+func (c *RealKubeClient) PodLogs(podName, containerName, namespace string, tailLines int64) ([]byte, error) {
+	// FIXME: that's hard to test properly using the fake
+	// clientset.
+	opts := &v1.PodLogOptions{
+		Container: containerName,
+	}
+	if tailLines != 0 {
+		opts.TailLines = &tailLines
+	}
+	return c.client.CoreV1().Pods(namespace).GetLogs(podName, opts).Do().Raw()
 }

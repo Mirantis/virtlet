@@ -69,6 +69,16 @@ var (
 				IsDir: true,
 				Children: map[string]diag.DiagResult{
 					"foo": fakeDiagResults[0].Children["foo"],
+					"virtlet-pod-virtlet": diag.DiagResult{
+						Name: "virtlet-pod-virtlet",
+						Ext:  "log",
+						Data: "foo-logs-virtlet",
+					},
+					"virtlet-pod-libvirt": diag.DiagResult{
+						Name: "virtlet-pod-libvirt",
+						Ext:  "log",
+						Data: "foo-logs-libvirt",
+					},
 				},
 			},
 			"kube-node-2": diag.DiagResult{
@@ -77,6 +87,16 @@ var (
 				Children: map[string]diag.DiagResult{
 					"r1": fakeDiagResults[1].Children["r1"],
 					"r2": fakeDiagResults[1].Children["r2"],
+					"virtlet-pod-virtlet": diag.DiagResult{
+						Name: "virtlet-pod-virtlet",
+						Ext:  "log",
+						Data: "bar-logs-virtlet",
+					},
+					"virtlet-pod-libvirt": diag.DiagResult{
+						Name: "virtlet-pod-libvirt",
+						Ext:  "log",
+						Data: "bar-logs-libvirt",
+					},
 				},
 			},
 		},
@@ -84,11 +104,15 @@ var (
 	expectedDiagFiles = map[string]interface{}{
 		"nodes": map[string]interface{}{
 			"kube-node-1": map[string]interface{}{
-				"foo.txt": "foobar",
+				"foo.txt":                 "foobar",
+				"virtlet-pod-virtlet.log": "foo-logs-virtlet",
+				"virtlet-pod-libvirt.log": "foo-logs-libvirt",
 			},
 			"kube-node-2": map[string]interface{}{
-				"r1.log": "baz1",
-				"r2.log": "baz2",
+				"r1.log":                  "baz1",
+				"r2.log":                  "baz2",
+				"virtlet-pod-virtlet.log": "bar-logs-virtlet",
+				"virtlet-pod-libvirt.log": "bar-logs-libvirt",
 			},
 		},
 	}
@@ -135,6 +159,12 @@ func runDiagDumpCommand(t *testing.T, input string, args ...string) []byte {
 		virtletPods: map[string]string{
 			"kube-node-1": "virtlet-foo42",
 			"kube-node-2": "virtlet-bar42",
+		},
+		logs: map[string]string{
+			"virtlet-foo42/virtlet/kube-system": "foo-logs-virtlet",
+			"virtlet-foo42/libvirt/kube-system": "foo-logs-libvirt",
+			"virtlet-bar42/virtlet/kube-system": "bar-logs-virtlet",
+			"virtlet-bar42/libvirt/kube-system": "bar-logs-libvirt",
 		},
 		expectedCommands: map[string]string{
 			"virtlet-foo42/virtlet/kube-system: virtlet --diag": string(fakeDiagResults[0].ToJSON()),

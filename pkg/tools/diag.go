@@ -31,6 +31,7 @@ import (
 )
 
 const (
+	maxVirtletPodLogLines         = 20000
 	sonobuoyPluginsConfigMapName  = "sonobuoy-plugins-cm"
 	virtletSonobuoyPluginFileName = "virtlet.yaml"
 	sonobuoyPluginYaml            = `sonobuoy-config:
@@ -89,38 +90,20 @@ func NewDiagDumpCommand(client KubeClient, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func (d *diagDumpCommand) Run() error {
-	diagSet := diag.NewDiagSet()
-	diagSet.RegisterDiagSource("nodes", &virtletNodeDiagSource{d.client})
-	// TODO: combine virtletNodeDiagSource with "virtletPodLogs"
-	// and "criproxy" source (support source combinations for this)
-	dr := diagSet.RunDiagnostics().Children["nodes"]
-	if d.useJSON {
-		d.out.Write(dr.ToJSON())
-		return nil
-	}
-	return dr.Unpack(d.outDir)
-}
-
-type virtletNodeDiagSource struct {
-	client KubeClient
-}
-
-var _ diag.DiagSource = &virtletNodeDiagSource{}
-
-func (s *virtletNodeDiagSource) DiagnosticInfo() (diag.DiagResult, error) {
+func (d *diagDumpCommand) diagResult() (diag.DiagResult, error) {
 	dr := diag.DiagResult{
 		IsDir:    true,
+		Name:     "nodes",
 		Children: make(map[string]diag.DiagResult),
 	}
-	podNames, nodeNames, err := s.client.GetVirtletPodAndNodeNames()
+	podNames, nodeNames, err := d.client.GetVirtletPodAndNodeNames()
 	if err != nil {
 		return diag.DiagResult{}, err
 	}
 	for n, podName := range podNames {
 		nodeName := nodeNames[n]
 		var buf bytes.Buffer
-		exitCode, err := s.client.ExecInContainer(
+		exitCode, err := d.client.ExecInContainer(
 			podName, "virtlet", "kube-system", nil,
 			&buf, os.Stderr, []string{"virtlet", "--diag"})
 		var cur diag.DiagResult
@@ -150,10 +133,41 @@ func (s *virtletNodeDiagSource) DiagnosticInfo() (diag.DiagResult, error) {
 			}
 		}
 
+		if cur.IsDir {
+			d.dumpLogs(&cur, podName, "virtlet")
+			d.dumpLogs(&cur, podName, "libvirt")
+		}
+
 		cur.Name = nodeName
 		dr.Children[nodeName] = cur
 	}
 	return dr, nil
+}
+
+func (d *diagDumpCommand) dumpLogs(dr *diag.DiagResult, podName, containerName string) {
+	cur := diag.DiagResult{
+		Name: "virtlet-pod-" + containerName,
+		Ext:  "log",
+	}
+	logs, err := d.client.PodLogs(podName, containerName, "kube-system", maxVirtletPodLogLines)
+	if err != nil {
+		cur.Error = err.Error()
+	} else {
+		cur.Data = string(logs)
+	}
+	dr.Children[cur.Name] = cur
+}
+
+func (d *diagDumpCommand) Run() error {
+	dr, err := d.diagResult()
+	if err != nil {
+		return err
+	}
+	if d.useJSON {
+		d.out.Write(dr.ToJSON())
+		return nil
+	}
+	return dr.Unpack(d.outDir)
 }
 
 type diagUnpackCommand struct {
