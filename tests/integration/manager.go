@@ -31,6 +31,7 @@ import (
 
 	"github.com/Mirantis/virtlet/pkg/api/virtlet.k8s/v1"
 	"github.com/Mirantis/virtlet/pkg/config"
+	"github.com/Mirantis/virtlet/pkg/diag"
 	"github.com/Mirantis/virtlet/pkg/manager"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
 )
@@ -124,7 +125,7 @@ func (v *VirtletManager) Run() {
 		DisableLogging:       pbool(true),
 		DisableKVM:           pbool(os.Getenv(disableKvmEnvVar) != ""),
 	})
-	v.manager = manager.NewVirtletManager(cfg, &fakeFDManager{}, nil)
+	v.manager = manager.NewVirtletManager(cfg, &fakeFDManager{}, nil, diag.NewDiagSet())
 	v.doneCh = make(chan struct{})
 	go func() {
 		if err := v.manager.Run(); err != nil {

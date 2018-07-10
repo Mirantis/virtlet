@@ -198,6 +198,9 @@ spec:
           name: image-name-translations
         - name: pods-log
           mountPath: /var/log/pods
+        # needed for diagnostic purposes
+        - name: libvirt-log
+          mountPath: /var/log/libvirt
         securityContext:
           privileged: true
         readinessProbe:
@@ -275,9 +278,6 @@ spec:
       - hostPath:
           path: /var/log/pods
         name: pods-log
-      - hostPath:
-          path: /var/run/netns
-        name: netns-dir
       - configMap:
           name: virtlet-image-translations
         name: image-name-translations

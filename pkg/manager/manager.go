@@ -25,6 +25,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/Mirantis/virtlet/pkg/api/virtlet.k8s/v1"
+	"github.com/Mirantis/virtlet/pkg/diag"
 	"github.com/Mirantis/virtlet/pkg/image"
 	"github.com/Mirantis/virtlet/pkg/imagetranslation"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
@@ -47,6 +48,7 @@ type VirtletManager struct {
 	config         *v1.VirtletConfig
 	metadataStore  metadata.Store
 	fdManager      tapmanager.FDManager
+	diagSet        *diag.DiagSet
 	clientCfg      clientcmd.ClientConfig
 	virtTool       *libvirttools.VirtualizationTool
 	imageStore     image.Store
@@ -56,8 +58,8 @@ type VirtletManager struct {
 }
 
 // NewVirtletManager creates a new VirtletManager.
-func NewVirtletManager(config *v1.VirtletConfig, fdManager tapmanager.FDManager, clientCfg clientcmd.ClientConfig) *VirtletManager {
-	return &VirtletManager{config: config, fdManager: fdManager}
+func NewVirtletManager(config *v1.VirtletConfig, fdManager tapmanager.FDManager, clientCfg clientcmd.ClientConfig, diagSet *diag.DiagSet) *VirtletManager {
+	return &VirtletManager{config: config, fdManager: fdManager, diagSet: diagSet}
 }
 
 // Run sets up the environment for the runtime and image services and
@@ -83,6 +85,7 @@ func (v *VirtletManager) Run() error {
 	if err != nil {
 		return fmt.Errorf("failed to create metadata store: %v", err)
 	}
+	v.diagSet.RegisterDiagSource("metadata", metadata.GetMetadataDumpSource(v.metadataStore))
 
 	downloader := image.NewDownloader(*v.config.DownloadProtocol)
 	v.imageStore = image.NewFileStore(*v.config.ImageDir, downloader, nil)
@@ -99,6 +102,7 @@ func (v *VirtletManager) Run() error {
 	if err != nil {
 		return fmt.Errorf("error establishing libvirt connection: %v", err)
 	}
+	v.diagSet.RegisterDiagSource("libvirt-xml", libvirttools.NewLibvirtDiagSource(conn, conn))
 
 	virtConfig := libvirttools.VirtualizationConfig{
 		DisableKVM:     *v.config.DisableKVM,
