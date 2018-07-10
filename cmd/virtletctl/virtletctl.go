@@ -43,7 +43,6 @@ func newRootCmd() *cobra.Command {
 	flag.CommandLine.Parse([]string{})
 
 	client := tools.NewRealKubeClient(clientCfg)
-	cmd.AddCommand(tools.NewDumpMetadataCmd(client))
 	cmd.AddCommand(tools.NewVirshCmd(client, os.Stdout))
 	cmd.AddCommand(tools.NewSSHCmd(client, os.Stdout, ""))
 	cmd.AddCommand(tools.NewVNCCmd(client, os.Stdout, true))

@@ -41,7 +41,6 @@ Kubernetes cluster.
 ### SEE ALSO
 
 * [virtletctl diag](virtletctl_diag.md)	 - Virtlet diagnostics
-* [virtletctl dump-metadata](virtletctl_dump-metadata.md)	 - Dump Virtlet metadata db
 * [virtletctl gen](virtletctl_gen.md)	 - Generate Kubernetes YAML for Virtlet deployment
 * [virtletctl gendoc](virtletctl_gendoc.md)	 - Generate Markdown documentation for the commands
 * [virtletctl install](virtletctl_install.md)	 - Install virtletctl as a kubectl plugin
