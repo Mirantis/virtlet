@@ -40,11 +40,12 @@ import (
 )
 
 const (
-	wantTapManagerEnv = "WANT_TAP_MANAGER"
-	nodeNameEnv       = "KUBE_NODE_NAME"
-	diagSocket        = "/run/virtlet-diag.sock"
-	netnsDiagCommand  = `if [ -d /var/run/netns ]; then cd /var/run/netns; for ns in *; do echo "*** ${ns} ***"; ip netns exec "${ns}" ip a; ip netns exec "${ns}" ip r; echo; done; fi`
-	qemuLogDir        = "/var/log/libvirt/qemu"
+	wantTapManagerEnv  = "WANT_TAP_MANAGER"
+	nodeNameEnv        = "KUBE_NODE_NAME"
+	diagSocket         = "/run/virtlet-diag.sock"
+	netnsDiagCommand   = `if [ -d /var/run/netns ]; then cd /var/run/netns; for ns in *; do echo "*** ${ns} ***"; ip netns exec "${ns}" ip a; ip netns exec "${ns}" ip r; echo; done; fi`
+	criproxyLogCommand = `nsenter -t 1 -m -u -i journalctl -xe -u criproxy -n 20000 --no-pager || true`
+	qemuLogDir         = "/var/log/libvirt/qemu"
 )
 
 var (
@@ -116,6 +117,7 @@ func runDiagServer() *diag.DiagSet {
 	diagSet.RegisterDiagSource("ip-a", diag.NewCommandSource("txt", []string{"ip", "a"}))
 	diagSet.RegisterDiagSource("ip-r", diag.NewCommandSource("txt", []string{"ip", "r"}))
 	diagSet.RegisterDiagSource("netns", diag.NewCommandSource("txt", []string{"/bin/bash", "-c", netnsDiagCommand}))
+	diagSet.RegisterDiagSource("criproxy", diag.NewCommandSource("log", []string{"/bin/bash", "-c", criproxyLogCommand}))
 	diagSet.RegisterDiagSource("libvirt-logs", diag.NewLogDirSource(qemuLogDir))
 	diagSet.RegisterDiagSource("stack", diag.StackDumpSource)
 	server := diag.NewServer(diagSet)
