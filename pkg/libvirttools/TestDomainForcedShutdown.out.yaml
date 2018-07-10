@@ -135,6 +135,7 @@
         MetaData: null
         RootVolumeSize: 0
         SSHKeys: null
+        SystemUUID: null
         UserData: null
         UserDataOverwrite: false
         UserDataScript: ""
