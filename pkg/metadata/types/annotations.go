@@ -24,6 +24,7 @@ import (
 
 	"github.com/ghodss/yaml"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
+	uuid "github.com/nu7hatch/gouuid"
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/Mirantis/virtlet/pkg/utils"
@@ -43,6 +44,7 @@ const (
 	libvirtCPUSetting                 = "VirtletLibvirtCPUSetting"
 	sshKeysKeyName                    = "VirtletSSHKeys"
 	chown9pfsMountsKeyName            = "VirtletChown9pfsMounts"
+	systemUUIDKeyName                 = "VirtletSystemUUID"
 	// CloudInitUserDataSourceKeyName is the name of user data source key in the pod annotations.
 	CloudInitUserDataSourceKeyName = "VirtletCloudInitUserDataSource"
 	// SSHKeySourceKeyName is the name of ssh key source key in the pod annotations.
@@ -114,6 +116,10 @@ type VirtletAnnotations struct {
 	// InjectedFiles specifies the files to be injected into VM's
 	// rootfs before booting the VM.
 	InjectedFiles map[string][]byte
+	// SystemUUID specifies particular uuid to use as system UUID
+	// in domain definition.  If not set - new one will be generated
+	// basing on pod id.
+	SystemUUID *uuid.UUID
 }
 
 // ExternalUserDataLoader is a function that loads external user data that's specified
@@ -301,6 +307,13 @@ func (va *VirtletAnnotations) parsePodAnnotations(ns string, podAnnotations map[
 
 	if podAnnotations[chown9pfsMountsKeyName] == "true" {
 		va.VirtletChown9pfsMounts = true
+	}
+
+	if systemUUIDStr, found := podAnnotations[systemUUIDKeyName]; found {
+		var err error
+		if va.SystemUUID, err = uuid.ParseHex(systemUUIDStr); err != nil {
+			return fmt.Errorf("failed to parse %q as system uuid: %v", systemUUIDStr, err)
+		}
 	}
 
 	return nil
