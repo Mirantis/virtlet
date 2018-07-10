@@ -141,9 +141,8 @@ func (d *metadataDumper) dumpSandbox(podID string, sandbox *types.PodSandboxInfo
 	return nil
 }
 
-// GetMetadataDumpSource returns a DiagSource that dumps Virtlet
-// metadata.
-func GetMetadataDumpSource(store Store) diag.DiagSource {
+// GetMetadataDumpSource returns a Source that dumps Virtlet metadata.
+func GetMetadataDumpSource(store Store) diag.Source {
 	return diag.NewSimpleTextSource("txt", func() (string, error) {
 		var out bytes.Buffer
 		dumper := newMetadataDumper(store, &out)

@@ -48,7 +48,7 @@ type VirtletManager struct {
 	config         *v1.VirtletConfig
 	metadataStore  metadata.Store
 	fdManager      tapmanager.FDManager
-	diagSet        *diag.DiagSet
+	diagSet        *diag.Set
 	clientCfg      clientcmd.ClientConfig
 	virtTool       *libvirttools.VirtualizationTool
 	imageStore     image.Store
@@ -58,7 +58,7 @@ type VirtletManager struct {
 }
 
 // NewVirtletManager creates a new VirtletManager.
-func NewVirtletManager(config *v1.VirtletConfig, fdManager tapmanager.FDManager, clientCfg clientcmd.ClientConfig, diagSet *diag.DiagSet) *VirtletManager {
+func NewVirtletManager(config *v1.VirtletConfig, fdManager tapmanager.FDManager, clientCfg clientcmd.ClientConfig, diagSet *diag.Set) *VirtletManager {
 	return &VirtletManager{config: config, fdManager: fdManager, diagSet: diagSet}
 }
 

@@ -32,7 +32,7 @@ type LibvirtDiagSource struct {
 	storageConn virt.StorageConnection
 }
 
-var _ diag.DiagSource = &LibvirtDiagSource{}
+var _ diag.Source = &LibvirtDiagSource{}
 
 // NewLibvirtDiagSource creates a new LibvirtDiagSource.
 func NewLibvirtDiagSource(domainConn virt.DomainConnection, storageConn virt.StorageConnection) *LibvirtDiagSource {
@@ -42,7 +42,7 @@ func NewLibvirtDiagSource(domainConn virt.DomainConnection, storageConn virt.Sto
 	}
 }
 
-func (s *LibvirtDiagSource) listDomains(dr *diag.DiagResult) error {
+func (s *LibvirtDiagSource) listDomains(dr *diag.Result) error {
 	domains, err := s.domainConn.ListDomains()
 	if err != nil {
 		return fmt.Errorf("error listing domains: %v", err)
@@ -59,7 +59,7 @@ func (s *LibvirtDiagSource) listDomains(dr *diag.DiagResult) error {
 	return nil
 }
 
-func (s *LibvirtDiagSource) listPoolsAndVolumes(dr *diag.DiagResult) error {
+func (s *LibvirtDiagSource) listPoolsAndVolumes(dr *diag.Result) error {
 	pools, err := s.storageConn.ListPools()
 	if err != nil {
 		return fmt.Errorf("error listing pools: %v", err)
@@ -79,7 +79,7 @@ func (s *LibvirtDiagSource) listPoolsAndVolumes(dr *diag.DiagResult) error {
 	return nil
 }
 
-func (s *LibvirtDiagSource) listVolumes(p virt.StoragePool, dr *diag.DiagResult) error {
+func (s *LibvirtDiagSource) listVolumes(p virt.StoragePool, dr *diag.Result) error {
 	vols, err := p.ListVolumes()
 	if err != nil {
 		return fmt.Errorf("error listing volumes: %v", err)
@@ -96,28 +96,30 @@ func (s *LibvirtDiagSource) listVolumes(p virt.StoragePool, dr *diag.DiagResult)
 	return nil
 }
 
-func (s *LibvirtDiagSource) DiagnosticInfo() (diag.DiagResult, error) {
-	dr := diag.DiagResult{
+// DiagnosticInfo implements DiagnosticInfo method of the Source
+// interface.
+func (s *LibvirtDiagSource) DiagnosticInfo() (diag.Result, error) {
+	dr := diag.Result{
 		IsDir:    true,
-		Children: make(map[string]diag.DiagResult),
+		Children: make(map[string]diag.Result),
 	}
 	err := s.listDomains(&dr)
 	if err == nil {
 		err = s.listPoolsAndVolumes(&dr)
 	}
 	if err != nil {
-		return diag.DiagResult{}, err
+		return diag.Result{}, err
 	}
 	return dr, nil
 }
 
-func addLibvirtXMLToDiagResult(objType, name string, xml libvirtxml.Document, dr *diag.DiagResult) error {
+func addLibvirtXMLToDiagResult(objType, name string, xml libvirtxml.Document, dr *diag.Result) error {
 	out, err := xml.Marshal()
 	if err != nil {
 		return fmt.Errorf("error marshalling the pool to xml: %v", err)
 	}
 	fileName := fmt.Sprintf("%s-%s", objType, name)
-	dr.Children[fileName] = diag.DiagResult{
+	dr.Children[fileName] = diag.Result{
 		Name: fileName,
 		Ext:  "xml",
 		Data: out,

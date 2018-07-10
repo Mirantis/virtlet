@@ -74,43 +74,44 @@ const (
 	toplevelDirName = "diagnostics"
 )
 
-// DiagResult denotes the result of a diagnostics run.
-type DiagResult struct {
+// Result denotes the result of a diagnostics run.
+type Result struct {
 	// Name is the name of the item sans extension.
 	Name string `json:"name,omitempty"`
 	// Ext is the file extension to use.
 	Ext string `json:"ext,omitempty"`
-	// Data is the content returned by the DiagSource.
+	// Data is the content returned by the Source.
 	Data string `json:"data,omitempty"`
 	// IsDir specifies whether this diagnostics result
 	// needs to be unpacked to a directory.
 	IsDir bool `json:"isdir"`
 	// Children denotes the child items to be placed into the
-	// subdirectory that should be made for this DiagResult during
+	// subdirectory that should be made for this Result during
 	// unpacking.
-	Children map[string]DiagResult `json:"children,omitempty"`
-	// Error contains an error message in case if the DiagSource
+	Children map[string]Result `json:"children,omitempty"`
+	// Error contains an error message in case if the Source
 	// has failed to provide the information.
 	Error string `json:"error,omitempty"`
 }
 
-func (dr DiagResult) FileName() string {
+// FileName returns the file name for this Result.
+func (dr Result) FileName() string {
 	if dr.Ext != "" {
 		return fmt.Sprintf("%s.%s", dr.Name, dr.Ext)
 	}
 	return dr.Name
 }
 
-// Unpack unpacks DiagResult under the specified directory.
-func (dr DiagResult) Unpack(parentDir string) error {
+// Unpack unpacks Result under the specified directory.
+func (dr Result) Unpack(parentDir string) error {
 	switch {
 	case dr.Name == "":
-		return errors.New("DiagResult name is not set")
+		return errors.New("Result name is not set")
 	case dr.Error != "":
 		glog.Warningf("Error recorded for the diag item %q: %v", dr.Name, dr.Error)
 		return nil
 	case !dr.IsDir && len(dr.Children) != 0:
-		return errors.New("DiagResult can't contain both Data and Children")
+		return errors.New("Result can't contain both Data and Children")
 	case dr.IsDir:
 		dirPath := filepath.Join(parentDir, dr.FileName())
 		if err := os.MkdirAll(dirPath, 0777); err != nil {
@@ -131,37 +132,37 @@ func (dr DiagResult) Unpack(parentDir string) error {
 	}
 }
 
-// ToJSON encodes DiagResult into JSON.
-func (dr DiagResult) ToJSON() []byte {
+// ToJSON encodes Result into JSON.
+func (dr Result) ToJSON() []byte {
 	bs, err := json.Marshal(dr)
 	if err != nil {
-		log.Panicf("Error marshalling DiagResult: %v", err)
+		log.Panicf("Error marshalling Result: %v", err)
 	}
 	return bs
 }
 
-// DiagSource speicifies a diagnostics information source
-type DiagSource interface {
+// Source speicifies a diagnostics information source
+type Source interface {
 	// DiagnosticInfo returns diagnostic information for the
 	// source. DiagnosticInfo() may skip setting Name in the
-	// DiagResult, in which case it'll be set to the name used to
+	// Result, in which case it'll be set to the name used to
 	// register the source.
-	DiagnosticInfo() (DiagResult, error)
+	DiagnosticInfo() (Result, error)
 }
 
-// DiagSet denotes a set of diagnostics sources.
-type DiagSet struct {
+// Set denotes a set of diagnostics sources.
+type Set struct {
 	sync.Mutex
-	sources map[string]DiagSource
+	sources map[string]Source
 }
 
-// NewDiagSet creates a new DiagSet.
-func NewDiagSet() *DiagSet {
-	return &DiagSet{sources: make(map[string]DiagSource)}
+// NewDiagSet creates a new Set.
+func NewDiagSet() *Set {
+	return &Set{sources: make(map[string]Source)}
 }
 
 // RegisterDiagSource registers a diagnostics source.
-func (ds *DiagSet) RegisterDiagSource(name string, source DiagSource) {
+func (ds *Set) RegisterDiagSource(name string, source Source) {
 	ds.Lock()
 	defer ds.Unlock()
 	ds.sources[name] = source
@@ -169,13 +170,13 @@ func (ds *DiagSet) RegisterDiagSource(name string, source DiagSource) {
 
 // RunDiagnostics collects the diagnostic information from all of the
 // available sources.
-func (ds *DiagSet) RunDiagnostics() DiagResult {
+func (ds *Set) RunDiagnostics() Result {
 	ds.Lock()
 	defer ds.Unlock()
-	r := DiagResult{
+	r := Result{
 		Name:     toplevelDirName,
 		IsDir:    true,
-		Children: make(map[string]DiagResult),
+		Children: make(map[string]Result),
 	}
 	for name, src := range ds.sources {
 		dr, err := src.DiagnosticInfo()
@@ -183,7 +184,7 @@ func (ds *DiagSet) RunDiagnostics() DiagResult {
 			dr.Name = name
 		}
 		if err != nil {
-			r.Children[name] = DiagResult{
+			r.Children[name] = Result{
 				Name:  dr.Name,
 				Error: err.Error(),
 			}
@@ -199,14 +200,14 @@ func (ds *DiagSet) RunDiagnostics() DiagResult {
 // connection.
 type Server struct {
 	sync.Mutex
-	ds     *DiagSet
+	ds     *Set
 	ln     net.Listener
 	doneCh chan struct{}
 }
 
-// NewServer makes a new diagnostics server using the specified DiagSet.
+// NewServer makes a new diagnostics server using the specified Set.
 // If diagSet is nil, DefaultDiagSet is used.
-func NewServer(diagSet *DiagSet) *Server {
+func NewServer(diagSet *Set) *Server {
 	if diagSet == nil {
 		diagSet = DefaultDiagSet
 	}
@@ -258,21 +259,21 @@ func (s *Server) Serve(socketPath string, readyCh chan struct{}) error {
 			if err != nil {
 				if ne, ok := err.(interface {
 					Temporary() bool
-				}); ok && ne.Temporary() {
-					if tempDelay == 0 {
-						tempDelay = 5 * time.Millisecond
-					} else {
-						tempDelay *= 2
-					}
-					if max := 1 * time.Second; tempDelay > max {
-						tempDelay = max
-					}
-					glog.Warningf("Accept error: %v; retrying in %v", err, tempDelay)
-					<-time.After(tempDelay)
-					continue
+				}); !ok || !ne.Temporary() {
+					glog.V(1).Infof("done serving; Accept = %v", err)
+					return err
 				}
-				glog.V(1).Infof("done serving; Accept = %v", err)
-				return err
+				if tempDelay == 0 {
+					tempDelay = 5 * time.Millisecond
+				} else {
+					tempDelay *= 2
+				}
+				if max := 1 * time.Second; tempDelay > max {
+					tempDelay = max
+				}
+				glog.Warningf("Accept error: %v; retrying in %v", err, tempDelay)
+				<-time.After(tempDelay)
+				continue
 			}
 			tempDelay = 0
 
@@ -298,30 +299,30 @@ func (s *Server) Stop() {
 
 // RetrieveDiagnostics retrieves the diagnostic info from the
 // specified UNIX domain socket.
-func RetrieveDiagnostics(socketPath string) (DiagResult, error) {
+func RetrieveDiagnostics(socketPath string) (Result, error) {
 	addr, err := net.ResolveUnixAddr("unix", socketPath)
 	if err != nil {
-		return DiagResult{}, fmt.Errorf("failed to resolve unix addr %q: %v", socketPath, err)
+		return Result{}, fmt.Errorf("failed to resolve unix addr %q: %v", socketPath, err)
 	}
 
 	conn, err := net.DialUnix("unix", nil, addr)
 	if err != nil {
-		return DiagResult{}, fmt.Errorf("can't connect to %q: %v", socketPath, err)
+		return Result{}, fmt.Errorf("can't connect to %q: %v", socketPath, err)
 	}
 
 	bs, err := ioutil.ReadAll(conn)
 	if err != nil {
-		return DiagResult{}, fmt.Errorf("can't read diagnostics: %v", err)
+		return Result{}, fmt.Errorf("can't read diagnostics: %v", err)
 	}
 
 	return DecodeDiagnostics(bs)
 }
 
 // DecodeDiagnostics loads the diagnostics info from the JSON data.
-func DecodeDiagnostics(data []byte) (DiagResult, error) {
-	var r DiagResult
+func DecodeDiagnostics(data []byte) (Result, error) {
+	var r Result
 	if err := json.Unmarshal(data, &r); err != nil {
-		return DiagResult{}, fmt.Errorf("error unmarshalling the diagnostics: %v", err)
+		return Result{}, fmt.Errorf("error unmarshalling the diagnostics: %v", err)
 	}
 	return r, nil
 }
@@ -333,7 +334,7 @@ type CommandSource struct {
 	cmd []string
 }
 
-var _ DiagSource = &CommandSource{}
+var _ Source = &CommandSource{}
 
 // NewCommandSource creates a new CommandSource.
 func NewCommandSource(ext string, cmd []string) *CommandSource {
@@ -343,13 +344,13 @@ func NewCommandSource(ext string, cmd []string) *CommandSource {
 	}
 }
 
-// DiagnosticInfo implements DiagnosticInfo method of the
-// CommandSource interface.
-func (s *CommandSource) DiagnosticInfo() (DiagResult, error) {
+// DiagnosticInfo implements DiagnosticInfo method of the Source
+// interface.
+func (s *CommandSource) DiagnosticInfo() (Result, error) {
 	if len(s.cmd) == 0 {
-		return DiagResult{}, errors.New("empty command")
+		return Result{}, errors.New("empty command")
 	}
-	r := DiagResult{
+	r := Result{
 		Ext: s.ext,
 	}
 	out, err := exec.Command(s.cmd[0], s.cmd[1:]...).Output()
@@ -358,9 +359,9 @@ func (s *CommandSource) DiagnosticInfo() (DiagResult, error) {
 	} else {
 		cmdStr := strings.Join(s.cmd, " ")
 		if ee, ok := err.(*exec.ExitError); ok {
-			return DiagResult{}, fmt.Errorf("error running command %q: stderr:\n%s", cmdStr, ee.Stderr)
+			return Result{}, fmt.Errorf("error running command %q: stderr:\n%s", cmdStr, ee.Stderr)
 		}
-		return DiagResult{}, fmt.Errorf("error running command %q: %v", cmdStr, err)
+		return Result{}, fmt.Errorf("error running command %q: %v", cmdStr, err)
 	}
 	return r, nil
 }
@@ -370,13 +371,13 @@ func (s *CommandSource) DiagnosticInfo() (DiagResult, error) {
 type SimpleTextSourceFunc func() (string, error)
 
 // SimpleTextSource invokes the specified function that returns a
-// string (and an error, if any) and wraps its result in DiagResult
+// string (and an error, if any) and wraps its result in Result
 type SimpleTextSource struct {
 	ext    string
 	toCall SimpleTextSourceFunc
 }
 
-var _ DiagSource = &SimpleTextSource{}
+var _ Source = &SimpleTextSource{}
 
 // NewSimpleTextSource creates a new SimpleTextSource.
 func NewSimpleTextSource(ext string, toCall SimpleTextSourceFunc) *SimpleTextSource {
@@ -386,14 +387,14 @@ func NewSimpleTextSource(ext string, toCall SimpleTextSourceFunc) *SimpleTextSou
 	}
 }
 
-// DiagnosticInfo implements DiagnosticInfo method of the
-// CommandSource interface.
-func (s *SimpleTextSource) DiagnosticInfo() (DiagResult, error) {
+// DiagnosticInfo implements DiagnosticInfo method of the Source
+// interface.
+func (s *SimpleTextSource) DiagnosticInfo() (Result, error) {
 	out, err := s.toCall()
 	if err != nil {
-		return DiagResult{}, err
+		return Result{}, err
 	}
-	return DiagResult{
+	return Result{
 		Ext:  s.ext,
 		Data: out,
 	}, nil
@@ -411,18 +412,18 @@ func NewLogDirSource(logDir string) *LogDirSource {
 	}
 }
 
-var _ DiagSource = &LogDirSource{}
+var _ Source = &LogDirSource{}
 
-// DiagnosticInfo implements DiagnosticInfo method of the
-// CommandSource interface.
-func (s *LogDirSource) DiagnosticInfo() (DiagResult, error) {
+// DiagnosticInfo implements DiagnosticInfo method of the Source
+// interface.
+func (s *LogDirSource) DiagnosticInfo() (Result, error) {
 	files, err := ioutil.ReadDir(s.logDir)
 	if err != nil {
-		return DiagResult{}, err
+		return Result{}, err
 	}
-	r := DiagResult{
+	r := Result{
 		IsDir:    true,
-		Children: make(map[string]DiagResult),
+		Children: make(map[string]Result),
 	}
 	for _, fi := range files {
 		if fi.IsDir() {
@@ -430,7 +431,7 @@ func (s *LogDirSource) DiagnosticInfo() (DiagResult, error) {
 		}
 		name := fi.Name()
 		ext := filepath.Ext(name)
-		cur := DiagResult{
+		cur := Result{
 			Name: name,
 		}
 		if ext != "" {
@@ -440,7 +441,7 @@ func (s *LogDirSource) DiagnosticInfo() (DiagResult, error) {
 		fullPath := filepath.Join(s.logDir, name)
 		data, err := ioutil.ReadFile(fullPath)
 		if err != nil {
-			return DiagResult{}, fmt.Errorf("error reading %q: %v", fullPath, err)
+			return Result{}, fmt.Errorf("error reading %q: %v", fullPath, err)
 		}
 		cur.Data = string(data)
 		r.Children[cur.Name] = cur
@@ -450,7 +451,7 @@ func (s *LogDirSource) DiagnosticInfo() (DiagResult, error) {
 
 type stackDumpSource struct{}
 
-func (s stackDumpSource) DiagnosticInfo() (DiagResult, error) {
+func (s stackDumpSource) DiagnosticInfo() (Result, error) {
 	var buf []byte
 	var stackSize int
 	bufSize := 32768
@@ -462,16 +463,16 @@ func (s stackDumpSource) DiagnosticInfo() (DiagResult, error) {
 		}
 		bufSize *= 2
 	}
-	return DiagResult{
+	return Result{
 		Ext:  "log",
 		Data: string(buf[:stackSize]),
 	}, nil
 }
 
 // StackDumpSource dumps Go runtime stack.
-var StackDumpSource DiagSource = stackDumpSource{}
+var StackDumpSource Source = stackDumpSource{}
 
-// DefaultDiagSet is the default DiagSet to use.
+// DefaultDiagSet is the default Set to use.
 var DefaultDiagSet = NewDiagSet()
 
 func init() {

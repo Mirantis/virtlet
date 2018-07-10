@@ -33,7 +33,7 @@ import (
 type diagTester struct {
 	t          *testing.T
 	tmpDir     string
-	ds         *DiagSet
+	ds         *Set
 	s          *Server
 	socketPath string
 	logDir     string
@@ -94,42 +94,42 @@ func (dt *diagTester) teardown() {
 func TestDiagServer(t *testing.T) {
 	dt := newDiagTester(t)
 	defer dt.teardown()
-	expectedResult := DiagResult{
+	expectedResult := Result{
 		Name:  "diagnostics",
 		IsDir: true,
-		Children: map[string]DiagResult{
-			"foo": DiagResult{
+		Children: map[string]Result{
+			"foo": Result{
 				Name: "foo",
 				Ext:  "txt",
 				Data: "this is foo",
 			},
-			"bar": DiagResult{
+			"bar": Result{
 				Name: "bar",
 				Ext:  "log",
 				Data: "this is bar",
 			},
-			"simple_text": DiagResult{
+			"simple_text": Result{
 				Name: "simple_text",
 				Ext:  "txt",
 				Data: "baz",
 			},
-			"logdir": DiagResult{
+			"logdir": Result{
 				Name:  "logdir",
 				IsDir: true,
-				Children: map[string]DiagResult{
-					"log1": DiagResult{
+				Children: map[string]Result{
+					"log1": Result{
 						Name: "log1",
 						Ext:  "txt",
 						Data: "log1 contents",
 					},
-					"log2": DiagResult{
+					"log2": Result{
 						Name: "log2",
 						Ext:  "txt",
 						Data: "log2 contents",
 					},
 				},
 			},
-			"fail": DiagResult{
+			"fail": Result{
 				Name:  "fail",
 				Error: "oops",
 			},

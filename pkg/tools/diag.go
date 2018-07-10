@@ -90,15 +90,15 @@ func NewDiagDumpCommand(client KubeClient, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func (d *diagDumpCommand) diagResult() (diag.DiagResult, error) {
-	dr := diag.DiagResult{
+func (d *diagDumpCommand) diagResult() (diag.Result, error) {
+	dr := diag.Result{
 		IsDir:    true,
 		Name:     "nodes",
-		Children: make(map[string]diag.DiagResult),
+		Children: make(map[string]diag.Result),
 	}
 	podNames, nodeNames, err := d.client.GetVirtletPodAndNodeNames()
 	if err != nil {
-		return diag.DiagResult{}, err
+		return diag.Result{}, err
 	}
 	for n, podName := range podNames {
 		nodeName := nodeNames[n]
@@ -106,22 +106,22 @@ func (d *diagDumpCommand) diagResult() (diag.DiagResult, error) {
 		exitCode, err := d.client.ExecInContainer(
 			podName, "virtlet", "kube-system", nil,
 			&buf, os.Stderr, []string{"virtlet", "--diag"})
-		var cur diag.DiagResult
+		var cur diag.Result
 		switch {
 		case err != nil:
-			cur = diag.DiagResult{
+			cur = diag.Result{
 				Ext:   "err",
 				Error: fmt.Sprintf("node %q: error getting version from Virtlet pod %q: %v", nodeName, podName, err),
 			}
 		case exitCode != 0:
-			cur = diag.DiagResult{
+			cur = diag.Result{
 				Ext:   "err",
 				Error: fmt.Sprintf("node %q: error getting version from Virtlet pod %q: exit code %d", nodeName, podName, exitCode),
 			}
 		default:
 			cur, err = diag.DecodeDiagnostics(buf.Bytes())
 			if err != nil {
-				cur = diag.DiagResult{
+				cur = diag.Result{
 					Ext:   "err",
 					Error: fmt.Sprintf("error unmarshalling the diagnostics: %v", err),
 				}
@@ -144,8 +144,8 @@ func (d *diagDumpCommand) diagResult() (diag.DiagResult, error) {
 	return dr, nil
 }
 
-func (d *diagDumpCommand) dumpLogs(dr *diag.DiagResult, podName, containerName string) {
-	cur := diag.DiagResult{
+func (d *diagDumpCommand) dumpLogs(dr *diag.Result, podName, containerName string) {
+	cur := diag.Result{
 		Name: "virtlet-pod-" + containerName,
 		Ext:  "log",
 	}

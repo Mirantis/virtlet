@@ -31,12 +31,12 @@ import (
 )
 
 var (
-	fakeDiagResults = []diag.DiagResult{
+	fakeDiagResults = []diag.Result{
 		{
 			Name:  "diagnostics",
 			IsDir: true,
-			Children: map[string]diag.DiagResult{
-				"foo": diag.DiagResult{
+			Children: map[string]diag.Result{
+				"foo": diag.Result{
 					Name: "foo",
 					Ext:  "txt",
 					Data: "foobar",
@@ -46,13 +46,13 @@ var (
 		{
 			Name:  "diagnostics",
 			IsDir: true,
-			Children: map[string]diag.DiagResult{
-				"r1": diag.DiagResult{
+			Children: map[string]diag.Result{
+				"r1": diag.Result{
 					Name: "r1",
 					Ext:  "log",
 					Data: "baz1",
 				},
-				"r2": diag.DiagResult{
+				"r2": diag.Result{
 					Name: "r2",
 					Ext:  "log",
 					Data: "baz2",
@@ -60,39 +60,39 @@ var (
 			},
 		},
 	}
-	expectedDiagResult = diag.DiagResult{
+	expectedDiagResult = diag.Result{
 		Name:  "nodes",
 		IsDir: true,
-		Children: map[string]diag.DiagResult{
-			"kube-node-1": diag.DiagResult{
+		Children: map[string]diag.Result{
+			"kube-node-1": diag.Result{
 				Name:  "kube-node-1",
 				IsDir: true,
-				Children: map[string]diag.DiagResult{
+				Children: map[string]diag.Result{
 					"foo": fakeDiagResults[0].Children["foo"],
-					"virtlet-pod-virtlet": diag.DiagResult{
+					"virtlet-pod-virtlet": diag.Result{
 						Name: "virtlet-pod-virtlet",
 						Ext:  "log",
 						Data: "foo-logs-virtlet",
 					},
-					"virtlet-pod-libvirt": diag.DiagResult{
+					"virtlet-pod-libvirt": diag.Result{
 						Name: "virtlet-pod-libvirt",
 						Ext:  "log",
 						Data: "foo-logs-libvirt",
 					},
 				},
 			},
-			"kube-node-2": diag.DiagResult{
+			"kube-node-2": diag.Result{
 				Name:  "kube-node-2",
 				IsDir: true,
-				Children: map[string]diag.DiagResult{
+				Children: map[string]diag.Result{
 					"r1": fakeDiagResults[1].Children["r1"],
 					"r2": fakeDiagResults[1].Children["r2"],
-					"virtlet-pod-virtlet": diag.DiagResult{
+					"virtlet-pod-virtlet": diag.Result{
 						Name: "virtlet-pod-virtlet",
 						Ext:  "log",
 						Data: "bar-logs-virtlet",
 					},
-					"virtlet-pod-libvirt": diag.DiagResult{
+					"virtlet-pod-libvirt": diag.Result{
 						Name: "virtlet-pod-libvirt",
 						Ext:  "log",
 						Data: "bar-logs-libvirt",

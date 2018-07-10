@@ -61,7 +61,7 @@ func configWithDefaults(cfg *v1.VirtletConfig) *v1.VirtletConfig {
 	return r
 }
 
-func runVirtlet(config *v1.VirtletConfig, clientCfg clientcmd.ClientConfig, diagSet *diag.DiagSet) {
+func runVirtlet(config *v1.VirtletConfig, clientCfg clientcmd.ClientConfig, diagSet *diag.Set) {
 	manager := manager.NewVirtletManager(config, nil, clientCfg, diagSet)
 	if err := manager.Run(); err != nil {
 		glog.Errorf("Error: %v", err)
@@ -112,7 +112,7 @@ func setLogLevel(config *v1.VirtletConfig) {
 	})
 }
 
-func runDiagServer() *diag.DiagSet {
+func runDiagServer() *diag.Set {
 	diagSet := diag.NewDiagSet()
 	diagSet.RegisterDiagSource("ip-a", diag.NewCommandSource("txt", []string{"ip", "a"}))
 	diagSet.RegisterDiagSource("ip-r", diag.NewCommandSource("txt", []string{"ip", "r"}))
