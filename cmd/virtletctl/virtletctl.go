@@ -43,7 +43,6 @@ func newRootCmd() *cobra.Command {
 	flag.CommandLine.Parse([]string{})
 
 	client := tools.NewRealKubeClient(clientCfg)
-	cmd.AddCommand(tools.NewDumpMetadataCmd(client))
 	cmd.AddCommand(tools.NewVirshCmd(client, os.Stdout))
 	cmd.AddCommand(tools.NewSSHCmd(client, os.Stdout, ""))
 	cmd.AddCommand(tools.NewVNCCmd(client, os.Stdout, true))
@@ -51,6 +50,7 @@ func newRootCmd() *cobra.Command {
 	cmd.AddCommand(tools.NewGenDocCmd(cmd, os.Stdout))
 	cmd.AddCommand(tools.NewGenCmd(os.Stdout))
 	cmd.AddCommand(tools.NewVersionCommand(client, os.Stdout, nil))
+	cmd.AddCommand(tools.NewDiagCommand(client, os.Stdin, os.Stdout))
 
 	for _, c := range cmd.Commands() {
 		c.PreRunE = func(*cobra.Command, []string) error {

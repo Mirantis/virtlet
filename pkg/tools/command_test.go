@@ -33,6 +33,7 @@ type fakeKubeClient struct {
 	expectedCommands        map[string]string
 	expectedPortForwards    []string
 	portForwardStopChannels []chan struct{}
+	logs                    map[string]string
 }
 
 var _ KubeClient = &fakeKubeClient{}
@@ -112,6 +113,16 @@ func (c *fakeKubeClient) ForwardPorts(podName, namespace string, ports []*Forwar
 	stopCh = make(chan struct{})
 	c.portForwardStopChannels = append(c.portForwardStopChannels, stopCh)
 	return stopCh, nil
+}
+
+func (c *fakeKubeClient) PodLogs(podName, containerName, namespace string, tailLines int64) ([]byte, error) {
+	key := fmt.Sprintf("%s/%s/%s", podName, containerName, namespace)
+	l, found := c.logs[key]
+	if !found {
+		c.t.Errorf("no logs specified for %q", key)
+		return []byte{}, nil
+	}
+	return []byte(l), nil
 }
 
 func fakeCobraCommand() *cobra.Command {

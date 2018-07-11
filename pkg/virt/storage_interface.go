@@ -40,14 +40,16 @@ type StorageConnection interface {
 	// UUID. In case if the domain cannot be found but no other
 	// error occurred, it returns ErrStoragePoolNotFound
 	LookupStoragePoolByName(name string) (StoragePool, error)
+	// ListPools() retrieves the list of pools
+	ListPools() ([]StoragePool, error)
 }
 
 // StoragePool represents a pool of volumes
 type StoragePool interface {
 	// CreateStorageVol creates a new storage volume based on the specified definition
 	CreateStorageVol(def *libvirtxml.StorageVolume) (StorageVolume, error)
-	// ListAllVolumes lists all storage volumes available in the pool
-	ListAllVolumes() ([]StorageVolume, error)
+	// ListVolumes lists all the storage volumes available in the pool
+	ListVolumes() ([]StorageVolume, error)
 	// LookupVolumeByName tries to locate the storage volume by its
 	// UUID. In case if the domain cannot be found but no other
 	// error occurred, it returns ErrStorageVolumeNotFound
@@ -55,6 +57,8 @@ type StoragePool interface {
 	// RemoveVolumeByName removes the storage volume with the
 	// specified name
 	RemoveVolumeByName(name string) error
+	// XML retrieves xml definition of the pool
+	XML() (*libvirtxml.StoragePool, error)
 }
 
 // StorageVolume represents a particular volume in pool
@@ -69,4 +73,6 @@ type StorageVolume interface {
 	Remove() error
 	// Format formats the volume as ext4 filesystem
 	Format() error
+	// XML retrieves xml definition of the volume
+	XML() (*libvirtxml.StorageVolume, error)
 }

@@ -97,8 +97,8 @@ func TestRootVolumesCleanup(t *testing.T) {
 		t.Fatalf("Cannot define new fake volume: %v", err)
 	}
 
-	if volumes, _ := pool.ListAllVolumes(); len(volumes) != 4 {
-		t.Errorf("Defined 4 fake volumes but ListAllVolumes() returned %d of them", len(volumes))
+	if volumes, _ := pool.ListVolumes(); len(volumes) != 4 {
+		t.Errorf("Defined 4 fake volumes but ListVolumes() returned %d of them", len(volumes))
 	}
 
 	// this should remove only root volumes corresponding to the two first
@@ -108,8 +108,8 @@ func TestRootVolumesCleanup(t *testing.T) {
 		t.Errorf("removeOrphanRootVolumes returned errors: %v", errors)
 	}
 
-	if volumes, _ := pool.ListAllVolumes(); len(volumes) != 2 {
-		t.Errorf("Expected 2 volumes to remain, but ListAllVolumes() returned %d of them", len(volumes))
+	if volumes, _ := pool.ListVolumes(); len(volumes) != 2 {
+		t.Errorf("Expected 2 volumes to remain, but ListVolumes() returned %d of them", len(volumes))
 	}
 
 	gm.Verify(t, gm.NewYamlVerifier(ct.rec.Content()))
@@ -139,8 +139,8 @@ func TestQcow2VolumesCleanup(t *testing.T) {
 		t.Fatalf("Cannot define new fake volume: %v", err)
 	}
 
-	if volumes, _ := pool.ListAllVolumes(); len(volumes) != 4 {
-		t.Errorf("Defined 4 fake volumes but ListAllVolumes() returned %d of them", len(volumes))
+	if volumes, _ := pool.ListVolumes(); len(volumes) != 4 {
+		t.Errorf("Defined 4 fake volumes but ListVolumes() returned %d of them", len(volumes))
 	}
 
 	// this should remove only ephemeral qcow2 volumes corresponding to
@@ -150,8 +150,8 @@ func TestQcow2VolumesCleanup(t *testing.T) {
 		t.Errorf("removeOrphanRootVolumes returned errors: %v", errors)
 	}
 
-	if volumes, _ := pool.ListAllVolumes(); len(volumes) != 2 {
-		t.Errorf("Expected two remaining volumes, ListAllVolumes() returned %d of them", len(volumes))
+	if volumes, _ := pool.ListVolumes(); len(volumes) != 2 {
+		t.Errorf("Expected two remaining volumes, ListVolumes() returned %d of them", len(volumes))
 	}
 
 	gm.Verify(t, gm.NewYamlVerifier(ct.rec.Content()))
