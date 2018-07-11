@@ -3,7 +3,7 @@
 Virtlet provides a set of
 [virtletctl diag](virtletctl/virtletctl_diag.md) commands that can
 help with troubleshooting. The diagnostics can be invoked either
-directly or buy means of a
+directly or by means of a
 [Sonobuoy](https://github.com/heptio/sonobuoy) plugin.
 
 ## Direct invocation
