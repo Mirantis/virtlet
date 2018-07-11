@@ -101,16 +101,16 @@ var _ = Describe("virtletctl", func() {
 			Expect(output).To(Equal("virtletctl-cirros-vm"))
 		}, 60)
 
-		It("Should dump Virtlet metadata on dump-metadata subcommand", func(done Done) {
+		It("Should dump Virtlet diagnostics on diag dump subcommand", func(done Done) {
 			defer close(done)
 
 			ctx, closeFunc := context.WithCancel(context.Background())
 			defer closeFunc()
 			localExecutor := framework.LocalExecutor(ctx)
 
-			By("Calling virtletctl dump-metadata")
-			output := callVirtletctl(localExecutor, "dump-metadata")
-			Expect(output).To(ContainSubstring("virtletctl-cirros-vm"))
+			By("Calling virtletctl diag dump")
+			output := callVirtletctl(localExecutor, "diag", "dump", "--json")
+			Expect(output).To(ContainSubstring("cirros-vm"))
 		}, 60)
 
 	})
