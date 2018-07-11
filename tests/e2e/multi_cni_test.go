@@ -100,7 +100,7 @@ func makeMultiCNIVM(name string, addCNIAnnotation bool) *multiCNIVM {
 	if addCNIAnnotation {
 		opts.MultiCNI = "calico,flannel"
 	}
-	Expect(vm.Create(opts.applyDefaults(), time.Minute*5, nil)).To(Succeed())
+	Expect(vm.Create(opts.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
 	vmPod, err := vm.Pod()
 	Expect(err).NotTo(HaveOccurred())
 	return &multiCNIVM{

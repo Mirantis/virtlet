@@ -65,7 +65,7 @@ var _ = Describe("Ceph volumes tests", func() {
 				})
 			}
 
-			Expect(vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, podCustomization)).To(Succeed())
+			Expect(vm.Create(VMOptions{}.ApplyDefaults(), time.Minute*5, podCustomization)).To(Succeed())
 			var err error
 			_, err = vm.Pod()
 			Expect(err).NotTo(HaveOccurred())
@@ -141,7 +141,7 @@ var _ = Describe("Ceph volumes tests", func() {
 				})
 			}
 
-			Expect(vm.Create(VMOptions{}.applyDefaults(), time.Minute*5, podCustomization)).To(Succeed())
+			Expect(vm.Create(VMOptions{}.ApplyDefaults(), time.Minute*5, podCustomization)).To(Succeed())
 			_ = do(vm.Pod()).(*framework.PodInterface)
 		})
 
