@@ -160,29 +160,27 @@ func (va *VirtletAnnotations) parsePodAnnotations(ns string, podAnnotations map[
 	}
 	if externalDataLoader != nil {
 		if err := externalDataLoader(va, ns, podAnnotations); err != nil {
-			return err
+			return fmt.Errorf("error loading data via external data loader: %v", err)
 		}
 	}
 
 	if vcpuCountStr, found := podAnnotations[vcpuCountAnnotationKeyName]; found {
 		var err error
-		n, err := strconv.Atoi(vcpuCountStr)
-		if err != nil {
-			return fmt.Errorf("error parsing cpu count for VM pod (%q)", vcpuCountStr)
+		if va.VCPUCount, err = strconv.Atoi(vcpuCountStr); err != nil {
+			return fmt.Errorf("error parsing cpu count for VM pod %q: %v", vcpuCountStr, err)
 		}
-		va.VCPUCount = n
 	}
 
 	if metaDataStr, found := podAnnotations[cloudInitMetaDataKeyName]; found {
 		if err := yaml.Unmarshal([]byte(metaDataStr), &va.MetaData); err != nil {
-			return fmt.Errorf("failed to unmarshal cloud-init metadata")
+			return fmt.Errorf("failed to unmarshal cloud-init metadata: %v", err)
 		}
 	}
 
 	if userDataStr, found := podAnnotations[cloudInitUserDataKeyName]; found {
 		var userData map[string]interface{}
 		if err := yaml.Unmarshal([]byte(userDataStr), &userData); err != nil {
-			return fmt.Errorf("failed to unmarshal cloud-init userdata")
+			return fmt.Errorf("failed to unmarshal cloud-init userdata: %v", err)
 		}
 		if va.UserDataOverwrite {
 			va.UserData = userData
