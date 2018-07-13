@@ -1,0 +1,19 @@
+#include <tunables/global>
+
+profile vms {
+  #include <abstractions/libvirt-qemu>
+
+  ptrace trace peer=@{profile_name},
+  ptrace readby,
+  ptrace tracedby,
+
+  /{usr/,}bin/sleep rix,
+  /{usr/,}bin/cut rix,
+  /{var/,}tmp/{,**} r,
+
+  /var/lib/virtlet/vms.procfile w,
+  /vms.sh rix,
+
+  @{PROC}/@{pid}/stat r,
+
+}
