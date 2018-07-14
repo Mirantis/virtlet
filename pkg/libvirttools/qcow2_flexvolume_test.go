@@ -91,7 +91,7 @@ func TestQCOW2VolumeLifeCycle(t *testing.T) {
 		t.Fatalf("newQCOW2Volume returned an error: %v", err)
 	}
 
-	vol, err := volume.Setup()
+	vol, _, err := volume.Setup()
 	if err != nil {
 		t.Errorf("Setup returned an error: %v", err)
 	}

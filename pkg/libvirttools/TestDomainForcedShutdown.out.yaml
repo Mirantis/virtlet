@@ -138,6 +138,7 @@
         UserDataOverwrite: false
         UserDataScript: ""
         VCPUCount: 1
+        VirtletChown9pfsMounts: false
       PodAnnotations:
         hello: world
         virt: let

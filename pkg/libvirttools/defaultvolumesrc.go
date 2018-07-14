@@ -22,6 +22,7 @@ func GetDefaultVolumeSource() VMVolumeSource {
 	return CombineVMVolumeSources(
 		GetRootVolume,
 		ScanFlexVolumes,
+		GetFileSystemVolumes,
 		// XXX: GetConfigVolume must go last because it
 		// doesn't produce correct name for cdrom devices
 		GetConfigVolume)

@@ -53,7 +53,7 @@ func (mounter *fakeMounter) validatePath(target string) {
 	}
 }
 
-func (mounter *fakeMounter) Mount(source string, target string, fstype string) error {
+func (mounter *fakeMounter) Mount(source string, target string, fstype string, flags uintptr) error {
 	mounter.validatePath(target)
 	mounter.journal = append(mounter.journal, fmt.Sprintf("mount: %s %s %s", source, target, fstype))
 
@@ -81,7 +81,7 @@ func (mounter *fakeMounter) Mount(source string, target string, fstype string) e
 	return nil
 }
 
-func (mounter *fakeMounter) Unmount(target string) error {
+func (mounter *fakeMounter) Unmount(target string, flags int) error {
 	// we make sure that path is under our tmpdir before wiping it
 	mounter.validatePath(target)
 	mounter.journal = append(mounter.journal, fmt.Sprintf("unmount: %s", target))

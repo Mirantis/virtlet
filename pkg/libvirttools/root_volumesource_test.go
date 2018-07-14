@@ -129,7 +129,7 @@ func TestRootVolumeSize(t *testing.T) {
 				},
 			})
 
-			_, err := rootVol.Setup()
+			_, _, err := rootVol.Setup()
 			if err != nil {
 				t.Fatalf("Setup returned an error: %v", err)
 			}
@@ -159,7 +159,7 @@ func TestRootVolumeLifeCycle(t *testing.T) {
 		Image:      "rootfs image name",
 	})
 
-	vol, err := rootVol.Setup()
+	vol, _, err := rootVol.Setup()
 	if err != nil {
 		t.Fatalf("Setup returned an error: %v", err)
 	}
@@ -218,3 +218,5 @@ func (vo fakeVolumeOwner) ImageManager() ImageManager {
 func (vo fakeVolumeOwner) RawDevices() []string { return nil }
 
 func (vo fakeVolumeOwner) KubeletRootDir() string { return "" }
+
+func (vo fakeVolumeOwner) VolumePoolName() string { return "" }

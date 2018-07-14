@@ -20,8 +20,11 @@ import (
 	"fmt"
 	"os"
 	"os/user"
+	"path/filepath"
 	"strconv"
 	"sync"
+
+	"github.com/golang/glog"
 )
 
 const (
@@ -35,7 +38,7 @@ var emulatorUser struct {
 }
 
 // ChownForEmulator makes a file or directory owned by the emulator user.
-func ChownForEmulator(filePath string) error {
+func ChownForEmulator(filePath string, recursive bool) error {
 	emulatorUser.Lock()
 	defer emulatorUser.Unlock()
 	if !emulatorUser.initialized {
@@ -52,8 +55,26 @@ func ChownForEmulator(filePath string) error {
 			return fmt.Errorf("bad gid %q for user %q: %v", u.Gid, emulatorUserName, err)
 		}
 	}
-	if err := os.Chown(filePath, emulatorUser.uid, emulatorUser.gid); err != nil {
-		return fmt.Errorf("can't set the owner of tapmanager socket: %v", err)
+
+	chown := os.Chown
+	if recursive {
+		chown = ChownR
+	}
+	if err := chown(filePath, emulatorUser.uid, emulatorUser.gid); err != nil {
+		return fmt.Errorf("can't set the owner of %q: %v", filePath, err)
 	}
 	return nil
+}
+
+// ChownR makes a file or directory owned by the emulator user recursively.
+func ChownR(path string, uid, gid int) error {
+	return filepath.Walk(path, func(name string, info os.FileInfo, err error) error {
+		if err == nil {
+			err = os.Chown(name, uid, gid)
+			if err != nil {
+				glog.Warningf("Failed to change the owner of %q: %v", name, err)
+			}
+		}
+		return err
+	})
 }

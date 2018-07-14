@@ -24,14 +24,15 @@ type mounter struct{}
 
 var _ Mounter = &mounter{}
 
-func NewMounter() *mounter {
+// NewMounter creates unsupported mounter struct
+func NewMounter() Mounter {
 	return &mounter{}
 }
 
-func (mounter *mounter) Mount(source string, target string, fstype string) error {
+func (mounter *mounter) Mount(source string, target string, fstype string, flags uintptr) error {
 	return errors.New("not implemented")
 }
 
-func (mounter *mounter) Unmount(target string) error {
+func (mounter *mounter) Unmount(target string, flags int) error {
 	return errors.New("not implemented")
 }

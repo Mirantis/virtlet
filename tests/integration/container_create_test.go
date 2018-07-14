@@ -103,11 +103,7 @@ func TestContainerCleanup(t *testing.T) {
 	ct.pullAllImages()
 
 	ct.runPodSandbox(sandbox)
-	mounts := []*kubeapi.Mount{
-		{
-			HostPath: "/var/lib/virtlet",
-		},
-	}
+	mounts := []*kubeapi.Mount{}
 
 	uuid := getDomainUUID(sandbox.Metadata.Uid)
 	// 1. Failure during adding/processing ephemerial and flexolumes
@@ -168,11 +164,7 @@ func TestContainerVolumes(t *testing.T) {
 	volumeCounts := []int{3, 2}
 	for idx, sandbox := range ct.sandboxes {
 		ct.runPodSandbox(sandbox)
-		mounts := []*kubeapi.Mount{
-			{
-				HostPath: "/var/lib/virtlet",
-			},
-		}
+		mounts := []*kubeapi.Mount{}
 		createResp := ct.createContainer(sandbox, ct.containers[idx], ct.imageSpecs[idx], mounts)
 		ct.startContainer(createResp.ContainerId)
 

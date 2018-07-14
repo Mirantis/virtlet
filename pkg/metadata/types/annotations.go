@@ -41,6 +41,7 @@ const (
 	rootVolumeSizeKeyName             = "VirtletRootVolumeSize"
 	libvirtCPUSetting                 = "VirtletLibvirtCPUSetting"
 	sshKeysKeyName                    = "VirtletSSHKeys"
+	chown9pfsMountsKeyName            = "VirtletChown9pfsMounts"
 	// CloudInitUserDataSourceKeyName is the name of user data source key in the pod annotations.
 	CloudInitUserDataSourceKeyName = "VirtletCloudInitUserDataSource"
 	// SSHKeySourceKeyName is the name of ssh key source key in the pod annotations.
@@ -100,6 +101,8 @@ type VirtletAnnotations struct {
 	// size of the QCOW2 image, the size of the QCOW2 image is
 	// used instead.
 	RootVolumeSize int64
+	// VirtletChown9pfsMounts indicates if chown is enabled for 9pfs mounts.
+	VirtletChown9pfsMounts bool
 }
 
 // ExternalDataLoader is a function that loads external data that's specified
@@ -238,6 +241,10 @@ func (va *VirtletAnnotations) parsePodAnnotations(ns string, podAnnotations map[
 		} else {
 			return fmt.Errorf("bad root volume size %q", rootVolumeSizeStr)
 		}
+	}
+
+	if podAnnotations[chown9pfsMountsKeyName] == "true" {
+		va.VirtletChown9pfsMounts = true
 	}
 
 	return nil

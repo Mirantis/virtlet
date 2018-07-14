@@ -78,19 +78,19 @@ func (v *rawDeviceVolume) UUID() string {
 	return v.opts.UUID
 }
 
-func (v *rawDeviceVolume) Setup() (*libvirtxml.DomainDisk, error) {
+func (v *rawDeviceVolume) Setup() (*libvirtxml.DomainDisk, *libvirtxml.DomainFilesystem, error) {
 	if err := v.verifyRawDeviceWhitelisted(v.opts.Path); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err := verifyRawDeviceAccess(v.opts.Path); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	return &libvirtxml.DomainDisk{
 		Device: "disk",
 		Source: &libvirtxml.DomainDiskSource{Block: &libvirtxml.DomainDiskSourceBlock{Dev: v.opts.Path}},
 		Driver: &libvirtxml.DomainDiskDriver{Name: "qemu", Type: "raw"},
-	}, nil
+	}, nil, nil
 }
 
 func init() {

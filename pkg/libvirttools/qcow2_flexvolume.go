@@ -97,27 +97,27 @@ func (v *qcow2Volume) UUID() string {
 	return v.uuid
 }
 
-func (v *qcow2Volume) Setup() (*libvirtxml.DomainDisk, error) {
+func (v *qcow2Volume) Setup() (*libvirtxml.DomainDisk, *libvirtxml.DomainFilesystem, error) {
 	vol, err := v.createQCOW2Volume(uint64(v.capacity), v.capacityUnit)
 	if err != nil {
-		return nil, fmt.Errorf("error during creation of volume '%s' with virtlet description %s: %v", v.volumeName(), v.name, err)
+		return nil, nil, fmt.Errorf("error during creation of volume '%s' with virtlet description %s: %v", v.volumeName(), v.name, err)
 	}
 
 	path, err := vol.Path()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	err = vol.Format()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	return &libvirtxml.DomainDisk{
 		Device: "disk",
 		Source: &libvirtxml.DomainDiskSource{File: &libvirtxml.DomainDiskSourceFile{File: path}},
 		Driver: &libvirtxml.DomainDiskDriver{Name: "qemu", Type: "qcow2"},
-	}, nil
+	}, nil, nil
 }
 
 func (v *qcow2Volume) Teardown() error {
