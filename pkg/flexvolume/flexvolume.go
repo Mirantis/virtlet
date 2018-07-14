@@ -269,6 +269,10 @@ func formatResult(fields map[string]interface{}, err error) string {
 // means that no partition number was specified.
 func GetFlexvolumeInfo(dir string) (string, int, error) {
 	dataFile := filepath.Join(dir, flexvolumeDataFile)
+	if _, err := os.Stat(dataFile); os.IsNotExist(err) {
+		return "", 0, err
+	}
+
 	var opts map[string]interface{}
 	if err := utils.ReadJSON(dataFile, &opts); err != nil {
 		return "", 0, fmt.Errorf("can't read flexvolume data file %q: %v", dataFile, err)

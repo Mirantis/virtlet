@@ -67,6 +67,9 @@ func ScanFlexVolumes(config *types.VMConfig, owner volumeOwner) ([]VMVolume, err
 		dataFilePath := filepath.Join(dir, fi.Name(), flexvolumeDataFile)
 		content, err := ioutil.ReadFile(dataFilePath)
 		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
 			return nil, fmt.Errorf("error reading flexvolume config %q: %v", dataFilePath, err)
 		}
 		var msi map[string]interface{}

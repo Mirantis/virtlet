@@ -51,8 +51,8 @@ func (v *configVolume) cloudInitGenerator() *CloudInitGenerator {
 	return NewCloudInitGenerator(v.config, configIsoDir)
 }
 
-func (v *configVolume) Setup() (*libvirtxml.DomainDisk, error) {
-	return v.cloudInitGenerator().DiskDef(), nil
+func (v *configVolume) Setup() (*libvirtxml.DomainDisk, *libvirtxml.DomainFilesystem, error) {
+	return v.cloudInitGenerator().DiskDef(),nil, nil
 }
 
 func (v *configVolume) WriteImage(volumeMap diskPathMap) error {

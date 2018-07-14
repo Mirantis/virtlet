@@ -330,12 +330,11 @@ func (v *VirtualizationTool) CreateContainer(config *types.VMConfig, netFdKey st
 	}
 
 	domainDef := settings.createDomain(config)
-
 	diskList, err := newDiskList(config, v.volumeSource, v)
 	if err != nil {
 		return "", err
 	}
-	domainDef.Devices.Disks, err = diskList.setup()
+	domainDef.Devices.Disks, domainDef.Devices.Filesystems, err = diskList.setup()
 	if err != nil {
 		return "", err
 	}
@@ -564,10 +563,10 @@ func (v *VirtualizationTool) cleanupVolumes(containerID string) error {
 		err = diskList.teardown()
 	}
 
+	var errs []string
 	if err != nil {
 		glog.Errorf("Volume teardown failed for domain %q: %v", containerID, err)
-		return err
-
+		errs = append(errs, err.Error())
 	}
 
 	return nil
@@ -832,6 +831,9 @@ func (v *VirtualizationTool) RawDevices() []string { return v.config.RawDevices 
 
 // KubeletRootDir implements volumeOwner KubeletRootDir method
 func (v *VirtualizationTool) KubeletRootDir() string { return v.config.KubeletRootDir }
+
+// KubeletRootDir implements volumeOwner VolumePoolName method
+func (v *VirtualizationTool) VolumePoolName() string { return v.config.VolumePoolName }
 
 func filterContainer(containerInfo *types.ContainerInfo, filter types.ContainerFilter) bool {
 	if filter.Id != "" && containerInfo.Id != filter.Id {
