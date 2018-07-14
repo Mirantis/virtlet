@@ -16,7 +16,8 @@ limitations under the License.
 
 package utils
 
+// Mounter defines mount/unmount interface
 type Mounter interface {
-	Mount(source string, target string, fstype string) error
-	Unmount(target string) error
+	Mount(source string, target string, fstype string, flags uintptr) error
+	Unmount(target string, flags int) error
 }

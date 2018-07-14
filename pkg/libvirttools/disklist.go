@@ -32,14 +32,16 @@ type diskItem struct {
 	volume VMVolume
 }
 
-func (di *diskItem) setup(config *types.VMConfig) (*libvirtxml.DomainDisk, error) {
-	diskDef, err := di.volume.Setup()
+func (di *diskItem) setup(config *types.VMConfig) (*libvirtxml.DomainDisk, *libvirtxml.DomainFilesystem, error) {
+	diskDef, fsDef, err := di.volume.Setup()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	diskDef.Target = di.driver.target()
-	diskDef.Address = di.driver.address()
-	return diskDef, nil
+	if diskDef != nil {
+		diskDef.Target = di.driver.target()
+		diskDef.Address = di.driver.address()
+	}
+	return diskDef, fsDef, nil
 }
 
 type diskList struct {
@@ -72,11 +74,12 @@ func newDiskList(config *types.VMConfig, source VMVolumeSource, owner volumeOwne
 }
 
 // setup performs the setup procedure on each volume in the diskList
-// and returns a list of libvirtxml DomainDisk structs
-func (dl *diskList) setup() ([]libvirtxml.DomainDisk, error) {
+// and returns a list of libvirtxml DomainDisk and domainFileSystems structs
+func (dl *diskList) setup() ([]libvirtxml.DomainDisk, []libvirtxml.DomainFilesystem, error) {
 	var domainDisks []libvirtxml.DomainDisk
+	var domainFileSystems []libvirtxml.DomainFilesystem
 	for n, item := range dl.items {
-		diskDef, err := item.setup(dl.config)
+		diskDef, fsDef, err := item.setup(dl.config)
 		if err != nil {
 			// try to tear down volumes that were already set up
 			for _, item := range dl.items[:n] {
@@ -84,11 +87,16 @@ func (dl *diskList) setup() ([]libvirtxml.DomainDisk, error) {
 					glog.Warningf("Failed to tear down a volume on error: %v", err)
 				}
 			}
-			return nil, err
+			return nil, nil, err
 		}
-		domainDisks = append(domainDisks, *diskDef)
+		if diskDef != nil {
+			domainDisks = append(domainDisks, *diskDef)
+		}
+		if fsDef != nil {
+			domainFileSystems = append(domainFileSystems, *fsDef)
+		}
 	}
-	return domainDisks, nil
+	return domainDisks, domainFileSystems, nil
 }
 
 // writeImages writes images for volumes that are based on generated

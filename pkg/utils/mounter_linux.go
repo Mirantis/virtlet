@@ -24,14 +24,15 @@ type mounter struct{}
 
 var _ Mounter = &mounter{}
 
-func NewMounter() *mounter {
+// NewMounter creates linux mounter struct
+func NewMounter() Mounter {
 	return &mounter{}
 }
 
-func (mounter *mounter) Mount(source string, target string, fstype string) error {
-	return syscall.Mount(source, target, fstype, syscall.MS_BIND|syscall.MS_REC, "")
+func (mounter *mounter) Mount(source string, target string, fstype string, flags uintptr) error {
+	return syscall.Mount(source, target, fstype, flags, "")
 }
 
-func (mounter *mounter) Unmount(target string) error {
-	return syscall.Unmount(target, 0)
+func (mounter *mounter) Unmount(target string, flags int) error {
+	return syscall.Unmount(target, flags)
 }
