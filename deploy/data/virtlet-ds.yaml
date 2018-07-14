@@ -185,6 +185,7 @@ spec:
           mountPath: /dev
         - mountPath: /var/lib/virtlet
           name: virtlet
+          mountPropagation: Bidirectional
         - mountPath: /var/lib/libvirt
           name: libvirt
         - mountPath: /var/run/libvirt
@@ -219,10 +220,14 @@ spec:
         volumeMounts:
         - mountPath: /var/lib/virtlet
           name: virtlet
+          mountPropagation: HostToContainer
         - mountPath: /var/lib/libvirt
           name: libvirt
         - name: vms-log
           mountPath: /var/log/vms
+        - mountPath: /var/lib/kubelet/pods
+          name: k8s-pods-dir
+          mountPropagation: HostToContainer
         - name: dev
           mountPath: /dev
         - name: modules

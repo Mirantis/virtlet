@@ -19,6 +19,7 @@ package libvirttools
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -228,6 +229,7 @@ type VirtualizationTool struct {
 	clock         clockwork.Clock
 	volumeSource  VMVolumeSource
 	config        VirtualizationConfig
+	fsVolumeList  *filesystemList
 }
 
 var _ volumeOwner = &VirtualizationTool{}
@@ -330,6 +332,13 @@ func (v *VirtualizationTool) CreateContainer(config *types.VMConfig, netFdKey st
 	}
 
 	domainDef := settings.createDomain(config)
+	fsList, err := newFilesystemList(config, v.config)
+	if err != nil {
+		glog.Errorf("Failed to new FS List: %v", err)
+		return "", err
+	}
+	v.fsVolumeList = fsList
+	domainDef.Devices.Filesystems, err = fsList.setup()
 
 	diskList, err := newDiskList(config, v.volumeSource, v)
 	if err != nil {
@@ -350,6 +359,9 @@ func (v *VirtualizationTool) CreateContainer(config *types.VMConfig, netFdKey st
 		}
 		if err := diskList.teardown(); err != nil {
 			glog.Warningf("error tearing down volumes after an error: %v", err)
+		}
+		if err := fsList.teardown(); err != nil {
+			glog.Warningf("error tearing down fs volumes after an error: %v", err)
 		}
 	}()
 
@@ -564,10 +576,17 @@ func (v *VirtualizationTool) cleanupVolumes(containerID string) error {
 		err = diskList.teardown()
 	}
 
+	var errs []string
 	if err != nil {
 		glog.Errorf("Volume teardown failed for domain %q: %v", containerID, err)
-		return err
+		errs = append(errs, err.Error())
+	}
 
+	err = v.fsVolumeList.teardown()
+	if err != nil {
+		glog.Errorf("Fs Volume teardown failed for domain %q: %v", containerID, err)
+		errs = append(errs, err.Error())
+		return fmt.Errorf("%v", strings.Join(errs, "\n"))
 	}
 
 	return nil
@@ -609,6 +628,9 @@ func (v *VirtualizationTool) removeDomain(containerID string, config *types.VMCo
 	diskList, err := newDiskList(config, v.volumeSource, v)
 	if err == nil {
 		err = diskList.teardown()
+	}
+	if err == nil {
+		err = v.fsVolumeList.teardown()
 	}
 
 	switch {

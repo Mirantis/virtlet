@@ -39,6 +39,10 @@
           <address type="pci" domain="0x0000" bus="0x00" slot="0x01" function="0x0"></address>
         </controller>
         <controller type="pci" model="pci-root"></controller>
+        <filesystem type="mount" accessmode="squash">
+          <source dir="/var/lib/virtlet/volumes/231700d5-c9a6-5a49-738d-99a954c51550"></source>
+          <target dir="virtletShared"></target>
+        </filesystem>
         <serial type="unix">
           <source mode="connect" path="/var/lib/libvirt/streamer.sock">
             <reconnect enabled="yes" timeout="1"></reconnect>

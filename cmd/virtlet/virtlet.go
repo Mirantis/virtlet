@@ -86,7 +86,7 @@ func runTapManager(config *v1.VirtletConfig) {
 		glog.Errorf("FD server returned error: %v", err)
 		os.Exit(1)
 	}
-	if err := libvirttools.ChownForEmulator(*config.FDServerSocketPath); err != nil {
+	if err := libvirttools.ChownForEmulator(*config.FDServerSocketPath, false); err != nil {
 		glog.Warningf("Couldn't set tapmanager socket permissions: %v", err)
 	}
 	for {
