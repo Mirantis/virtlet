@@ -255,7 +255,7 @@ kubernetes objects. In order to do so, one uses `VirtletSSHKeySource` annotation
 As for the user-data, `kind` is one of `configmap`, `secret`, `name` is the name of resource and `key` is the key name in that resource
 containing SSH keys in the same format in `VirtletSSHKeys`. The `key` part is optional. When using `kind/name` annotation (without `key`),
 `virtlet` will look for the `authorized_keys` key. As with the `user-data` `VirtletSSHKeys` keys are going to be appended to those from
-`VirtletSSHKeySource` unless it is set to overwrite them by `VirtletCloudInitUserData: "true"`.
+`VirtletSSHKeySource` unless it is set to overwrite them by `VirtletCloudInitUserDataOverwrite: "true"`.
 
 ## <a name="workarounds"></a>Workarounds for volume mounting
 
