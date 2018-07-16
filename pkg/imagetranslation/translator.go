@@ -180,7 +180,7 @@ func (t *imageNameTranslator) Translate(name string) image.Endpoint {
 			}
 			re, err := regexp.Compile(r.Regex)
 			if err != nil {
-				glog.V(2).Infof("invalid regexp in image translation config: ", r.Regex)
+				glog.V(2).Infof("invalid regexp in image translation config: %q", r.Regex)
 				continue
 			}
 			submatchIndexes := re.FindStringSubmatchIndex(unprefixedName)
