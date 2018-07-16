@@ -163,7 +163,7 @@ As of now, there's no need to mount volumes into the container, it's enough to d
 #### Supported features of RBD Volume definition
 
 ```
-- FlexVolume Driver name: kubernetes.io/flexvolume_driver
+- FlexVolume Driver name: virtlet/flexvolume_driver
 - type: ceph
 - monitor: <ip:port>
 - user: <user-name>
@@ -202,7 +202,7 @@ spec:
   volumes:
     - name: test
       flexVolume:
-        driver: kubernetes.io/flexvolume_driver
+        driver: virtlet/flexvolume_driver
         options:
           type: ceph
           monitor: 10.192.0.1:6789
