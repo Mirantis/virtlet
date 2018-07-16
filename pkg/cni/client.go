@@ -166,7 +166,7 @@ func handleAddSandboxToNetwork(arg interface{}) (interface{}, error) {
 		glog.V(3).Infof("AddSandboxToNetwork: PodID %q, PodName %q, PodNs %q: result:\n%s",
 			req.PodID, req.PodName, req.PodNs, spew.Sdump(result))
 	} else {
-		glog.V(3).Infof("AddSandboxToNetwork: PodID %q, PodName %q, PodNs %q: error: %v",
+		glog.Errorf("AddSandboxToNetwork: PodID %q, PodName %q, PodNs %q: error: %v",
 			req.PodID, req.PodName, req.PodNs, err)
 		return nil, err
 	}
@@ -190,7 +190,7 @@ func handleRemoveSandboxFromNetwork(arg interface{}) (interface{}, error) {
 		glog.V(3).Infof("RemoveSandboxFromNetwork: PodID %q, PodName %q, PodNs %q: success",
 			req.PodID, req.PodName, req.PodNs)
 	} else {
-		glog.V(3).Infof("RemoveSandboxFromNetwork: PodID %q, PodName %q, PodNs %q: error: %v",
+		glog.Errorf("RemoveSandboxFromNetwork: PodID %q, PodName %q, PodNs %q: error: %v",
 			req.PodID, req.PodName, req.PodNs, err)
 	}
 	return nil, err
