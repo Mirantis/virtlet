@@ -504,7 +504,8 @@ func (c *FDClient) AddFDs(key string, data interface{}) ([]byte, error) {
 		return nil, err
 	}
 	if respHdr.getKey() != key {
-		return nil, fmt.Errorf("fd key mismatch in the server response")
+		return nil, fmt.Errorf("fd key mismatch in the server response, expect %q, cur %q",
+			key, respHdr.getKey())
 	}
 	return respData, nil
 }
