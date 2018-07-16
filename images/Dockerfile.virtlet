@@ -13,6 +13,7 @@ COPY _output/flexvolume_driver /
 # in build/test image and production one
 COPY _output/virtlet /usr/local/bin
 COPY _output/virtletctl /usr/local/bin
+COPY _output/virtlet-longevity-tests /usr/local/bin
 COPY _output/vmwrapper /
 COPY _output/virtlet-e2e-tests /
 
