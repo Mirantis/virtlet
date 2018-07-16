@@ -45,6 +45,10 @@ func main() {
 		instances = append(instances, longevity.GetStressTests(controller)...)
 	}
 
+	if len(instances) == 0 {
+		glog.Fatal("No tests selected. Quitting...")
+	}
+
 	err = longevity.Run(controller, instances)
 	if err != nil {
 		glog.Fatal(err)
