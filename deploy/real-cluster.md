@@ -4,7 +4,7 @@ For Virtlet to work, the following prerequisites have to be fulfilled
 on the nodes which will run them:
 
 1. Node names must be resolvable via DNS configured on the nodes
-1. AppArmor and SELinux must be disabled on the nodes
+1. SELinux must be disabled on the nodes (apparmor is currently supported)
 1. Kubernetes 1.8 and 1.9 must have the MountPropagation=true feature gate enabled in API server and on all kubelet instances
 
 Virtlet deployment consists of preparing the nodes and then deploying
@@ -20,6 +20,11 @@ please follow the steps from its
 Repeat it on each node that's going to run Virtlet.
 
 # Deploying Virtlet DaemonSet
+
+## Applying apparmor profiles
+Follow [this guide](apparmor/README.md) if you deploy
+the Virtlet DaemonSet on an apparmor-enabled environment.
+##
 
 First, you need to apply `extraRuntime=virtlet` label to each node that will run Virtlet DaemonSet (replace `XXXXXX` with the node name):
 ```bash
