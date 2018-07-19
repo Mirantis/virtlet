@@ -19,6 +19,7 @@ package manager
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
@@ -227,7 +228,7 @@ func ContainerInfoToCRIContainerStatus(in *types.ContainerInfo) *kubeapi.Contain
 		Labels:      in.Config.ContainerLabels,
 		Annotations: in.Config.ContainerAnnotations,
 		Mounts:      mounts,
-		LogPath:     in.Config.LogPath,
+		LogPath:     filepath.Join(in.Config.LogDirectory, in.Config.LogPath),
 		// TODO: FinishedAt, Reason, Message
 	}
 }
