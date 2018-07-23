@@ -28,6 +28,18 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
+const (
+	sizeOfIfReq = 40
+	ifnamsiz    = 16
+)
+
+// Had to duplicate ifReq here as it's not exported
+type ifReq struct {
+	Name  [ifnamsiz]byte
+	Flags uint16
+	pad   [sizeOfIfReq - ifnamsiz - 2]byte
+}
+
 // OpenTAP opens a tap device and returns an os.File for it
 func OpenTAP(devName string) (*os.File, error) {
 	tapFile, err := os.OpenFile("/dev/net/tun", os.O_RDWR, 0)

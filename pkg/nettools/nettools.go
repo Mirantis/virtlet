@@ -37,12 +37,10 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"sort"
 
 	"github.com/containernetworking/cni/pkg/ns"
@@ -54,7 +52,6 @@ import (
 
 	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/network"
-	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 const (
@@ -63,17 +60,7 @@ const (
 	loopbackInterfaceName       = "lo"
 	// Address for dhcp server internal interface
 	internalDhcpAddr = "169.254.254.2/24"
-
-	sizeOfIfReq = 40
-	ifnamsiz    = 16
 )
-
-// Had to duplicate ifReq here as it's not exported
-type ifReq struct {
-	Name  [ifnamsiz]byte
-	Flags uint16
-	pad   [sizeOfIfReq - ifnamsiz - 2]byte
-}
 
 func makeVethPair(name, peer string, mtu int) (netlink.Link, error) {
 	veth := &netlink.Veth{
@@ -557,172 +544,66 @@ func SetHardwareAddr(link netlink.Link, hwAddr net.HardwareAddr) error {
 	return nil
 }
 
-// verify if device is pci virtual function (in the same way as does
-// that libvirt (src/util/virpci.c:virPCIIsVirtualFunction)
-func isSriovVf(link netlink.Link) bool {
-	_, err := os.Stat(filepath.Join("/sys/class/net", link.Attrs().Name, "device/physfn"))
-	return err == nil
-}
+func setupTapAndGetInterfaceDescription(link netlink.Link, nsPath string, ifaceNo int) (*network.InterfaceDescription, error) {
+	hwAddr := link.Attrs().HardwareAddr
+	ifaceName := link.Attrs().Name
 
-func getPCIAddressOfVF(devName string) (string, error) {
-	linkDestination, err := os.Readlink(filepath.Join("/sys/class/net", devName, "device"))
-	if err != nil {
-		return "", err
+	mtu := link.Attrs().MTU
+
+	newHwAddr, err := GenerateMacAddress()
+	if err == nil {
+		err = SetHardwareAddr(link, newHwAddr)
 	}
-	if linkDestination[:13] != "../../../0000" {
-		return "", fmt.Errorf("unknown address as device symlink: %q", linkDestination)
-	}
-	// we need pci address without leading "../../../"
-	return linkDestination[9:], nil
-}
-
-func getDevNameByPCIAddress(address string) (string, error) {
-	desiredLinkLocation := "../../../" + address
-	devices, err := ioutil.ReadDir("/sys/class/net")
-	if err != nil {
-		return "", err
-	}
-	for _, fi := range devices {
-		// skip entries in /sys/class/net which are not directories
-		// with "device" entry (example: bonding_masters)
-		devPath := filepath.Join("/sys/class/net", fi.Name(), "device")
-		if _, err := os.Stat(devPath); err != nil {
-			continue
-		}
-
-		linkDestination, err := os.Readlink(devPath)
-		if err != nil {
-			return "", err
-		}
-		if linkDestination == desiredLinkLocation {
-			return fi.Name(), nil
-		}
-	}
-	return "", fmt.Errorf("can't find network device with pci address %q", address)
-}
-
-func unbindDriverFromDevice(pciAddress string) error {
-	return ioutil.WriteFile(
-		filepath.Join("/sys/bus/pci/devices", pciAddress, "driver/unbind"),
-		[]byte(pciAddress),
-		0200,
-	)
-}
-
-func getDeviceIdentifier(pciAddress string) (string, error) {
-	devDir := filepath.Join("/sys/bus/pci/devices", pciAddress)
-
-	vendor, err := ioutil.ReadFile(filepath.Join(devDir, "vendor"))
-	if err != nil {
-		return "", err
-	}
-
-	devID, err := ioutil.ReadFile(filepath.Join(devDir, "device"))
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("%s %s", vendor, devID), nil
-}
-
-func rebindDriverToDevice(pciAddress string) error {
-	return ioutil.WriteFile(
-		"/sys/bus/pci/drivers_probe",
-		[]byte(pciAddress),
-		0200,
-	)
-}
-
-func bindDeviceToVFIO(devIdentifier string) error {
-	return ioutil.WriteFile(
-		"/sys/bus/pci/drivers/vfio-pci/new_id",
-		[]byte(devIdentifier),
-		0200,
-	)
-}
-
-func getVirtFNNo(pciAddress string) (int, error) {
-	for i := 0; ; i++ {
-		dest, err := os.Readlink(
-			filepath.Join("/sys/bus/pci/devices", pciAddress, "physfn",
-				fmt.Sprintf("virtfn%d", i),
-			),
-		)
-		if err != nil {
-			return 0, err
-		}
-		if dest[3:] == pciAddress {
-			return i, nil
-		}
-	}
-}
-
-func getMasterLinkOfVf(pciAddress string) (netlink.Link, error) {
-	dest, err := os.Readlink(filepath.Join("/sys/bus/pci/devices", pciAddress, "physfn"))
-	if err != nil {
-		return nil, err
-	}
-	masterDev, err := getDevNameByPCIAddress(dest[3:])
-	if err != nil {
-		return nil, err
-	}
-	masterLink, err := netlink.LinkByName(masterDev)
 	if err != nil {
 		return nil, err
 	}
 
-	return masterLink, nil
-}
-
-// setMacAndVlanOnVf uses VF pci address to locate its parent device and uses
-// it to set mac address and VLAN id on VF.  It needs to be called from the host netns.
-func setMacAndVlanOnVf(pciAddress string, mac net.HardwareAddr, vlanID int) error {
-	virtFNNo, err := getVirtFNNo(pciAddress)
+	tapInterfaceName := fmt.Sprintf(tapInterfaceNameTemplate, ifaceNo)
+	tap, err := CreateTAP(tapInterfaceName, mtu)
 	if err != nil {
-		return fmt.Errorf("cannot find VF number for device with pci address %q: %v", pciAddress, err)
-	}
-	masterLink, err := getMasterLinkOfVf(pciAddress)
-	if err != nil {
-		return fmt.Errorf("cannot get link for PF of VF with pci address %q: %v", pciAddress, err)
-	}
-	if err := netlink.LinkSetVfHardwareAddr(masterLink, virtFNNo, mac); err != nil {
-		return fmt.Errorf("cannot set mac address of VF with pci address %q: %v", pciAddress, err)
-	}
-	err = netlink.LinkSetVfVlan(masterLink, virtFNNo, vlanID)
-	if err != nil {
-		return fmt.Errorf("cannot set vlan of VF with pci address %q: %v", pciAddress, err)
-	}
-	return nil
-}
-
-func getVfVlanID(pciAddress string) (int, error) {
-	virtFNNo, err := getVirtFNNo(pciAddress)
-	if err != nil {
-		return 0, err
-	}
-	masterLink, err := getMasterLinkOfVf(pciAddress)
-	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	// vfinfos are gathered using `ip link show` because of failure in vishvananda/netlink
-	// which is occuring for bigger netlink queries like one asking for list ov VFs of an interface.
-	iplinkOutput, err := exec.Command("ip", "link", "show", masterLink.Attrs().Name).CombinedOutput()
+	containerBridgeName := fmt.Sprintf(containerBridgeNameTemplate, ifaceNo)
+	br, err := SetupBridge(containerBridgeName, []netlink.Link{link, tap})
 	if err != nil {
-		return 0, fmt.Errorf("error during execution of ip link show: %q\nOutput:%s", err, iplinkOutput)
-	}
-	vfinfos, err := utils.ParseIPLinkOutput(iplinkOutput)
-	if err != nil {
-		return 0, fmt.Errorf("error during parsing ip link output for device %q: %v",
-			masterLink.Attrs().Name, err)
+		return nil, fmt.Errorf("failed to create bridge: %v", err)
 	}
 
-	for _, vfInfo := range vfinfos {
-		if vfInfo.ID == virtFNNo {
-			return int(vfInfo.VLanID), nil
-		}
+	if err := netlink.AddrAdd(br, mustParseAddr(internalDhcpAddr)); err != nil {
+		return nil, fmt.Errorf("failed to set address for the bridge: %v", err)
 	}
-	return 0, fmt.Errorf("vlan info for %d vf on %s not found", virtFNNo, masterLink.Attrs().Name)
+
+	// Add ebtables DHCP blocking rules
+	if err := updateEbTables(nsPath, ifaceName, "-A"); err != nil {
+		return nil, err
+	}
+
+	// Work around bridge MAC learning problem
+	// https://ubuntuforums.org/showthread.php?t=2329373&s=cf580a41179e0f186ad4e625834a1d61&p=13511965#post13511965
+	// (affects Flannel)
+	if err := disableMacLearning(nsPath, containerBridgeName); err != nil {
+		return nil, err
+	}
+
+	if err := bringUpLoopback(); err != nil {
+		return nil, err
+	}
+
+	glog.V(3).Infof("Opening tap interface %q for link %q", tapInterfaceName, ifaceName)
+	fo, err := OpenTAP(tapInterfaceName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open tap: %v", err)
+	}
+	glog.V(3).Infof("Adding interface %q as %q", ifaceName, tapInterfaceName)
+
+	return &network.InterfaceDescription{
+		Type:         network.InterfaceTypeTap,
+		Name:         ifaceName,
+		Fo:           fo,
+		HardwareAddr: hwAddr,
+		MTU:          uint16(mtu),
+	}, nil
 }
 
 // SetupContainerSideNetwork sets up networking in container
@@ -748,130 +629,26 @@ func SetupContainerSideNetwork(info *cnicurrent.Result, nsPath string, allLinks 
 			return nil, fmt.Errorf("missing link #%d in the container network namespace (Virtlet pod restarted?)", i)
 		}
 
-		hwAddr := link.Attrs().HardwareAddr
-		ifaceName := link.Attrs().Name
-		pciAddress := ""
-		vlanID := 0
-		var ifaceType network.InterfaceType
-		var fo *os.File
-
-		mtu := link.Attrs().MTU
-
 		if err := StripLink(link); err != nil {
 			return nil, err
 		}
+
+		var ifDesc *network.InterfaceDescription
 
 		if isSriovVf(link) {
 			if !enableSriov {
 				return nil, fmt.Errorf("SR-IOV device configured in container network namespace while Virtlet is configured with disabled SR-IOV support")
 			}
-
-			ifaceType = network.InterfaceTypeVF
-
-			pciAddress, err = getPCIAddressOfVF(ifaceName)
-			if err != nil {
+			if ifDesc, err = setupSriovAndGetInterfaceDescription(link, hostNS); err != nil {
 				return nil, err
 			}
-
-			// tapmanager protocol needs a file descriptor in Fo field
-			// but SR-IOV part is not using it at all, so set it to
-			// new file descriptor with /dev/null opened
-			fo, err = os.Open("/dev/null")
-			if err != nil {
-				return nil, err
-			}
-
-			// Switch to the host netns to get VLAN ID of the VF using its master device.
-			if err := utils.CallInNetNSWithSysfsRemounted(hostNS, func(ns.NetNS) error {
-				var err error
-				vlanID, err = getVfVlanID(pciAddress)
-				return err
-			}); err != nil {
-				return nil, err
-			}
-
-			if err := unbindDriverFromDevice(pciAddress); err != nil {
-				return nil, err
-			}
-
-			devIdentifier, err := getDeviceIdentifier(pciAddress)
-			if err != nil {
-				return nil, err
-			}
-
-			if err := bindDeviceToVFIO(devIdentifier); err != nil {
-				return nil, err
-			}
-
-			// Switch to the host netns to set mac address and VLAN id
-			// of VF using its master device.
-			if err := utils.CallInNetNSWithSysfsRemounted(hostNS, func(ns.NetNS) error {
-				return setMacAndVlanOnVf(pciAddress, hwAddr, vlanID)
-			}); err != nil {
-				return nil, err
-			}
-
-			glog.V(3).Infof("Adding interface %q as VF on %s address", ifaceName, pciAddress)
 		} else {
-			newHwAddr, err := GenerateMacAddress()
-			if err == nil {
-				err = SetHardwareAddr(link, newHwAddr)
-			}
-			if err != nil {
+			if ifDesc, err = setupTapAndGetInterfaceDescription(link, nsPath, i); err != nil {
 				return nil, err
 			}
-
-			ifaceType = network.InterfaceTypeTap
-
-			tapInterfaceName := fmt.Sprintf(tapInterfaceNameTemplate, i)
-			tap, err := CreateTAP(tapInterfaceName, mtu)
-			if err != nil {
-				return nil, err
-			}
-
-			containerBridgeName := fmt.Sprintf(containerBridgeNameTemplate, i)
-			br, err := SetupBridge(containerBridgeName, []netlink.Link{link, tap})
-			if err != nil {
-				return nil, fmt.Errorf("failed to create bridge: %v", err)
-			}
-
-			if err := netlink.AddrAdd(br, mustParseAddr(internalDhcpAddr)); err != nil {
-				return nil, fmt.Errorf("failed to set address for the bridge: %v", err)
-			}
-
-			// Add ebtables DHCP blocking rules
-			if err := updateEbTables(nsPath, ifaceName, "-A"); err != nil {
-				return nil, err
-			}
-
-			// Work around bridge MAC learning problem
-			// https://ubuntuforums.org/showthread.php?t=2329373&s=cf580a41179e0f186ad4e625834a1d61&p=13511965#post13511965
-			// (affects Flannel)
-			if err := disableMacLearning(nsPath, containerBridgeName); err != nil {
-				return nil, err
-			}
-
-			if err := bringUpLoopback(); err != nil {
-				return nil, err
-			}
-
-			glog.V(3).Infof("Opening tap interface %q for link %q", tapInterfaceName, ifaceName)
-			fo, err = OpenTAP(tapInterfaceName)
-			if err != nil {
-				return nil, fmt.Errorf("failed to open tap: %v", err)
-			}
-			glog.V(3).Infof("Adding interface %q as %q", ifaceName, tapInterfaceName)
 		}
 
-		interfaces = append(interfaces, &network.InterfaceDescription{
-			Type:         ifaceType,
-			Name:         ifaceName,
-			Fo:           fo,
-			HardwareAddr: hwAddr,
-			PCIAddress:   pciAddress,
-			MTU:          uint16(mtu),
-			VlanID:       vlanID,
-		})
+		interfaces = append(interfaces, ifDesc)
 	}
 
 	return &network.ContainerSideNetwork{info, nsPath, interfaces}, nil
@@ -1066,59 +843,6 @@ func Teardown(csn *network.ContainerSideNetwork) error {
 	return nil
 }
 
-// ReconstructVFs iterates over stored PCI addresses, rebinding each
-// corresponding interface to its host driver, changing its MAC address and name
-// to the values stored in csn and then moving it into the container namespace
-func ReconstructVFs(csn *network.ContainerSideNetwork, netns ns.NetNS, ignoreUnbind bool) error {
-	for _, iface := range csn.Interfaces {
-		if iface.Type != network.InterfaceTypeVF {
-			continue
-		}
-		if err := unbindDriverFromDevice(iface.PCIAddress); err != nil {
-			if ignoreUnbind != true {
-				return err
-			}
-		}
-		if err := rebindDriverToDevice(iface.PCIAddress); err != nil {
-			return err
-		}
-		devName, err := getDevNameByPCIAddress(iface.PCIAddress)
-		if err != nil {
-			return err
-		}
-		if err := setMacAndVlanOnVf(iface.PCIAddress, iface.HardwareAddr, iface.VlanID); err != nil {
-			return err
-		}
-		link, err := netlink.LinkByName(devName)
-		if err != nil {
-			return fmt.Errorf("can't find link with name %q: %v", devName, err)
-		}
-		tmpName, err := RandomVethName()
-		if err != nil {
-			return err
-		}
-		if err := netlink.LinkSetName(link, tmpName); err != nil {
-			return fmt.Errorf("can't set random name %q on interface %q: %v", tmpName, iface.Name, err)
-		}
-		if link, err = netlink.LinkByName(tmpName); err != nil {
-			return fmt.Errorf("can't reread link info: %v", err)
-		}
-		if err := netlink.LinkSetNsFd(link, int(netns.Fd())); err != nil {
-			return fmt.Errorf("can't move link %q to netns %q: %v", iface.Name, netns.Path(), err)
-		}
-		if err := netns.Do(func(ns.NetNS) error {
-			if err := netlink.LinkSetName(link, iface.Name); err != nil {
-				return fmt.Errorf("can't rename device %q to %q: %v", devName, iface.Name, err)
-			}
-			return nil
-		}); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // GenerateMacAddress returns a random locally administrated unicast
 // hardware address.
 // Copied from:
@@ -1136,150 +860,4 @@ func GenerateMacAddress() (net.HardwareAddr, error) {
 	}
 
 	return mac, nil
-}
-
-var calicoGatewayIP = net.IP{169, 254, 1, 1}
-
-// DetectCalico checks if the specified link in the current network
-// namespace is configured by Calico. It returns two boolean values
-// where the first one denotes whether Calico is used for the specified
-// link and the second one denotes whether Calico's default route
-// needs to be used. This approach is needed for multiple CNI use case
-// when the types of individual CNI plugins are not available.
-func DetectCalico(link netlink.Link) (bool, bool, error) {
-	haveCalico, haveCalicoGateway := false, false
-	routes, err := netlink.RouteList(link, FAMILY_V4)
-	if err != nil {
-		return false, false, fmt.Errorf("failed to list routes: %v", err)
-	}
-	for _, route := range routes {
-		switch {
-		case route.Protocol == RTPROT_KERNEL:
-			// route created by kernel
-		case route.LinkIndex == link.Attrs().Index && route.Gw == nil && route.Dst.IP.Equal(calicoGatewayIP):
-			haveCalico = true
-		case (route.Dst == nil || route.Dst.IP == nil) && route.Gw.Equal(calicoGatewayIP):
-			haveCalicoGateway = true
-		}
-	}
-	return haveCalico, haveCalico && haveCalicoGateway, nil
-}
-
-func getLinkForIPConfig(netConfig *cnicurrent.Result, ipConfigIndex int) (netlink.Link, error) {
-	if ipConfigIndex > len(netConfig.IPs) {
-		return nil, fmt.Errorf("ip config index out of range: %d", ipConfigIndex)
-	}
-
-	ipConfig := netConfig.IPs[ipConfigIndex]
-	if ipConfig.Interface >= len(netConfig.Interfaces) {
-		return nil, errors.New("interface index out of range in the CNI result")
-	}
-
-	if ipConfig.Version != "4" {
-		return nil, errors.New("skipping non-IPv4 config")
-	}
-
-	iface := netConfig.Interfaces[ipConfig.Interface]
-	if iface.Sandbox == "" {
-		return nil, errors.New("error: IP config has non-sandboxed interface")
-	}
-
-	link, err := netlink.LinkByName(iface.Name)
-	if err != nil {
-		return nil, fmt.Errorf("can't get link %q: %v", iface.Name, err)
-	}
-
-	return link, nil
-}
-
-func getDummyGateway(dummyNetwork *cnicurrent.Result) (net.IP, error) {
-	for n, ipConfig := range dummyNetwork.IPs {
-		var haveCalico bool
-		link, err := getLinkForIPConfig(dummyNetwork, n)
-		if err == nil {
-			haveCalico, _, err = DetectCalico(link)
-		}
-		if err != nil {
-			glog.Warningf("Calico fix: dummy network: skipping link for config %d: %v", n, err)
-			continue
-		}
-		if haveCalico {
-			return ipConfig.Address.IP, nil
-		}
-	}
-	return nil, errors.New("Calico fix: couldn't find dummy gateway")
-}
-
-// FixCalicoNetworking updates netConfig to make Calico work with
-// Virtlet's DHCP-server based scheme. It does so by throwing away
-// Calico's gateway and dev route and using a fake gateway instead.
-// The fake gateway provided by getDummyGateway() is just an IP
-// address allocated by Calico IPAM, it's needed for proper ARP
-// responses for VMs.
-// This function must be called from within the container network
-// namespace.
-func FixCalicoNetworking(netConfig *cnicurrent.Result, calicoSubnetSize int, getDummyNetwork func() (*cnicurrent.Result, string, error)) error {
-	for n, ipConfig := range netConfig.IPs {
-		link, err := getLinkForIPConfig(netConfig, n)
-		if err != nil {
-			glog.Warningf("Calico fix: skipping link for config %d: %v", n, err)
-			continue
-		}
-		haveCalico, haveCalicoGateway, err := DetectCalico(link)
-		if err != nil {
-			return err
-		}
-		if !haveCalico {
-			continue
-		}
-		ipConfig.Address.Mask = net.CIDRMask(calicoSubnetSize, 32)
-		if haveCalicoGateway {
-			dummyNetwork, nsPath, err := getDummyNetwork()
-			if err != nil {
-				return err
-			}
-			dummyNS, err := ns.GetNS(nsPath)
-			if err != nil {
-				return err
-			}
-			if err := dummyNS.Do(func(ns.NetNS) error {
-				allLinks, err := netlink.LinkList()
-				if err != nil {
-					return fmt.Errorf("failed to list links inside the dummy netns: %v", err)
-				}
-				dummyNetwork, err := ValidateAndFixCNIResult(dummyNetwork, nsPath, allLinks)
-				if err != nil {
-					return err
-				}
-				dummyGateway, err := getDummyGateway(dummyNetwork)
-				if err != nil {
-					return err
-				}
-				ipConfig.Gateway = dummyGateway
-				return nil
-			}); err != nil {
-				return err
-			}
-
-			var newRoutes []*cnitypes.Route
-			// remove the default gateway
-			for _, r := range netConfig.Routes {
-				if r.Dst.Mask != nil {
-					ones, _ := r.Dst.Mask.Size()
-					if ones == 0 {
-						continue
-					}
-				}
-				newRoutes = append(newRoutes, r)
-			}
-			netConfig.Routes = append(newRoutes, &cnitypes.Route{
-				Dst: net.IPNet{
-					IP:   net.IP{0, 0, 0, 0},
-					Mask: net.IPMask{0, 0, 0, 0},
-				},
-				GW: ipConfig.Gateway,
-			})
-		}
-	}
-	return nil
 }
