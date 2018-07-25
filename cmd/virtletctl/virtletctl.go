@@ -36,6 +36,7 @@ func newRootCmd() *cobra.Command {
                         virtletctl provides a number of utilities for Virtet-enabled
                         Kubernetes cluster.`),
 	}
+	cmd.DisableAutoGenTag = true
 
 	clientCfg := tools.BindFlags(cmd.PersistentFlags())
 	// Fix unwanted glog warnings, see
