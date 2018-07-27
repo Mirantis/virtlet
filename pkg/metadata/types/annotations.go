@@ -166,7 +166,11 @@ func (va *VirtletAnnotations) parsePodAnnotations(ns string, podAnnotations map[
 		}
 		va.CPUSetting = &cpuSetting
 	}
-	
+
+	if cpuModelStr, found := podAnnotations[cpuModel]; found {
+		va.CPUModel = CPUModelType(cpuModelStr)
+	}
+
 	if podAnnotations[cloudInitUserDataOverwriteKeyName] == "true" {
 		va.UserDataOverwrite = true
 	}
