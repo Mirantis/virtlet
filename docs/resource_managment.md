@@ -3,6 +3,20 @@
 ## CPU Model
 By default, libvirt runs QEMU with a CPU model that doesn't support nested virtualization. It's possible to change this behavior by using `VirtletCPUModel: host-model` annotation in the pod definition. You can also use `cpuModel` value in Virtlet config to override the value globally for the cluster or for a particular subset of nodes.
 
+If you are familiar with the cpu part in libvirt domain definition, you can use `VirtletLibvirtCPUSetting` annotation, the value is directly passed to libvirt after translating form yaml style. It is more flexible than usage of VirtletCPUModel as it allows to provide more detailed configuration.
+For example:
+```
+  annotations:
+    VirtletLibvirtCPUSetting: |
+      mode: custom
+      model:
+        value: Westmere
+      features:
+      - name: avx
+        policy: disable
+```
+See [cpuSetting](../examples/ubuntu-vm-with-libvirt-cpusetting.yaml) for a full example.
+
 ## Resource monitoring on the node
 As Kubelet uses cAdvisor to collect metrics about running containers and Virtlet doesn't create container per each VM, and instead spawns VMs inside Virtlet container. This leads to all the resource usage being lumped together and ascribed to Virtlet pod.
 
