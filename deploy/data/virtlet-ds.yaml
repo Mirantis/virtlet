@@ -46,7 +46,7 @@ spec:
         - name: k8s-flexvolume-plugins-dir
           mountPath: /kubelet-volume-plugins
         - name: run
-          mountPropagation: Bidirectional
+          # Don't add "mountPropagation: Bidirectional", it will lack mount entry
           mountPath: /run
         - name: dockersock
           mountPath: /var/run/docker.sock
@@ -141,8 +141,8 @@ spec:
           name: boot
           readOnly: true
         - mountPath: /run
+          # Don't add "mountPropagation: Bidirectional", it will lack mount entry
           name: run
-          mountPropagation: Bidirectional
         - mountPath: /var/lib/virtlet
           name: virtlet
         - mountPath: /var/lib/libvirt
@@ -172,8 +172,8 @@ spec:
         imagePullPolicy: IfNotPresent
         volumeMounts:
         - mountPath: /run
+          # Don't add "mountPropagation: Bidirectional", it will lack mount entry
           name: run
-          mountPropagation: Bidirectional
         # /boot and /lib/modules are required by supermin
         - mountPath: /lib/modules
           name: modules
@@ -203,6 +203,9 @@ spec:
         # needed for diagnostic purposes
         - name: libvirt-log
           mountPath: /var/log/libvirt
+        - name: netns-dir
+          mountPath: /var/run/netns
+          mountPropagation: Bidirectional
         securityContext:
           privileged: true
         readinessProbe:
@@ -280,6 +283,9 @@ spec:
       - hostPath:
           path: /var/log/pods
         name: pods-log
+      - hostPath:
+          path: /var/run/netns
+        name: netns-dir
       - configMap:
           name: virtlet-image-translations
         name: image-name-translations

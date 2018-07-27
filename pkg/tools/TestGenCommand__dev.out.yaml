@@ -50,7 +50,6 @@ spec:
           name: boot
           readOnly: true
         - mountPath: /run
-          mountPropagation: Bidirectional
           name: run
         - mountPath: /var/lib/virtlet
           name: virtlet
@@ -80,7 +79,6 @@ spec:
           privileged: true
         volumeMounts:
         - mountPath: /run
-          mountPropagation: Bidirectional
           name: run
         - mountPath: /lib/modules
           name: modules
@@ -109,6 +107,9 @@ spec:
           name: pods-log
         - mountPath: /var/log/libvirt
           name: libvirt-log
+        - mountPath: /var/run/netns
+          mountPropagation: Bidirectional
+          name: netns-dir
         - mountPath: /dind
           name: dind
       - command:
@@ -208,7 +209,6 @@ spec:
         - mountPath: /kubelet-volume-plugins
           name: k8s-flexvolume-plugins-dir
         - mountPath: /run
-          mountPropagation: Bidirectional
           name: run
         - mountPath: /var/run/docker.sock
           name: dockersock
@@ -272,6 +272,9 @@ spec:
       - hostPath:
           path: /var/log/pods
         name: pods-log
+      - hostPath:
+          path: /var/run/netns
+        name: netns-dir
       - configMap:
           name: virtlet-image-translations
         name: image-name-translations
