@@ -181,6 +181,8 @@ spec:
         - mountPath: /boot
           name: boot
           readOnly: true
+        - name: dev
+          mountPath: /dev
         - mountPath: /var/lib/virtlet
           name: virtlet
         - mountPath: /var/lib/libvirt
