@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/ghodss/yaml"
+	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
@@ -36,6 +37,7 @@ const (
 	cloudInitUserDataScriptKeyName    = "VirtletCloudInitUserDataScript"
 	cloudInitImageType                = "VirtletCloudInitImageType"
 	cpuModel                          = "VirtletCPUModel"
+	libvirtCPUSetting                 = "VirtletLibvirtCPUSetting"
 	sshKeysKeyName                    = "VirtletSSHKeys"
 	// CloudInitUserDataSourceKeyName is the name of user data source key in the pod annotations.
 	CloudInitUserDataSourceKeyName = "VirtletCloudInitUserDataSource"
@@ -89,6 +91,8 @@ type VirtletAnnotations struct {
 	SSHKeys []string
 	// DiskDriver specifies the disk driver to use.
 	DiskDriver DiskDriverName
+	// CPUSetting directly specifies the cpu to use for libvirt.
+	CPUSetting *libvirtxml.DomainCPU
 }
 
 // ExternalDataLoader is a function that loads external data that's specified
@@ -155,6 +159,14 @@ func loadAnnotations(ns string, podAnnotations map[string]string) (*VirtletAnnot
 }
 
 func (va *VirtletAnnotations) parsePodAnnotations(ns string, podAnnotations map[string]string) error {
+	if cpuSettingStr, found := podAnnotations[libvirtCPUSetting]; found {
+		var cpuSetting libvirtxml.DomainCPU
+		if err := yaml.Unmarshal([]byte(cpuSettingStr), &cpuSetting); err != nil {
+			return err
+		}
+		va.CPUSetting = &cpuSetting
+	}
+	
 	if podAnnotations[cloudInitUserDataOverwriteKeyName] == "true" {
 		va.UserDataOverwrite = true
 	}
