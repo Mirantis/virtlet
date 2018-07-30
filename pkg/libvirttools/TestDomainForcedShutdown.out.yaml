@@ -129,6 +129,7 @@
       ParsedAnnotations:
         CDImageType: nocloud
         CPUModel: ""
+        CPUSetting: null
         DiskDriver: scsi
         MetaData: null
         SSHKeys: null

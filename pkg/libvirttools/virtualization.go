@@ -148,28 +148,35 @@ func (ds *domainSettings) createDomain(config *types.VMConfig) *libvirtxml.Domai
 		},
 	}
 
-	switch ds.cpuModel {
-	case types.CPUModelHostModel:
-		// The following enables nested virtualization.
-		// In case of intel processors it requires nested=1 option
-		// for kvm_intel module. That can be passed like this:
-		// modprobe kvm_intel nested=1
-		domain.CPU = &libvirtxml.DomainCPU{
-			Mode: types.CPUModelHostModel,
-			Model: &libvirtxml.DomainCPUModel{
-				Fallback: "forbid",
-			},
-			Features: []libvirtxml.DomainCPUFeature{
-				{
-					Policy: "require",
-					Name:   "vmx",
+	// Set cpu model.
+	// If user understand the cpu definition of libvirt,
+	// the user is very professional, we prior to use it.
+	if config.ParsedAnnotations.CPUSetting != nil {
+		domain.CPU = config.ParsedAnnotations.CPUSetting
+	} else {
+		switch ds.cpuModel {
+		case types.CPUModelHostModel:
+			// The following enables nested virtualization.
+			// In case of intel processors it requires nested=1 option
+			// for kvm_intel module. That can be passed like this:
+			// modprobe kvm_intel nested=1
+			domain.CPU = &libvirtxml.DomainCPU{
+				Mode: types.CPUModelHostModel,
+				Model: &libvirtxml.DomainCPUModel{
+					Fallback: "forbid",
 				},
-			},
+				Features: []libvirtxml.DomainCPUFeature{
+					{
+						Policy: "require",
+						Name:   "vmx",
+					},
+				},
+			}
+		case "":
+			// leave it empty
+		default:
+			glog.Warningf("Unknown value set in VIRTLET_CPU_MODEL: %q", ds.cpuModel)
 		}
-	case "":
-		// leave it empty
-	default:
-		glog.Warningf("Unknown value set in VIRTLET_CPU_MODEL: %q", ds.cpuModel)
 	}
 
 	if ds.enableSriov {
