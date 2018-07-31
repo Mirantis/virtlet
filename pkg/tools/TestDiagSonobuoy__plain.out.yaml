@@ -41,7 +41,6 @@ data:
       - name: RESULTS_DIR
         value: /tmp/results
       image: mirantis/virtlet
-      imagePullPolicy: Never
       name: sonobuoy-virtlet
       volumeMounts:
       - mountPath: /tmp/results

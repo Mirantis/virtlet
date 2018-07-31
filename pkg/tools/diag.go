@@ -23,11 +23,13 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
 
 	"github.com/Mirantis/virtlet/pkg/diag"
+	"github.com/Mirantis/virtlet/pkg/version"
 )
 
 const (
@@ -46,8 +48,7 @@ spec:
   env:
   - name: RESULTS_DIR
     value: /tmp/results
-  image: mirantis/virtlet
-  imagePullPolicy: Never
+  image: mirantis/virtlet$TAG
   name: sonobuoy-virtlet
   volumeMounts:
   - mountPath: /tmp/results
@@ -208,13 +209,14 @@ func (d *diagUnpackCommand) Run() error {
 type diagSonobuoyCommand struct {
 	in  io.Reader
 	out io.Writer
+	tag string
 }
 
 // NewDiagSonobuoyCommand returns a new cobra.Command that adds
 // Virtlet plugin to sonobuoy-generated yaml
 func NewDiagSonobuoyCommand(in io.Reader, out io.Writer) *cobra.Command {
 	d := &diagSonobuoyCommand{in: in, out: out}
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "sonobuoy",
 		Short: "Add Virtlet sonobuoy plugin to the sonobuoy output",
 		Long:  "Find and patch sonobuoy configmap in the yaml that's read from stdin to include Virtlet sonobuoy plugin",
@@ -225,6 +227,8 @@ func NewDiagSonobuoyCommand(in io.Reader, out io.Writer) *cobra.Command {
 			return d.Run()
 		},
 	}
+	cmd.Flags().StringVar(&d.tag, "tag", version.Get().ImageTag, "Set virtlet image tag for the plugin")
+	return cmd
 }
 
 func (d *diagSonobuoyCommand) getYaml() ([]byte, error) {
@@ -249,7 +253,12 @@ func (d *diagSonobuoyCommand) getYaml() ([]byte, error) {
 			continue
 		}
 		found = true
-		cfgMap.Data[virtletSonobuoyPluginFileName] = sonobuoyPluginYaml
+		tagStr := ""
+		if d.tag != "" {
+			tagStr = ":" + d.tag
+		}
+		yaml := strings.Replace(sonobuoyPluginYaml, "$TAG", tagStr, -1)
+		cfgMap.Data[virtletSonobuoyPluginFileName] = yaml
 	}
 	if !found {
 		return nil, fmt.Errorf("ConfigMap not found: %q", sonobuoyPluginsConfigMapName)
