@@ -363,8 +363,8 @@ jobs:
   e2e_multi_cni:
     <<: *e2e
 
-  e2e_1_9:
-    <<: *e2e
+  # e2e_1_9:
+  #   <<: *e2e
 
   e2e_1_10:
     <<: *e2e
@@ -469,13 +469,13 @@ workflows:
           tags:
             only:
               - /^v[0-9].*/
-    - e2e_1_9:
-        requires:
-        - build
-        filters:
-          tags:
-            only:
-              - /^v[0-9].*/
+    # - e2e_1_9:
+    #     requires:
+    #     - build
+    #     filters:
+    #       tags:
+    #         only:
+    #           - /^v[0-9].*/
     - e2e_1_10:
         requires:
         - build
@@ -498,7 +498,7 @@ workflows:
         - e2e_flannel
         - e2e_weave
         - e2e_multi_cni
-        - e2e_1_9
+        # - e2e_1_9
         - e2e_1_10
         - integration
         filters:
