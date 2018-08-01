@@ -88,6 +88,8 @@ spec:
         - mountPath: /boot
           name: boot
           readOnly: true
+        - mountPath: /dev
+          name: dev
         - mountPath: /var/lib/virtlet
           name: virtlet
         - mountPath: /var/lib/libvirt
