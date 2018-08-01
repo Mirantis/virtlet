@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -220,14 +221,30 @@ func TestDiagUnpack(t *testing.T) {
 }
 
 func TestDiagSonobuoy(t *testing.T) {
-	in := bytes.NewBuffer([]byte(fakeSonobuoyYaml))
-	var out bytes.Buffer
-	cmd := NewDiagCommand(nil, in, &out)
-	cmd.SetArgs([]string{"sonobuoy"})
-	cmd.SilenceUsage = true
-	cmd.SilenceErrors = true
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("diag dump: %v", err)
+	for _, tc := range []struct {
+		name string
+		args string
+	}{
+		{
+			name: "plain",
+			args: "sonobuoy",
+		},
+		{
+			name: "tag",
+			args: "sonobuoy --tag 1.1.2",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			in := bytes.NewBuffer([]byte(fakeSonobuoyYaml))
+			var out bytes.Buffer
+			cmd := NewDiagCommand(nil, in, &out)
+			cmd.SetArgs(strings.Split(tc.args, " "))
+			cmd.SilenceUsage = true
+			cmd.SilenceErrors = true
+			if err := cmd.Execute(); err != nil {
+				t.Fatalf("diag dump: %v", err)
+			}
+			gm.Verify(t, gm.NewYamlVerifier(out.Bytes()))
+		})
 	}
-	gm.Verify(t, gm.NewYamlVerifier(out.Bytes()))
 }
