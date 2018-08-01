@@ -16,8 +16,6 @@ spec:
   selector:
     run: sonobuoy-master
   type: ClusterIP
-status:
-  loadBalancer: {}
 
 ---
 apiVersion: v1
