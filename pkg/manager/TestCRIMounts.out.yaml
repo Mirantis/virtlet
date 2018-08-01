@@ -220,7 +220,7 @@
         io.kubernetes.pod.name: testName_0
         io.kubernetes.pod.namespace: default
         io.kubernetes.pod.uid: 69eec606-0493-5825-73a4-c5e0c0236155
-      log_path: container-for-testName_0_0.log
+      log_path: /var/log/test_log_directory/container-for-testName_0_0.log
       metadata:
         name: container-for-testName_0
       mounts:

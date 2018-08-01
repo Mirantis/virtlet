@@ -17,5 +17,4 @@ spec:
   - image: docker.io/busybox
     name: tst
     resources: {}
-status: {}
 

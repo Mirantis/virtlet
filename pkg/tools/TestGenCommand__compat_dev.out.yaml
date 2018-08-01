@@ -273,11 +273,6 @@ spec:
           path: /dind
         name: dind
   updateStrategy: {}
-status:
-  currentNumberScheduled: 0
-  desiredNumberScheduled: 0
-  numberMisscheduled: 0
-  numberReady: 0
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
@@ -435,11 +430,6 @@ spec:
     singular: virtletimagemapping
   scope: Namespaced
   version: v1
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: null
 
 ---
 apiVersion: apiextensions.k8s.io/v1beta1
@@ -513,9 +503,4 @@ spec:
             priority:
               type: integer
   version: v1
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: null
 

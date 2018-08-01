@@ -18,8 +18,10 @@ package tools
 
 import (
 	"bytes"
+	"encoding/json"
 
 	"github.com/ghodss/yaml"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 )
@@ -46,7 +48,20 @@ func LoadYaml(data []byte) ([]runtime.Object, error) {
 func ToYaml(objs []runtime.Object) ([]byte, error) {
 	var out bytes.Buffer
 	for _, obj := range objs {
-		bs, err := yaml.Marshal(obj)
+		// the idea is from https://github.com/ant31/crd-validation/blob/master/pkg/cli-utils.go
+		bs, err := json.Marshal(obj)
+		if err != nil {
+			return nil, err
+		}
+
+		var us unstructured.Unstructured
+		if err := json.Unmarshal(bs, &us.Object); err != nil {
+			return nil, err
+		}
+
+		unstructured.RemoveNestedField(us.Object, "status")
+
+		bs, err = yaml.Marshal(us.Object)
 		if err != nil {
 			return nil, err
 		}
