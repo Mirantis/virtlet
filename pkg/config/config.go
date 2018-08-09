@@ -73,6 +73,9 @@ const (
 
 	defaultCPUModel = ""
 	cpuModelEnv     = "VIRTLET_CPU_MODEL"
+
+	defaultStreamPort = 10010
+	streamPortEnv = "VIRTLET_STREAM_PORT"
 )
 
 func configFieldSet(c *virtlet_v1.VirtletConfig) *fieldSet {
@@ -98,6 +101,8 @@ func configFieldSet(c *virtlet_v1.VirtletConfig) *fieldSet {
 	// this field duplicates glog's --v, so no option for it, which is signified
 	// by "+" here (it's only for doc)
 	fs.addIntField("logLevel", "+v", "", "Log level to use", logLevelEnv, 1, 0, math.MaxInt32, &c.LogLevel)
+	//add configrable stream port flag
+	fs.addIntField("streamPort", "stream-port", "", "configurable port to the virtlet server", streamPortEnv, defaultStreamPort, 1, 65535, &c.StreamPort)
 	return &fs
 }
 

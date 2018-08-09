@@ -64,6 +64,8 @@ type VirtletConfig struct {
 	CPUModel *string `json:"cpuModel,omitempty"`
 	// LogLevel specifies the log level to use
 	LogLevel *int `json:"logLevel,omitempty"`
+	// Configrable stream port in command line
+	StreamPort *int `json: "streamPort,omitempty"`
 }
 
 // VirtletConfigMappingSpec is the contents of a VirtletConfigMapping.

@@ -27,6 +27,7 @@ import (
 	"github.com/golang/glog"
 	knet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
+	"strconv"
 )
 
 // Server implements streaming.Runtime
@@ -46,7 +47,7 @@ type Server struct {
 var _ streaming.Runtime = (*Server)(nil)
 
 // NewServer creates a new Server
-func NewServer(socketPath string, metadataStore metadata.Store) (*Server, error) {
+func NewServer(socketPath string, metadataStore metadata.Store, iStreamPort int) (*Server, error) {
 	s := &Server{DeadlineSeconds: 10}
 
 	// Prepare unix server
@@ -56,7 +57,7 @@ func NewServer(socketPath string, metadataStore metadata.Store) (*Server, error)
 	if err != nil {
 		return nil, err
 	}
-	streamPort := "10010"
+	streamPort := strconv.Itoa(iStreamPort)
 
 	streamServerConfig := streaming.DefaultConfig
 	streamServerConfig.Addr = net.JoinHostPort(bindAddress.String(), streamPort)
