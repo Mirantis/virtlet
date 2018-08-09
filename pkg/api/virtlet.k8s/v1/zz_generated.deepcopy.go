@@ -297,6 +297,15 @@ func (in *VirtletConfig) DeepCopyInto(out *VirtletConfig) {
 			**out = **in
 		}
 	}
+	if in.StreamPort != nil {
+		in, out := &in.StreamPort, &out.StreamPort
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int)
+			**out = **in
+		}
+	}
 	if in.LogLevel != nil {
 		in, out := &in.LogLevel, &out.LogLevel
 		if *in == nil {
