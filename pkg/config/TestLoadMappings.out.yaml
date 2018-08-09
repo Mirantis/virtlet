@@ -16,3 +16,4 @@ libvirtURI: qemu:///system
 logLevel: 1
 rawDevices: sd*
 skipImageTranslation: false
+streamPort: 10010

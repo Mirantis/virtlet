@@ -116,7 +116,7 @@ func (v *VirtletManager) Run() error {
 
 	var streamServer StreamServer
 	if !*v.config.DisableLogging {
-		s, err := stream.NewServer(streamerSocketPath, v.metadataStore)
+		s, err := stream.NewServer(streamerSocketPath, v.metadataStore, *v.config.StreamPort)
 		if err != nil {
 			return fmt.Errorf("couldn't create stream server: %v", err)
 		}

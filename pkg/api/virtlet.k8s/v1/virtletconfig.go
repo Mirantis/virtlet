@@ -62,6 +62,8 @@ type VirtletConfig struct {
 	// CPUModel specifies the default CPU model to use in the libvirt domain definition.
 	// It can be overridden using VirtletCPUModel pod annotation.
 	CPUModel *string `json:"cpuModel,omitempty"`
+	// StreamPort specifies the configurable stream port of virtlet server.
+	StreamPort *int `json:"streamPort,omitempty"`
 	// LogLevel specifies the log level to use
 	LogLevel *int `json:"logLevel,omitempty"`
 }
