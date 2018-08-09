@@ -75,7 +75,7 @@ const (
 	cpuModelEnv     = "VIRTLET_CPU_MODEL"
 
 	defaultStreamPort = 10010
-	streamPortEnv = "VIRTLET_STREAM_PORT"
+	streamPortEnv     = "VIRTLET_STREAM_PORT"
 )
 
 func configFieldSet(c *virtlet_v1.VirtletConfig) *fieldSet {
