@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"syscall"
 	"strconv"
+	"syscall"
 
 	"github.com/Mirantis/virtlet/pkg/metadata"
 
