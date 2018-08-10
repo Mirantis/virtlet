@@ -16,3 +16,4 @@ libvirtURI: qemu:///foobar
 logLevel: 3
 rawDevices: sd*
 skipImageTranslation: false
+streamPort: 10010

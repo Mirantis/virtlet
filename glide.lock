@@ -1,5 +1,5 @@
-hash: b30bbdd1f282c28a740a7fc85d9090ffab31476f58d507fcddbd92e3c1ab1ff8
-updated: 2018-06-29T00:59:01.939551306+02:00
+hash: f17006424759b604953cac400ad4d4262fb614710be91bfd85848b3c9fe6bc15
+updated: 2018-08-09T20:23:35.724072779+08:00
 imports:
 - name: github.com/boltdb/bolt
   version: fd01fc79c553a8e99d512a07e8e0c63d4a3ccfc5
@@ -103,7 +103,7 @@ imports:
   - protoc-gen-gogo/descriptor
   - sortkeys
 - name: github.com/golang/glog
-  version: 23def4e6c14b4da8ac2ed8007337bc5eb5007998
+  version: 44145f04b68cf362d9c4df2182967c2275eaefed
 - name: github.com/golang/groupcache
   version: 02826c3e79038b59d737d3b1c0a1d937f71a4433
   subpackages:
@@ -208,7 +208,7 @@ imports:
 - name: github.com/vishvananda/netns
   version: 8ba1072b58e0c2a240eb5f6120165c7776c3e7b8
 - name: go.universe.tf/netboot
-  version: cc33920b4f3296801a64d731d269978116f40d92
+  version: 870d490bda51cd67f4d53593ce4219d47db00a0d
   subpackages:
   - dhcp4
 - name: golang.org/x/crypto
