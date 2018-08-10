@@ -21,13 +21,13 @@ import (
 	"net"
 	"os"
 	"syscall"
+	"strconv"
 
 	"github.com/Mirantis/virtlet/pkg/metadata"
 
 	"github.com/golang/glog"
 	knet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
-	"strconv"
 )
 
 // Server implements streaming.Runtime
