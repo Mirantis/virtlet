@@ -1,6 +1,8 @@
-hash: b30bbdd1f282c28a740a7fc85d9090ffab31476f58d507fcddbd92e3c1ab1ff8
-updated: 2018-06-29T00:59:01.939551306+02:00
+hash: 5744e56f5d6ff5300a44dad41e3853162b34fb69bc259f8e688728ce1fdbdaf6
+updated: 2018-08-13T17:58:46.518847222+02:00
 imports:
+- name: github.com/aykevl/osfs
+  version: e4b1ff739ec92f420bca98d909fffb71fc68e29c
 - name: github.com/boltdb/bolt
   version: fd01fc79c553a8e99d512a07e8e0c63d4a3ccfc5
 - name: github.com/containernetworking/cni

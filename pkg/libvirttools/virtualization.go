@@ -816,7 +816,7 @@ func (v *VirtualizationTool) ContainerInfo(containerID string) (*types.Container
 
 // volumeOwner implementation follows
 
-// StoragePool implements volumeOwner StoragePool method
+// StoragePool returns StoragePool for volumes
 func (v *VirtualizationTool) StoragePool() (virt.StoragePool, error) {
 	return ensureStoragePool(v.storageConn, v.config.VolumePoolName)
 }

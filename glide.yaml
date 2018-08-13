@@ -59,7 +59,7 @@ import:
 - package: github.com/docker/engine-api
   version: dea108d3aa0c67d7162a3fd8aa65f38a430019fd
 - package: github.com/opencontainers/go-digest
-  version: a6d0ee40d4207ea02364bd3b9e8e77b9159ba1eb  
+  version: a6d0ee40d4207ea02364bd3b9e8e77b9159ba1eb
 - package: github.com/spf13/pflag
   version: 4c012f6dcd9546820e378d0bdda4d8fc772cdfea
 - package: k8s.io/client-go
@@ -82,3 +82,5 @@ import:
   version: 01a732e01d00cb9a81bb0ca050d3e6d2b947927b
 - package: golang.org/x/tools
   version: 2382e3994d48b1d22acc2c86bcad0a2aff028e32
+- package: github.com/aykevl/osfs
+  version: e4b1ff739ec92f420bca98d909fffb71fc68e29c
