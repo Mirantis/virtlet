@@ -579,7 +579,7 @@ func (s *FileStore) FilesystemStats() (*FilesystemStats, error) {
 		return nil, fmt.Errorf("cannot get mountpoint for %q: err", s.dir)
 	}
 	return &FilesystemStats{
-		Mountpoint: mount.Root,
+		Mountpoint: mount.FSRoot,
 		UsedBytes:  occupiedBytes,
 		UsedInodes: occupiedInodes,
 	}, nil
