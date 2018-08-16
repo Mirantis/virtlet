@@ -579,7 +579,7 @@ func (s *FileStore) FilesystemStats() (*FilesystemStats, error) {
 		return nil, err
 	}
 	return &FilesystemStats{
-		Mountpoint: mount.Root,
+		Mountpoint: mount.FSRoot,
 		UsedBytes:  occupiedBytes,
 		UsedInodes: occupiedInodes,
 	}, nil
