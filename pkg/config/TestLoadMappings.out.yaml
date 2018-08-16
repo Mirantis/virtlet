@@ -10,7 +10,7 @@ downloadProtocol: https
 enableRegexpImageTranslation: true
 enableSriov: false
 fdServerSocketPath: /var/lib/virtlet/tapfdserver.sock
-imageDir: /var/lib/virtlet/images
+imageDir: /var/lib/libvirt/images
 imageTranslationConfigsDir: /etc/virtlet/images
 libvirtURI: qemu:///system
 logLevel: 1

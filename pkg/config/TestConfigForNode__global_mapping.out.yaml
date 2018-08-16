@@ -10,7 +10,7 @@ downloadProtocol: http
 enableRegexpImageTranslation: false
 enableSriov: true
 fdServerSocketPath: /some/fd/server.sock
-imageDir: /var/lib/virtlet/images
+imageDir: /var/lib/libvirt/images
 imageTranslationConfigsDir: /some/translation/dir
 libvirtURI: qemu:///foobar
 logLevel: 3

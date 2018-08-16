@@ -1,7 +1,7 @@
 export VIRTLET_FD_SERVER_SOCKET_PATH=/var/lib/virtlet/tapfdserver.sock
 export VIRTLET_DATABASE_PATH=/var/lib/virtlet/virtlet.db
 export VIRTLET_DOWNLOAD_PROTOCOL=https
-export VIRTLET_IMAGE_DIR=/var/lib/virtlet/images
+export VIRTLET_IMAGE_DIR=/var/lib/libvirt/images
 export VIRTLET_IMAGE_TRANSLATIONS_DIR=/etc/virtlet/images
 export VIRTLET_LIBVIRT_URI=qemu:///system
 export VIRTLET_RAW_DEVICES=loop\*

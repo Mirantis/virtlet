@@ -40,7 +40,7 @@ const (
 	defaultDownloadProtocol  = "https"
 	imageDownloadProtocolEnv = "VIRTLET_DOWNLOAD_PROTOCOL"
 
-	defaultImageDir = "/var/lib/virtlet/images"
+	defaultImageDir = "/var/lib/libvirt/images"
 	imageDirEnv     = "VIRTLET_IMAGE_DIR"
 
 	defaultImageTranslationConfigsDir = "/etc/virtlet/images"

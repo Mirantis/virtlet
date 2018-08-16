@@ -568,15 +568,15 @@ func GetHexDigest(imageSpec string) string {
 func (s *FileStore) FilesystemStats() (*FilesystemStats, error) {
 	occupiedBytes, occupiedInodes, err := utils.GetFsStatsForPath(s.dir)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot stat %q: %v", s.dir, err)
 	}
 	info, err := osfs.Read()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot read filesystem info: %v", err)
 	}
 	mount, err := info.GetPath(s.dir)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot get mountpoint for %q: err", s.dir)
 	}
 	return &FilesystemStats{
 		Mountpoint: mount.Root,
