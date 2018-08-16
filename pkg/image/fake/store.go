@@ -18,6 +18,7 @@ package image
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 
@@ -124,4 +125,8 @@ func (s *FakeStore) GetImagePathAndVirtualSize(imageName string) (string, uint64
 // SetRefGetter implements SetRefGetter method of Store interface.
 func (s *FakeStore) SetRefGetter(imageRefGetter image.RefGetter) {
 	s.refGetter = imageRefGetter
+}
+
+func (s *FakeStore) FilesystemStats() (*image.FilesystemStats, error) {
+	return nil, errors.New("not implemented")
 }
