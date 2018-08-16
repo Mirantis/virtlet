@@ -167,7 +167,10 @@ e2e: &e2e
         elif [[ ${CIRCLE_JOB} = e2e_1_10 ]]; then
           export KUBE_VERSION=1.10
         fi
-        SKIP_SNAPSHOT=1 \
+        # APISERVER_PORT is set explicitly to avoid dynamic allocation
+        # of the port by kdc
+        APISERVER_PORT=8080 \
+          SKIP_SNAPSHOT=1 \
           NONINTERACTIVE=1 \
           NO_VM_CONSOLE=1 \
           INJECT_LOCAL_IMAGE=1 \
