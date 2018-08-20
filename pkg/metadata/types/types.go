@@ -92,6 +92,9 @@ type ContainerInfo struct {
 
 // VMStats contains cpu/memory/disk usage for VM.
 type VMStats struct {
+	// ContainerID holds identifier of container for which these statistics
+	// were collected
+	ContainerID string
 	// Timestatmp holds an unix timestamp (including nanoseconds)
 	// for stats collection
 	Timestamp int64
@@ -294,5 +297,17 @@ type ContainerFilter struct {
 	// LabelSelector to select matches.
 	// Only api.MatchLabels is supported for now and the requirements
 	// are ANDed. MatchExpressions is not supported yet.
+	LabelSelector map[string]string
+}
+
+// VMStatsFilter is used to filter set of container stats
+// All those fields are combined with 'AND'
+type VMStatsFilter struct {
+	// ID holds of the container.
+	Id string
+	// PodSandboxID holds id of podsandbox.
+	PodSandboxID string
+	// LabelSelector to select matches. Requirementes should be ANDed.
+	// Match Expressions is not supported.
 	LabelSelector map[string]string
 }

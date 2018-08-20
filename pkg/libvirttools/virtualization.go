@@ -816,7 +816,8 @@ func (v *VirtualizationTool) VMStats(containerID string) (*types.VMStats, error)
 		return nil, err
 	}
 	vs := types.VMStats{
-		Timestamp: time.Now().UnixNano(),
+		Timestamp:   time.Now().UnixNano(),
+		ContainerID: containerID,
 	}
 	if rss, err := domain.GetRSS(); err != nil {
 		return nil, err
@@ -832,6 +833,39 @@ func (v *VirtualizationTool) VMStats(containerID string) (*types.VMStats, error)
 	// used by it bytes/inodes. Additionally mountpoint of fs on which
 	// root volume is located should be found and filled there
 	return &vs, nil
+}
+
+// ListVMStats returns statistics (same as VMStats) for all containers matching
+// provided filter (id AND podstandboxid AND labels)
+func (v *VirtualizationTool) ListVMStats(filter *types.VMStatsFilter) ([]types.VMStats, error) {
+	var containersFilter *types.ContainerFilter
+	if filter != nil {
+		containersFilter = &types.ContainerFilter{}
+		if filter.Id != "" {
+			containersFilter.Id = filter.Id
+		}
+		if filter.PodSandboxID != "" {
+			containersFilter.PodSandboxID = filter.PodSandboxID
+		}
+		if filter.LabelSelector != nil {
+			containersFilter.LabelSelector = filter.LabelSelector
+		}
+	}
+
+	infos, err := v.ListContainers(containersFilter)
+	if err != nil {
+		return nil, err
+	}
+
+	var statsList []types.VMStats
+	for _, info := range infos {
+		if stats, err := v.VMStats(info.Id); err != nil {
+			return nil, err
+		} else {
+			statsList = append(statsList, *stats)
+		}
+	}
+	return statsList, nil
 }
 
 // volumeOwner implementation follows
