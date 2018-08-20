@@ -127,6 +127,7 @@ func (s *FakeStore) SetRefGetter(imageRefGetter image.RefGetter) {
 	s.refGetter = imageRefGetter
 }
 
+// FilesystemStats implements FilesystemStats method from Store interface.
 func (s *FakeStore) FilesystemStats() (*image.FilesystemStats, error) {
 	return nil, errors.New("not implemented")
 }
