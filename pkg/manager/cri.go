@@ -198,7 +198,7 @@ func CRIContainerStatsFilterToVMStatsFilter(in *kubeapi.ContainerStatsFilter) *t
 		return nil
 	}
 	return &types.VMStatsFilter{
-		Id:            in.ID,
+		Id:            in.Id,
 		PodSandboxID:  in.PodSandboxId,
 		LabelSelector: in.LabelSelector,
 	}

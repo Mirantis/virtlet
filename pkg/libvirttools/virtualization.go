@@ -819,16 +819,19 @@ func (v *VirtualizationTool) VMStats(containerID string) (*types.VMStats, error)
 		Timestamp:   time.Now().UnixNano(),
 		ContainerID: containerID,
 	}
-	if rss, err := domain.GetRSS(); err != nil {
+
+	rss, err := domain.GetRSS()
+	if err != nil {
 		return nil, err
-	} else {
-		vs.MemoryUsage = rss
 	}
-	if cpuTime, err := domain.GetCPUTime(); err != nil {
+	vs.MemoryUsage = rss
+
+	cpuTime, err := domain.GetCPUTime()
+	if err != nil {
 		return nil, err
-	} else {
-		vs.CpuUsage = cpuTime
 	}
+	vs.CpuUsage = cpuTime
+
 	// TODO: find image created by rootfs provider, stat it and fill there
 	// used by it bytes/inodes. Additionally mountpoint of fs on which
 	// root volume is located should be found and filled there
@@ -859,11 +862,11 @@ func (v *VirtualizationTool) ListVMStats(filter *types.VMStatsFilter) ([]types.V
 
 	var statsList []types.VMStats
 	for _, info := range infos {
-		if stats, err := v.VMStats(info.Id); err != nil {
+		stats, err := v.VMStats(info.Id)
+		if err != nil {
 			return nil, err
-		} else {
-			statsList = append(statsList, *stats)
 		}
+		statsList = append(statsList, *stats)
 	}
 	return statsList, nil
 }

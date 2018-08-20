@@ -520,9 +520,9 @@ func (v *VirtletRuntimeService) ListContainerStats(ctx context.Context, in *kube
 		})
 	}
 
-	return nil, &kubeapi.ListContainerStatsResponse{
+	return &kubeapi.ListContainerStatsResponse{
 		Stats: stats,
-	}
+	}, nil
 }
 
 // ReopenContainerLog is a placeholder for an unimplemented CRI method.
