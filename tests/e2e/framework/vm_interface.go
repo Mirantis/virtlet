@@ -39,19 +39,34 @@ type VMInterface struct {
 
 // VMOptions defines VM parameters
 type VMOptions struct {
-	Image             string
-	VCPUCount         int
-	SSHKey            string
-	SSHKeySource      string
-	CloudInitScript   string
-	DiskDriver        string
-	Limits            map[string]string
-	UserData          string
+	// VM image to use.
+	Image string
+	// Number of virtual CPUs.
+	VCPUCount int
+	// SSH public key to add to the VM.
+	SSHKey string
+	// SSH key source to use
+	SSHKeySource string
+	// Cloud-init userdata script
+	CloudInitScript string
+	// Disk driver to use
+	DiskDriver string
+	// VM resource limit specs
+	Limits map[string]string
+	// Cloud-init userdata
+	UserData string
+	// Enable overridding the userdata
 	OverwriteUserData bool
-	UserDataScript    string
-	UserDataSource    string
-	NodeName          string
-	MultiCNI          string
+	// Replaces cloud-init userdata with a script
+	UserDataScript string
+	// Data source for the userdata
+	UserDataSource string
+	// The name of the node to run the VM on
+	NodeName string
+	// Root volume size spec
+	RootVolumeSize string
+	// "cni" annotation value for CNI-Genie
+	MultiCNI string
 }
 
 func newVMInterface(controller *Controller, name string) *VMInterface {
@@ -154,6 +169,9 @@ func (vmi *VMInterface) buildVMPod(options VMOptions) *v1.Pod {
 	}
 	if options.VCPUCount > 0 {
 		annotations["VirtletVCPUCount"] = strconv.Itoa(options.VCPUCount)
+	}
+	if options.RootVolumeSize != "" {
+		annotations["VirtletRootVolumeSize"] = options.RootVolumeSize
 	}
 	if options.MultiCNI != "" {
 		annotations["cni"] = options.MultiCNI

@@ -36,7 +36,8 @@ var _ = Describe("VM resources", func() {
 	BeforeAll(func() {
 		vm = controller.VM("vm-resources")
 		Expect(vm.Create(VMOptions{
-			VCPUCount: 2,
+			VCPUCount:      2,
+			RootVolumeSize: "4Gi",
 		}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
 		do(vm.Pod())
 	})
@@ -61,5 +62,12 @@ var _ = Describe("VM resources", func() {
 			total += do(strconv.Atoi(m[1])).(int)
 		}
 		Expect(total).To(Equal(1024*(*memoryLimit) - 128))
+	})
+
+	It("Should grow the root volume size if requested", func() {
+		sizeStr := do(framework.RunSimple(ssh, "/bin/sh", "-c", `df -m / | tail -1 | awk "{print \$2}"`)).(string)
+		size, err := strconv.Atoi(sizeStr)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(size).To(BeNumerically(">", 3900))
 	})
 })
