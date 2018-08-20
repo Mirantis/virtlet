@@ -456,9 +456,35 @@ func (v *VirtletRuntimeService) Status(context.Context, *kubeapi.StatusRequest) 
 	}, nil
 }
 
-// ContainerStats is a placeholder for an unimplemented CRI method.
+// ContainerStats returns cpu/memory/disk usage for particular container id
 func (v *VirtletRuntimeService) ContainerStats(ctx context.Context, in *kubeapi.ContainerStatsRequest) (*kubeapi.ContainerStatsResponse, error) {
-	return nil, errors.New("ContainerStats() not implemented")
+	vs, err := v.virtTool.VMStats(in.ContainerId)
+	if err != nil {
+		return nil, err
+	}
+	return &kubeapi.ContainerStatsResponse{
+		Stats: &kubeapi.ContainerStats{
+			Attributes: &kubeapi.ContainerAttributes{
+				Id: in.ContainerId,
+			},
+			Cpu: &kubeapi.CpuUsage{
+				Timestamp:            vs.Timestamp,
+				UsageCoreNanoSeconds: &kubeapi.UInt64Value{Value: vs.CpuUsage},
+			},
+			Memory: &kubeapi.MemoryUsage{
+				Timestamp:       vs.Timestamp,
+				WorkingSetBytes: &kubeapi.UInt64Value{Value: vs.MemoryUsage},
+			},
+			WritableLayer: &kubeapi.FilesystemUsage{
+				Timestamp: vs.Timestamp,
+				FsId: &kubeapi.FilesystemIdentifier{
+					Mountpoint: vs.Mountpoint,
+				},
+				UsedBytes:  &kubeapi.UInt64Value{Value: vs.FsBytes},
+				InodesUsed: &kubeapi.UInt64Value{Value: vs.FsInodes},
+			},
+		},
+	}, nil
 }
 
 // ListContainerStats is a placeholder for an unimplemented CRI method.

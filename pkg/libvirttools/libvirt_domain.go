@@ -211,6 +211,36 @@ func (domain *libvirtDomain) XML() (*libvirtxml.Domain, error) {
 	return &d, nil
 }
 
+// GetRSS returns RSS used by VM in bytes
+func (domain *libvirtDomain) GetRSS() (uint64, error) {
+	stats, err := domain.d.MemoryStats(uint32(libvirt.DOMAIN_MEMORY_STAT_LAST), 0)
+	if err != nil {
+		return 0, err
+	}
+	for _, stat := range stats {
+		if stat.Tag == int32(libvirt.DOMAIN_MEMORY_STAT_RSS) {
+			return stat.Val * 1024, nil
+		}
+	}
+	return 0, fmt.Errorf("rss not found in memory stats")
+}
+
+// GetCPUTime returns cpu time used by VM in nanoseconds per core
+func (domain *libvirtDomain) GetCPUTime() (uint64, error) {
+	// all vcpus as a single value
+	stats, err := domain.d.GetCPUStats(-1, 1, 0)
+	if err != nil {
+		return 0, err
+	}
+	if len(stats) != 1 {
+		return 0, fmt.Errorf("domain.GetCPUStats returned %d values while single one was expected", len(stats))
+	}
+	if !stats[0].VcpuTimeSet {
+		return 0, fmt.Errorf("domain.VcpuTime not found in memory stats")
+	}
+	return stats[0].VcpuTime, nil
+}
+
 type libvirtSecret struct {
 	s *libvirt.Secret
 }

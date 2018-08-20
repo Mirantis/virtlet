@@ -90,6 +90,25 @@ type ContainerInfo struct {
 	Config VMConfig
 }
 
+// VMStats contains cpu/memory/disk usage for VM.
+type VMStats struct {
+	// Timestatmp holds an unix timestamp (including nanoseconds)
+	// for stats collection
+	Timestamp int64
+	// CpuUsage in nano seconds per cpu
+	CpuUsage uint64
+	// MemoryUsage is expected to contain the amount of working set memory
+	// in bytes what in our case will be returned using RSS value
+	MemoryUsage uint64
+	// Mountpoint on host for filesystem containing the directory in which
+	// rootfs of VM is stored
+	Mountpoint string
+	// FsBytes represents current size of rootfs in bytes
+	FsBytes uint64
+	// FsInodes contains number of inodes used by rootfs image
+	FsInodes uint64
+}
+
 // NamespaceOption provides options for Linux namespaces.
 type NamespaceOption struct {
 	// If set, use the host's network namespace.

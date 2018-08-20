@@ -809,6 +809,31 @@ func (v *VirtualizationTool) ContainerInfo(containerID string) (*types.Container
 	return containerInfo, nil
 }
 
+// VMStats returns current cpu/memory/disk usage for VM
+func (v *VirtualizationTool) VMStats(containerID string) (*types.VMStats, error) {
+	domain, err := v.domainConn.LookupDomainByUUIDString(containerID)
+	if err != nil {
+		return nil, err
+	}
+	vs := types.VMStats{
+		Timestamp: time.Now().UnixNano(),
+	}
+	if rss, err := domain.GetRSS(); err != nil {
+		return nil, err
+	} else {
+		vs.MemoryUsage = rss
+	}
+	if cpuTime, err := domain.GetCPUTime(); err != nil {
+		return nil, err
+	} else {
+		vs.CpuUsage = cpuTime
+	}
+	// TODO: find image created by rootfs provider, stat it and fill there
+	// used by it bytes/inodes. Additionally mountpoint of fs on which
+	// root volume is located should be found and filled there
+	return &vs, nil
+}
+
 // volumeOwner implementation follows
 
 // StoragePool returns StoragePool for volumes
