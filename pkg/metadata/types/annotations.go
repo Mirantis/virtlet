@@ -23,6 +23,7 @@ import (
 
 	"github.com/ghodss/yaml"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
@@ -37,6 +38,7 @@ const (
 	cloudInitUserDataScriptKeyName    = "VirtletCloudInitUserDataScript"
 	cloudInitImageType                = "VirtletCloudInitImageType"
 	cpuModel                          = "VirtletCPUModel"
+	rootVolumeSizeKeyName             = "VirtletRootVolumeSize"
 	libvirtCPUSetting                 = "VirtletLibvirtCPUSetting"
 	sshKeysKeyName                    = "VirtletSSHKeys"
 	// CloudInitUserDataSourceKeyName is the name of user data source key in the pod annotations.
@@ -93,6 +95,11 @@ type VirtletAnnotations struct {
 	DiskDriver DiskDriverName
 	// CPUSetting directly specifies the cpu to use for libvirt.
 	CPUSetting *libvirtxml.DomainCPU
+	// Root volume size in bytes. Defaults to 0 which means using
+	// the size of QCOW2 image). If the value is less then the
+	// size of the QCOW2 image, the size of the QCOW2 image is
+	// used instead.
+	RootVolumeSize int64
 }
 
 // ExternalDataLoader is a function that loads external data that's specified
@@ -183,7 +190,7 @@ func (va *VirtletAnnotations) parsePodAnnotations(ns string, podAnnotations map[
 	if vcpuCountStr, found := podAnnotations[vcpuCountAnnotationKeyName]; found {
 		var err error
 		if va.VCPUCount, err = strconv.Atoi(vcpuCountStr); err != nil {
-			return fmt.Errorf("error parsing cpu count for VM pod %q: %v", vcpuCountStr, err)
+			return fmt.Errorf("error parsing cpu count for VM pod: %q: %v", vcpuCountStr, err)
 		}
 	}
 
@@ -222,6 +229,16 @@ func (va *VirtletAnnotations) parsePodAnnotations(ns string, podAnnotations map[
 
 	va.CDImageType = CloudInitImageType(strings.ToLower(podAnnotations[cloudInitImageType]))
 	va.DiskDriver = DiskDriverName(podAnnotations[diskDriverKeyName])
+
+	if rootVolumeSizeStr, found := podAnnotations[rootVolumeSizeKeyName]; found {
+		if q, err := resource.ParseQuantity(rootVolumeSizeStr); err != nil {
+			return fmt.Errorf("error parsing the root volume size for VM pod: %q: %v", rootVolumeSizeStr, err)
+		} else if size, ok := q.AsInt64(); ok {
+			va.RootVolumeSize = size
+		} else {
+			return fmt.Errorf("bad root volume size %q", rootVolumeSizeStr)
+		}
+	}
 
 	return nil
 }

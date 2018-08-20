@@ -132,6 +132,7 @@
         CPUSetting: null
         DiskDriver: scsi
         MetaData: null
+        RootVolumeSize: 0
         SSHKeys: null
         UserData: null
         UserDataOverwrite: false

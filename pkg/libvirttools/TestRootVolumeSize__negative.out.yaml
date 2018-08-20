@@ -1,0 +1,16 @@
+- name: 'image: GetImagePathAndVirtualSize'
+  value: rootfs image name
+- name: 'volumes: CreateStorageVol'
+  value: |-
+    <volume type="file">
+      <name>virtlet_root_77f29a0e-46af-4188-a6af-9ff8b8a65224</name>
+      <allocation unit="b">0</allocation>
+      <capacity unit="b">424242</capacity>
+      <target>
+        <format type="qcow2"></format>
+      </target>
+      <backingStore>
+        <path>/fake/volume/path</path>
+        <format type="qcow2"></format>
+      </backingStore>
+    </volume>
