@@ -49,7 +49,7 @@ func checkDefaultRoute(instance *VMInstance) error {
 	}
 
 	glog.V(4).Infof("Should have default route")
-	out, err := framework.RunSimple(instance.ssh, "ip r")
+	out, err := framework.RunSimple(instance.ssh, "/sbin/ip r")
 	if err != nil {
 		return err
 	}
