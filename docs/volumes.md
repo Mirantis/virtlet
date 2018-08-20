@@ -77,6 +77,24 @@ CD-ROM and all the flexvolume types that Virtlet supports.
    finding the device inside the virtual machine. Note that both
    mechanisms are Linux-specific.
 
+## Specifying the root volume size
+
+You can set the size of the root volume of a Virtlet VM by using
+`VirtletRootVolumeSize` annotation. The specified size must be
+greater than the QCOW2 volume size, otherwise it will be ignored.
+Here's an example:
+```yaml
+metadata:
+  name: my-vm
+  annotations:
+    kubernetes.io/target-runtime: virtlet.cloud
+    VirtletRootVolumeSize: 4Gi
+```
+This sets the root volume size to 4 GiB unless QCOW2 image size is
+larger than 4 GiB, in which case the QCOW2 volume size is used.
+The annotation uses the standard Kubernetes quantity specification
+format, for more info, see [here](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory).
+
 ## Flexvolume driver
 
 Virtlet uses custom

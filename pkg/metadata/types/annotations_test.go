@@ -83,6 +83,16 @@ func TestVirtletAnnotations(t *testing.T) {
 			},
 		},
 		{
+			name:        "root volume size",
+			annotations: map[string]string{"VirtletRootVolumeSize": "1Gi"},
+			va: &VirtletAnnotations{
+				VCPUCount:      1,
+				DiskDriver:     "scsi",
+				CDImageType:    "nocloud",
+				RootVolumeSize: 1073741824,
+			},
+		},
+		{
 			name: "cloud-init yaml and ssh keys",
 			annotations: map[string]string{
 				"VirtletCloudInitMetaData": `

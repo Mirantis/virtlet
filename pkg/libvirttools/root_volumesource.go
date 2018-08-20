@@ -51,6 +51,11 @@ func (v *rootVolume) createVolume() (virt.StorageVolume, error) {
 		return nil, err
 	}
 
+	if v.config.ParsedAnnotations != nil && v.config.ParsedAnnotations.RootVolumeSize > 0 &&
+		uint64(v.config.ParsedAnnotations.RootVolumeSize) > virtualSize {
+		virtualSize = uint64(v.config.ParsedAnnotations.RootVolumeSize)
+	}
+
 	storagePool, err := v.owner.StoragePool()
 	if err != nil {
 		return nil, err

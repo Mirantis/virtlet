@@ -29,7 +29,8 @@ import (
 )
 
 const (
-	testUUID = "77f29a0e-46af-4188-a6af-9ff8b8a65224"
+	testUUID             = "77f29a0e-46af-4188-a6af-9ff8b8a65224"
+	fakeImageVirtualSize = 424242
 )
 
 type FakeImageManager struct {
@@ -46,7 +47,7 @@ func NewFakeImageManager(rec testutils.Recorder) *FakeImageManager {
 
 func (im *FakeImageManager) GetImagePathAndVirtualSize(imageName string) (string, uint64, error) {
 	im.rec.Rec("GetImagePathAndVirtualSize", imageName)
-	return "/fake/volume/path", 424242, nil
+	return "/fake/volume/path", fakeImageVirtualSize, nil
 }
 
 func TestRootVolumeNaming(t *testing.T) {
@@ -63,20 +64,17 @@ func TestRootVolumeNaming(t *testing.T) {
 	}
 }
 
-func TestRootVolumeLifeCycle(t *testing.T) {
+func getRootVolumeForTest(t *testing.T, vmConfig *types.VMConfig) (*rootVolume, *testutils.TopLevelRecorder, *fake.FakeStoragePool) {
 	rec := testutils.NewToplevelRecorder()
-
 	volumesPoolPath := "/fake/volumes/pool"
-	expectedRootVolumePath := volumesPoolPath + "/virtlet_root_" + testUUID
 	spool := fake.NewFakeStoragePool(rec.Child("volumes"), &libvirtxml.StoragePool{
 		Name:   "volumes",
 		Target: &libvirtxml.StoragePoolTarget{Path: volumesPoolPath},
 	})
-
 	im := NewFakeImageManager(rec.Child("image"))
 
 	volumes, err := GetRootVolume(
-		&types.VMConfig{DomainUUID: testUUID, Image: "rootfs image name"},
+		vmConfig,
 		newFakeVolumeOwner(spool, im),
 	)
 	if err != nil {
@@ -87,11 +85,83 @@ func TestRootVolumeLifeCycle(t *testing.T) {
 		t.Fatalf("GetRootVolumes returned non single number of volumes: %d", len(volumes))
 	}
 
-	rootVol := volumes[0]
+	return volumes[0].(*rootVolume), rec, spool
+}
+
+func TestRootVolumeSize(t *testing.T) {
+	for _, tc := range []struct {
+		name                    string
+		specifiedRootVolumeSize int64
+		expectedVolumeSize      int64
+	}{
+		{
+			name: "default (zero)",
+			specifiedRootVolumeSize: 0,
+			expectedVolumeSize:      fakeImageVirtualSize,
+		},
+		{
+			name: "negative",
+			specifiedRootVolumeSize: -1,
+			expectedVolumeSize:      fakeImageVirtualSize,
+		},
+		{
+			name: "smaller than fakeImageVirtualSize",
+			specifiedRootVolumeSize: fakeImageVirtualSize - 10,
+			expectedVolumeSize:      fakeImageVirtualSize,
+		},
+		{
+			name: "same as fakeImageVirtualSize",
+			specifiedRootVolumeSize: fakeImageVirtualSize,
+			expectedVolumeSize:      fakeImageVirtualSize,
+		},
+		{
+			name: "greater than fakeImageVirtualSize",
+			specifiedRootVolumeSize: fakeImageVirtualSize + 10,
+			expectedVolumeSize:      fakeImageVirtualSize + 10,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rootVol, rec, spool := getRootVolumeForTest(t, &types.VMConfig{
+				DomainUUID: testUUID,
+				Image:      "rootfs image name",
+				ParsedAnnotations: &types.VirtletAnnotations{
+					RootVolumeSize: tc.specifiedRootVolumeSize,
+				},
+			})
+
+			_, err := rootVol.Setup()
+			if err != nil {
+				t.Fatalf("Setup returned an error: %v", err)
+			}
+
+			virtVol, err := spool.LookupVolumeByName(rootVol.volumeName())
+			if err != nil {
+				t.Fatalf("couldn't find volume %q", rootVol.volumeName())
+			}
+
+			size, err := virtVol.Size()
+			if err != nil {
+				t.Fatalf("couldn't get virt volume size: %v", err)
+			}
+
+			if int64(size) != tc.expectedVolumeSize {
+				t.Errorf("bad volume size %d instead of %d", size, tc.expectedVolumeSize)
+			}
+			gm.Verify(t, gm.NewYamlVerifier(rec.Content()))
+		})
+	}
+}
+
+func TestRootVolumeLifeCycle(t *testing.T) {
+	expectedRootVolumePath := "/fake/volumes/pool/virtlet_root_" + testUUID
+	rootVol, rec, _ := getRootVolumeForTest(t, &types.VMConfig{
+		DomainUUID: testUUID,
+		Image:      "rootfs image name",
+	})
 
 	vol, err := rootVol.Setup()
 	if err != nil {
-		t.Errorf("Setup returned an error: %v", err)
+		t.Fatalf("Setup returned an error: %v", err)
 	}
 
 	if vol.Source.File == nil {

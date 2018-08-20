@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
 	"regexp"
 	"strconv"
 	"time"
@@ -36,7 +37,8 @@ var _ = Describe("VM resources", func() {
 	BeforeAll(func() {
 		vm = controller.VM("vm-resources")
 		Expect(vm.Create(VMOptions{
-			VCPUCount: 2,
+			VCPUCount:      2,
+			RootVolumeSize: "4Gi",
 		}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
 		do(vm.Pod())
 	})
@@ -61,5 +63,20 @@ var _ = Describe("VM resources", func() {
 			total += do(strconv.Atoi(m[1])).(int)
 		}
 		Expect(total).To(Equal(1024*(*memoryLimit) - 128))
+	})
+
+	It("Should grow the root volume size if requested", func() {
+		Eventually(func() error {
+			sizeStr := do(framework.RunSimple(ssh, "/bin/sh", "-c", `df -m / | tail -1 | awk "{print \$2}"`)).(string)
+			size, err := strconv.Atoi(sizeStr)
+			if err != nil {
+				return err
+			}
+			minSize := 3900
+			if size < minSize {
+				return fmt.Errorf("the size is %d but needs to be at least %d", size, minSize)
+			}
+			return nil
+		})
 	})
 })
