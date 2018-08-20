@@ -95,7 +95,7 @@ func (v *VirtletImageService) ImageFsInfo(ctx context.Context, in *kubeapi.Image
 	return &kubeapi.ImageFsInfoResponse{
 		ImageFilesystems: []*kubeapi.FilesystemUsage{
 			&kubeapi.FilesystemUsage{
-				Timestamp: time.Now().Unix(),
+				Timestamp: time.Now().UnixNano(),
 				FsId: &kubeapi.FilesystemIdentifier{
 					Mountpoint: stats.Mountpoint,
 				},
