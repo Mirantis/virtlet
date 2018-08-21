@@ -4,7 +4,7 @@
 
 Be proffesional. When it's possible - follow general golang [code review guidelines](https://github.com/golang/go/wiki/CodeReviewComments).
 
-## Contribugin guidelines
+## Contributing guidelines
 
 Please check out [Effective Go](https://golang.org/doc/effective_go.html) as 
 a base source of rules for this project.

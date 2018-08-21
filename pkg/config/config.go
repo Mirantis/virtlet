@@ -199,7 +199,7 @@ func configForNode(mappings []virtlet_v1.VirtletConfigMapping, localConfig *virt
 	}
 	sort.Slice(sortedMappings, func(i, j int) bool {
 		a, b := sortedMappings[i], sortedMappings[j]
-		// Iitems that go later in the list take precedence.
+		// Items that go later in the list take precedence.
 		return a.Spec.Priority < b.Spec.Priority
 	})
 

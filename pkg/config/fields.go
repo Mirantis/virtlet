@@ -267,7 +267,7 @@ func (fs *fieldSet) applyDefaults() {
 
 func (fs *fieldSet) addFlags(flagSet *flag.FlagSet) {
 	for _, f := range fs.fields {
-		if f.flagName() != "" && !strings.Contains("+", f.flagName()) {
+		if f.flagName() != "" && !strings.Contains(f.flagName(), "+") {
 			f.addFlag(flagSet)
 		}
 	}

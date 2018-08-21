@@ -107,7 +107,7 @@ func printVersion() {
 
 func setLogLevel(config *v1.VirtletConfig) {
 	goflag.CommandLine.Parse([]string{
-		fmt.Sprintf("-v=%d", config.LogLevel),
+		fmt.Sprintf("-v=%d", *config.LogLevel),
 		"-logtostderr=true",
 	})
 }
