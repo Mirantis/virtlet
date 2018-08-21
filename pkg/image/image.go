@@ -25,9 +25,12 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/aykevl/osfs"
 	"github.com/docker/distribution/reference"
 	"github.com/golang/glog"
 	digest "github.com/opencontainers/go-digest"
+
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 // Image describes an image.
@@ -53,6 +56,17 @@ type Translator func(context.Context, string) Endpoint
 // RefGetter is a function that returns the list of images
 // that are currently in use.
 type RefGetter func() (map[string]bool, error)
+
+// FilesystemStats contains info about filesystem mountpoint and
+// space/inodes used by images on it
+type FilesystemStats struct {
+	// Mountpoint denotes the filesystem mount point
+	Mountpoint string
+	// UsedBytes is the number of bytes used by images
+	UsedBytes uint64
+	// UsedInodes is the number of inodes used by images
+	UsedInodes uint64
+}
 
 // Store is an interface for the image store.
 type Store interface {
@@ -85,6 +99,9 @@ type Store interface {
 	// SetRefGetter sets a function that will be used to determine
 	// the set of images that are currently in use.
 	SetRefGetter(imageRefGetter RefGetter)
+
+	// FilesystemStats returns disk space and inode usage info for this store.
+	FilesystemStats() (*FilesystemStats, error)
 }
 
 // VirtualSizeFunc specifies a function that returns the virtual
@@ -540,4 +557,28 @@ func GetHexDigest(imageSpec string) string {
 	}
 
 	return ""
+}
+
+// FilesystemStats returns disk space and inode usage info for this store.
+// TODO: instead of returning data from filesystem we should retrieve from
+// metadata store sizes of images and sum them, or even retrieve precalculated
+// sum. That's because same filesystem could be used by other things than images.
+func (s *FileStore) FilesystemStats() (*FilesystemStats, error) {
+	occupiedBytes, occupiedInodes, err := utils.GetFsStatsForPath(s.dir)
+	if err != nil {
+		return nil, err
+	}
+	info, err := osfs.Read()
+	if err != nil {
+		return nil, err
+	}
+	mount, err := info.GetPath(s.dir)
+	if err != nil {
+		return nil, err
+	}
+	return &FilesystemStats{
+		Mountpoint: mount.FSRoot,
+		UsedBytes:  occupiedBytes,
+		UsedInodes: occupiedInodes,
+	}, nil
 }

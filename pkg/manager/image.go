@@ -17,8 +17,7 @@ limitations under the License.
 package manager
 
 import (
-	"errors"
-
+	"github.com/jonboulle/clockwork"
 	"golang.org/x/net/context"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
@@ -29,13 +28,18 @@ import (
 type VirtletImageService struct {
 	imageStore      image.Store
 	imageTranslator image.Translator
+	clock           clockwork.Clock
 }
 
 // NewVirtletImageService returns a new instance of VirtletImageService.
-func NewVirtletImageService(imageStore image.Store, imageTranslator image.Translator) *VirtletImageService {
+func NewVirtletImageService(imageStore image.Store, imageTranslator image.Translator, clock clockwork.Clock) *VirtletImageService {
+	if clock == nil {
+		clock = clockwork.NewRealClock()
+	}
 	return &VirtletImageService{
 		imageStore:      imageStore,
 		imageTranslator: imageTranslator,
+		clock:           clock,
 	}
 }
 
@@ -86,9 +90,24 @@ func (v *VirtletImageService) RemoveImage(ctx context.Context, in *kubeapi.Remov
 	return &kubeapi.RemoveImageResponse{}, nil
 }
 
-// ImageFsInfo is a placeholder an unimplemented CRI method.
+// ImageFsInfo returns an info about filesystem used by images service
 func (v *VirtletImageService) ImageFsInfo(ctx context.Context, in *kubeapi.ImageFsInfoRequest) (*kubeapi.ImageFsInfoResponse, error) {
-	return nil, errors.New("ImageFsInfo() not implemented")
+	stats, err := v.imageStore.FilesystemStats()
+	if err != nil {
+		return nil, err
+	}
+	return &kubeapi.ImageFsInfoResponse{
+		ImageFilesystems: []*kubeapi.FilesystemUsage{
+			&kubeapi.FilesystemUsage{
+				Timestamp: v.clock.Now().UnixNano(),
+				FsId: &kubeapi.FilesystemIdentifier{
+					Mountpoint: stats.Mountpoint,
+				},
+				UsedBytes:  &kubeapi.UInt64Value{Value: stats.UsedBytes},
+				InodesUsed: &kubeapi.UInt64Value{Value: stats.UsedInodes},
+			},
+		},
+	}, nil
 }
 
 func imageToKubeapi(img *image.Image) *kubeapi.Image {

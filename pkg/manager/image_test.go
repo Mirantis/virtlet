@@ -36,5 +36,6 @@ func TestCRIImages(t *testing.T) {
 	tst.listImages(nil)
 	// second RemoveImage() should not cause an error
 	tst.removeImage(cirrosImg())
+	tst.imageFsInfo(&kubeapi.ImageFsInfoRequest{})
 	tst.verify()
 }

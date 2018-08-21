@@ -30,7 +30,7 @@ if [[ ! -d ${PLUGIN_DIR} ]]; then
 fi
 
 # Ensure that the dirs required by virtlet exist on the node
-mkdir -p /host-var-lib/libvirt/images /hostlog/virtlet/vms /host-var-lib/virtlet/volumes
+mkdir -p /host-var-lib/virtlet/images /hostlog/virtlet/vms /host-var-lib/virtlet/volumes
 
 # set up KVM
 if [[ ! ${VIRTLET_DISABLE_KVM:-} ]]; then
