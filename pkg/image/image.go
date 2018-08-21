@@ -60,11 +60,11 @@ type RefGetter func() (map[string]bool, error)
 // FilesystemStats contains info about filesystem mountpoint and
 // space/inodes used by images on it
 type FilesystemStats struct {
-	// Mountpoint denotes a filesystem mount point
+	// Mountpoint denotes the filesystem mount point
 	Mountpoint string
-	// UsedBytes contains number of bytes used by images
+	// UsedBytes is the number of bytes used by images
 	UsedBytes uint64
-	// UsedInodes contains number of inodes used by images
+	// UsedInodes is the number of inodes used by images
 	UsedInodes uint64
 }
 
@@ -100,8 +100,7 @@ type Store interface {
 	// the set of images that are currently in use.
 	SetRefGetter(imageRefGetter RefGetter)
 
-	// FilesystemStats returns info about used bytes/inodes by images
-	// in this store
+	// FilesystemStats returns disk space and inode usage info for this store.
 	FilesystemStats() (*FilesystemStats, error)
 }
 
@@ -560,8 +559,7 @@ func GetHexDigest(imageSpec string) string {
 	return ""
 }
 
-// FilesystemStats returns info about used bytes/inodes by images
-// in this store.
+// FilesystemStats returns disk space and inode usage info for this store.
 // TODO: instead of returning data from filesystem we should retrieve from
 // metadata store sizes of images and sum them, or even retrieve precalculated
 // sum. That's because same filesystem could be used by other things than images.

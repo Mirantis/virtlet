@@ -241,7 +241,7 @@ func makeVirtletCRITester(t *testing.T) *virtletCRITester {
 	streamServer := newFakeStreamServer(rec.Child("streamServer"))
 	criHandler := &criHandler{
 		VirtletRuntimeService: NewVirtletRuntimeService(virtTool, metadataStore, fdManager, streamServer, imageStore, clock),
-		VirtletImageService:   NewVirtletImageService(imageStore, translateImageName),
+		VirtletImageService:   NewVirtletImageService(imageStore, translateImageName, clock),
 	}
 	return &virtletCRITester{
 		t:              t,
@@ -407,6 +407,10 @@ func (tst *virtletCRITester) attach(req *kubeapi.AttachRequest) {
 
 func (tst *virtletCRITester) portForward(req *kubeapi.PortForwardRequest) {
 	tst.invoke("PortForward", req, true)
+}
+
+func (tst *virtletCRITester) imageFsInfo(req *kubeapi.ImageFsInfoRequest) {
+	tst.invoke("ImageFsInfo", req, true)
 }
 
 func cirrosImg() *kubeapi.ImageSpec {

@@ -18,7 +18,6 @@ package image
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 
@@ -27,6 +26,12 @@ import (
 
 	"github.com/Mirantis/virtlet/pkg/image"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
+)
+
+const (
+	fakeStoreMountpoint = "/var/lib/virtlet"
+	fakeUsedBytes       = 1024 * 1024 * 1024
+	fakeUsedInodes      = 1024
 )
 
 // FakeStore is a fake implementation of Store interface for testing.
@@ -129,5 +134,9 @@ func (s *FakeStore) SetRefGetter(imageRefGetter image.RefGetter) {
 
 // FilesystemStats implements FilesystemStats method from Store interface.
 func (s *FakeStore) FilesystemStats() (*image.FilesystemStats, error) {
-	return nil, errors.New("not implemented")
+	return &image.FilesystemStats{
+		Mountpoint: fakeStoreMountpoint,
+		UsedBytes:  fakeUsedBytes,
+		UsedInodes: fakeUsedInodes,
+	}, nil
 }

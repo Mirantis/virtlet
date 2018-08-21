@@ -22,8 +22,8 @@ import (
 	"syscall"
 )
 
-// GetFsStatsForPath returns inodes and space in bytes used by filesystem
-// releated to passed path
+// GetFsStatsForPath returns the info about inode usage and space usage
+// (in bytes) for the filesystem that contains the provided path.
 func GetFsStatsForPath(path string) (uint64, uint64, error) {
 	fs := syscall.Statfs_t{}
 	if err := syscall.Statfs(path, &fs); err != nil {

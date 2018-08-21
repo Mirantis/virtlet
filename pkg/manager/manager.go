@@ -134,7 +134,7 @@ func (v *VirtletManager) Run() error {
 	v.virtTool = libvirttools.NewVirtualizationTool(conn, conn, v.imageStore, v.metadataStore, volSrc, virtConfig)
 
 	runtimeService := NewVirtletRuntimeService(v.virtTool, v.metadataStore, v.fdManager, streamServer, v.imageStore, nil)
-	imageService := NewVirtletImageService(v.imageStore, translator)
+	imageService := NewVirtletImageService(v.imageStore, translator, nil)
 
 	v.server = NewServer()
 	v.server.Register(runtimeService, imageService)

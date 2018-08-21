@@ -22,7 +22,7 @@ import (
 	"errors"
 )
 
-// GetFsStatsForPath is a placeholder for not implemented function
+// GetFsStatsForPath is a placeholder for an unimplemented function
 func GetFsStatsForPath(path string) (uint64, uint64, error) {
 	return 0, 0, errors.New("not implemented")
 }

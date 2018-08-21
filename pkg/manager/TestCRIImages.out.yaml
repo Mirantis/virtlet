@@ -99,3 +99,15 @@
   value: localhost/cirros.img
 - name: 'leave: RemoveImage'
   value: {}
+- name: 'enter: ImageFsInfo'
+  value: {}
+- name: 'leave: ImageFsInfo'
+  value:
+    image_filesystems:
+    - fs_id:
+        mountpoint: /var/lib/virtlet
+      inodes_used:
+        value: 1024
+      timestamp: 1524648266720331175
+      used_bytes:
+        value: 1073741824

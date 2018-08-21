@@ -17,8 +17,7 @@ limitations under the License.
 package manager
 
 import (
-	"time"
-
+	"github.com/jonboulle/clockwork"
 	"golang.org/x/net/context"
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
@@ -29,13 +28,18 @@ import (
 type VirtletImageService struct {
 	imageStore      image.Store
 	imageTranslator image.Translator
+	clock           clockwork.Clock
 }
 
 // NewVirtletImageService returns a new instance of VirtletImageService.
-func NewVirtletImageService(imageStore image.Store, imageTranslator image.Translator) *VirtletImageService {
+func NewVirtletImageService(imageStore image.Store, imageTranslator image.Translator, clock clockwork.Clock) *VirtletImageService {
+	if clock == nil {
+		clock = clockwork.NewRealClock()
+	}
 	return &VirtletImageService{
 		imageStore:      imageStore,
 		imageTranslator: imageTranslator,
+		clock:           clock,
 	}
 }
 
@@ -95,7 +99,7 @@ func (v *VirtletImageService) ImageFsInfo(ctx context.Context, in *kubeapi.Image
 	return &kubeapi.ImageFsInfoResponse{
 		ImageFilesystems: []*kubeapi.FilesystemUsage{
 			&kubeapi.FilesystemUsage{
-				Timestamp: time.Now().UnixNano(),
+				Timestamp: v.clock.Now().UnixNano(),
 				FsId: &kubeapi.FilesystemIdentifier{
 					Mountpoint: stats.Mountpoint,
 				},
