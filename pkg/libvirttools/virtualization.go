@@ -18,7 +18,9 @@ package libvirttools
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -832,9 +834,30 @@ func (v *VirtualizationTool) VMStats(containerID string) (*types.VMStats, error)
 	}
 	vs.CpuUsage = cpuTime
 
-	// TODO: find image created by rootfs provider, stat it and fill there
-	// used by it bytes/inodes. Additionally mountpoint of fs on which
-	// root volume is located should be found and filled there
+	domainxml, err := domain.XML()
+	if err != nil {
+		return nil, err
+	}
+
+	rootDiskLocation := ""
+	for _, disk := range domainxml.Devices.Disks {
+		fname := disk.Source.File.File
+		// TODO: split file name and use HasPrefix on last part
+		// instead of Contains
+		if strings.Contains(fname, "virtlet_root_") {
+			rootDiskLocation = fname
+		}
+	}
+	if rootDiskLocation == "" {
+		return nil, fmt.Errorf("cannot locate root disk in domain definition")
+	}
+
+	fstat, err := os.Stat(rootDiskLocation)
+	if err != nil {
+		return nil, err
+	}
+	vs.FsBytes = uint64(fstat.Size())
+
 	return &vs, nil
 }
 
@@ -873,7 +896,7 @@ func (v *VirtualizationTool) ListVMStats(filter *types.VMStatsFilter) ([]types.V
 
 // volumeOwner implementation follows
 
-// StoragePool returns StoragePool for volumes
+// StoragePool implements volumeOwner StoragePool method
 func (v *VirtualizationTool) StoragePool() (virt.StoragePool, error) {
 	return ensureStoragePool(v.storageConn, v.config.VolumePoolName)
 }

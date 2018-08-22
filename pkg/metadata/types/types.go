@@ -103,13 +103,8 @@ type VMStats struct {
 	// MemoryUsage is expected to contain the amount of working set memory
 	// in bytes what in our case will be returned using RSS value
 	MemoryUsage uint64
-	// Mountpoint on host for filesystem containing the directory in which
-	// rootfs of VM is stored
-	Mountpoint string
 	// FsBytes represents current size of rootfs in bytes
 	FsBytes uint64
-	// FsInodes contains number of inodes used by rootfs image
-	FsInodes uint64
 }
 
 // NamespaceOption provides options for Linux namespaces.
@@ -310,4 +305,15 @@ type VMStatsFilter struct {
 	// LabelSelector to select matches. Requirementes should be ANDed.
 	// Match Expressions is not supported.
 	LabelSelector map[string]string
+}
+
+// FilesystemStats contains info about filesystem mountpoint and
+// space/inodes used by images on it
+type FilesystemStats struct {
+	// Mountpoint denotes the filesystem mount point
+	Mountpoint string
+	// UsedBytes is the number of bytes used by images
+	UsedBytes uint64
+	// UsedInodes is the number of inodes used by images
+	UsedInodes uint64
 }

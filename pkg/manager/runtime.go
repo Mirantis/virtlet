@@ -462,8 +462,12 @@ func (v *VirtletRuntimeService) ContainerStats(ctx context.Context, in *kubeapi.
 	if err != nil {
 		return nil, err
 	}
+	fsstats, err := v.virtTool.ImageManager().FilesystemStats()
+	if err != nil {
+		return nil, err
+	}
 	return &kubeapi.ContainerStatsResponse{
-		Stats: VMStatsToCRIContainerStats(vs),
+		Stats: VMStatsToCRIContainerStats(*vs, fsstats.Mountpoint),
 	}, nil
 }
 
@@ -475,9 +479,13 @@ func (v *VirtletRuntimeService) ListContainerStats(ctx context.Context, in *kube
 	if err != nil {
 		return nil, err
 	}
+	fsstats, err := v.virtTool.ImageManager().FilesystemStats()
+	if err != nil {
+		return nil, err
+	}
 	var stats []*kubeapi.ContainerStats
 	for _, vs := range vmstatsList {
-		stats = append(stats, VMStatsToCRIContainerStats(vs))
+		stats = append(stats, VMStatsToCRIContainerStats(vs, fsstats.Mountpoint))
 	}
 
 	return &kubeapi.ListContainerStatsResponse{
@@ -487,7 +495,7 @@ func (v *VirtletRuntimeService) ListContainerStats(ctx context.Context, in *kube
 
 // VMStatsToCRIContainerStats converts internal representation of vm/container stats
 // to corresponding kubeapi type object
-func VMStatsToCRIContainerStats(vs types.VMStats) *kubeapi.ContainerStats {
+func VMStatsToCRIContainerStats(vs types.VMStats, mountpoint string) *kubeapi.ContainerStats {
 	return &kubeapi.ContainerStats{
 		Attributes: &kubeapi.ContainerAttributes{
 			Id: vs.ContainerID,
@@ -503,10 +511,10 @@ func VMStatsToCRIContainerStats(vs types.VMStats) *kubeapi.ContainerStats {
 		WritableLayer: &kubeapi.FilesystemUsage{
 			Timestamp: vs.Timestamp,
 			FsId: &kubeapi.FilesystemIdentifier{
-				Mountpoint: vs.Mountpoint,
+				Mountpoint: mountpoint,
 			},
 			UsedBytes:  &kubeapi.UInt64Value{Value: vs.FsBytes},
-			InodesUsed: &kubeapi.UInt64Value{Value: vs.FsInodes},
+			InodesUsed: &kubeapi.UInt64Value{Value: 1},
 		},
 	}
 }

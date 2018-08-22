@@ -25,6 +25,7 @@ import (
 	digest "github.com/opencontainers/go-digest"
 
 	"github.com/Mirantis/virtlet/pkg/image"
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 )
 
@@ -133,8 +134,8 @@ func (s *FakeStore) SetRefGetter(imageRefGetter image.RefGetter) {
 }
 
 // FilesystemStats implements FilesystemStats method from Store interface.
-func (s *FakeStore) FilesystemStats() (*image.FilesystemStats, error) {
-	return &image.FilesystemStats{
+func (s *FakeStore) FilesystemStats() (*types.FilesystemStats, error) {
+	return &types.FilesystemStats{
 		Mountpoint: fakeStoreMountpoint,
 		UsedBytes:  fakeUsedBytes,
 		UsedInodes: fakeUsedInodes,
