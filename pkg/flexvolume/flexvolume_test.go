@@ -41,7 +41,7 @@ type fakeMounter struct {
 	journal []string
 }
 
-var _ Mounter = &fakeMounter{}
+var _ utils.Mounter = &fakeMounter{}
 
 func newFakeMounter(t *testing.T, tmpDir string) *fakeMounter {
 	return &fakeMounter{t: t, tmpDir: tmpDir}

@@ -16,22 +16,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package flexvolume
+package utils
 
 import "syscall"
 
-type LinuxMounter struct{}
+type mounter struct{}
 
-var _ Mounter = &LinuxMounter{}
+var _ Mounter = &mounter{}
 
-func NewLinuxMounter() *LinuxMounter {
-	return &LinuxMounter{}
+func NewMounter() *mounter {
+	return &mounter{}
 }
 
-func (mounter *LinuxMounter) Mount(source string, target string, fstype string) error {
-	return syscall.Mount(source, target, fstype, 0, "")
+func (mounter *mounter) Mount(source string, target string, fstype string) error {
+	return syscall.Mount(source, target, fstype, syscall.MS_BIND|syscall.MS_REC, "")
 }
 
-func (mounter *LinuxMounter) Unmount(target string) error {
+func (mounter *mounter) Unmount(target string) error {
 	return syscall.Unmount(target, 0)
 }
