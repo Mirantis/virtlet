@@ -1,5 +1,5 @@
 /*
-Copyright 2017 Mirantis
+Copyright 2018 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,19 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package utils
 
-import (
-	"math/rand"
-	"os"
-	"time"
-
-	"github.com/Mirantis/virtlet/pkg/flexvolume"
-	"github.com/Mirantis/virtlet/pkg/utils"
-)
-
-func main() {
-	rand.Seed(time.Now().UnixNano())
-	driver := flexvolume.NewFlexVolumeDriver(utils.NewUUID, utils.NewMounter())
-	os.Stdout.WriteString(driver.Run(os.Args[1:]))
+type Mounter interface {
+	Mount(source string, target string, fstype string) error
+	Unmount(target string) error
 }

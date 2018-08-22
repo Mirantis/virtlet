@@ -46,11 +46,6 @@ func init() {
 	}
 }
 
-type Mounter interface {
-	Mount(source string, target string, fstype string) error
-	Unmount(target string) error
-}
-
 type nullMounter struct{}
 
 func (m *nullMounter) Mount(source string, target string, fstype string) error {
@@ -67,10 +62,10 @@ type UuidGen func() string
 
 type FlexVolumeDriver struct {
 	uuidGen UuidGen
-	mounter Mounter
+	mounter utils.Mounter
 }
 
-func NewFlexVolumeDriver(uuidGen UuidGen, mounter Mounter) *FlexVolumeDriver {
+func NewFlexVolumeDriver(uuidGen UuidGen, mounter utils.Mounter) *FlexVolumeDriver {
 	return &FlexVolumeDriver{uuidGen: uuidGen, mounter: mounter}
 }
 
