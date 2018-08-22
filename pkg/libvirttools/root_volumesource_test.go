@@ -30,8 +30,10 @@ import (
 )
 
 const (
-	testUUID             = "77f29a0e-46af-4188-a6af-9ff8b8a65224"
-	fakeImageVirtualSize = 424242
+	testUUID                 = "77f29a0e-46af-4188-a6af-9ff8b8a65224"
+	fakeImageVirtualSize     = 424242
+	fakeImageStoreUsedBytes  = 424242
+	fakeImageStoreUsedInodes = 424242
 )
 
 type FakeImageManager struct {
@@ -49,6 +51,14 @@ func NewFakeImageManager(rec testutils.Recorder) *FakeImageManager {
 func (im *FakeImageManager) GetImagePathAndVirtualSize(imageName string) (string, uint64, error) {
 	im.rec.Rec("GetImagePathAndVirtualSize", imageName)
 	return "/fake/volume/path", fakeImageVirtualSize, nil
+}
+
+func (im *FakeImageManager) FilesystemStats() (*types.FilesystemStats, error) {
+	return &types.FilesystemStats{
+		Mountpoint: "/some/dir",
+		UsedBytes:  fakeImageStoreUsedBytes,
+		UsedInodes: fakeImageStoreUsedInodes,
+	}, nil
 }
 
 func TestRootVolumeNaming(t *testing.T) {
