@@ -112,7 +112,7 @@ func intercept(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo,
 	case err != nil && !bool(glog.V(criErrorLogLevel)):
 		// do nothing
 	case err != nil:
-		glog.Infof("FAIL: %s(): %v", info.FullMethod, err)
+		glog.Errorf("FAIL: %s(): %v", info.FullMethod, err)
 	case bool(glog.V(logLevel)):
 		glog.Infof("LEAVE: %s()\n%s", info.FullMethod, dump(resp))
 	}
