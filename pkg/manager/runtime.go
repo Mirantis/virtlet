@@ -463,27 +463,7 @@ func (v *VirtletRuntimeService) ContainerStats(ctx context.Context, in *kubeapi.
 		return nil, err
 	}
 	return &kubeapi.ContainerStatsResponse{
-		Stats: &kubeapi.ContainerStats{
-			Attributes: &kubeapi.ContainerAttributes{
-				Id: in.ContainerId,
-			},
-			Cpu: &kubeapi.CpuUsage{
-				Timestamp:            vs.Timestamp,
-				UsageCoreNanoSeconds: &kubeapi.UInt64Value{Value: vs.CpuUsage},
-			},
-			Memory: &kubeapi.MemoryUsage{
-				Timestamp:       vs.Timestamp,
-				WorkingSetBytes: &kubeapi.UInt64Value{Value: vs.MemoryUsage},
-			},
-			WritableLayer: &kubeapi.FilesystemUsage{
-				Timestamp: vs.Timestamp,
-				FsId: &kubeapi.FilesystemIdentifier{
-					Mountpoint: vs.Mountpoint,
-				},
-				UsedBytes:  &kubeapi.UInt64Value{Value: vs.FsBytes},
-				InodesUsed: &kubeapi.UInt64Value{Value: vs.FsInodes},
-			},
-		},
+		Stats: VMStatsToCRIContainerStats(vs),
 	}, nil
 }
 
@@ -497,32 +477,38 @@ func (v *VirtletRuntimeService) ListContainerStats(ctx context.Context, in *kube
 	}
 	var stats []*kubeapi.ContainerStats
 	for _, vs := range vmstatsList {
-		stats = append(stats, &kubeapi.ContainerStats{
-			Attributes: &kubeapi.ContainerAttributes{
-				Id: vs.ContainerID,
-			},
-			Cpu: &kubeapi.CpuUsage{
-				Timestamp:            vs.Timestamp,
-				UsageCoreNanoSeconds: &kubeapi.UInt64Value{Value: vs.CpuUsage},
-			},
-			Memory: &kubeapi.MemoryUsage{
-				Timestamp:       vs.Timestamp,
-				WorkingSetBytes: &kubeapi.UInt64Value{Value: vs.MemoryUsage},
-			},
-			WritableLayer: &kubeapi.FilesystemUsage{
-				Timestamp: vs.Timestamp,
-				FsId: &kubeapi.FilesystemIdentifier{
-					Mountpoint: vs.Mountpoint,
-				},
-				UsedBytes:  &kubeapi.UInt64Value{Value: vs.FsBytes},
-				InodesUsed: &kubeapi.UInt64Value{Value: vs.FsInodes},
-			},
-		})
+		stats = append(stats, VMStatsToCRIContainerStats(vs))
 	}
 
 	return &kubeapi.ListContainerStatsResponse{
 		Stats: stats,
 	}, nil
+}
+
+// VMStatsToCRIContainerStats converts internal representation of vm/container stats
+// to corresponding kubeapi type object
+func VMStatsToCRIContainerStats(vs types.VMStats) *kubeapi.ContainerStats {
+	return &kubeapi.ContainerStats{
+		Attributes: &kubeapi.ContainerAttributes{
+			Id: vs.ContainerID,
+		},
+		Cpu: &kubeapi.CpuUsage{
+			Timestamp:            vs.Timestamp,
+			UsageCoreNanoSeconds: &kubeapi.UInt64Value{Value: vs.CpuUsage},
+		},
+		Memory: &kubeapi.MemoryUsage{
+			Timestamp:       vs.Timestamp,
+			WorkingSetBytes: &kubeapi.UInt64Value{Value: vs.MemoryUsage},
+		},
+		WritableLayer: &kubeapi.FilesystemUsage{
+			Timestamp: vs.Timestamp,
+			FsId: &kubeapi.FilesystemIdentifier{
+				Mountpoint: vs.Mountpoint,
+			},
+			UsedBytes:  &kubeapi.UInt64Value{Value: vs.FsBytes},
+			InodesUsed: &kubeapi.UInt64Value{Value: vs.FsInodes},
+		},
+	}
 }
 
 // ReopenContainerLog is a placeholder for an unimplemented CRI method.
