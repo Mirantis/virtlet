@@ -198,7 +198,7 @@ e2e: &e2e
         skip="-ginkgo.skip=\[Heavy\]|\[MultiCNI\]|\[Disruptive\]|RBD volumes"
         if [[ ${CIRCLE_JOB} = e2e_multi_cni ]]; then
           # per-node config test requires an additional worker node
-          skip="-ginkgo.skip=\[Heavy\]|\[Disruptive\]|Per-node configuration"
+          skip="-ginkgo.skip=\[Heavy\]|\[Disruptive\]|Per-node configuration|RBD volumes"
         fi
         _output/virtlet-e2e-tests -test.v "${skip}" -junitOutput ~/junit/junit.xml -include-unsafe-tests=true
 
