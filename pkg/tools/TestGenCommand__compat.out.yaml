@@ -493,6 +493,10 @@ spec:
                   type: string
                 skipImageTranslation:
                   type: boolean
+                streamPort:
+                  maximum: 65535
+                  minimum: 1
+                  type: integer
             nodeName:
               type: string
             nodeSelector:

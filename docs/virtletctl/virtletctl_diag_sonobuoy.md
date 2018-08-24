@@ -13,7 +13,8 @@ virtletctl diag sonobuoy [flags]
 ### Options
 
 ```
-  -h, --help   help for sonobuoy
+  -h, --help         help for sonobuoy
+      --tag string   Set virtlet image tag for the plugin
 ```
 
 ### Options inherited from parent commands

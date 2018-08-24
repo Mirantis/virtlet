@@ -16,4 +16,5 @@
 | Calico subnet size to use | `calicoSubnetSize` | `24` | integer | `--calico-subnet-size` / `VIRTLET_CALICO_SUBNET` |
 | Enable regexp image name translation | `enableRegexpImageTranslation` | `true` | boolean | `--enable-regexp-image-translation` / `IMAGE_REGEXP_TRANSLATION` |
 | CPU model to use in libvirt domain definition (libvirt's default value will be used if not set) | `cpuModel` |  | string | `--cpu-model` / `VIRTLET_CPU_MODEL` |
+| configurable port to the virtlet server | `streamPort` | `10010` | integer | `--stream-port` / `VIRTLET_STREAM_PORT` |
 | Log level to use | `logLevel` | `1` | integer | `--v` / `VIRTLET_LOGLEVEL` |

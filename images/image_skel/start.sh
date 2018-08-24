@@ -21,4 +21,4 @@ verbose=
 if [[ ${VIRTLET_LOGLEVEL:-} ]]; then
     verbose="--v ${VIRTLET_LOGLEVEL}"
 fi
-/usr/local/bin/virtlet ${verbose}
+/usr/local/bin/virtlet ${verbose} $*
