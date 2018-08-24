@@ -104,6 +104,9 @@ spec:
           name: pods-log
         - mountPath: /var/log/libvirt
           name: libvirt-log
+        - mountPath: /var/run/netns
+          mountPropagation: Bidirectional
+          name: netns-dir
       - command:
         - /vms.sh
         image: mirantis/virtlet
@@ -260,6 +263,9 @@ spec:
       - hostPath:
           path: /var/log/pods
         name: pods-log
+      - hostPath:
+          path: /var/run/netns
+        name: netns-dir
       - configMap:
           name: virtlet-image-translations
         name: image-name-translations
