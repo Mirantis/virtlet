@@ -235,10 +235,10 @@ func (domain *libvirtDomain) GetCPUTime() (uint64, error) {
 	if len(stats) != 1 {
 		return 0, fmt.Errorf("domain.GetCPUStats returned %d values while single one was expected", len(stats))
 	}
-	if !stats[0].VcpuTimeSet {
-		return 0, fmt.Errorf("domain.VcpuTime not found in memory stats")
+	if !stats[0].CpuTimeSet {
+		return 0, fmt.Errorf("domain.CpuTime not found in memory stats")
 	}
-	return stats[0].VcpuTime, nil
+	return stats[0].CpuTime, nil
 }
 
 type libvirtSecret struct {
