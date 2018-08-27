@@ -430,6 +430,9 @@ func (s *LogDirSource) DiagnosticInfo() (Result, error) {
 			continue
 		}
 		name := fi.Name()
+		if strings.HasPrefix(name, ".") {
+			continue
+		}
 		ext := filepath.Ext(name)
 		cur := Result{
 			Name: name,
