@@ -31,7 +31,7 @@ func TestDump(t *testing.T) {
 	sandbox := fakemeta.GetSandboxes(1)[0]
 	ct.setPodSandbox(sandbox)
 
-	ct.createContainer(sandbox, nil)
+	ct.createContainer(sandbox, nil, nil)
 
 	// Avoid having volatile cloud-init .iso path in the domain
 	// definition

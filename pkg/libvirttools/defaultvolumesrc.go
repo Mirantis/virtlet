@@ -21,6 +21,7 @@ package libvirttools
 func GetDefaultVolumeSource() VMVolumeSource {
 	return CombineVMVolumeSources(
 		GetRootVolume,
+		GetBlockVolumes,
 		ScanFlexVolumes,
 		GetFileSystemVolumes,
 		// XXX: GetConfigVolume must go last because it

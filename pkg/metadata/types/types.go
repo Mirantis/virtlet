@@ -180,6 +180,15 @@ type VMMount struct {
 	Readonly bool
 }
 
+// VMVolumeDevice denotes a raw block device mapping within a VM which
+// is used for block PVs.
+type VMVolumeDevice struct {
+	// DevicePath specifies the path to the device inside the VM.
+	DevicePath string
+	// HostPath specifies the mount path in the host namespace.
+	HostPath string
+}
+
 // VMConfig contains the information needed to start create a VM
 // TODO: use this struct to store VM metadata.
 type VMConfig struct {
@@ -219,6 +228,9 @@ type VMConfig struct {
 	// Host directories corresponding to the volumes which are to.
 	// be mounted inside the VM
 	Mounts []VMMount
+	// Host block devices that should be made available inside the VM.
+	// This is used for block PVs.
+	VolumeDevices []VMVolumeDevice
 	// ContainerSideNetwork stores info about container side network configuration.
 	ContainerSideNetwork *network.ContainerSideNetwork
 	// Path to the directory on the host in which container log files are
