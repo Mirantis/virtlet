@@ -46,8 +46,10 @@ func setupLogDir(t *testing.T, baseDir string) string {
 		t.Fatalf("MkdirAll(): %v", err)
 	}
 	for name, contents := range map[string]string{
-		"log1.txt": "log1 contents",
-		"log2.txt": "log2 contents",
+		"log1.txt":      "log1 contents",
+		"log2.txt":      "log2 contents",
+		".placeholder":  "ignored file",
+		".place.holder": "another ignored file",
 	} {
 		if err := ioutil.WriteFile(filepath.Join(logDir, name), []byte(contents), 0777); err != nil {
 			t.Fatalf("WriteFile(): %v", err)
