@@ -12,6 +12,7 @@ enableSriov: true
 fdServerSocketPath: /some/fd/server.sock
 imageDir: /some/image/dir
 imageTranslationConfigsDir: /some/translation/dir
+kubeletRootDir: /var/lib/kubelet/pods
 libvirtURI: qemu:///foobar
 logLevel: 1
 rawDevices: sd*

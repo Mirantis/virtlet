@@ -49,8 +49,7 @@ const (
 	domainDestroyTimeout          = 5 * time.Second
 
 	// ContainerNsUUID template for container ns uuid generation
-	ContainerNsUUID       = "67b7fb47-7735-4b64-86d2-6d062d121966"
-	defaultKubeletRootDir = "/var/lib/kubelet/pods"
+	ContainerNsUUID = "67b7fb47-7735-4b64-86d2-6d062d121966"
 
 	// KubernetesPodNameLabel is pod name container label (copied from kubetypes).
 	KubernetesPodNameLabel = "io.kubernetes.pod.name"
@@ -215,12 +214,6 @@ type VirtualizationConfig struct {
 	SharedFilesystemPath string
 }
 
-func (c *VirtualizationConfig) applyDefaults() {
-	if c.KubeletRootDir == "" {
-		c.KubeletRootDir = defaultKubeletRootDir
-	}
-}
-
 // VirtualizationTool provides methods to operate on libvirt.
 type VirtualizationTool struct {
 	domainConn    virt.DomainConnection
@@ -241,7 +234,6 @@ func NewVirtualizationTool(domainConn virt.DomainConnection,
 	storageConn virt.StorageConnection, imageManager ImageManager,
 	metadataStore metadata.Store, volumeSource VMVolumeSource,
 	config VirtualizationConfig, mounter utils.Mounter) *VirtualizationTool {
-	config.applyDefaults()
 	return &VirtualizationTool{
 		domainConn:    domainConn,
 		storageConn:   storageConn,
