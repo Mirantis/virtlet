@@ -5,9 +5,9 @@ Thanks to [CNI-Genie](https://github.com/Huawei-PaaS/CNI-Genie), Virtlet can use
 
 # Requirements
 
-* forked CNI Genie, docker image: `mirantis/cnigenie`
+* CNI Genie https://github.com/Huawei-PaaS/CNI-Genie
 * pre-installed CNI plugins in version 0.6.0 or 0.7.1
-* `cniVersion` set to at least `0.3.0` in all configuration files for CNI networks (see examples below) 
+* `cniVersion` set to at least `0.3.0` in all configuration files for CNI networks (see examples below)
 
 ## CNI-genie
 
