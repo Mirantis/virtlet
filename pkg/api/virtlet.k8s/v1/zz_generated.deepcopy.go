@@ -315,6 +315,15 @@ func (in *VirtletConfig) DeepCopyInto(out *VirtletConfig) {
 			**out = **in
 		}
 	}
+	if in.KubeletRootDir != nil {
+		in, out := &in.KubeletRootDir, &out.KubeletRootDir
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(string)
+			**out = **in
+		}
+	}
 	return
 }
 

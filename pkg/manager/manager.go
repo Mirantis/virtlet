@@ -112,6 +112,7 @@ func (v *VirtletManager) Run() error {
 		CPUModel:             *v.config.CPUModel,
 		VolumePoolName:       volumePoolName,
 		SharedFilesystemPath: virtletSharedFsDir,
+		KubeletRootDir:       *v.config.KubeletRootDir,
 	}
 	if *v.config.RawDevices != "" {
 		virtConfig.RawDevices = strings.Split(*v.config.RawDevices, ",")

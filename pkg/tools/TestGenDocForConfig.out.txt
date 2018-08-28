@@ -17,4 +17,5 @@
 | Enable regexp image name translation | `enableRegexpImageTranslation` | `true` | boolean | `--enable-regexp-image-translation` / `IMAGE_REGEXP_TRANSLATION` |
 | CPU model to use in libvirt domain definition (libvirt's default value will be used if not set) | `cpuModel` |  | string | `--cpu-model` / `VIRTLET_CPU_MODEL` |
 | configurable port to the virtlet server | `streamPort` | `10010` | integer | `--stream-port` / `VIRTLET_STREAM_PORT` |
+| Pod's root dir in kubelet | `kubeletRootDir` | `/var/lib/kubelet/pods` | string | `--kubelet-root-dir` / `KUBELET_ROOT_DIR` |
 | Log level to use | `logLevel` | `1` | integer | `--v` / `VIRTLET_LOGLEVEL` |

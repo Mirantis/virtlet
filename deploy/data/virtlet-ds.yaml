@@ -121,6 +121,12 @@ spec:
               name: virtlet-config
               key: cpu-model
               optional: true
+        - name: KUBELET_ROOT_DIR
+          valueFrom:
+            configMapKeyRef:
+              name: virtlet-config
+              key: kubelet_root_dir
+              optional: true
         - name: VIRTLET_IMAGE_TRANSLATIONS_DIR
           value: /etc/virtlet/images
 
