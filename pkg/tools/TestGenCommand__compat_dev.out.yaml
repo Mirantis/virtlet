@@ -130,7 +130,7 @@ spec:
           name: modules
         - mountPath: /dind
           name: dind
-      dnsPolicy: ClusterFirstWithHostNet
+      dnsPolicy: ClusterFirst
       hostNetwork: true
       hostPID: true
       initContainers:

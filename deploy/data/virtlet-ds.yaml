@@ -15,7 +15,7 @@ spec:
         runtime: virtlet
     spec:
       hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
+      dnsPolicy: ClusterFirst
       # hostPID is true to (1) enable VMs to survive virtlet container restart
       # (to be checked) and (2) to enable the use of nsenter in init container
       hostPID: true

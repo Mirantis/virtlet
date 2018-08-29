@@ -125,7 +125,7 @@ spec:
           name: dev
         - mountPath: /lib/modules
           name: modules
-      dnsPolicy: ClusterFirstWithHostNet
+      dnsPolicy: ClusterFirst
       hostNetwork: true
       hostPID: true
       initContainers:
