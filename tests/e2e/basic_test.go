@@ -138,7 +138,7 @@ var _ = Describe("Virtlet [Basic cirros tests]", func() {
 		localExecutor := framework.LocalExecutor(ctx)
 
 		By(fmt.Sprintf("Starting nginx pod"))
-		nginxPod, err := controller.RunPod(podName, "nginx", nil, time.Minute*4, 80)
+		nginxPod, err := controller.RunPod(podName, framework.NginxImage, nil, time.Minute*4, 80)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(nginxPod).NotTo(BeNil())
 
@@ -209,7 +209,7 @@ func itShouldHaveNetworkConnectivity(podIface func() *framework.PodInterface, ss
 		var nginxPod *framework.PodInterface
 
 		BeforeAll(func() {
-			p, err := controller.RunPod("nginx", "nginx", nil, time.Minute*4, 80)
+			p, err := controller.RunPod("nginx", framework.NginxImage, nil, time.Minute*4, 80)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(p).NotTo(BeNil())
 			nginxPod = p
