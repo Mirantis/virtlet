@@ -20,12 +20,10 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"syscall"
 
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
 	"github.com/Mirantis/virtlet/pkg/metadata/types"
-	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 // rootVolume denotes the root disk of the VM
@@ -38,8 +36,6 @@ type filesystemVolume struct {
 
 var _ VMVolume = &filesystemVolume{}
 
-var mounter = utils.NewMounter()
-
 func (v *filesystemVolume) UUID() string { return "" }
 
 func (v *filesystemVolume) Setup() (*libvirtxml.DomainDisk, *libvirtxml.DomainFilesystem, error) {
@@ -48,7 +44,7 @@ func (v *filesystemVolume) Setup() (*libvirtxml.DomainDisk, *libvirtxml.DomainFi
 		err = ChownForEmulator(v.volumeMountPoint, false)
 	}
 	if err == nil {
-		err = mounter.Mount(v.mount.HostPath, v.volumeMountPoint, "bind", syscall.MS_BIND|syscall.MS_REC)
+		err = v.owner.Mounter().Mount(v.mount.HostPath, v.volumeMountPoint, "bind", true)
 	}
 	if err == nil {
 		err = ChownForEmulator(v.volumeMountPoint, v.chownRecursively)
@@ -69,7 +65,7 @@ func (v *filesystemVolume) Setup() (*libvirtxml.DomainDisk, *libvirtxml.DomainFi
 func (v *filesystemVolume) Teardown() error {
 	var err error
 	if _, err = os.Stat(v.volumeMountPoint); err == nil {
-		err = mounter.Unmount(v.volumeMountPoint, syscall.MNT_DETACH)
+		err = v.owner.Mounter().Unmount(v.volumeMountPoint, true)
 	}
 	if err == nil {
 		err = os.Remove(v.volumeMountPoint)

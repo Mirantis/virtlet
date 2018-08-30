@@ -91,7 +91,7 @@ func newContainerTester(t *testing.T, rec *testutils.TopLevelRecorder) *containe
 		KubeletRootDir:     ct.kubeletRootDir,
 		StreamerSocketPath: "/var/lib/libvirt/streamer.sock",
 	}
-	ct.virtTool = NewVirtualizationTool(ct.domainConn, ct.storageConn, imageManager, ct.metadataStore, GetDefaultVolumeSource(), virtConfig)
+	ct.virtTool = NewVirtualizationTool(ct.domainConn, ct.storageConn, imageManager, ct.metadataStore, GetDefaultVolumeSource(), virtConfig, utils.NullMounter)
 	ct.virtTool.SetClock(ct.clock)
 
 	return ct
@@ -320,7 +320,7 @@ func TestDomainDefinitions(t *testing.T) {
 	flexVolumeDriver := flexvolume.NewFlexVolumeDriver(func() string {
 		// note that this is only good for just one flexvolume
 		return fakeUUID
-	}, flexvolume.NullMounter)
+	}, utils.NullMounter)
 	for _, tc := range []struct {
 		name        string
 		annotations map[string]string

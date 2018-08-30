@@ -236,7 +236,7 @@ func makeVirtletCRITester(t *testing.T) *virtletCRITester {
 		KubeletRootDir:     kubeletRootDir,
 		StreamerSocketPath: streamerSocketPath,
 	}
-	virtTool := libvirttools.NewVirtualizationTool(domainConn, storageConn, imageStore, metadataStore, libvirttools.GetDefaultVolumeSource(), virtConfig)
+	virtTool := libvirttools.NewVirtualizationTool(domainConn, storageConn, imageStore, metadataStore, libvirttools.GetDefaultVolumeSource(), virtConfig, utils.NullMounter)
 	virtTool.SetClock(clock)
 	streamServer := newFakeStreamServer(rec.Child("streamServer"))
 	criHandler := &criHandler{
@@ -291,7 +291,7 @@ func (tst *virtletCRITester) invoke(name string, req interface{}, failOnError bo
 func (tst *virtletCRITester) getSampleFlexvolMounts(podSandboxID string) []*kubeapi.Mount {
 	flexVolumeDriver := flexvolume.NewFlexVolumeDriver(func() string {
 		return "abb67e3c-71b3-4ddd-5505-8c4215d5c4eb"
-	}, flexvolume.NullMounter)
+	}, utils.NullMounter)
 	flexVolDir := filepath.Join(tst.kubeletRootDir, podSandboxID, "volumes/virtlet~flexvolume_driver", "vol1")
 	flexVolDef := map[string]interface{}{
 		"type":     "qcow2",

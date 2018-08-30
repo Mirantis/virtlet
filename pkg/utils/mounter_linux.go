@@ -29,10 +29,18 @@ func NewMounter() Mounter {
 	return &mounter{}
 }
 
-func (mounter *mounter) Mount(source string, target string, fstype string, flags uintptr) error {
+func (mounter *mounter) Mount(source string, target string, fstype string, bind bool) error {
+	flags := uintptr(0)
+	if bind {
+		flags = syscall.MS_BIND | syscall.MS_REC
+	}
 	return syscall.Mount(source, target, fstype, flags, "")
 }
 
-func (mounter *mounter) Unmount(target string, flags int) error {
+func (mounter *mounter) Unmount(target string, detach bool) error {
+	flags := 0
+	if detach {
+		flags = syscall.MNT_DETACH
+	}
 	return syscall.Unmount(target, flags)
 }

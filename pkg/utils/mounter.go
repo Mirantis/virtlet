@@ -18,6 +18,25 @@ package utils
 
 // Mounter defines mount/unmount interface
 type Mounter interface {
-	Mount(source string, target string, fstype string, flags uintptr) error
-	Unmount(target string, flags int) error
+	// Mount mounts the specified source under the target path.
+	// For bind mounts, bind must be true.
+	Mount(source string, target string, fstype string, bind bool) error
+	// Unmount unmounts the specified target directory. If detach
+	// is true, MNT_DETACH option is used (disconnect the
+	// filesystem for the new accesses even if it's busy).
+	Unmount(target string, detach bool) error
 }
+
+type nullMounter struct{}
+
+func (m *nullMounter) Mount(source string, target string, fstype string, bind bool) error {
+	return nil
+}
+
+func (m *nullMounter) Unmount(target string, detach bool) error {
+	return nil
+}
+
+// NullMounter is a mounter that's used for testing and does nothing
+// instead of mounting/unmounting.
+var NullMounter Mounter = &nullMounter{}

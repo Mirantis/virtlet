@@ -18,7 +18,6 @@ package libvirttools
 
 import (
 	"fmt"
-	"os"
 	"path"
 	"strings"
 
@@ -28,11 +27,6 @@ import (
 // GetFileSystemVolumes using prepared by kubelet volumes and contained in pod sandbox
 // annotations prepares volumes to be passed to libvirt as a DomainFileSystem definitions.
 func GetFileSystemVolumes(config *types.VMConfig, owner volumeOwner) ([]VMVolume, error) {
-	volumePoolPath := supportedStoragePools[owner.VolumePoolName()]
-	if _, err := os.Stat(volumePoolPath); err != nil {
-		return nil, err
-	}
-
 	var fsVolumes []VMVolume
 	for index, mount := range config.Mounts {
 		if isRegularFile(mount.HostPath) ||
@@ -44,8 +38,9 @@ func GetFileSystemVolumes(config *types.VMConfig, owner volumeOwner) ([]VMVolume
 
 		// `Index` is used to avoid causing conflicts as multiple host paths can have the same `path.Base`
 		volumeDirName := fmt.Sprintf("virtlet_%s_%s_%d", config.DomainUUID, path.Base(mount.HostPath), index)
-		volumeMountPoint := path.Join(volumePoolPath, volumeDirName)
+		volumeMountPoint := path.Join(owner.SharedFilesystemPath(), volumeDirName)
 		fsVolume := &filesystemVolume{
+			volumeBase:       volumeBase{config, owner},
 			mount:            mount,
 			volumeMountPoint: volumeMountPoint,
 			chownRecursively: config.ParsedAnnotations.VirtletChown9pfsMounts,

@@ -53,9 +53,9 @@ func (mounter *fakeMounter) validatePath(target string) {
 	}
 }
 
-func (mounter *fakeMounter) Mount(source string, target string, fstype string, flags uintptr) error {
+func (mounter *fakeMounter) Mount(source string, target string, fstype string, bind bool) error {
 	mounter.validatePath(target)
-	mounter.journal = append(mounter.journal, fmt.Sprintf("mount: %s %s %s", source, target, fstype))
+	mounter.journal = append(mounter.journal, fmt.Sprintf("mount: %s %s %s %v", source, target, fstype, bind))
 
 	// We want to check directory contents both before & after mount,
 	// see comment in FlexVolumeDriver.mount() in flexvolume.go.
@@ -81,10 +81,10 @@ func (mounter *fakeMounter) Mount(source string, target string, fstype string, f
 	return nil
 }
 
-func (mounter *fakeMounter) Unmount(target string, flags int) error {
+func (mounter *fakeMounter) Unmount(target string, detach bool) error {
 	// we make sure that path is under our tmpdir before wiping it
 	mounter.validatePath(target)
-	mounter.journal = append(mounter.journal, fmt.Sprintf("unmount: %s", target))
+	mounter.journal = append(mounter.journal, fmt.Sprintf("unmount: %s %v", target, detach))
 
 	paths, err := filepath.Glob(filepath.Join(target, "*"))
 	if err != nil {
@@ -186,7 +186,7 @@ func TestFlexVolume(t *testing.T) {
 				},
 			},
 			mountJournal: []string{
-				fmt.Sprintf("mount: tmpfs %s tmpfs", cephDir),
+				fmt.Sprintf("mount: tmpfs %s tmpfs false", cephDir),
 			},
 		},
 		{
@@ -195,7 +195,7 @@ func TestFlexVolume(t *testing.T) {
 			status: "Success",
 			subdir: "ceph",
 			mountJournal: []string{
-				fmt.Sprintf("unmount: %s", cephDir),
+				fmt.Sprintf("unmount: %s true", cephDir),
 			},
 		},
 		{
@@ -210,7 +210,7 @@ func TestFlexVolume(t *testing.T) {
 				},
 			},
 			mountJournal: []string{
-				fmt.Sprintf("mount: tmpfs %s tmpfs", cephDir),
+				fmt.Sprintf("mount: tmpfs %s tmpfs false", cephDir),
 			},
 		},
 		{
@@ -219,7 +219,7 @@ func TestFlexVolume(t *testing.T) {
 			status: "Success",
 			subdir: "ceph",
 			mountJournal: []string{
-				fmt.Sprintf("unmount: %s", cephDir),
+				fmt.Sprintf("unmount: %s true", cephDir),
 			},
 		},
 		{
