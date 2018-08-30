@@ -211,6 +211,8 @@ type VirtualizationConfig struct {
 	// of cpu model to be passed in libvirt domain definition.
 	// Empty value denotes libvirt defaults usage.
 	CPUModel string
+	// Path to the directory used for shared filesystems
+	SharedFilesystemPath string
 }
 
 func (c *VirtualizationConfig) applyDefaults() {
@@ -228,6 +230,7 @@ type VirtualizationTool struct {
 	clock         clockwork.Clock
 	volumeSource  VMVolumeSource
 	config        VirtualizationConfig
+	mounter       utils.Mounter
 }
 
 var _ volumeOwner = &VirtualizationTool{}
@@ -237,7 +240,7 @@ var _ volumeOwner = &VirtualizationTool{}
 func NewVirtualizationTool(domainConn virt.DomainConnection,
 	storageConn virt.StorageConnection, imageManager ImageManager,
 	metadataStore metadata.Store, volumeSource VMVolumeSource,
-	config VirtualizationConfig) *VirtualizationTool {
+	config VirtualizationConfig, mounter utils.Mounter) *VirtualizationTool {
 	config.applyDefaults()
 	return &VirtualizationTool{
 		domainConn:    domainConn,
@@ -247,6 +250,7 @@ func NewVirtualizationTool(domainConn virt.DomainConnection,
 		clock:         clockwork.NewRealClock(),
 		volumeSource:  volumeSource,
 		config:        config,
+		mounter:       mounter,
 	}
 }
 
@@ -834,6 +838,12 @@ func (v *VirtualizationTool) KubeletRootDir() string { return v.config.KubeletRo
 
 // VolumePoolName implements volumeOwner VolumePoolName method
 func (v *VirtualizationTool) VolumePoolName() string { return v.config.VolumePoolName }
+
+// Mounter implements volumeOwner Mounter method
+func (v *VirtualizationTool) Mounter() utils.Mounter { return v.mounter }
+
+// SharedFilesystemPath implements volumeOwner SharedFilesystemPath method
+func (v *VirtualizationTool) SharedFilesystemPath() string { return v.config.SharedFilesystemPath }
 
 func filterContainer(containerInfo *types.ContainerInfo, filter types.ContainerFilter) bool {
 	if filter.Id != "" && containerInfo.Id != filter.Id {

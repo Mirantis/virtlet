@@ -20,6 +20,7 @@ import (
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
 	"github.com/Mirantis/virtlet/pkg/metadata/types"
+	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/Mirantis/virtlet/pkg/virt"
 )
 
@@ -35,6 +36,8 @@ type volumeOwner interface {
 	RawDevices() []string
 	KubeletRootDir() string
 	VolumePoolName() string
+	Mounter() utils.Mounter
+	SharedFilesystemPath() string
 }
 
 // VMVolumeSource is a function that provides `VMVolume`s for VMs
