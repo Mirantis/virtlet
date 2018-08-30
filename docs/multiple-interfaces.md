@@ -5,9 +5,9 @@ Thanks to [CNI-Genie](https://github.com/Huawei-PaaS/CNI-Genie), Virtlet can use
 
 # Requirements
 
-* forked CNI Genie, docker image: `mirantis/cnigenie`
+* CNI Genie https://github.com/Huawei-PaaS/CNI-Genie
 * pre-installed CNI plugins in version 0.6.0 or 0.7.1
-* `cniVersion` set to at least `0.3.0` in all configuration files for CNI networks (see examples below) 
+* `cniVersion` set to at least `0.3.0` in all configuration files for CNI networks (see examples below)
 
 ## CNI-genie
 
@@ -42,7 +42,7 @@ kubectl apply -f https://docs.projectcalico.org/v2.6/getting-started/kubernetes/
 ```
 Install CNI-Genie:
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/Mirantis/CNI-Genie/mymaster/conf/1.8/genie.yaml
+kubectl apply -f https://raw.githubusercontent.com/Huawei-PaaS/CNI-Genie/master/conf/1.8/genie-plugin.yaml
 ```
 
 ## Update configuration files
@@ -166,8 +166,3 @@ File `/etc/cni/net.d/10-flannel.conflist`:
 # Troubleshooting
 
 If you encounter any issues when configuring multiple interfaces, gather all logs from the Virtlet pod starting with `CNI Genie`.
-
-# Notes
-
-We are using forked [CNI Genie](https://github.com/Mirantis/CNI-Genie/tree/mymaster) where we merge results from all plugins.
-We are working on merging our fork back and we already did many [changes](https://github.com/Huawei-PaaS/CNI-Genie/commits?author=lukaszo)
