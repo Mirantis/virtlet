@@ -83,21 +83,21 @@ func (v *rootVolume) createVolume() (virt.StorageVolume, error) {
 
 func (v *rootVolume) UUID() string { return "" }
 
-func (v *rootVolume) Setup() (*libvirtxml.DomainDisk, error) {
+func (v *rootVolume) Setup() (*libvirtxml.DomainDisk, *libvirtxml.DomainFilesystem, error) {
 	vol, err := v.createVolume()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	volPath, err := vol.Path()
 	if err != nil {
-		return nil, fmt.Errorf("error getting root volume path: %v", err)
+		return nil, nil, fmt.Errorf("error getting root volume path: %v", err)
 	}
 
 	return &libvirtxml.DomainDisk{
 		Device: "disk",
 		Driver: &libvirtxml.DomainDiskDriver{Name: "qemu", Type: "qcow2"},
 		Source: &libvirtxml.DomainDiskSource{File: &libvirtxml.DomainDiskSourceFile{File: volPath}},
-	}, nil
+	}, nil, nil
 }
 
 func (v *rootVolume) Teardown() error {

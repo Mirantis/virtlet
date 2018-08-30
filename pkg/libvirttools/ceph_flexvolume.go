@@ -93,24 +93,24 @@ func (v *cephVolume) UUID() string {
 	return v.opts.UUID
 }
 
-func (v *cephVolume) Setup() (*libvirtxml.DomainDisk, error) {
+func (v *cephVolume) Setup() (*libvirtxml.DomainDisk, *libvirtxml.DomainFilesystem, error) {
 	ipPortPair := strings.Split(v.opts.Monitor, ":")
 	if len(ipPortPair) != 2 {
-		return nil, fmt.Errorf("invalid format of ceph monitor setting: %s. Expected ip:port", v.opts.Monitor)
+		return nil, nil, fmt.Errorf("invalid format of ceph monitor setting: %s. Expected ip:port", v.opts.Monitor)
 	}
 
 	secret, err := v.owner.DomainConnection().DefineSecret(v.secretDef())
 	if err != nil {
-		return nil, fmt.Errorf("error defining ceph secret: %v", err)
+		return nil, nil, fmt.Errorf("error defining ceph secret: %v", err)
 	}
 
 	key, err := base64.StdEncoding.DecodeString(v.opts.Secret)
 	if err != nil {
-		return nil, fmt.Errorf("error decoding ceph secret: %v", err)
+		return nil, nil, fmt.Errorf("error decoding ceph secret: %v", err)
 	}
 
 	if err := secret.SetValue([]byte(key)); err != nil {
-		return nil, fmt.Errorf("error setting value of secret %q: %v", v.secretUsageName(), err)
+		return nil, nil, fmt.Errorf("error setting value of secret %q: %v", v.secretUsageName(), err)
 	}
 
 	return &libvirtxml.DomainDisk{
@@ -135,7 +135,7 @@ func (v *cephVolume) Setup() (*libvirtxml.DomainDisk, error) {
 				},
 			},
 		},
-	}, nil
+	}, nil, nil
 }
 
 func (v *cephVolume) Teardown() error {

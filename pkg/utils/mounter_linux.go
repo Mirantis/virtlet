@@ -1,3 +1,5 @@
+// +build linux
+
 /*
 Copyright 2018 Mirantis
 
@@ -14,16 +16,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package libvirttools
+package utils
 
-// GetDefaultVolumeSource returns a volume source that supports
-// root volume, flexvolumes and a ConfigSource for cloud-init
-func GetDefaultVolumeSource() VMVolumeSource {
-	return CombineVMVolumeSources(
-		GetRootVolume,
-		ScanFlexVolumes,
-		GetFileSystemVolumes,
-		// XXX: GetConfigVolume must go last because it
-		// doesn't produce correct name for cdrom devices
-		GetConfigVolume)
+import "syscall"
+
+type mounter struct{}
+
+var _ Mounter = &mounter{}
+
+// NewMounter creates linux mounter struct
+func NewMounter() Mounter {
+	return &mounter{}
+}
+
+func (mounter *mounter) Mount(source string, target string, fstype string, flags uintptr) error {
+	return syscall.Mount(source, target, fstype, flags, "")
+}
+
+func (mounter *mounter) Unmount(target string, flags int) error {
+	return syscall.Unmount(target, flags)
 }

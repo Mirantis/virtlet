@@ -1,4 +1,4 @@
-// +build linux
+// +build !linux
 
 /*
 Copyright 2018 Mirantis
@@ -16,22 +16,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package flexvolume
+package utils
 
-import "syscall"
+import "errors"
 
-type LinuxMounter struct{}
+type mounter struct{}
 
-var _ Mounter = &LinuxMounter{}
+var _ Mounter = &mounter{}
 
-func NewLinuxMounter() *LinuxMounter {
-	return &LinuxMounter{}
+// NewMounter creates unsupported mounter struct
+func NewMounter() Mounter {
+	return &mounter{}
 }
 
-func (mounter *LinuxMounter) Mount(source string, target string, fstype string) error {
-	return syscall.Mount(source, target, fstype, 0, "")
+func (mounter *mounter) Mount(source string, target string, fstype string, flags uintptr) error {
+	return errors.New("not implemented")
 }
 
-func (mounter *LinuxMounter) Unmount(target string) error {
-	return syscall.Unmount(target, 0)
+func (mounter *mounter) Unmount(target string, flags int) error {
+	return errors.New("not implemented")
 }

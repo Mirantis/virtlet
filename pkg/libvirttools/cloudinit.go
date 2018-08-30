@@ -467,41 +467,74 @@ func (g *CloudInitGenerator) generateMounts(volumeMap diskPathMap) ([]interface{
 	var mountScriptLines []string
 	for _, m := range g.config.Mounts {
 		// Skip file based mounts (including secrets and config maps).
-		if isRegularFile(m.HostPath) {
+		if isRegularFile(m.HostPath) ||
+			strings.Contains(m.HostPath, "kubernetes.io~secret") ||
+			strings.Contains(m.HostPath, "kubernetes.io~configmap") {
 			continue
 		}
 
-		uuid, part, err := flexvolume.GetFlexvolumeInfo(m.HostPath)
+		mountInfo, mountScriptLine, err := generateFlexvolumeMounts(volumeMap, m)
 		if err != nil {
-			glog.Errorf("Can't mount directory %q to %q inside the VM: can't get flexvolume uuid: %v", m.HostPath, m.ContainerPath, err)
-			continue
+			if !os.IsNotExist(err) {
+				glog.Errorf("Can't mount directory %q to %q inside the VM: %v", m.HostPath, m.ContainerPath, err)
+				continue
+			}
+
+			// Fs based volume
+			mountInfo, mountScriptLine, err = generateFsBasedVolumeMounts(m)
+			if err != nil {
+				glog.Errorf("Can't mount directory %q to %q inside the VM: %v", m.HostPath, m.ContainerPath, err)
+				continue
+			}
 		}
-		dpath, found := volumeMap[uuid]
-		if !found {
-			glog.Errorf("Can't mount directory %q to %q inside the VM: no device found for flexvolume uuid %q", m.HostPath, m.ContainerPath, uuid)
-			continue
-		}
-		if part < 0 {
-			part = 1
-		}
-		devPath := dpath.devPath
-		mountDevSuffix := ""
-		if part != 0 {
-			devPath += fmt.Sprintf("-part%d", part)
-			mountDevSuffix += strconv.Itoa(part)
-		}
-		r = append(r, []interface{}{devPath, m.ContainerPath})
-		mountScriptLines = append(
-			mountScriptLines,
-			// TODO: do better job at escaping m.ContainerPath
-			fmt.Sprintf("if ! mountpoint '%s'; then mkdir -p '%s' && mount /dev/`ls %s`%s '%s'; fi",
-				m.ContainerPath, m.ContainerPath, dpath.sysfsPath, mountDevSuffix, m.ContainerPath))
+
+		r = append(r, mountInfo)
+		mountScriptLines = append(mountScriptLines, mountScriptLine)
 	}
+
 	mountScript := ""
 	if len(mountScriptLines) != 0 {
 		mountScript = fmt.Sprintf("#!/bin/sh\n%s\n", strings.Join(mountScriptLines, "\n"))
 	}
 	return r, mountScript
+}
+
+func generateFlexvolumeMounts(volumeMap diskPathMap, mount types.VMMount) ([]interface{}, string, error) {
+	uuid, part, err := flexvolume.GetFlexvolumeInfo(mount.HostPath)
+	if err != nil {
+		// If the error is NotExist, return the original error
+		if os.IsNotExist(err) {
+			return nil, "", err
+		}
+		err = fmt.Errorf("can't get flexvolume uuid: %v", err)
+		return nil, "", err
+	}
+	dpath, found := volumeMap[uuid]
+	if !found {
+		err = fmt.Errorf("no device found for flexvolume uuid %q", uuid)
+		return nil, "", err
+	}
+	if part < 0 {
+		part = 1
+	}
+	devPath := dpath.devPath
+	mountDevSuffix := ""
+	if part != 0 {
+		devPath += fmt.Sprintf("-part%d", part)
+		mountDevSuffix += strconv.Itoa(part)
+	}
+	// TODO: do better job at escaping mount.ContainerPath
+	mountScriptLine := fmt.Sprintf("if ! mountpoint '%s'; then mkdir -p '%s' && mount /dev/`ls %s`%s '%s'; fi",
+		mount.ContainerPath, mount.ContainerPath, dpath.sysfsPath, mountDevSuffix, mount.ContainerPath)
+	return []interface{}{devPath, mount.ContainerPath}, mountScriptLine, nil
+}
+
+func generateFsBasedVolumeMounts(mount types.VMMount) ([]interface{}, string, error) {
+	mountTag := path.Base(mount.ContainerPath)
+	fsMountScript := fmt.Sprintf("if ! mountpoint '%s'; then mkdir -p '%s' && mount -t 9p -o trans=virtio %s '%s'; fi",
+		mount.ContainerPath, mount.ContainerPath, mountTag, mount.ContainerPath)
+	r := []interface{}{mountTag, mount.ContainerPath, "9p", "trans=virtio"}
+	return r, fsMountScript, nil
 }
 
 type writeFilesUpdater struct {

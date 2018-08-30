@@ -67,7 +67,7 @@ func newContainerTester(t *testing.T) *containerTester {
 			{Image: imageCirrosUrl},
 			{Image: imageCopyCirrosUrl},
 		},
-		fv: flexvolume.NewFlexVolumeDriver(utils.NewUUID, flexvolume.NewLinuxMounter()),
+		fv: flexvolume.NewFlexVolumeDriver(utils.NewUUID, utils.NewMounter()),
 	}
 }
 
