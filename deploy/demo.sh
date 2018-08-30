@@ -149,7 +149,8 @@ function demo::install-cni-genie {
   "${kubectl}" apply -f https://docs.projectcalico.org/v2.6/getting-started/kubernetes/installation/hosted/kubeadm/1.6/calico.yaml
   demo::wait-for "Calico etcd" demo::pods-ready k8s-app=calico-etcd
   demo::wait-for "Calico node" demo::pods-ready k8s-app=calico-node
-  "${kubectl}" apply -f https://raw.githubusercontent.com/Mirantis/CNI-Genie/mymaster/conf/1.8/genie.yaml
+  "${kubectl}" apply -f https://raw.githubusercontent.com/Huawei-PaaS/CNI-Genie/master/conf/1.8/genie-plugin.yaml
+
   demo::wait-for "CNI Genie" demo::pods-ready k8s-app=genie
   demo::jq-patch kube-node-1 '.cniVersion="0.3.0"|.default_plugin="calico,flannel"' /etc/cni/net.d/00-genie.conf
   demo::jq-patch kube-node-1 '.cniVersion="0.3.0"' /etc/cni/net.d/10-calico.conf
