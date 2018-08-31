@@ -89,6 +89,8 @@ func logLevelForMethod(fullMethod string) glog.Level {
 		return criNoisyLogLevel
 	case strings.Contains(methodName, "List"):
 		return criListLogLevel
+	case methodName == "ImageFsInfo":
+		return criListLogLevel
 	default:
 		return criRequestLogLevel
 	}
