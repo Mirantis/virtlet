@@ -46,18 +46,6 @@ func init() {
 	}
 }
 
-type nullMounter struct{}
-
-func (m *nullMounter) Mount(source string, target string, fstype string, flags uintptr) error {
-	return nil
-}
-
-func (m *nullMounter) Unmount(target string, flags int) error {
-	return nil
-}
-
-var NullMounter = &nullMounter{}
-
 type UuidGen func() string
 
 type FlexVolumeDriver struct {
@@ -128,7 +116,7 @@ func (d *FlexVolumeDriver) mount(targetMountDir, jsonOptions string) (map[string
 		return nil, err
 	}
 
-	if err := d.mounter.Mount("tmpfs", targetMountDir, "tmpfs", 0); err != nil {
+	if err := d.mounter.Mount("tmpfs", targetMountDir, "tmpfs", false); err != nil {
 		return nil, fmt.Errorf("error mounting tmpfs at %q: %v", targetMountDir, err)
 	}
 
@@ -136,7 +124,7 @@ func (d *FlexVolumeDriver) mount(targetMountDir, jsonOptions string) (map[string
 	defer func() {
 		// try to unmount upon error or panic
 		if !done {
-			d.mounter.Unmount(targetMountDir, 0)
+			d.mounter.Unmount(targetMountDir, true)
 		}
 	}()
 
@@ -150,7 +138,7 @@ func (d *FlexVolumeDriver) mount(targetMountDir, jsonOptions string) (map[string
 
 // Invocation: <driver executable> unmount <mount dir>
 func (d *FlexVolumeDriver) unmount(targetMountDir string) (map[string]interface{}, error) {
-	if err := d.mounter.Unmount(targetMountDir, 0); err != nil {
+	if err := d.mounter.Unmount(targetMountDir, true); err != nil {
 		return nil, fmt.Errorf("unmount %q: %v", targetMountDir, err.Error())
 	}
 

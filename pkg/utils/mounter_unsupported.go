@@ -18,21 +18,8 @@ limitations under the License.
 
 package utils
 
-import "errors"
-
-type mounter struct{}
-
-var _ Mounter = &mounter{}
-
-// NewMounter creates unsupported mounter struct
+// NewMounter is a placeholder for an function that is not implemented
+// on non-Linux platforms.
 func NewMounter() Mounter {
-	return &mounter{}
-}
-
-func (mounter *mounter) Mount(source string, target string, fstype string, flags uintptr) error {
-	return errors.New("not implemented")
-}
-
-func (mounter *mounter) Unmount(target string, flags int) error {
-	return errors.New("not implemented")
+	panic("Not implemented")
 }
