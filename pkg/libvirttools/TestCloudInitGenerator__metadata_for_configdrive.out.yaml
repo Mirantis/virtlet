@@ -1,0 +1,5 @@
+meta-data:
+  hostname: foo
+  instance-id: foo.default
+  local-hostname: foo
+  uuid: foo.default

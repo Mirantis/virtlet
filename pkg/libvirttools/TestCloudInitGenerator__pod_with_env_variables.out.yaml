@@ -1,0 +1,10 @@
+meta-data:
+  instance-id: foo.default
+  local-hostname: foo
+user-data:
+  write_files:
+  - content: |
+      foo=bar
+      baz=abc
+    path: /etc/cloud/environment
+    permissions: "0644"

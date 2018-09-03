@@ -22,11 +22,6 @@ import (
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
 	"github.com/Mirantis/virtlet/pkg/metadata/types"
-	"github.com/Mirantis/virtlet/pkg/utils"
-)
-
-const (
-	blockVolumeNsUUID = "593c763a-381c-4736-8c7d-20cff5278e76"
 )
 
 // blockBolume denotes a block device that's made accessible inside the VM
@@ -38,7 +33,7 @@ type blockVolume struct {
 var _ VMVolume = &blockVolume{}
 
 func (v *blockVolume) UUID() string {
-	return utils.NewUUID5(blockVolumeNsUUID, v.dev.HostPath)
+	return v.dev.UUID()
 }
 
 func (v *blockVolume) Setup() (*libvirtxml.DomainDisk, *libvirtxml.DomainFilesystem, error) {

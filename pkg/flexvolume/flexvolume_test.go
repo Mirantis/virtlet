@@ -176,13 +176,13 @@ func TestFlexVolume(t *testing.T) {
 		},
 		{
 			name:   "mount-ceph",
-			args:   []string{"mount", cephDir, utils.MapToJSON(cephJSONOpts)},
+			args:   []string{"mount", cephDir, utils.ToJSON(cephJSONOpts)},
 			status: "Success",
 			subdir: "ceph",
 			files: map[string]interface{}{
-				"virtlet-flexvolume.json": utils.MapToJSONUnindented(cephJSONVolumeInfo),
+				"virtlet-flexvolume.json": utils.ToJSONUnindented(cephJSONVolumeInfo),
 				".shadowed": map[string]interface{}{
-					"virtlet-flexvolume.json": utils.MapToJSONUnindented(cephJSONVolumeInfo),
+					"virtlet-flexvolume.json": utils.ToJSONUnindented(cephJSONVolumeInfo),
 				},
 			},
 			mountJournal: []string{
@@ -200,13 +200,13 @@ func TestFlexVolume(t *testing.T) {
 		},
 		{
 			name:   "mount-ceph-1",
-			args:   []string{"mount", cephDir, utils.MapToJSON(cephJSONOpts)},
+			args:   []string{"mount", cephDir, utils.ToJSON(cephJSONOpts)},
 			status: "Success",
 			subdir: "ceph",
 			files: map[string]interface{}{
-				"virtlet-flexvolume.json": utils.MapToJSONUnindented(cephJSONVolumeInfo),
+				"virtlet-flexvolume.json": utils.ToJSONUnindented(cephJSONVolumeInfo),
 				".shadowed": map[string]interface{}{
-					"virtlet-flexvolume.json": utils.MapToJSONUnindented(cephJSONVolumeInfo),
+					"virtlet-flexvolume.json": utils.ToJSONUnindented(cephJSONVolumeInfo),
 				},
 			},
 			mountJournal: []string{
@@ -296,7 +296,7 @@ func TestFlexVolume(t *testing.T) {
 					t.Fatalf("dirToMap() on %q: %v", subdir, err)
 				}
 				if !reflect.DeepEqual(files, step.files) {
-					t.Errorf("bad file content.\n%s\n-- instead of --\n%s", utils.MapToJSON(files), utils.MapToJSON(step.files))
+					t.Errorf("bad file content.\n%s\n-- instead of --\n%s", utils.ToJSON(files), utils.ToJSON(step.files))
 				}
 			}
 			if !reflect.DeepEqual(mounter.journal, step.mountJournal) {

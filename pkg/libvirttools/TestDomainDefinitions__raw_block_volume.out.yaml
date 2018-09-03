@@ -96,6 +96,15 @@
       version: 1
     user-data: |
       #cloud-config
+      runcmd:
+      - /etc/cloud/symlink-devs.sh
+      - ln -s '/etc/cloud/symlink-devs.sh' /var/lib/cloud/scripts/per-boot/
+      write_files:
+      - content: |
+          #!/bin/sh
+          ln -fs /dev/`ls /sys/devices/pci0000:00/0000:00:01.0/virtio*/host*/target*:0:0/*:0:0:1/block/` '/dev/tst'
+        path: /etc/cloud/symlink-devs.sh
+        permissions: "0755"
 - name: 'domain conn: virtlet-231700d5-c9a6-container1: Destroy'
 - name: 'domain conn: virtlet-231700d5-c9a6-container1: Undefine'
 - name: 'storage: volumes: RemoveVolumeByName'

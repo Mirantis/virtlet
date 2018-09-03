@@ -18,6 +18,11 @@ package types
 
 import (
 	"github.com/Mirantis/virtlet/pkg/network"
+	"github.com/Mirantis/virtlet/pkg/utils"
+)
+
+const (
+	blockVolumeNsUUID = "593c763a-381c-4736-8c7d-20cff5278e76"
 )
 
 // PodSandboxState specifies the state of the sandbox
@@ -187,6 +192,12 @@ type VMVolumeDevice struct {
 	DevicePath string
 	// HostPath specifies the mount path in the host namespace.
 	HostPath string
+}
+
+// UUID returns an uuid that uniquely identifies the block device on
+// the host.
+func (dev VMVolumeDevice) UUID() string {
+	return utils.NewUUID5(blockVolumeNsUUID, dev.HostPath)
 }
 
 // VMConfig contains the information needed to start create a VM

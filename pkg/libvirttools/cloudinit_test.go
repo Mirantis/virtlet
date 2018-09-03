@@ -36,6 +36,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/network"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
+	"github.com/Mirantis/virtlet/tests/gm"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 )
 
@@ -98,15 +99,29 @@ func TestCloudInitGenerator(t *testing.T) {
 		newFakeFlexvolume(t, tmpDir, "82b7a880-dc04-48a3-8f2d-0c6249bb53fe", 0),
 		newFakeFlexvolume(t, tmpDir, "94ae25c7-62e1-4854-9f9b-9e285c3a5ed9", 2),
 	}
+	volDevs := []types.VMVolumeDevice{
+		{
+			DevicePath: "/dev/disk-a",
+			HostPath:   vols[0].path,
+		},
+		{
+			DevicePath: "/dev/disk-b",
+			HostPath:   vols[1].path,
+		},
+		{
+			DevicePath: "/dev/disk-c",
+			HostPath:   vols[2].path,
+		},
+	}
 
 	for _, tc := range []struct {
-		name                  string
-		config                *types.VMConfig
-		volumeMap             diskPathMap
-		expectedMetaData      map[string]interface{}
-		expectedUserData      map[string]interface{}
-		expectedNetworkConfig map[string]interface{}
-		expectedUserDataStr   string
+		name                string
+		config              *types.VMConfig
+		volumeMap           diskPathMap
+		verifyMetaData      bool
+		verifyUserData      bool
+		verifyNetworkConfig bool
+		verifyUserDataStr   bool
 	}{
 		{
 			name: "plain pod",
@@ -115,14 +130,8 @@ func TestCloudInitGenerator(t *testing.T) {
 				PodNamespace:      "default",
 				ParsedAnnotations: &types.VirtletAnnotations{CDImageType: types.CloudInitImageTypeNoCloud},
 			},
-			expectedMetaData: map[string]interface{}{
-				"instance-id":    "foo.default",
-				"local-hostname": "foo",
-			},
-			expectedNetworkConfig: map[string]interface{}{
-				// that's how yaml parses the number
-				"version": float64(1),
-			},
+			verifyMetaData:      true,
+			verifyNetworkConfig: true,
 		},
 		{
 			name: "metadata for configdrive",
@@ -131,12 +140,7 @@ func TestCloudInitGenerator(t *testing.T) {
 				PodNamespace:      "default",
 				ParsedAnnotations: &types.VirtletAnnotations{CDImageType: types.CloudInitImageTypeConfigDrive},
 			},
-			expectedMetaData: map[string]interface{}{
-				"instance-id":    "foo.default",
-				"local-hostname": "foo",
-				"uuid":           "foo.default",
-				"hostname":       "foo",
-			},
+			verifyMetaData: true,
 		},
 		{
 			name: "pod with ssh keys",
@@ -148,11 +152,7 @@ func TestCloudInitGenerator(t *testing.T) {
 					CDImageType: types.CloudInitImageTypeNoCloud,
 				},
 			},
-			expectedMetaData: map[string]interface{}{
-				"instance-id":    "foo.default",
-				"local-hostname": "foo",
-				"public-keys":    []interface{}{"key1", "key2"},
-			},
+			verifyMetaData: true,
 		},
 		{
 			name: "pod with ssh keys and meta-data override",
@@ -167,11 +167,7 @@ func TestCloudInitGenerator(t *testing.T) {
 					CDImageType: types.CloudInitImageTypeNoCloud,
 				},
 			},
-			expectedMetaData: map[string]interface{}{
-				"instance-id":    "foobar",
-				"local-hostname": "foo",
-				"public-keys":    []interface{}{"key1", "key2"},
-			},
+			verifyMetaData: true,
 		},
 		{
 			name: "pod with user data",
@@ -190,18 +186,8 @@ func TestCloudInitGenerator(t *testing.T) {
 					CDImageType: types.CloudInitImageTypeNoCloud,
 				},
 			},
-			expectedMetaData: map[string]interface{}{
-				"instance-id":    "foo.default",
-				"local-hostname": "foo",
-				"public-keys":    []interface{}{"key1", "key2"},
-			},
-			expectedUserData: map[string]interface{}{
-				"users": []interface{}{
-					map[string]interface{}{
-						"name": "cloudy",
-					},
-				},
-			},
+			verifyMetaData: true,
+			verifyUserData: true,
 		},
 		{
 			name: "pod with env variables",
@@ -214,19 +200,8 @@ func TestCloudInitGenerator(t *testing.T) {
 					{"baz", "abc"},
 				},
 			},
-			expectedMetaData: map[string]interface{}{
-				"instance-id":    "foo.default",
-				"local-hostname": "foo",
-			},
-			expectedUserData: map[string]interface{}{
-				"write_files": []interface{}{
-					map[string]interface{}{
-						"path":        "/etc/cloud/environment",
-						"content":     "foo=bar\nbaz=abc\n",
-						"permissions": "0644",
-					},
-				},
-			},
+			verifyMetaData: true,
+			verifyUserData: true,
 		},
 		{
 			name: "pod with env variables and user data",
@@ -254,28 +229,8 @@ func TestCloudInitGenerator(t *testing.T) {
 					{"baz", "abc"},
 				},
 			},
-			expectedMetaData: map[string]interface{}{
-				"instance-id":    "foo.default",
-				"local-hostname": "foo",
-			},
-			expectedUserData: map[string]interface{}{
-				"users": []interface{}{
-					map[string]interface{}{
-						"name": "cloudy",
-					},
-				},
-				"write_files": []interface{}{
-					map[string]interface{}{
-						"path":    "/etc/foobar",
-						"content": "whatever",
-					},
-					map[string]interface{}{
-						"path":        "/etc/cloud/environment",
-						"content":     "foo=bar\nbaz=abc\n",
-						"permissions": "0644",
-					},
-				},
-			},
+			verifyMetaData: true,
+			verifyUserData: true,
 		},
 		{
 			name: "pod with user data script",
@@ -288,12 +243,8 @@ func TestCloudInitGenerator(t *testing.T) {
 					CDImageType:    types.CloudInitImageTypeNoCloud,
 				},
 			},
-			expectedMetaData: map[string]interface{}{
-				"instance-id":    "foo.default",
-				"local-hostname": "foo",
-				"public-keys":    []interface{}{"key1", "key2"},
-			},
-			expectedUserDataStr: "#!/bin/sh\necho hi\n",
+			verifyMetaData:    true,
+			verifyUserDataStr: true,
 		},
 		{
 			name: "pod with volumes to mount",
@@ -330,27 +281,73 @@ func TestCloudInitGenerator(t *testing.T) {
 					sysfsPath: "/sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:3/block/",
 				},
 			},
-			expectedMetaData: map[string]interface{}{
-				"instance-id":    "foo.default",
-				"local-hostname": "foo",
+			verifyMetaData: true,
+			verifyUserData: true,
+		},
+		{
+			name: "pod with volume devices",
+			config: &types.VMConfig{
+				PodName:           "foo",
+				PodNamespace:      "default",
+				ParsedAnnotations: &types.VirtletAnnotations{CDImageType: types.CloudInitImageTypeNoCloud},
+				VolumeDevices:     volDevs,
 			},
-			expectedUserData: map[string]interface{}{
-				"mounts": []interface{}{
-					[]interface{}{"/dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:1-part1", "/opt"},
-					[]interface{}{"/dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:2", "/var/lib/whatever"},
-					[]interface{}{"/dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:3-part2", "/var/lib/foobar"},
+			volumeMap: diskPathMap{
+				volDevs[0].UUID(): {
+					devPath:   "/dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:1",
+					sysfsPath: "/sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:1/block/",
 				},
-				"write_files": []interface{}{
-					map[string]interface{}{
-						"path":        "/etc/cloud/mount-volumes.sh",
-						"permissions": "0755",
-						"content": "#!/bin/sh\n" +
-							"if ! mountpoint '/opt'; then mkdir -p '/opt' && mount /dev/`ls /sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:1/block/`1 '/opt'; fi\n" +
-							"if ! mountpoint '/var/lib/whatever'; then mkdir -p '/var/lib/whatever' && mount /dev/`ls /sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:2/block/` '/var/lib/whatever'; fi\n" +
-							"if ! mountpoint '/var/lib/foobar'; then mkdir -p '/var/lib/foobar' && mount /dev/`ls /sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:3/block/`2 '/var/lib/foobar'; fi\n",
+				volDevs[1].UUID(): {
+					devPath:   "/dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:2",
+					sysfsPath: "/sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:2/block/",
+				},
+				volDevs[2].UUID(): {
+					devPath:   "/dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:3",
+					sysfsPath: "/sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:3/block/",
+				},
+			},
+			verifyMetaData: true,
+			verifyUserData: true,
+		},
+		{
+			name: "pod with volume devices and volumes to mount",
+			config: &types.VMConfig{
+				PodName:      "foo",
+				PodNamespace: "default",
+				ParsedAnnotations: &types.VirtletAnnotations{
+					CDImageType: types.CloudInitImageTypeNoCloud,
+					UserData: map[string]interface{}{
+						"mounts": []interface{}{
+							[]interface{}{"/dev/foo1", "/foo1"},
+							[]interface{}{"/dev/disk-a", "/foobar"},
+							[]interface{}{"/dev/disk-b", "/foobar"},
+						},
+					},
+				},
+				VolumeDevices: volDevs[:2],
+				Mounts: []types.VMMount{
+					{
+						ContainerPath: "/var/lib/foobar",
+						HostPath:      vols[2].path,
 					},
 				},
 			},
+			volumeMap: diskPathMap{
+				volDevs[0].UUID(): {
+					devPath:   "/dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:1",
+					sysfsPath: "/sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:1/block/",
+				},
+				volDevs[1].UUID(): {
+					devPath:   "/dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:2",
+					sysfsPath: "/sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:2/block/",
+				},
+				vols[2].uuid: {
+					devPath:   "/dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:3",
+					sysfsPath: "/sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:3/block/",
+				},
+			},
+			verifyMetaData: true,
+			verifyUserData: true,
 		},
 		{
 			name: "injecting mount script into user data script",
@@ -374,13 +371,38 @@ func TestCloudInitGenerator(t *testing.T) {
 					sysfsPath: "/sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:1/block/",
 				},
 			},
-			expectedMetaData: map[string]interface{}{
-				"instance-id":    "foo.default",
-				"local-hostname": "foo",
+			verifyMetaData:    true,
+			verifyUserDataStr: true,
+		},
+		{
+			name: "injecting mount and symlink scripts into user data script",
+			config: &types.VMConfig{
+				PodName:      "foo",
+				PodNamespace: "default",
+				ParsedAnnotations: &types.VirtletAnnotations{
+					UserDataScript: "#!/bin/sh\necho hi\n@virtlet-mount-script@",
+					CDImageType:    types.CloudInitImageTypeNoCloud,
+				},
+				VolumeDevices: volDevs[1:2],
+				Mounts: []types.VMMount{
+					{
+						ContainerPath: "/opt",
+						HostPath:      vols[0].path,
+					},
+				},
 			},
-			expectedUserDataStr: "#!/bin/sh\necho hi\n" +
-				"#!/bin/sh\n" +
-				"if ! mountpoint '/opt'; then mkdir -p '/opt' && mount /dev/`ls /sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:1/block/`1 '/opt'; fi\n",
+			volumeMap: diskPathMap{
+				vols[0].uuid: {
+					devPath:   "/dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:1",
+					sysfsPath: "/sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:1/block/",
+				},
+				volDevs[1].UUID(): {
+					devPath:   "/dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:2",
+					sysfsPath: "/sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:2/block/",
+				},
+			},
+			verifyMetaData:    true,
+			verifyUserDataStr: true,
 		},
 		{
 			name: "pod with network config",
@@ -422,34 +444,7 @@ func TestCloudInitGenerator(t *testing.T) {
 					Search:      []string{"some", "search"},
 				},
 			}, "nocloud"),
-			expectedNetworkConfig: map[string]interface{}{
-				"version": float64(1),
-				"config": []interface{}{
-					map[string]interface{}{
-						"mac_address": "00:11:22:33:44:55",
-						"name":        "cni0",
-						"subnets": []interface{}{
-							map[string]interface{}{
-								"address": "1.1.1.1",
-								"netmask": "255.0.0.0",
-								"type":    "static",
-							},
-						},
-						"mtu":  float64(1500),
-						"type": "physical",
-					},
-					map[string]interface{}{
-						"destination": "0.0.0.0/0",
-						"gateway":     "1.2.3.4",
-						"type":        "route",
-					},
-					map[string]interface{}{
-						"address": []interface{}{"1.2.3.4"},
-						"search":  []interface{}{"some", "search"},
-						"type":    "nameserver",
-					},
-				},
-			},
+			verifyNetworkConfig: true,
 		},
 		{
 			name: "pod with multiple network interfaces",
@@ -507,47 +502,7 @@ func TestCloudInitGenerator(t *testing.T) {
 					Search:      []string{"some", "search"},
 				},
 			}, "nocloud"),
-			expectedNetworkConfig: map[string]interface{}{
-				"version": float64(1),
-				"config": []interface{}{
-					map[string]interface{}{
-						"mac_address": "00:11:22:33:44:55",
-						"name":        "cni0",
-						"subnets": []interface{}{
-							map[string]interface{}{
-								"address": "1.1.1.1",
-								"netmask": "255.0.0.0",
-								"type":    "static",
-							},
-						},
-						"type": "physical",
-						"mtu":  float64(1500),
-					},
-					map[string]interface{}{
-						"mac_address": "00:11:22:33:ab:cd",
-						"name":        "cni1",
-						"subnets": []interface{}{
-							map[string]interface{}{
-								"address": "192.168.100.42",
-								"netmask": "255.255.255.0",
-								"type":    "static",
-							},
-						},
-						"type": "physical",
-						"mtu":  float64(1500),
-					},
-					map[string]interface{}{
-						"destination": "0.0.0.0/0",
-						"gateway":     "1.2.3.4",
-						"type":        "route",
-					},
-					map[string]interface{}{
-						"address": []interface{}{"1.2.3.4"},
-						"search":  []interface{}{"some", "search"},
-						"type":    "nameserver",
-					},
-				},
-			},
+			verifyNetworkConfig: true,
 		},
 		{
 			name: "pod with network config - configdrive",
@@ -589,38 +544,7 @@ func TestCloudInitGenerator(t *testing.T) {
 					Search:      []string{"some", "search"},
 				},
 			}, "configdrive"),
-			expectedNetworkConfig: map[string]interface{}{
-				"links": []interface{}{
-					map[string]interface{}{
-						"ethernet_mac_address": "00:11:22:33:44:55",
-						"id":   "cni0",
-						"type": "phy",
-						"mtu":  float64(1500),
-					},
-				},
-				"networks": []interface{}{
-					map[string]interface{}{
-						"id":         "net-0",
-						"ip_address": "1.1.1.1",
-						"link":       "cni0",
-						"netmask":    "255.0.0.0",
-						"network_id": "net-0",
-						"type":       "ipv4",
-					},
-				},
-				"services": []interface{}{
-					map[string]interface{}{
-						"address": []interface{}{
-							"1.2.3.4",
-						},
-						"search": []interface{}{
-							"some",
-							"search",
-						},
-						"type": "nameserver",
-					},
-				},
-			},
+			verifyNetworkConfig: true,
 		},
 		{
 			name: "pod with multiple network interfaces - configdrive",
@@ -678,59 +602,7 @@ func TestCloudInitGenerator(t *testing.T) {
 					Search:      []string{"some", "search"},
 				},
 			}, "configdrive"),
-			expectedNetworkConfig: map[string]interface{}{
-				"services": []interface{}{
-					map[string]interface{}{
-						"address": []interface{}{
-							"1.2.3.4",
-						},
-						"search": []interface{}{
-							"some",
-							"search",
-						},
-						"type": "nameserver",
-					},
-				},
-				"links": []interface{}{
-					map[string]interface{}{
-						"id":                   "cni0",
-						"type":                 "phy",
-						"ethernet_mac_address": "00:11:22:33:44:55",
-						"mtu": float64(1500),
-					},
-					map[string]interface{}{
-						"type":                 "phy",
-						"ethernet_mac_address": "00:11:22:33:ab:cd",
-						"id":  "cni1",
-						"mtu": float64(1500),
-					},
-				},
-				"networks": []interface{}{
-					map[string]interface{}{
-						"netmask":    "255.0.0.0",
-						"network_id": "net-0",
-						"routes": []interface{}{
-							map[string]interface{}{
-								"netmask": "0.0.0.0",
-								"network": "0.0.0.0",
-								"gateway": "1.2.3.4",
-							},
-						},
-						"type":       "ipv4",
-						"id":         "net-0",
-						"ip_address": "1.1.1.1",
-						"link":       "cni0",
-					},
-					map[string]interface{}{
-						"type":       "ipv4",
-						"id":         "net-1",
-						"ip_address": "192.168.100.42",
-						"link":       "cni1",
-						"netmask":    "255.255.255.0",
-						"network_id": "net-1",
-					},
-				},
-			},
+			verifyNetworkConfig: true,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -738,7 +610,8 @@ func TestCloudInitGenerator(t *testing.T) {
 			// as isoDir will do
 			g := NewCloudInitGenerator(tc.config, "/foobar")
 
-			if tc.expectedMetaData != nil {
+			r := map[string]interface{}{}
+			if tc.verifyMetaData {
 				metaDataBytes, err := g.generateMetaData()
 				if err != nil {
 					t.Fatalf("generateMetaData(): %v", err)
@@ -748,20 +621,19 @@ func TestCloudInitGenerator(t *testing.T) {
 					t.Fatalf("Can't unmarshal meta-data: %v", err)
 				}
 
-				if !reflect.DeepEqual(tc.expectedMetaData, metaData) {
-					t.Errorf("Bad meta-data:\n%s\nUnmarshaled:\n%s", metaDataBytes, spew.Sdump(metaData))
-				}
+				r["meta-data"] = metaData
 			}
 
 			userDataBytes, err := g.generateUserData(tc.volumeMap)
 			if err != nil {
 				t.Fatalf("generateUserData(): %v", err)
 			}
-			if tc.expectedUserDataStr != "" {
-				if string(userDataBytes) != tc.expectedUserDataStr {
-					t.Errorf("Bad user-data string:\n%s", userDataBytes)
-				}
-			} else {
+
+			if tc.verifyUserDataStr {
+				r["user-data-str"] = string(userDataBytes)
+			}
+
+			if tc.verifyUserData {
 				if !bytes.HasPrefix(userDataBytes, []byte("#cloud-config\n")) {
 					t.Errorf("No #cloud-config header")
 				}
@@ -770,12 +642,10 @@ func TestCloudInitGenerator(t *testing.T) {
 					t.Fatalf("Can't unmarshal user-data: %v", err)
 				}
 
-				if !reflect.DeepEqual(tc.expectedUserData, userData) {
-					t.Errorf("Bad user-data:\n%s\nUnmarshaled:\n%s", userDataBytes, spew.Sdump(userData))
-				}
+				r["user-data"] = userData
 			}
 
-			if tc.expectedNetworkConfig != nil {
+			if tc.verifyNetworkConfig {
 				networkConfigBytes, err := g.generateNetworkConfiguration()
 				if err != nil {
 					t.Fatalf("generateNetworkConfiguration(): %v", err)
@@ -784,10 +654,9 @@ func TestCloudInitGenerator(t *testing.T) {
 				if err := yaml.Unmarshal(networkConfigBytes, &networkConfig); err != nil {
 					t.Fatalf("Can't unmarshal user-data: %v", err)
 				}
-				if !reflect.DeepEqual(tc.expectedNetworkConfig, networkConfig) {
-					t.Errorf("Bad network-config:\n%s\nUnmarshaled:\n%s", networkConfigBytes, spew.Sdump(networkConfig))
-				}
+				r["network-config"] = networkConfig
 			}
+			gm.Verify(t, gm.NewYamlVerifier(r))
 		})
 	}
 }
