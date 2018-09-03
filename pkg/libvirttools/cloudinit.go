@@ -124,7 +124,7 @@ func (g *CloudInitGenerator) generateUserData(volumeMap diskPathMap) ([]byte, er
 		fullMountScript := ""
 		switch {
 		case mountScript != "" && symlinkScript != "":
-			fullMountScript = mountScript + "\n" + symlinkScript
+			fullMountScript = symlinkScript + "\n" + mountScript
 		case mountScript != "":
 			fullMountScript = mountScript
 		case symlinkScript != "":

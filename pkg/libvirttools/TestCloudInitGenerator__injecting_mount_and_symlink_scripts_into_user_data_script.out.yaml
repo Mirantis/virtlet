@@ -5,7 +5,7 @@ user-data-str: |
   #!/bin/sh
   echo hi
   #!/bin/sh
-  if ! mountpoint /opt; then mkdir -p /opt && mount /dev/`ls /sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:1/block/`1 /opt; fi
+  ln -fs /dev/`ls /sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:2/block/` /dev/disk-b
 
   #!/bin/sh
-  ln -fs /dev/`ls /sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:2/block/` /dev/disk-b
+  if ! mountpoint /opt; then mkdir -p /opt && mount /dev/`ls /sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:1/block/`1 /opt; fi
