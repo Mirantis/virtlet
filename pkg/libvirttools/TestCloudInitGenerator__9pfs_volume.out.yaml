@@ -1,0 +1,15 @@
+meta-data:
+  instance-id: foo.default
+  local-hostname: foo
+user-data:
+  mounts:
+  - - opt
+    - /opt
+    - 9p
+    - trans=virtio
+  write_files:
+  - content: |
+      #!/bin/sh
+      if ! mountpoint '/opt'; then mkdir -p '/opt' && mount -t 9p -o trans=virtio opt '/opt'; fi
+    path: /etc/cloud/mount-volumes.sh
+    permissions: "0755"

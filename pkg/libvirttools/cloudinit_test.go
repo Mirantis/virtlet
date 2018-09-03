@@ -114,6 +114,11 @@ func TestCloudInitGenerator(t *testing.T) {
 		},
 	}
 
+	sharedDir := filepath.Join(tmpDir, "640ad329-e533-4ec0-820f-f11b2255bd56")
+	if err := os.MkdirAll(sharedDir, 0777); err != nil {
+		t.Fatalf("MkdirAll(): %q: %v", sharedDir, err)
+	}
+
 	for _, tc := range []struct {
 		name                string
 		config              *types.VMConfig
@@ -279,6 +284,22 @@ func TestCloudInitGenerator(t *testing.T) {
 				vols[2].uuid: {
 					devPath:   "/dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:3",
 					sysfsPath: "/sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:3/block/",
+				},
+			},
+			verifyMetaData: true,
+			verifyUserData: true,
+		},
+		{
+			name: "9pfs volume",
+			config: &types.VMConfig{
+				PodName:           "foo",
+				PodNamespace:      "default",
+				ParsedAnnotations: &types.VirtletAnnotations{CDImageType: types.CloudInitImageTypeNoCloud},
+				Mounts: []types.VMMount{
+					{
+						ContainerPath: "/opt",
+						HostPath:      sharedDir,
+					},
 				},
 			},
 			verifyMetaData: true,
