@@ -13,16 +13,16 @@ user-data:
     - /var/lib/foobar
   runcmd:
   - /etc/cloud/symlink-devs.sh
-  - ln -s '/etc/cloud/symlink-devs.sh' /var/lib/cloud/scripts/per-boot/
+  - ln -s /etc/cloud/symlink-devs.sh /var/lib/cloud/scripts/per-boot/
   write_files:
   - content: |
       #!/bin/sh
-      ln -fs /dev/`ls /sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:1/block/` '/dev/disk-a'
-      ln -fs /dev/`ls /sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:2/block/` '/dev/disk-b'
+      ln -fs /dev/`ls /sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:1/block/` /dev/disk-a
+      ln -fs /dev/`ls /sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:2/block/` /dev/disk-b
     path: /etc/cloud/symlink-devs.sh
     permissions: "0755"
   - content: |
       #!/bin/sh
-      if ! mountpoint '/var/lib/foobar'; then mkdir -p '/var/lib/foobar' && mount /dev/`ls /sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:3/block/`2 '/var/lib/foobar'; fi
+      if ! mountpoint /var/lib/foobar; then mkdir -p /var/lib/foobar && mount /dev/`ls /sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:3/block/`2 /var/lib/foobar; fi
     path: /etc/cloud/mount-volumes.sh
     permissions: "0755"

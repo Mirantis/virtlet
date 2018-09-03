@@ -84,3 +84,5 @@ import:
   version: 2382e3994d48b1d22acc2c86bcad0a2aff028e32
 - package: github.com/aykevl/osfs
   version: e4b1ff739ec92f420bca98d909fffb71fc68e29c
+- package: github.com/kballard/go-shellquote
+  version: 95032a82bc518f77982ea72343cc1ade730072f0

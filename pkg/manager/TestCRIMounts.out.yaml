@@ -255,7 +255,7 @@
       write_files:
       - content: |
           #!/bin/sh
-          if ! mountpoint '/mnt'; then mkdir -p '/mnt' && mount /dev/`ls /sys/devices/pci0000:00/0000:00:01.0/virtio*/host*/target*:0:0/*:0:0:1/block/`1 '/mnt'; fi
+          if ! mountpoint /mnt; then mkdir -p /mnt && mount /dev/`ls /sys/devices/pci0000:00/0000:00:01.0/virtio*/host*/target*:0:0/*:0:0:1/block/`1 /mnt; fi
         path: /etc/cloud/mount-volumes.sh
         permissions: "0755"
 - name: 'leave: StartContainer'
