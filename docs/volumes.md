@@ -423,3 +423,48 @@ Secrets can be consumed in the same manner as ConfigMaps, see
 Like any other pod, Virtlet VM pods have predefined secret with Kubernetes API
 access token which is written into
 `/var/run/secrets/kubernetes.io/serviceaccount` directory.
+
+## Consuming raw block PVs
+
+Virtlet supports consuming
+[Raw Block Volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#raw-block-volume-support)
+in the VMs. In order to do this, you need a PVC with `volumeMode:
+Block` (let's say its name is `testpvc`) bound to a PV (which needs also to be `volumeMode: Block`). You can use this mechanism with both local and non-local PVs.
+
+You can then add the following to pod's volumes:
+```yaml
+volumes:
+- name: testpvc
+  persistentVolumeClaim:
+    claimName: local-block-pvc
+```
+and corresponding `volumeDevices` entry to the container:
+```yaml
+volumeDevices:
+- devicePath: /dev/testpvc
+  name: testpvc
+```
+
+Virtlet will ensure that `/dev/testpvc` inside the VM is a symlink
+pointing to the device that corresponds to the block volume (for more
+details on this, see
+[cloud-init data generation document](cloud-init-data-generation.md).
+
+You can also mount the block device inside the VM using cloud-init:
+```yaml
+VirtletCloudInitUserData: |
+  mounts:
+  - ["/dev/testpvc", "/mnt"]
+```
+
+See [local block PV example](../examples/ubuntu-vm-local-block-pv.yaml).
+
+## Consuming other types of Kubernetes volumes
+
+Specifying `volumeMounts` with volumes that that are not Secrets,
+ConfigMaps or Virtlet-specific flexvolumes cause Virtlet to mount them
+using QEMU's VirtFS (9pfs). Note that this means that the performance
+may be suboptimal in some cases. File permissions can also constitute
+a problem here; you can set `VirtletChown9pfsMounts` pod annotation to
+`true` to make Virtlet change the owner user/group on the directory
+recursively to one enabling read-write access for the VM.
