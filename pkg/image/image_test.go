@@ -476,3 +476,24 @@ func TestCancelPullImage(t *testing.T) {
 		t.Errorf("the downloader isn't marked as canelled")
 	}
 }
+
+func TestVerifyImageChecksum(t *testing.T) {
+	tst := newIfsTester(t)
+	defer tst.teardown()
+
+	// Use image ref instead of the name.
+	// The ref contains sha256 sum
+	tst.pullImage(tst.refs[0], tst.refs[0])
+	tst.verifyListImages("foobar")
+
+	_, err := tst.store.PullImage(
+		context.Background(),
+		tst.images[0].Name+"@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+		tst.translateImageName)
+	switch {
+	case err == nil:
+		tst.t.Errorf("PullImage() din't return any error for an image with mismatching digest")
+	case !strings.Contains(err.Error(), "image digest mismatch"):
+		t.Errorf("PullImage() is expected to return invalid checksum error but returned %q", err)
+	}
+}

@@ -159,7 +159,7 @@ func (s *FileStore) dataFileName(hexDigest string) string {
 }
 
 func (s *FileStore) linkFileName(imageName string) string {
-	imageName = StripTags(imageName)
+	imageName, _ = SplitImageName(imageName)
 	return filepath.Join(s.linkDir(), strings.Replace(imageName, "/", "%", -1))
 }
 
@@ -380,7 +380,7 @@ func (s *FileStore) ImageStatus(name string) (*Image, error) {
 
 // PullImage implements PullImage method of Store interface.
 func (s *FileStore) PullImage(ctx context.Context, name string, translator Translator) (string, error) {
-	name = StripTags(name)
+	name, specDigest := SplitImageName(name)
 	ep := translator(ctx, name)
 	glog.V(1).Infof("Image translation: %q -> %q", name, ep.URL)
 	if err := os.MkdirAll(s.dataDir(), 0777); err != nil {
@@ -390,6 +390,11 @@ func (s *FileStore) PullImage(ctx context.Context, name string, translator Trans
 	if err != nil {
 		return "", fmt.Errorf("failed to create a temporary file: %v", err)
 	}
+	defer func() {
+		if tempFile != nil {
+			tempFile.Close()
+		}
+	}()
 	if err := s.downloader.DownloadFile(ctx, ep, tempFile); err != nil {
 		tempFile.Close()
 		if err := os.Remove(tempFile.Name()); err != nil {
@@ -409,7 +414,12 @@ func (s *FileStore) PullImage(ctx context.Context, name string, translator Trans
 	if err := tempFile.Close(); err != nil {
 		return "", fmt.Errorf("closing %q: %v", tempFile.Name(), err)
 	}
-	if err := s.placeImage(tempFile.Name(), d.Hex(), name); err != nil {
+	fileName := tempFile.Name()
+	tempFile = nil
+	if specDigest != "" && d != specDigest {
+		return "", fmt.Errorf("image digest mismatch: %s instead of %s", d, specDigest)
+	}
+	if err := s.placeImage(fileName, d.Hex(), name); err != nil {
 		return "", err
 	}
 	named, err := reference.WithName(name)
@@ -524,17 +534,25 @@ func (s *FileStore) SetRefGetter(imageRefGetter RefGetter) {
 	s.refGetter = imageRefGetter
 }
 
-// StripTags removes tags from an image name.
-func StripTags(imageName string) string {
+// SplitImageName parses image nmae and returns the name sans tag and
+// the digest, if any.
+func SplitImageName(imageName string) (string, digest.Digest) {
 	ref, err := reference.Parse(imageName)
 	if err != nil {
 		glog.Warningf("StripTags: failed to parse image name as ref: %q: %v", imageName, err)
-		return imageName
+		return imageName, ""
 	}
-	if namedTagged, ok := ref.(reference.NamedTagged); ok {
-		return namedTagged.Name()
+
+	named, ok := ref.(reference.Named)
+	if !ok {
+		return imageName, ""
 	}
-	return imageName
+
+	if digested, ok := ref.(reference.Digested); ok {
+		return named.Name(), digested.Digest()
+	}
+
+	return named.Name(), ""
 }
 
 // GetHexDigest returns the hex digest contained in imageSpec, if any,

@@ -65,13 +65,13 @@ func (s *FakeStore) ListImages(filter string) ([]*image.Image, error) {
 
 // ImageStatus implements ImageStatus method of Store interface.
 func (s *FakeStore) ImageStatus(name string) (*image.Image, error) {
-	name = image.StripTags(name)
+	name, _ = image.SplitImageName(name)
 	return s.images[name], nil
 }
 
 // PullImage implements PullImage method of Store interface.
 func (s *FakeStore) PullImage(ctx context.Context, name string, translator image.Translator) (string, error) {
-	name = image.StripTags(name)
+	name, _ = image.SplitImageName(name)
 	ep := translator(ctx, name)
 	d := digest.FromString(name)
 	named, err := reference.WithName(name)
