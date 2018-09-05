@@ -17,7 +17,7 @@ limitations under the License.
 package e2e
 
 const (
-	defaultVMImageLocation = "download.cirros-cloud.net/0.4.0/cirros-0.4.0-x86_64-disk.img"
+	defaultVMImageLocation = "download.cirros-cloud.net/0.4.0/cirros-0.4.0-x86_64-disk.img@sha256:a8dd75ecffd4cdd96072d60c2237b448e0c8b2bc94d57f10fdbc8c481d9005b8"
 	DefaultSSHUser         = "cirros"
 
 	SshPublicKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCaJEcFDXEK2ZbX0ZLS1EIYFZRbDAcRfuVjpstSc0De8+sV1aiu+deP" +
