@@ -322,6 +322,8 @@ func (s *FileStore) imageInfo(fi os.FileInfo) (*Image, error) {
 }
 
 func (s *FileStore) listImagesUnlocked(filter string) ([]*Image, error) {
+	filter, digestSpec := SplitImageName(filter)
+
 	if linkDirExists, err := s.linkDirExists(); err != nil {
 		return nil, err
 	} else if !linkDirExists {
@@ -339,13 +341,16 @@ func (s *FileStore) listImagesUnlocked(filter string) ([]*Image, error) {
 			continue
 		}
 		image, err := s.imageInfo(fi)
-		if err != nil {
+		switch {
+		case err != nil:
 			glog.Warningf("listing images: skipping image link %q: %v", fi.Name(), err)
 			continue
+		case filter != "" && image.Name != filter:
+			continue
+		case digestSpec != "" && digest.Digest(image.Digest) != digestSpec:
+			continue
 		}
-		if filter == "" || image.Name == filter {
-			r = append(r, image)
-		}
+		r = append(r, image)
 	}
 
 	return r, nil
@@ -363,7 +368,15 @@ func (s *FileStore) imageStatusUnlocked(name string) (*Image, error) {
 	// get info about the link itself, not its target
 	switch fi, err := os.Lstat(linkFileName); {
 	case err == nil:
-		return s.imageInfo(fi)
+		info, err := s.imageInfo(fi)
+		if err != nil {
+			return nil, err
+		}
+		_, digestSpec := SplitImageName(name)
+		if digestSpec != "" && digest.Digest(info.Digest) != digestSpec {
+			return nil, fmt.Errorf("image digest mismatch: %s instead of %s", info.Digest, digestSpec)
+		}
+		return info, nil
 	case os.IsNotExist(err):
 		return nil, nil
 	default:
