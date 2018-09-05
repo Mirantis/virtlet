@@ -38,7 +38,7 @@ var _ = Describe("Virtlet [Basic cirros tests]", func() {
 
 	BeforeAll(func() {
 		vm = controller.VM("cirros-vm")
-		Expect(vm.Create(VMOptions{}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
+		Expect(vm.CreateAndWait(VMOptions{}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
 		var err error
 		vmPod, err = vm.Pod()
 		Expect(err).NotTo(HaveOccurred())
@@ -182,7 +182,7 @@ var _ = Describe("Virtlet [Disruptive]", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		vm = controller.VM("cirros-vm")
-		Expect(vm.Create(VMOptions{}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
+		Expect(vm.CreateAndWait(VMOptions{}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
 	})
 })
 
@@ -228,3 +228,35 @@ func itShouldHaveNetworkConnectivity(podIface func() *framework.PodInterface, ss
 		}, 60*5)
 	})
 }
+
+var _ = Describe("Virtlet [Image verification]", func() {
+	var (
+		vm *framework.VMInterface
+	)
+
+	BeforeAll(func() {
+		vm = controller.VM("cirros-vm")
+	})
+
+	AfterAll(func() {
+		Expect(vm.Delete(time.Minute * 2)).To(Succeed())
+	})
+
+	It("Should fail for images with mismatching digest", func() {
+		opts := VMOptions{}.ApplyDefaults()
+		p := strings.Index(opts.Image, "@")
+		if p >= 0 {
+			opts.Image = opts.Image[:p]
+		}
+		opts.Image += "@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+		Expect(vm.Create(opts, nil)).To(Succeed())
+
+		pod := vm.PodWithoutChecks()
+		Expect(pod.WaitForPodStatus([]string{
+			"ErrImagePull", "ImagePullBackOff", "ImageInspectError",
+		}, time.Minute*5)).To(Succeed())
+		events, err := pod.LoadEvents()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(events).To(ContainElement(ContainSubstring("image digest mismatch")))
+	})
+})

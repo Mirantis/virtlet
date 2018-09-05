@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -73,8 +74,10 @@ func (pi *PodInterface) Delete() error {
 	return pi.controller.client.Pods(pi.Pod.Namespace).Delete(pi.Pod.Name, nil)
 }
 
-// Wait waits for pod to start and checks that it doesn't fail immediately after that
-func (pi *PodInterface) Wait(timing ...time.Duration) error {
+// WaitForPodStatus waits for the pod to reach the specified status. If expectedContainerErrors
+// is empty, the pod is expected to become Running and Ready. If it isn't, the pod is expected
+// to have one of these errors among its container statuses.
+func (pi *PodInterface) WaitForPodStatus(expectedContainerErrors []string, timing ...time.Duration) error {
 	timeout := time.Minute * 5
 	pollPeriond := time.Second
 	consistencyPeriod := time.Second * 5
@@ -95,21 +98,43 @@ func (pi *PodInterface) Wait(timing ...time.Duration) error {
 		}
 		pi.Pod = podUpdated
 
+		needErrors := len(expectedContainerErrors) > 0
 		phase := v1.PodRunning
+		if needErrors {
+			phase = v1.PodPending
+		}
 		if podUpdated.Status.Phase != phase {
 			return fmt.Errorf("pod %s is not %s phase: %s", podUpdated.Name, phase, podUpdated.Status.Phase)
 		}
 
+		gotExpectedError := false
 		for _, cs := range podUpdated.Status.ContainerStatuses {
-			if cs.State.Running == nil {
+			switch {
+			case !needErrors && cs.State.Running == nil:
 				return fmt.Errorf("container %s in pod %s is not running: %s", cs.Name, podUpdated.Name, spew.Sdump(cs.State))
-			}
-			if !cs.Ready {
+			case !needErrors && !cs.Ready:
 				return fmt.Errorf("container %s in pod %s in not ready", cs.Name, podUpdated.Name)
+			case needErrors && cs.State.Waiting == nil:
+				return fmt.Errorf("container %s in pod %s not in waiting state", cs.Name)
+			case needErrors:
+				for _, errStr := range expectedContainerErrors {
+					if cs.State.Waiting.Reason == errStr {
+						gotExpectedError = true
+						break
+					}
+				}
 			}
+		}
+		if needErrors && !gotExpectedError {
+			return fmt.Errorf("didn't get one of expected container errors: %s", strings.Join(expectedContainerErrors, " | "))
 		}
 		return nil
 	}, timeout, pollPeriond, consistencyPeriod)
+}
+
+// Wait waits for pod to start and checks that it doesn't fail immediately after that
+func (pi *PodInterface) Wait(timing ...time.Duration) error {
+	return pi.WaitForPodStatus(nil, timing...)
 }
 
 // WaitDestruction waits for the pod to be deleted
@@ -230,6 +255,20 @@ func (pi *PodInterface) PortForward(ports []*tools.ForwardedPort) (chan struct{}
 // DinDNodeExecutor return DinD executor for node, where this pod is located
 func (pi *PodInterface) DinDNodeExecutor() (Executor, error) {
 	return pi.controller.DinDNodeExecutor(pi.Pod.Spec.NodeName)
+}
+
+// LoadEvents retrieves the evnets for this pod as a list
+// of strings of the form Type:Reason:Message
+func (pi *PodInterface) LoadEvents() ([]string, error) {
+	events, err := pi.controller.client.Events(pi.controller.Namespace()).Search(scheme.Scheme, pi.Pod)
+	if err != nil {
+		return nil, err
+	}
+	var r []string
+	for _, e := range events.Items {
+		r = append(r, fmt.Sprintf("%s:%s:%s", e.Type, e.Reason, e.Message))
+	}
+	return r, nil
 }
 
 type containerInterface struct {

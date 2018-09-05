@@ -36,7 +36,7 @@ var _ = Describe("Virtlet restart [Disruptive]", func() {
 
 	BeforeAll(func() {
 		vm = controller.VM("cirros-vm")
-		vm.Create(VMOptions{}.ApplyDefaults(), time.Minute*5, nil)
+		vm.CreateAndWait(VMOptions{}.ApplyDefaults(), time.Minute*5, nil)
 		var err error
 		vmPod, err = vm.Pod()
 		Expect(err).NotTo(HaveOccurred())
