@@ -40,7 +40,6 @@ import (
 )
 
 const (
-	wantTapManagerEnv  = "WANT_TAP_MANAGER"
 	nodeNameEnv        = "KUBE_NODE_NAME"
 	diagSocket         = "/run/virtlet-diag.sock"
 	netnsDiagCommand   = `if [ -d /var/run/netns ]; then cd /var/run/netns; for ns in *; do echo "*** ${ns} ***"; ip netns exec "${ns}" ip a; ip netns exec "${ns}" ip r; echo; done; fi`
