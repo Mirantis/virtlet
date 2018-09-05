@@ -165,6 +165,13 @@ func GetVMConfig(in *kubeapi.CreateContainerRequest, csn *network.ContainerSideN
 		})
 	}
 
+	for _, dev := range in.Config.Devices {
+		r.VolumeDevices = append(r.VolumeDevices, types.VMVolumeDevice{
+			DevicePath: dev.ContainerPath,
+			HostPath:   dev.HostPath,
+		})
+	}
+
 	return r, nil
 }
 

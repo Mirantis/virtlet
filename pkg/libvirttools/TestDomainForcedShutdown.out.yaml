@@ -145,6 +145,7 @@
       PodName: testName_0
       PodNamespace: default
       PodSandboxID: 69eec606-0493-5825-73a4-c5e0c0236155
+      VolumeDevices: null
     CreatedAt: 1496175540000000000
     Id: 231700d5-c9a6-5a49-738d-99a954c51550
     Name: container1

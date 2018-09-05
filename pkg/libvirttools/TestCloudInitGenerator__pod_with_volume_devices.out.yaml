@@ -1,0 +1,15 @@
+meta-data:
+  instance-id: foo.default
+  local-hostname: foo
+user-data:
+  runcmd:
+  - /etc/cloud/symlink-devs.sh
+  - ln -s /etc/cloud/symlink-devs.sh /var/lib/cloud/scripts/per-boot/
+  write_files:
+  - content: |
+      #!/bin/sh
+      ln -fs /dev/`ls /sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:1/block/` /dev/disk-a
+      ln -fs /dev/`ls /sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:2/block/` /dev/disk-b
+      ln -fs /dev/`ls /sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:3/block/` /dev/disk-c
+    path: /etc/cloud/symlink-devs.sh
+    permissions: "0755"

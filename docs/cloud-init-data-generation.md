@@ -236,7 +236,8 @@ The `user-data` content is generated as follows:
   useful if you want to pass a script there which may be necessary for
   older/simpler cloud-init implementations such as one used by CirrOS.
   Within the content of this script, `@virtlet-mount-script@` can be
-  replaced with volume mounting shell commands (see
+  replaced with volume mounting shell commands and commands for making
+  symlinks for raw block volumes (see
   [Workarounds for volume mounting](#workarounds) below)
 
 ## Propagating user-data from kubernetes objects
@@ -257,7 +258,7 @@ containing SSH keys in the same format in `VirtletSSHKeys`. The `key` part is op
 `virtlet` will look for the `authorized_keys` key. As with the `user-data` `VirtletSSHKeys` keys are going to be appended to those from
 `VirtletSSHKeySource` unless it is set to overwrite them by `VirtletCloudInitUserDataOverwrite: "true"`.
 
-## <a name="workarounds"></a>Workarounds for volume mounting
+## <a name="workarounds"></a>Workarounds for volume mounting and raw block volumes
 
 Currenly Virtlet uses `/dev/disk/by-path` to mount volumes specified
 using Virtlet flexvolume driver. There's a problem with this approach
@@ -270,14 +271,28 @@ write a shell script named `/etc/cloud/mount-volumes.sh` (the script
 uses `/bin/sh`) that performs the necessary volume mounts using sysfs
 to look up the proper device names under `/dev`. The script also
 checks whether the volumes are already mounted so as not to mount them
-several times (so it's idempotent). To deal with the systems without
-proper `user-data` support such as CirrOS, Virtlet makes it possible
-to specify `@virtlet-mount-script@` inside
-`VirtletCloudInitUserDataScript` annotation. This string will be
-replaced with the content that's normally written to
-`/etc/cloud/mount-volumes.sh`. Given that the script starts with
-`#!/bin/sh`, you can use the following construct in the pod
-annotations:
+several times (so it's idempotent).
+
+Another slightly related problem is that when raw block volumes are
+used, symlinks must be created inside the VM that lead to the proper
+device files under `/dev`. This is done by means of
+`/etc/cloud/symlink-devs.sh` script that's injected via cloud-init.
+It's also automatically added to the `runcmd` section, so it gets
+executed on the first VM boot and linked from
+`/var/lib/cloud/scripts/per-boot/` so that it gets executed on
+subsequent VM boots, too. In any case, this script gets executed after
+`mounts` are processed, so Virtlet updates `mounts` entries in the
+user-specified `user-data` that point to the raw block volume devices
+to make them work as if the symlinks were in place during the
+mounting.
+
+To deal with the systems without proper `user-data` support such as
+CirrOS, Virtlet makes it possible to specify `@virtlet-mount-script@`
+inside `VirtletCloudInitUserDataScript` annotation. This string will
+be replaced with the content that's normally written to
+`/etc/cloud/symlink-devs.sh` and `/etc/cloud/mount-volumes.sh` (in
+this order). Given that the script starts with `#!/bin/sh`, you can
+use the following construct in the pod annotations:
 
 ```yaml
 VirtletCloudInitUserDataScript: "@virtlet-mount-script@"

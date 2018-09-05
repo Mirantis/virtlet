@@ -1,0 +1,20 @@
+network-config:
+  links:
+  - ethernet_mac_address: "00:11:22:33:44:55"
+    id: cni0
+    mtu: 1500
+    type: phy
+  networks:
+  - id: net-0
+    ip_address: 1.1.1.1
+    link: cni0
+    netmask: 255.0.0.0
+    network_id: net-0
+    type: ipv4
+  services:
+  - address:
+    - 1.2.3.4
+    search:
+    - some
+    - search
+    type: nameserver

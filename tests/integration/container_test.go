@@ -384,7 +384,7 @@ func (ct *containerTester) mountFlexvolume(podId, name string, opts map[string]i
 	// let Virtlet process tmpfs contents. Currently the contents
 	// of flexvolume's tmpfs and the shadowed directory should be the
 	// same though.
-	if err := ct.runFlexvolumeDriver("mount", volumeDir, utils.MapToJSON(opts)); err != nil {
+	if err := ct.runFlexvolumeDriver("mount", volumeDir, utils.ToJSON(opts)); err != nil {
 		ct.t.Fatal(err)
 	}
 }

@@ -41,8 +41,8 @@ func addFlexvolumeSource(fvType string, source flexvolumeSource) {
 	flexvolumeTypeMap[fvType] = source
 }
 
-// ScanFlexVolumes using prepared by kubelet volumes and contained in pod sandbox
-// annotations prepares volumes to be passed to libvirt as a DomainDisk definitions.
+// ScanFlexVolumes returns VMVolume objects for Virtlet flexvolumes
+// mounted into the pod.
 func ScanFlexVolumes(config *types.VMConfig, owner volumeOwner) ([]VMVolume, error) {
 	dir := filepath.Join(owner.KubeletRootDir(), config.PodSandboxID, flexvolumeSubdir)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {

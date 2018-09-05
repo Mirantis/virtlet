@@ -14,17 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package libvirttools
+package utils
 
-// GetDefaultVolumeSource returns a volume source that supports
-// root volume, flexvolumes and a ConfigSource for cloud-init
-func GetDefaultVolumeSource() VMVolumeSource {
-	return CombineVMVolumeSources(
-		GetRootVolume,
-		GetBlockVolumes,
-		ScanFlexVolumes,
-		GetFileSystemVolumes,
-		// XXX: GetConfigVolume must go last because it
-		// doesn't produce correct name for cdrom devices
-		GetConfigVolume)
+import "testing"
+
+func TestNewShellTemplate(t *testing.T) {
+	tmpl := NewShellTemplate("mount {{ shq .Foobar }} {{ .Baz }}")
+	out, err := tmpl.ExecuteToString(map[string]string{
+		"Foobar": "abc def",
+		"Baz":    "qqq",
+	})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	expectedText := "mount 'abc def' qqq"
+	if out != expectedText {
+		t.Errorf("Bad template result. Expected:\n%s\nGot:\n%s", expectedText, out)
+	}
 }

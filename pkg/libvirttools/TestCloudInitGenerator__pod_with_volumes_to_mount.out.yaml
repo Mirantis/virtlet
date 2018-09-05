@@ -1,0 +1,19 @@
+meta-data:
+  instance-id: foo.default
+  local-hostname: foo
+user-data:
+  mounts:
+  - - /dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:1-part1
+    - /opt
+  - - /dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:2
+    - /var/lib/whatever
+  - - /dev/disk/by-path/virtio-pci-0000:00:01.0-scsi-0:0:0:3-part2
+    - /var/lib/foobar
+  write_files:
+  - content: |
+      #!/bin/sh
+      if ! mountpoint /opt; then mkdir -p /opt && mount /dev/`ls /sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:1/block/`1 /opt; fi
+      if ! mountpoint /var/lib/whatever; then mkdir -p /var/lib/whatever && mount /dev/`ls /sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:2/block/` /var/lib/whatever; fi
+      if ! mountpoint /var/lib/foobar; then mkdir -p /var/lib/foobar && mount /dev/`ls /sys/devices/pci0000:00/0000:00:03.0/virtio*/host*/target*:0:0/*:0:0:3/block/`2 /var/lib/foobar; fi
+    path: /etc/cloud/mount-volumes.sh
+    permissions: "0755"

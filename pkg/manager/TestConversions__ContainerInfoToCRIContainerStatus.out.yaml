@@ -22,6 +22,7 @@
       PodName: ""
       PodNamespace: ""
       PodSandboxID: 69eec606-0493-5825-73a4-c5e0c0236155
+      VolumeDevices: null
     CreatedAt: 1496175540000000000
     Id: f1bfb494-af3d-48ab-b8b1-2c850e1e8a00
     Name: testcontainer
@@ -65,6 +66,7 @@
       PodName: ""
       PodNamespace: ""
       PodSandboxID: d25ded14-d35d-510b-5749-f83cc165794e
+      VolumeDevices: null
     CreatedAt: 1496175560000000000
     Id: 13bdedae-540d-4131-959b-366c6343d5b4
     Name: testcontainer1

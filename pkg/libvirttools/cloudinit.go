@@ -33,6 +33,7 @@ import (
 	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
+	"github.com/kballard/go-shellquote"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
 	"github.com/Mirantis/virtlet/pkg/flexvolume"
@@ -42,10 +43,31 @@ import (
 )
 
 const (
-	envFileLocation   = "/etc/cloud/environment"
-	mountFileLocation = "/etc/cloud/mount-volumes.sh"
-	mountScriptSubst  = "@virtlet-mount-script@"
+	envFileLocation     = "/etc/cloud/environment"
+	symlinkFileLocation = "/etc/cloud/symlink-devs.sh"
+	mountFileLocation   = "/etc/cloud/mount-volumes.sh"
+	mountScriptSubst    = "@virtlet-mount-script@"
+	cloudInitPerBootDir = "/var/lib/cloud/scripts/per-boot"
 )
+
+// Note that in the templates below, we don't use shellquote (shq) on
+// SysfsPath, because it *must* be expanded by the shell to work
+// (it contains '*')
+
+var linkStartupScriptTemplate = utils.NewShellTemplate(
+	"ln -s {{ shq .StartupScript }} /var/lib/cloud/scripts/per-boot/")
+var linkBlockDeviceScriptTemplate = utils.NewShellTemplate(
+	"ln -fs /dev/`ls {{ .SysfsPath }}` {{ shq .DevicePath }}")
+var mountDevScriptTemplate = utils.NewShellTemplate(
+	"if ! mountpoint {{ shq .ContainerPath }}; then " +
+		"mkdir -p {{ shq .ContainerPath }} && " +
+		"mount /dev/`ls {{ .SysfsPath }}`{{ .DevSuffix }} {{ .ContainerPath }}; " +
+		"fi")
+var mountFSScriptTemplate = utils.NewShellTemplate(
+	"if ! mountpoint {{ shq .ContainerPath }}; then " +
+		"mkdir -p {{ shq .ContainerPath }} && " +
+		"mount -t 9p -o trans=virtio {{ shq .MountTag }} {{ shq .ContainerPath }}; " +
+		"fi")
 
 // CloudInitGenerator provides a common part for Cloud Init ISO drive preparation
 // for NoCloud and ConfigDrive volume sources.
@@ -95,10 +117,20 @@ func (g *CloudInitGenerator) generateMetaData() ([]byte, error) {
 }
 
 func (g *CloudInitGenerator) generateUserData(volumeMap diskPathMap) ([]byte, error) {
+	symlinkScript := g.generateSymlinkScript(volumeMap)
 	mounts, mountScript := g.generateMounts(volumeMap)
 
 	if userDataScript := g.config.ParsedAnnotations.UserDataScript; userDataScript != "" {
-		return []byte(strings.Replace(userDataScript, mountScriptSubst, mountScript, -1)), nil
+		fullMountScript := ""
+		switch {
+		case mountScript != "" && symlinkScript != "":
+			fullMountScript = symlinkScript + "\n" + mountScript
+		case mountScript != "":
+			fullMountScript = mountScript
+		case symlinkScript != "":
+			fullMountScript = symlinkScript
+		}
+		return []byte(strings.Replace(userDataScript, mountScriptSubst, fullMountScript, -1)), nil
 	}
 
 	userData := make(map[string]interface{})
@@ -108,13 +140,22 @@ func (g *CloudInitGenerator) generateUserData(volumeMap diskPathMap) ([]byte, er
 
 	mounts = utils.Merge(userData["mounts"], mounts).([]interface{})
 	if len(mounts) != 0 {
-		userData["mounts"] = mounts
+		userData["mounts"] = g.fixMounts(volumeMap, mounts)
 	}
 
 	writeFilesUpdater := newWriteFilesUpdater(g.config.Mounts)
 	writeFilesUpdater.addSecrets()
 	writeFilesUpdater.addConfigMapEntries()
 	writeFilesUpdater.addFileLikeMounts()
+	if symlinkScript != "" {
+		writeFilesUpdater.addSymlinkScript(symlinkScript)
+		userData["runcmd"] = utils.Merge(userData["runcmd"], []string{
+			shellquote.Join(symlinkFileLocation),
+			linkStartupScriptTemplate.MustExecuteToString(map[string]string{
+				"StartupScript": symlinkFileLocation,
+			}),
+		})
+	}
 	if mountScript != "" {
 		writeFilesUpdater.addMountScript(mountScript)
 	}
@@ -462,6 +503,59 @@ func isRegularFile(path string) bool {
 	return fi.Mode().IsRegular()
 }
 
+func (g *CloudInitGenerator) generateSymlinkScript(volumeMap diskPathMap) string {
+	var symlinkLines []string
+	for _, dev := range g.config.VolumeDevices {
+		dpath, found := volumeMap[dev.UUID()]
+		if !found {
+			glog.Warningf("Couldn't determine the path for device %q inside the VM (target path inside the VM: %q)", dev.HostPath, dev.DevicePath)
+			continue
+		}
+		line := linkBlockDeviceScriptTemplate.MustExecuteToString(map[string]string{
+			"SysfsPath":  dpath.sysfsPath,
+			"DevicePath": dev.DevicePath,
+		})
+		symlinkLines = append(symlinkLines, line)
+	}
+	return makeScript(symlinkLines)
+}
+
+func (g *CloudInitGenerator) fixMounts(volumeMap diskPathMap, mounts []interface{}) []interface{} {
+	devMap := make(map[string]string)
+	for _, dev := range g.config.VolumeDevices {
+		dpath, found := volumeMap[dev.UUID()]
+		if !found {
+			glog.Warningf("Couldn't determine the path for device %q inside the VM (target path inside the VM: %q)", dev.HostPath, dev.DevicePath)
+			continue
+		}
+		devMap[dev.DevicePath] = dpath.devPath
+	}
+	if len(devMap) == 0 {
+		return mounts
+	}
+
+	var r []interface{}
+	for _, item := range mounts {
+		m, ok := item.([]interface{})
+		if !ok || len(m) == 0 {
+			r = append(r, item)
+			continue
+		}
+		devPath, ok := m[0].(string)
+		if !ok {
+			r = append(r, item)
+			continue
+		}
+		mapTo, found := devMap[devPath]
+		if !found {
+			r = append(r, item)
+			continue
+		}
+		r = append(r, append([]interface{}{mapTo}, m[1:]...))
+	}
+	return r
+}
+
 func (g *CloudInitGenerator) generateMounts(volumeMap diskPathMap) ([]interface{}, string) {
 	var r []interface{}
 	var mountScriptLines []string
@@ -492,11 +586,7 @@ func (g *CloudInitGenerator) generateMounts(volumeMap diskPathMap) ([]interface{
 		mountScriptLines = append(mountScriptLines, mountScriptLine)
 	}
 
-	mountScript := ""
-	if len(mountScriptLines) != 0 {
-		mountScript = fmt.Sprintf("#!/bin/sh\n%s\n", strings.Join(mountScriptLines, "\n"))
-	}
-	return r, mountScript
+	return r, makeScript(mountScriptLines)
 }
 
 func generateFlexvolumeMounts(volumeMap diskPathMap, mount types.VMMount) ([]interface{}, string, error) {
@@ -523,16 +613,20 @@ func generateFlexvolumeMounts(volumeMap diskPathMap, mount types.VMMount) ([]int
 		devPath += fmt.Sprintf("-part%d", part)
 		mountDevSuffix += strconv.Itoa(part)
 	}
-	// TODO: do better job at escaping mount.ContainerPath
-	mountScriptLine := fmt.Sprintf("if ! mountpoint '%s'; then mkdir -p '%s' && mount /dev/`ls %s`%s '%s'; fi",
-		mount.ContainerPath, mount.ContainerPath, dpath.sysfsPath, mountDevSuffix, mount.ContainerPath)
+	mountScriptLine := mountDevScriptTemplate.MustExecuteToString(map[string]string{
+		"ContainerPath": mount.ContainerPath,
+		"SysfsPath":     dpath.sysfsPath,
+		"DevSuffix":     mountDevSuffix,
+	})
 	return []interface{}{devPath, mount.ContainerPath}, mountScriptLine, nil
 }
 
 func generateFsBasedVolumeMounts(mount types.VMMount) ([]interface{}, string, error) {
 	mountTag := path.Base(mount.ContainerPath)
-	fsMountScript := fmt.Sprintf("if ! mountpoint '%s'; then mkdir -p '%s' && mount -t 9p -o trans=virtio %s '%s'; fi",
-		mount.ContainerPath, mount.ContainerPath, mountTag, mount.ContainerPath)
+	fsMountScript := mountFSScriptTemplate.MustExecuteToString(map[string]string{
+		"ContainerPath": mount.ContainerPath,
+		"MountTag":      mountTag,
+	})
 	r := []interface{}{mountTag, mount.ContainerPath, "9p", "trans=virtio"}
 	return r, fsMountScript, nil
 }
@@ -618,6 +712,10 @@ func (u *writeFilesUpdater) addFilesForVolumeType(suffix string) {
 	}) {
 		u.addFilesForMount(mount)
 	}
+}
+
+func (u *writeFilesUpdater) addSymlinkScript(content string) {
+	u.putPlainText(symlinkFileLocation, content, 0755)
 }
 
 func (u *writeFilesUpdater) addMountScript(content string) {
@@ -715,4 +813,11 @@ func scanDirectory(dirPath string, callback func(string) error) error {
 	}
 
 	return nil
+}
+
+func makeScript(lines []string) string {
+	if len(lines) != 0 {
+		return fmt.Sprintf("#!/bin/sh\n%s\n", strings.Join(lines, "\n"))
+	}
+	return ""
 }
