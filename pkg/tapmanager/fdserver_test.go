@@ -192,14 +192,6 @@ func withFDClient(t *testing.T, toCall func(*FDClient, *sampleFDSource)) {
 		}
 	}()
 	c := NewFDClient(socketPath)
-	if err := c.Connect(); err != nil {
-		t.Fatalf("Connect(): %v", err)
-	}
-	defer func() {
-		if err := c.Close(); err != nil {
-			t.Errorf("Close(): %v", err)
-		}
-	}()
 
 	toCall(c, src)
 }

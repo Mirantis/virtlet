@@ -311,9 +311,6 @@ func newTapFDSourceTester(t *testing.T, podId string, info *cnicurrent.Result, h
 
 func (tst *tapFDSourceTester) stop() {
 	if tst.c != nil {
-		if err := tst.c.Close(); err != nil {
-			tst.t.Errorf("FDClient.Close(): %v", err)
-		}
 		tst.c = nil
 	}
 	if tst.s != nil {
@@ -349,9 +346,6 @@ func (tst *tapFDSourceTester) setupServerAndConnectToFDServer() *tapmanager.FDCl
 	}
 
 	tst.c = tapmanager.NewFDClient(tst.socketPath)
-	if err := tst.c.Connect(); err != nil {
-		tst.t.Fatalf("Connect(): %v", err)
-	}
 
 	return tst.c
 }
