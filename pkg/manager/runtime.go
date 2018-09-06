@@ -101,7 +101,7 @@ func (v *VirtletRuntimeService) Version(ctx context.Context, in *kubeapi.Version
 //
 
 // RunPodSandbox implements RunPodSandbox method of CRI.
-func (v *VirtletRuntimeService) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSandboxRequest) (*kubeapi.RunPodSandboxResponse, error) {
+func (v *VirtletRuntimeService) RunPodSandbox(ctx context.Context, in *kubeapi.RunPodSandboxRequest) (response *kubeapi.RunPodSandboxResponse, retErr error) {
 	config := in.GetConfig()
 	if config == nil {
 		return nil, errors.New("no pod sandbox config passed to RunPodSandbox")
@@ -146,14 +146,19 @@ func (v *VirtletRuntimeService) RunPodSandbox(ctx context.Context, in *kubeapi.R
 			Options:     config.DnsConfig.Options,
 		}
 	}
+
 	fdPayload := &tapmanager.GetFDPayload{Description: pnd}
 	csnBytes, err := v.fdManager.AddFDs(podID, fdPayload)
+	defer func() {
+		if retErr != nil {
+			// Try to clean up CNI netns (this may be necessary e.g. in case of multiple CNI plugins with CNI Genie)
+			if fdErr := v.fdManager.ReleaseFDs(podID); fdErr != nil {
+				glog.Errorf("Error removing pod %s (%s) from CNI network: %v", podName, podID, fdErr)
+			}
+		}
+	}()
 	if err != nil {
 		// Try to clean up CNI netns (this may be necessary e.g. in case of multiple CNI plugins with CNI Genie)
-		if fdErr := v.fdManager.ReleaseFDs(podID); err != nil {
-			glog.Errorf("Error removing pod %s (%s) from CNI network: %v", podName, podID, fdErr)
-		}
-
 		return nil, fmt.Errorf("Error adding pod %s (%s) to CNI network: %v", podName, podID, err)
 	}
 
@@ -162,23 +167,17 @@ func (v *VirtletRuntimeService) RunPodSandbox(ctx context.Context, in *kubeapi.R
 		csnBytes, types.PodSandboxState(state), v.clock)
 	if err != nil {
 		// cleanup cni if we could not add pod to metadata store to prevent resource leaking
-		if fdErr := v.fdManager.ReleaseFDs(podID); err != nil {
-			glog.Errorf("Error removing pod %s (%s) from CNI network: %v", podName, podID, fdErr)
-		}
 		return nil, err
 	}
 
 	sandbox = v.metadataStore.PodSandbox(config.Metadata.Uid)
-	if storeErr := sandbox.Save(
+	if err := sandbox.Save(
 		func(c *types.PodSandboxInfo) (*types.PodSandboxInfo, error) {
 			return psi, nil
 		},
-	); storeErr != nil {
+	); err != nil {
 		// cleanup cni if we could not add pod to metadata store to prevent resource leaking
-		if err := v.fdManager.ReleaseFDs(podID); err != nil {
-			glog.Errorf("Error removing pod %s (%s) from CNI network: %v", podName, podID, err)
-		}
-		return nil, storeErr
+		return nil, err
 	}
 
 	return &kubeapi.RunPodSandboxResponse{
