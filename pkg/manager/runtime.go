@@ -149,16 +149,17 @@ func (v *VirtletRuntimeService) RunPodSandbox(ctx context.Context, in *kubeapi.R
 
 	fdPayload := &tapmanager.GetFDPayload{Description: pnd}
 	csnBytes, err := v.fdManager.AddFDs(podID, fdPayload)
+	// The reason that put defer function here is that it is also necessary to ReleaseFDs if AddFDs fail
 	defer func() {
 		if retErr != nil {
 			// Try to clean up CNI netns (this may be necessary e.g. in case of multiple CNI plugins with CNI Genie)
+			// Try to clean up CNI netns if we could not add pod to metadata or store to prevent resource leaking
 			if fdErr := v.fdManager.ReleaseFDs(podID); fdErr != nil {
 				glog.Errorf("Error removing pod %s (%s) from CNI network: %v", podName, podID, fdErr)
 			}
 		}
 	}()
 	if err != nil {
-		// Try to clean up CNI netns (this may be necessary e.g. in case of multiple CNI plugins with CNI Genie)
 		return nil, fmt.Errorf("Error adding pod %s (%s) to CNI network: %v", podName, podID, err)
 	}
 
@@ -166,7 +167,6 @@ func (v *VirtletRuntimeService) RunPodSandbox(ctx context.Context, in *kubeapi.R
 		CRIPodSandboxConfigToPodSandboxConfig(config),
 		csnBytes, types.PodSandboxState(state), v.clock)
 	if err != nil {
-		// cleanup cni if we could not add pod to metadata store to prevent resource leaking
 		return nil, err
 	}
 
@@ -176,7 +176,6 @@ func (v *VirtletRuntimeService) RunPodSandbox(ctx context.Context, in *kubeapi.R
 			return psi, nil
 		},
 	); err != nil {
-		// cleanup cni if we could not add pod to metadata store to prevent resource leaking
 		return nil, err
 	}
 
