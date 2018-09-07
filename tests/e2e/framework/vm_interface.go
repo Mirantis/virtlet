@@ -97,22 +97,32 @@ func (vmi *VMInterface) Pod() (*PodInterface, error) {
 	return vmi.pod, nil
 }
 
-// Create create new virtlet VM pod in k8s
-func (vmi *VMInterface) Create(options VMOptions, waitTimeout time.Duration, beforeCreate func(*PodInterface)) error {
+// PodWithoutChecks returns the underlying pods without performing any
+// checks
+func (vmi *VMInterface) PodWithoutChecks() *PodInterface {
+	return vmi.pod
+}
+
+// Create creates a new VM pod
+func (vmi *VMInterface) Create(options VMOptions, beforeCreate func(*PodInterface)) error {
 	pod := newPodInterface(vmi.controller, vmi.buildVMPod(options))
 	if beforeCreate != nil {
 		beforeCreate(pod)
 	}
-	err := pod.Create()
-	if err != nil {
-		return err
-	}
-	err = pod.Wait(waitTimeout)
-	if err != nil {
+	if err := pod.Create(); err != nil {
 		return err
 	}
 	vmi.pod = pod
 	return nil
+}
+
+// CreateAndWait creates a new VM pod in k8s and waits for it to start
+func (vmi *VMInterface) CreateAndWait(options VMOptions, waitTimeout time.Duration, beforeCreate func(*PodInterface)) error {
+	err := vmi.Create(options, beforeCreate)
+	if err == nil {
+		err = vmi.pod.Wait(waitTimeout)
+	}
+	return err
 }
 
 // Delete deletes VM pod and waits for it to disappear from k8s
@@ -243,6 +253,9 @@ func (vmi *VMInterface) DomainName() (string, error) {
 	pod, err := vmi.Pod()
 	if err != nil {
 		return "", err
+	}
+	if len(pod.Pod.Status.ContainerStatuses) != 1 {
+		return "", fmt.Errorf("expected single container status, but got %d statuses", len(pod.Pod.Status.ContainerStatuses))
 	}
 	containerID := pod.Pod.Status.ContainerStatuses[0].ContainerID
 	match := regexp.MustCompile("__(.+)$").FindStringSubmatch(containerID)

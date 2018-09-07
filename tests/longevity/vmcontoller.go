@@ -74,7 +74,7 @@ func (i *VMInstance) Create() error {
 	var err error
 
 	i.vm = i.controller.VM(i.name)
-	err = i.vm.Create(e2e.VMOptions{}.ApplyDefaults(), time.Minute*5, nil)
+	err = i.vm.CreateAndWait(e2e.VMOptions{}.ApplyDefaults(), time.Minute*5, nil)
 	if err != nil {
 		return err
 	}

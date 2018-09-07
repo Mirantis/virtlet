@@ -35,7 +35,7 @@ var _ = Describe("Virtlet CNI", func() {
 		// if network namespace was deleted
 		It("Should delete network namespace when VM is deleted", func() {
 			vm = controller.VM("cirros-vm")
-			err := vm.Create(VMOptions{}.ApplyDefaults(), time.Minute*5, nil)
+			err := vm.CreateAndWait(VMOptions{}.ApplyDefaults(), time.Minute*5, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			virtletPod, err := vm.VirtletPod()

@@ -33,7 +33,7 @@ var _ = Describe("Hung VM", func() {
 
 	BeforeAll(func() {
 		vm = controller.VM("hung-vm")
-		Expect(vm.Create(VMOptions{}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
+		Expect(vm.CreateAndWait(VMOptions{}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
 		var err error
 		_, err = vm.Pod()
 		Expect(err).NotTo(HaveOccurred())

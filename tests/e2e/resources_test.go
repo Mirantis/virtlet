@@ -36,7 +36,7 @@ var _ = Describe("VM resources", func() {
 
 	BeforeAll(func() {
 		vm = controller.VM("vm-resources")
-		Expect(vm.Create(VMOptions{
+		Expect(vm.CreateAndWait(VMOptions{
 			VCPUCount:      2,
 			RootVolumeSize: "4Gi",
 		}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
