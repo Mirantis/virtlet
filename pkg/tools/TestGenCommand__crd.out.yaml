@@ -72,6 +72,8 @@ spec:
                   type: string
                 imageTranslationConfigsDir:
                   type: string
+                kubeletRootDir:
+                  type: string
                 libvirtURI:
                   type: string
                 logLevel:

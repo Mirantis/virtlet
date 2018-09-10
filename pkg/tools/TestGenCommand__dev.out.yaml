@@ -202,6 +202,12 @@ spec:
               key: cpu-model
               name: virtlet-config
               optional: true
+        - name: KUBELET_ROOT_DIR
+          valueFrom:
+            configMapKeyRef:
+              key: kubelet_root_dir
+              name: virtlet-config
+              optional: true
         - name: VIRTLET_IMAGE_TRANSLATIONS_DIR
           value: /etc/virtlet/images
         image: mirantis/virtlet
@@ -499,6 +505,8 @@ spec:
                 imageDir:
                   type: string
                 imageTranslationConfigsDir:
+                  type: string
+                kubeletRootDir:
                   type: string
                 libvirtURI:
                   type: string
