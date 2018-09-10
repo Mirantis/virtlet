@@ -191,14 +191,13 @@ e2e: &e2e
 
   - run:
       name: Run e2e tests
-      # Ceph RBD tests are disabled for now because ceph/demo image is gone
       command: |
         build/portforward.sh 8080&
         mkdir -p ~/junit
-        skip="-ginkgo.skip=\[Heavy\]|\[MultiCNI\]|\[Disruptive\]|RBD volumes"
+        skip="-ginkgo.skip=\[Heavy\]|\[MultiCNI\]|\[Disruptive\]"
         if [[ ${CIRCLE_JOB} = e2e_multi_cni ]]; then
           # per-node config test requires an additional worker node
-          skip="-ginkgo.skip=\[Heavy\]|\[Disruptive\]|Per-node configuration|RBD volumes"
+          skip="-ginkgo.skip=\[Heavy\]|\[Disruptive\]|Per-node configuration"
         fi
         _output/virtlet-e2e-tests -test.v "${skip}" -junitOutput ~/junit/junit.xml -include-unsafe-tests=true
 
