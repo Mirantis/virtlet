@@ -5,7 +5,7 @@ an [apparmor](https://gitlab.com/apparmor/apparmor/wikis/home) enabled environme
 
 * install the profiles located in this directory into the corresponding directory (/etc/apparmor.d/ if you use Debian or its derivatives)
 ```bash
-sudo install -m 0644 libvirt virtlet vms -t /etc/apparmor.d/
+sudo install -m 0644 libvirtd virtlet vms -t /etc/apparmor.d/
 ```
 * apply them by
   * restarting the apparmor service
