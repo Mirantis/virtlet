@@ -4,6 +4,7 @@ This directory contains the Virtlet documentation.
 * [Cloud-init data generation](cloud-init-data-generation.md)
 * [Developer documentation](devel/README.md)
 * [Architecture overview](architecture.md)
+    * [VM pod lifecycle](vmpod-lifecycle.md)
     * [Description of networking](networking.md)
     * [Description of SyncPod workflow](sync-pod-workflow.md)
     * [Volume handling](volumes.md)
