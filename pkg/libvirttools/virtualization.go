@@ -18,7 +18,6 @@ package libvirttools
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -818,7 +817,7 @@ func (v *VirtualizationTool) VMStats(containerID string, name string) (*types.VM
 		return nil, err
 	}
 	vs := types.VMStats{
-		Timestamp:   time.Now().UnixNano(),
+		Timestamp:   v.clock.Now().UnixNano(),
 		ContainerID: containerID,
 		Name:        name,
 	}
@@ -853,11 +852,11 @@ func (v *VirtualizationTool) VMStats(containerID string, name string) (*types.VM
 		return nil, fmt.Errorf("cannot locate root disk in domain definition")
 	}
 
-	fstat, err := os.Stat(rootDiskLocation)
+	rootDiskSize, err := v.ImageManager().BytesUsedBy(rootDiskLocation)
 	if err != nil {
 		return nil, err
 	}
-	vs.FsBytes = uint64(fstat.Size())
+	vs.FsBytes = rootDiskSize
 
 	return &vs, nil
 }

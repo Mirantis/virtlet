@@ -141,3 +141,8 @@ func (s *FakeStore) FilesystemStats() (*types.FilesystemStats, error) {
 		UsedInodes: fakeUsedInodes,
 	}, nil
 }
+
+// BytesUsedBy implements BytesUsedBy method from Store interface.
+func (s *FakeStore) BytesUsedBy(path string) (uint64, error) {
+	return fakeUsedBytes, nil
+}

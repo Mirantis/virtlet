@@ -301,6 +301,56 @@
         name: container-for-testName_0
       started_at: 1524648266720331175
       state: 1
+- name: 'enter: ContainerStats'
+  value:
+    container_id: 231700d5-c9a6-5a49-738d-99a954c51550
+- name: 'leave: ContainerStats'
+  value:
+    stats:
+      attributes:
+        id: 231700d5-c9a6-5a49-738d-99a954c51550
+        metadata:
+          name: 231700d5-c9a6-5a49-738d-99a954c51550
+      cpu:
+        timestamp: 1524648266720331175
+        usage_core_nano_seconds: {}
+      memory:
+        timestamp: 1524648266720331175
+        working_set_bytes: {}
+      writable_layer:
+        fs_id:
+          mountpoint: /var/lib/virtlet
+        inodes_used:
+          value: 1
+        timestamp: 1524648266720331175
+        used_bytes:
+          value: 1073741824
+- name: 'enter: ListContainerStats'
+  value: {}
+- name: 'domain conn: ListDomains'
+  value:
+  - virtlet-231700d5-c9a6-container-for-testName_0
+- name: 'leave: ListContainerStats'
+  value:
+    stats:
+    - attributes:
+        id: 231700d5-c9a6-5a49-738d-99a954c51550
+        metadata:
+          name: 231700d5-c9a6-5a49-738d-99a954c51550
+      cpu:
+        timestamp: 1524648266720331175
+        usage_core_nano_seconds: {}
+      memory:
+        timestamp: 1524648266720331175
+        working_set_bytes: {}
+      writable_layer:
+        fs_id:
+          mountpoint: /var/lib/virtlet
+        inodes_used:
+          value: 1
+        timestamp: 1524648266720331175
+        used_bytes:
+          value: 1073741824
 - name: 'enter: PullImage'
   value:
     image:

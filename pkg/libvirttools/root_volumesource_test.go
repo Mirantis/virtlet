@@ -61,6 +61,11 @@ func (im *FakeImageManager) FilesystemStats() (*types.FilesystemStats, error) {
 	}, nil
 }
 
+func (im *FakeImageManager) BytesUsedBy(path string) (uint64, error) {
+	im.rec.Rec("BytesUsedBy", path)
+	return fakeImageVirtualSize, nil
+}
+
 func TestRootVolumeNaming(t *testing.T) {
 	v := rootVolume{
 		volumeBase{

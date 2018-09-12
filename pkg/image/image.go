@@ -92,6 +92,9 @@ type Store interface {
 
 	// FilesystemStats returns disk space and inode usage info for this store.
 	FilesystemStats() (*types.FilesystemStats, error)
+
+	// BytesUsedBy returns disk usage of the file in this store.
+	BytesUsedBy(path string) (uint64, error)
 }
 
 // VirtualSizeFunc specifies a function that returns the virtual
@@ -602,4 +605,13 @@ func (s *FileStore) FilesystemStats() (*types.FilesystemStats, error) {
 		UsedBytes:  occupiedBytes,
 		UsedInodes: occupiedInodes,
 	}, nil
+}
+
+// BytesUsedBy return disk usage of provided file as seen in store
+func (s *FileStore) BytesUsedBy(path string) (uint64, error) {
+	fstat, err := os.Stat(path)
+	if err != nil {
+		return 0, err
+	}
+	return uint64(fstat.Size()), nil
 }
