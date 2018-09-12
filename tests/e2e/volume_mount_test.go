@@ -30,34 +30,13 @@ import (
 var _ = Describe("Container volume mounts", func() {
 	Context("Of raw volumes", func() {
 		var (
-			err             error
 			virtletNodeName string
 			vm              *framework.VMInterface
-			nodeExecutor    framework.Executor
 			devPath         string
 			ssh             framework.Executor
 		)
 
-		BeforeAll(func() {
-			virtletNodeName, err = controller.VirtletNodeName()
-			Expect(err).NotTo(HaveOccurred())
-			nodeExecutor, err = controller.DinDNodeExecutor(virtletNodeName)
-			Expect(err).NotTo(HaveOccurred())
-
-			_, err = framework.RunSimple(nodeExecutor, "dd", "if=/dev/zero", "of=/rawdevtest", "bs=1M", "count=10")
-			Expect(err).NotTo(HaveOccurred())
-			// We use mkfs.ext3 here because mkfs.ext4 on
-			// the node may be too new for CirrOS, causing
-			// errors like this in VM's dmesg:
-			// [    1.316395] EXT3-fs (vdb): error: couldn't mount because of unsupported optional features (2c0)
-			// [    1.320222] EXT4-fs (vdb): couldn't mount RDWR because of unsupported optional features (400)
-			// [    1.339594] EXT3-fs (vdc1): error: couldn't mount because of unsupported optional features (240)
-			// [    1.342850] EXT4-fs (vdc1): mounted filesystem with ordered data mode. Opts: (null)
-			_, err = framework.RunSimple(nodeExecutor, "mkfs.ext3", "/rawdevtest")
-			Expect(err).NotTo(HaveOccurred())
-			devPath, err = framework.RunSimple(nodeExecutor, "losetup", "-f", "/rawdevtest", "--show")
-			Expect(err).NotTo(HaveOccurred())
-		})
+		withLoopbackBlockDevice(&virtletNodeName, &devPath)
 
 		AfterEach(func() {
 			if ssh != nil {
@@ -68,15 +47,8 @@ var _ = Describe("Container volume mounts", func() {
 			}
 		})
 
-		AfterAll(func() {
-			// The loopback device is detached by itself upon
-			// success (TODO: check why it happens), so we
-			// ignore errors here
-			framework.RunSimple(nodeExecutor, "losetup", "-d", devPath)
-		})
-
 		It("Should be handled inside the VM", func() {
-			vm = makeVolumeMountVM(virtletNodeName, func(pod *framework.PodInterface) {
+			vm = makeVMWithMountAndSymlinkScript(virtletNodeName, nil, func(pod *framework.PodInterface) {
 				addFlexvolMount(pod, "blockdev", "/foo", map[string]string{
 					"type": "raw",
 					"path": devPath,
@@ -88,7 +60,7 @@ var _ = Describe("Container volume mounts", func() {
 		})
 
 		It("Should be handled inside the VM together with another volume mount", func() {
-			vm = makeVolumeMountVM(virtletNodeName, func(pod *framework.PodInterface) {
+			vm = makeVMWithMountAndSymlinkScript(virtletNodeName, nil, func(pod *framework.PodInterface) {
 				addFlexvolMount(pod, "blockdev1", "/foo", map[string]string{
 					"type": "raw",
 					"path": devPath,
@@ -112,7 +84,7 @@ var _ = Describe("Container volume mounts", func() {
 		)
 
 		BeforeAll(func() {
-			vm = makeVolumeMountVM("", func(pod *framework.PodInterface) {
+			vm = makeVMWithMountAndSymlinkScript("", nil, func(pod *framework.PodInterface) {
 				addFlexvolMount(pod, "blockdev", "/foo", map[string]string{
 					"type":     "qcow2",
 					"capacity": "10MB",
@@ -266,20 +238,6 @@ func addFlexvolMount(pod *framework.PodInterface, name string, mountPath string,
 		Name:      name,
 		MountPath: mountPath,
 	})
-}
-
-func makeVolumeMountVM(nodeName string, podCustomization func(*framework.PodInterface)) *framework.VMInterface {
-	vm := controller.VM("mount-vm")
-	Expect(vm.CreateAndWait(VMOptions{
-		NodeName: nodeName,
-		// TODO: should also have an option to test using
-		// ubuntu image with volumes mounted using cloud-init
-		// userdata 'mounts' section
-		UserDataScript: "@virtlet-mount-script@",
-	}.ApplyDefaults(), time.Minute*5, podCustomization)).To(Succeed())
-	_, err := vm.Pod()
-	Expect(err).NotTo(HaveOccurred())
-	return vm
 }
 
 func shouldBeMounted(ssh framework.Executor, path string) {

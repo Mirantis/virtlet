@@ -27,10 +27,14 @@ import (
 	. "github.com/onsi/gomega"
 
 	"k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/Mirantis/virtlet/tests/e2e/framework"
 	. "github.com/Mirantis/virtlet/tests/e2e/ginkgo-ext"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+const cephContainerName = "ceph_cluster"
 
 var (
 	vmImageLocation       = flag.String("image", defaultVMImageLocation, "VM image URL (*without http(s)://*")
@@ -39,6 +43,7 @@ var (
 	includeUnsafeTests    = flag.Bool("include-unsafe-tests", false, "include tests that can be unsafe if they're run outside the build container")
 	memoryLimit           = flag.Int("memoryLimit", 160, "default VM memory limit (in MiB)")
 	junitOutput           = flag.String("junitOutput", "", "JUnit XML output file")
+	controller            *framework.Controller
 )
 
 // scheduleWaitSSH schedules SSH interface initialization before the test context starts
@@ -173,4 +178,154 @@ func includeUnsafe() {
 	if !*includeUnsafeTests {
 		Skip("Tests that are unsafe outside the build container are disabled")
 	}
+}
+
+func withLoopbackBlockDevice(virtletNodeName, devPath *string) {
+	var nodeExecutor framework.Executor
+	BeforeAll(func() {
+		var err error
+		*virtletNodeName, err = controller.VirtletNodeName()
+		Expect(err).NotTo(HaveOccurred())
+		nodeExecutor, err = controller.DinDNodeExecutor(*virtletNodeName)
+		Expect(err).NotTo(HaveOccurred())
+
+		_, err = framework.RunSimple(nodeExecutor, "dd", "if=/dev/zero", "of=/rawdevtest", "bs=1M", "count=10")
+		Expect(err).NotTo(HaveOccurred())
+		// We use mkfs.ext3 here because mkfs.ext4 on
+		// the node may be too new for CirrOS, causing
+		// errors like this in VM's dmesg:
+		// [    1.316395] EXT3-fs (vdb): error: couldn't mount because of unsupported optional features (2c0)
+		// [    1.320222] EXT4-fs (vdb): couldn't mount RDWR because of unsupported optional features (400)
+		// [    1.339594] EXT3-fs (vdc1): error: couldn't mount because of unsupported optional features (240)
+		// [    1.342850] EXT4-fs (vdc1): mounted filesystem with ordered data mode. Opts: (null)
+		_, err = framework.RunSimple(nodeExecutor, "mkfs.ext3", "/rawdevtest")
+		Expect(err).NotTo(HaveOccurred())
+		*devPath, err = framework.RunSimple(nodeExecutor, "losetup", "-f", "/rawdevtest", "--show")
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterAll(func() {
+		// The loopback device is detached by itself upon
+		// success (TODO: check why it happens), so we
+		// ignore errors here
+		framework.RunSimple(nodeExecutor, "losetup", "-d", *devPath)
+	})
+}
+
+func withCeph(monitorIP, secret *string, kubeSecret string) {
+	BeforeAll(func() {
+		nodeExecutor, err := (*controller).DinDNodeExecutor("kube-master")
+		Expect(err).NotTo(HaveOccurred())
+
+		route, err := framework.RunSimple(nodeExecutor, "route", "-n")
+		Expect(err).NotTo(HaveOccurred())
+
+		match := regexp.MustCompile(`(?:default|0\.0\.0\.0)\s+([\d.]+)`).FindStringSubmatch(route)
+		Expect(match).To(HaveLen(2))
+
+		*monitorIP = match[1]
+		cephPublicNetwork := *monitorIP + "/16"
+
+		container, err := controller.DockerContainer(cephContainerName)
+		Expect(err).NotTo(HaveOccurred())
+
+		container.Delete()
+		Expect(container.PullImage("docker.io/ceph/daemon:v3.1.0-stable-3.1-mimic-centos-7")).To(Succeed())
+		Expect(container.Run("docker.io/ceph/daemon:v3.1.0-stable-3.1-mimic-centos-7",
+			map[string]string{
+				"MON_IP":               *monitorIP,
+				"CEPH_PUBLIC_NETWORK":  cephPublicNetwork,
+				"CEPH_DEMO_UID":        "foo",
+				"CEPH_DEMO_ACCESS_KEY": "foo",
+				"CEPH_DEMO_SECRET_KEY": "foo",
+				"CEPH_DEMO_BUCKET":     "foo",
+				"DEMO_DAEMONS":         "osd mds",
+			},
+			"host", nil, false, "demo")).To(Succeed())
+
+		cephContainerExecutor := container.Executor(false, "")
+		By("Waiting for ceph cluster")
+		Eventually(func() error {
+			_, err := framework.RunSimple(cephContainerExecutor, "ceph", "-s")
+			return err
+		}).Should(Succeed())
+		By("Ceph cluster started")
+
+		commands := []string{
+			// Add rbd pool and volume
+			`ceph osd pool create libvirt-pool 8 8`,
+			`rbd create rbd-test-image1 --size 10M --pool libvirt-pool --image-feature layering`,
+			`rbd create rbd-test-image2 --size 10M --pool libvirt-pool --image-feature layering`,
+			`rbd create rbd-test-image-pv --size 10M --pool libvirt-pool --image-feature layering`,
+
+			// Add user for virtlet
+			`ceph auth get-key client.admin`,
+		}
+		var out string
+		for _, cmd := range commands {
+			out = do(framework.RunSimple(cephContainerExecutor, "/bin/bash", "-c", cmd)).(string)
+		}
+		if secret != nil {
+			*secret = out
+		}
+		if kubeSecret != "" {
+			// buf := bytes.NewBufferString(out)
+			// decoder := base64.NewDecoder(base64.StdEncoding, buf)
+			// decoded, err := ioutil.ReadAll(decoder)
+			// Expect(err).NotTo(HaveOccurred())
+			_, err = controller.Secrets().Create(&v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: kubeSecret,
+				},
+				Type: "kubernetes.io/rbd",
+				Data: map[string][]byte{
+					"key": []byte(out),
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+		}
+	})
+
+	AfterAll(func() {
+		container, err := controller.DockerContainer(cephContainerName)
+		Expect(err).NotTo(HaveOccurred())
+		container.Delete()
+		if kubeSecret != "" {
+			Expect(controller.Secrets().Delete(kubeSecret, nil)).To(Succeed())
+			Eventually(func() error {
+				if _, err := controller.Secrets().Get(kubeSecret, metav1.GetOptions{}); err != nil {
+					if k8serrors.IsNotFound(err) {
+						return nil
+					}
+					return err
+				}
+				return fmt.Errorf("secret %s was not deleted", kubeSecret)
+			})
+		}
+	})
+}
+
+func makeVMWithMountAndSymlinkScript(nodeName string, PVCs []framework.PVCSpec, podCustomization func(*framework.PodInterface)) *framework.VMInterface {
+	vm := controller.VM("mount-vm")
+	Expect(vm.CreateAndWait(VMOptions{
+		NodeName: nodeName,
+		// TODO: should also have an option to test using
+		// ubuntu image with volumes mounted using cloud-init
+		// userdata 'mounts' section
+		UserDataScript: "@virtlet-mount-script@",
+		PVCs:           PVCs,
+	}.ApplyDefaults(), time.Minute*5, podCustomization)).To(Succeed())
+	_, err := vm.Pod()
+	Expect(err).NotTo(HaveOccurred())
+	return vm
+}
+
+func expectToBeUsableForFilesystem(ssh framework.Executor, devPath string) {
+	Eventually(func() error {
+		_, err := framework.RunSimple(ssh, fmt.Sprintf("sudo /usr/sbin/mkfs.ext2 %s", devPath))
+		return err
+	}, 60*5, 3).Should(Succeed())
+	do(framework.RunSimple(ssh, fmt.Sprintf("sudo mount %s /mnt", devPath)))
+	out := do(framework.RunSimple(ssh, "ls -l /mnt")).(string)
+	Expect(out).To(ContainSubstring("lost+found"))
 }

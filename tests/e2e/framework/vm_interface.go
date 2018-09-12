@@ -35,6 +35,7 @@ type VMInterface struct {
 	pod        *PodInterface
 
 	Name string
+	PVCs []*PVCInterface
 }
 
 // VMOptions defines VM parameters
@@ -67,6 +68,8 @@ type VMOptions struct {
 	RootVolumeSize string
 	// "cni" annotation value for CNI-Genie
 	MultiCNI string
+	// PVCs (with corresponding PVs) to use
+	PVCs []PVCSpec
 }
 
 func newVMInterface(controller *Controller, name string) *VMInterface {
@@ -106,6 +109,14 @@ func (vmi *VMInterface) PodWithoutChecks() *PodInterface {
 // Create creates a new VM pod
 func (vmi *VMInterface) Create(options VMOptions, beforeCreate func(*PodInterface)) error {
 	pod := newPodInterface(vmi.controller, vmi.buildVMPod(options))
+	for _, pvcSpec := range options.PVCs {
+		pvc := newPersistentVolumeClaim(vmi.controller, pvcSpec)
+		if err := pvc.Create(); err != nil {
+			return err
+		}
+		pvc.AddToPod(pod, pvcSpec.Name)
+		vmi.PVCs = append(vmi.PVCs, pvc)
+	}
 	if beforeCreate != nil {
 		beforeCreate(pod)
 	}
@@ -130,8 +141,21 @@ func (vmi *VMInterface) Delete(waitTimeout time.Duration) error {
 	if vmi.pod == nil {
 		return nil
 	}
-	vmi.pod.Delete()
-	return vmi.pod.WaitDestruction(waitTimeout)
+	if err := vmi.pod.Delete(); err != nil {
+		return err
+	}
+	if err := vmi.pod.WaitForDestruction(waitTimeout); err != nil {
+		return err
+	}
+	for _, pvc := range vmi.PVCs {
+		if err := pvc.Delete(); err != nil {
+			return err
+		}
+		if err := pvc.WaitForDestruction(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // VirtletPod returns pod in which virtlet instance, responsible for this VM is located
