@@ -177,6 +177,7 @@ e2e: &e2e
           VIRTLET_DEMO_BRANCH=master \
           ENABLE_CEPH=1 \
           FEATURE_GATES="BlockVolume=true" \
+          KUBELET_FEATURE_GATES="BlockVolume=true" \
           BASE_LOCATION="$PWD" \
           deploy/demo.sh
   - run:

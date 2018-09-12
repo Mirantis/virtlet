@@ -17,6 +17,10 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
+
+	. "github.com/onsi/gomega"
+
 	"github.com/Mirantis/virtlet/tests/e2e/framework"
 	. "github.com/Mirantis/virtlet/tests/e2e/ginkgo-ext"
 )
@@ -56,6 +60,11 @@ var _ = Describe("Block PVs", func() {
 				},
 			}, nil)
 			ssh = waitSSH(vm)
+			Eventually(
+				func() error {
+					_, err := framework.RunSimple(ssh, fmt.Sprintf("test -e %s", devPath))
+					return err
+				}, 60*5, 3).Should(Succeed())
 			expectToBeUsableForFilesystem(ssh, "/dev/testpvc")
 		})
 	})
