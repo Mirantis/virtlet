@@ -458,7 +458,11 @@ func (v *VirtletRuntimeService) Status(context.Context, *kubeapi.StatusRequest) 
 
 // ContainerStats returns cpu/memory/disk usage for particular container id
 func (v *VirtletRuntimeService) ContainerStats(ctx context.Context, in *kubeapi.ContainerStatsRequest) (*kubeapi.ContainerStatsResponse, error) {
-	vs, err := v.virtTool.VMStats(in.ContainerId)
+	info, err := v.virtTool.ContainerInfo(in.ContainerId)
+	if err != nil {
+		return nil, err
+	}
+	vs, err := v.virtTool.VMStats(info.Id, info.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -499,6 +503,9 @@ func VMStatsToCRIContainerStats(vs types.VMStats, mountpoint string) *kubeapi.Co
 	return &kubeapi.ContainerStats{
 		Attributes: &kubeapi.ContainerAttributes{
 			Id: vs.ContainerID,
+			Metadata: &kubeapi.ContainerMetadata{
+				Name: vs.ContainerID,
+			},
 		},
 		Cpu: &kubeapi.CpuUsage{
 			Timestamp:            vs.Timestamp,

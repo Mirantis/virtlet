@@ -812,7 +812,7 @@ func (v *VirtualizationTool) ContainerInfo(containerID string) (*types.Container
 }
 
 // VMStats returns current cpu/memory/disk usage for VM
-func (v *VirtualizationTool) VMStats(containerID string) (*types.VMStats, error) {
+func (v *VirtualizationTool) VMStats(containerID string, name string) (*types.VMStats, error) {
 	domain, err := v.domainConn.LookupDomainByUUIDString(containerID)
 	if err != nil {
 		return nil, err
@@ -820,6 +820,7 @@ func (v *VirtualizationTool) VMStats(containerID string) (*types.VMStats, error)
 	vs := types.VMStats{
 		Timestamp:   time.Now().UnixNano(),
 		ContainerID: containerID,
+		Name:        name,
 	}
 
 	rss, err := domain.GetRSS()
@@ -885,7 +886,7 @@ func (v *VirtualizationTool) ListVMStats(filter *types.VMStatsFilter) ([]types.V
 
 	var statsList []types.VMStats
 	for _, info := range infos {
-		stats, err := v.VMStats(info.Id)
+		stats, err := v.VMStats(info.Id, info.Name)
 		if err != nil {
 			return nil, err
 		}

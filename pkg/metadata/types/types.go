@@ -95,6 +95,8 @@ type VMStats struct {
 	// ContainerID holds identifier of container for which these statistics
 	// were collected
 	ContainerID string
+	// Name holds name of the container
+	Name string
 	// Timestatmp holds an unix timestamp (including nanoseconds)
 	// for stats collection
 	Timestamp int64
