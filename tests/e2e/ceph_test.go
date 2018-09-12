@@ -22,14 +22,10 @@ import (
 
 	. "github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/Mirantis/virtlet/tests/e2e/framework"
 	. "github.com/Mirantis/virtlet/tests/e2e/ginkgo-ext"
 )
-
-const cephContainerName = "ceph_cluster"
 
 var _ = Describe("Ceph volumes tests", func() {
 	var (
@@ -37,15 +33,7 @@ var _ = Describe("Ceph volumes tests", func() {
 		secret    string
 	)
 
-	BeforeAll(func() {
-		monitorIP, secret = setupCeph()
-	})
-
-	AfterAll(func() {
-		container, err := controller.DockerContainer(cephContainerName)
-		Expect(err).NotTo(HaveOccurred())
-		container.Delete()
-	})
+	withCeph(&monitorIP, &secret, "")
 
 	Context("RBD volumes", func() {
 		var (
@@ -87,7 +75,7 @@ var _ = Describe("Ceph volumes tests", func() {
 			scheduleWaitSSH(&vm, &ssh)
 
 			It("Must be accessible from within OS", func() {
-				checkFilesystemAccess(ssh)
+				expectToBeUsableForFilesystem(ssh, "/dev/vdb")
 			})
 		})
 	})
@@ -98,57 +86,22 @@ var _ = Describe("Ceph volumes tests", func() {
 		)
 
 		BeforeAll(func() {
-			pv := &v1.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "rbd-pv-virtlet",
-				},
-				Spec: v1.PersistentVolumeSpec{
-					Capacity: v1.ResourceList{
-						v1.ResourceStorage: resource.MustParse("10M"),
-					},
-					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						FlexVolume: cephPersistentVolumeSource("rbd-test-image-pv", monitorIP, secret),
-					},
-				},
-			}
-			do(controller.PersistentVolumesClient().Create(pv))
-
-			pvc := &v1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "rbd-claim",
-				},
-				Spec: v1.PersistentVolumeClaimSpec{
-					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceStorage: resource.MustParse("10M"),
-						},
-					},
-				},
-			}
-			do(controller.PersistentVolumeClaimsClient().Create(pvc))
-
 			vm = controller.VM("cirros-vm-rbd-pv")
-			podCustomization := func(pod *framework.PodInterface) {
-				pod.Pod.Spec.Volumes = append(pod.Pod.Spec.Volumes, v1.Volume{
-					Name: "test",
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "rbd-claim",
-						},
+			opts := VMOptions{
+				PVCs: []framework.PVCSpec{
+					{
+						Name:              "rbd-pv-virtlet",
+						Size:              "10M",
+						FlexVolumeOptions: cephOptions("rbd-test-image-pv", monitorIP, secret),
 					},
-				})
-			}
-
-			Expect(vm.CreateAndWait(VMOptions{}.ApplyDefaults(), time.Minute*5, podCustomization)).To(Succeed())
+				},
+			}.ApplyDefaults()
+			Expect(vm.CreateAndWait(opts, time.Minute*5, nil)).To(Succeed())
 			_ = do(vm.Pod()).(*framework.PodInterface)
 		})
 
 		AfterAll(func() {
 			deleteVM(vm)
-			controller.PersistentVolumeClaimsClient().Delete("rbd-claim", nil)
-			controller.PersistentVolumesClient().Delete("rbd-pv-virtlet", nil)
 		})
 
 		It("Must be attached to libvirt domain", func() {
@@ -156,89 +109,18 @@ var _ = Describe("Ceph volumes tests", func() {
 			Expect(regexp.MustCompile("(?m:rbd-test-image-pv$)").MatchString(out)).To(BeTrue())
 		})
 
-		Context("Mounted volumes", func() {
-			var ssh framework.Executor
-			scheduleWaitSSH(&vm, &ssh)
-
-			It("Must be accessible from within OS", func() {
-				checkFilesystemAccess(ssh)
-			})
+		It("Must be accessible from within the VM", func() {
+			ssh := waitSSH(vm)
+			expectToBeUsableForFilesystem(ssh, "/dev/vdb")
 		})
 	})
 })
-
-func checkFilesystemAccess(ssh framework.Executor) {
-	do(framework.RunSimple(ssh, "sudo /usr/sbin/mkfs.ext2 /dev/vdb"))
-	do(framework.RunSimple(ssh, "sudo mount /dev/vdb /mnt"))
-	out := do(framework.RunSimple(ssh, "ls -l /mnt")).(string)
-	Expect(out).To(ContainSubstring("lost+found"))
-}
-
-func setupCeph() (string, string) {
-	nodeExecutor, err := controller.DinDNodeExecutor("kube-master")
-	Expect(err).NotTo(HaveOccurred())
-
-	route, err := framework.RunSimple(nodeExecutor, "route", "-n")
-	Expect(err).NotTo(HaveOccurred())
-
-	match := regexp.MustCompile(`(?:default|0\.0\.0\.0)\s+([\d.]+)`).FindStringSubmatch(route)
-	Expect(match).To(HaveLen(2))
-
-	monIP := match[1]
-	cephPublicNetwork := monIP + "/16"
-
-	container, err := controller.DockerContainer(cephContainerName)
-	Expect(err).NotTo(HaveOccurred())
-
-	container.Delete()
-	Expect(container.PullImage("docker.io/ceph/daemon:v3.1.0-stable-3.1-mimic-centos-7")).To(Succeed())
-	Expect(container.Run("docker.io/ceph/daemon:v3.1.0-stable-3.1-mimic-centos-7",
-		map[string]string{
-			"MON_IP":               monIP,
-			"CEPH_PUBLIC_NETWORK":  cephPublicNetwork,
-			"CEPH_DEMO_UID":        "foo",
-			"CEPH_DEMO_ACCESS_KEY": "foo",
-			"CEPH_DEMO_SECRET_KEY": "foo",
-			"CEPH_DEMO_BUCKET":     "foo",
-			"DEMO_DAEMONS":         "osd mds",
-		},
-		"host", nil, false, "demo")).To(Succeed())
-
-	cephContainerExecutor := container.Executor(false, "")
-	By("Waiting for ceph cluster")
-	Eventually(func() error {
-		_, err := framework.RunSimple(cephContainerExecutor, "ceph", "-s")
-		return err
-	}).Should(Succeed())
-	By("Ceph cluster started")
-
-	var out string
-	commands := []string{
-		// Adjust ceph configs
-		`echo -e "rbd default features = 1\nrbd default format = 2" >> /etc/ceph/ceph.conf`,
-
-		// Add rbd pool and volume
-		`ceph osd pool create libvirt-pool 8 8`,
-		`rbd create rbd-test-image1 --size 10M --pool libvirt-pool --image-feature layering`,
-		`rbd create rbd-test-image2 --size 10M --pool libvirt-pool --image-feature layering`,
-		`rbd create rbd-test-image-pv --size 10M --pool libvirt-pool --image-feature layering`,
-
-		// Add user for virtlet
-		`ceph auth get-or-create client.libvirt`,
-		`ceph auth caps client.libvirt mon "allow *" osd "allow *"`,
-		`ceph auth get-key client.libvirt`,
-	}
-	for _, cmd := range commands {
-		out = do(framework.RunSimple(cephContainerExecutor, "/bin/bash", "-c", cmd)).(string)
-	}
-	return monIP, out
-}
 
 func cephOptions(volume, monitorIP, secret string) map[string]string {
 	return map[string]string{
 		"type":    "ceph",
 		"monitor": monitorIP + ":6789",
-		"user":    "libvirt",
+		"user":    "admin",
 		"secret":  secret,
 		"volume":  volume,
 		"pool":    "libvirt-pool",
@@ -252,9 +134,4 @@ func cephVolumeSource(volume, monitorIP, secret string) *v1.FlexVolumeSource {
 	}
 }
 
-func cephPersistentVolumeSource(volume, monitorIP, secret string) *v1.FlexPersistentVolumeSource {
-	return &v1.FlexPersistentVolumeSource{
-		Driver:  "virtlet/flexvolume_driver",
-		Options: cephOptions(volume, monitorIP, secret),
-	}
-}
+// TODO: use client.admin instead of client.libvirt

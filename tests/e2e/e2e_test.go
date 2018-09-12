@@ -29,8 +29,6 @@ import (
 	. "github.com/Mirantis/virtlet/tests/e2e/ginkgo-ext"
 )
 
-var controller *framework.Controller
-
 func TestE2E(t *testing.T) {
 	SetDefaultEventuallyTimeout(time.Minute * 5)
 	RegisterFailHandler(Fail)
