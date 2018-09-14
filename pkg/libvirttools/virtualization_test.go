@@ -33,6 +33,7 @@ import (
 	fakemeta "github.com/Mirantis/virtlet/pkg/metadata/fake"
 	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	"github.com/Mirantis/virtlet/pkg/utils"
+	fakeutils "github.com/Mirantis/virtlet/pkg/utils/fake"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 	"github.com/Mirantis/virtlet/pkg/virt/fake"
 	"github.com/Mirantis/virtlet/tests/gm"
@@ -59,7 +60,7 @@ type containerTester struct {
 	metadataStore  metadata.Store
 }
 
-func newContainerTester(t *testing.T, rec *testutils.TopLevelRecorder) *containerTester {
+func newContainerTester(t *testing.T, rec *testutils.TopLevelRecorder, cmds []fakeutils.CmdSpec) *containerTester {
 	ct := &containerTester{
 		t:     t,
 		clock: clockwork.NewFakeClockAt(time.Date(2017, 5, 30, 20, 19, 0, 0, time.UTC)),
@@ -83,7 +84,7 @@ func newContainerTester(t *testing.T, rec *testutils.TopLevelRecorder) *containe
 		t.Fatalf("Failed to create fake bolt client: %v", err)
 	}
 
-	imageManager := NewFakeImageManager(ct.rec)
+	imageManager := newFakeImageManager(ct.rec)
 	ct.kubeletRootDir = filepath.Join(ct.tmpDir, "kubelet-root")
 	virtConfig := VirtualizationConfig{
 		VolumePoolName:     "volumes",
@@ -91,7 +92,11 @@ func newContainerTester(t *testing.T, rec *testutils.TopLevelRecorder) *containe
 		KubeletRootDir:     ct.kubeletRootDir,
 		StreamerSocketPath: "/var/lib/libvirt/streamer.sock",
 	}
-	ct.virtTool = NewVirtualizationTool(ct.domainConn, ct.storageConn, imageManager, ct.metadataStore, GetDefaultVolumeSource(), virtConfig, utils.NullMounter)
+	fakeCommander := fakeutils.NewFakeCommander(rec, cmds)
+	fakeCommander.ReplaceTempPath("__pods__", "/fakedev")
+	ct.virtTool = NewVirtualizationTool(
+		ct.domainConn, ct.storageConn, imageManager, ct.metadataStore,
+		GetDefaultVolumeSource(), virtConfig, utils.NullMounter, fakeCommander)
 	ct.virtTool.SetClock(ct.clock)
 
 	return ct
@@ -181,7 +186,7 @@ func (ct *containerTester) verifyContainerRootfsExists(containerInfo *types.Cont
 }
 
 func TestContainerLifecycle(t *testing.T) {
-	ct := newContainerTester(t, testutils.NewToplevelRecorder())
+	ct := newContainerTester(t, testutils.NewToplevelRecorder(), nil)
 	defer ct.teardown()
 
 	sandbox := fakemeta.GetSandboxes(1)[0]
@@ -263,7 +268,7 @@ func TestContainerLifecycle(t *testing.T) {
 }
 
 func TestDomainForcedShutdown(t *testing.T) {
-	ct := newContainerTester(t, testutils.NewToplevelRecorder())
+	ct := newContainerTester(t, testutils.NewToplevelRecorder(), nil)
 	defer ct.teardown()
 
 	sandbox := fakemeta.GetSandboxes(1)[0]
@@ -298,7 +303,7 @@ func TestDomainForcedShutdown(t *testing.T) {
 }
 
 func TestDoubleStartError(t *testing.T) {
-	ct := newContainerTester(t, testutils.NewToplevelRecorder())
+	ct := newContainerTester(t, testutils.NewToplevelRecorder(), nil)
 	defer ct.teardown()
 
 	sandbox := fakemeta.GetSandboxes(1)[0]
@@ -320,6 +325,7 @@ type volMount struct {
 type volDevice struct {
 	name       string
 	devicePath string
+	size       int
 }
 
 func TestDomainDefinitions(t *testing.T) {
@@ -333,6 +339,7 @@ func TestDomainDefinitions(t *testing.T) {
 		flexVolumes map[string]map[string]interface{}
 		mounts      []volMount
 		volDevs     []volDevice
+		cmds        []fakeutils.CmdSpec
 	}{
 		{
 			name: "plain domain",
@@ -418,11 +425,36 @@ func TestDomainDefinitions(t *testing.T) {
 				"VirtletDiskDriver": "virtio",
 			},
 		},
+		{
+			name: "persistent rootfs",
+			volDevs: []volDevice{
+				{
+					name:       "root",
+					devicePath: "/",
+					size:       512000,
+				},
+			},
+			cmds: []fakeutils.CmdSpec{
+				{
+					Match:  "blockdev --getsz",
+					Stdout: "1000",
+				},
+				{
+					Match: "qemu-img convert",
+				},
+				{
+					Match: "dmsetup create",
+				},
+				{
+					Match: "dmsetup remove",
+				},
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := testutils.NewToplevelRecorder()
 
-			ct := newContainerTester(t, rec)
+			ct := newContainerTester(t, rec, tc.cmds)
 			defer ct.teardown()
 
 			sandbox := fakemeta.GetSandboxes(1)[0]
@@ -458,10 +490,17 @@ func TestDomainDefinitions(t *testing.T) {
 					t.Fatal(err)
 				}
 				hostPath := filepath.Join(baseDir, d.name)
-				if f, err := os.OpenFile(hostPath, os.O_RDONLY|os.O_CREATE, 0666); err != nil {
+				if f, err := os.Create(hostPath); err != nil {
 					t.Fatal(err)
 				} else {
-					f.Close()
+					if d.size != 0 {
+						if _, err := f.Write(make([]byte, d.size)); err != nil {
+							t.Fatal(err)
+						}
+					}
+					if err := f.Close(); err != nil {
+						t.Fatal(err)
+					}
 				}
 				volDevs = append(volDevs, types.VMVolumeDevice{
 					DevicePath: d.devicePath,
@@ -489,7 +528,7 @@ func TestDomainResourceConstraints(t *testing.T) {
 
 	rec := testutils.NewToplevelRecorder()
 	rec.AddFilter("DefineDomain")
-	ct := newContainerTester(t, rec)
+	ct := newContainerTester(t, rec, nil)
 	defer ct.teardown()
 	sandbox := fakemeta.GetSandboxes(1)[0]
 	sandbox.Annotations = map[string]string{

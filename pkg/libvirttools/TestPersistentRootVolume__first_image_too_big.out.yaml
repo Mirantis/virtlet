@@ -1,0 +1,7 @@
+- name: setup
+- name: 'image: GetImagePathDigestAndVirtualSize'
+  value: persistent/image1
+- name: CMD
+  value:
+    cmd: blockdev --getsz /dev/rootdev
+    stdout: "8"

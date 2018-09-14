@@ -18,6 +18,7 @@ package libvirttools
 
 import (
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
+	digest "github.com/opencontainers/go-digest"
 
 	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	"github.com/Mirantis/virtlet/pkg/utils"
@@ -26,7 +27,7 @@ import (
 
 // ImageManager describes a images info provider.
 type ImageManager interface {
-	GetImagePathAndVirtualSize(ref string) (string, uint64, error)
+	GetImagePathDigestAndVirtualSize(ref string) (string, digest.Digest, uint64, error)
 }
 
 type volumeOwner interface {
@@ -38,6 +39,7 @@ type volumeOwner interface {
 	VolumePoolName() string
 	Mounter() utils.Mounter
 	SharedFilesystemPath() string
+	Commander() utils.Commander
 }
 
 // VMVolumeSource is a function that provides `VMVolume`s for VMs

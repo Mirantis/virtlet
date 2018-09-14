@@ -1,27 +1,17 @@
 - name: GetImagePathDigestAndVirtualSize
   value: fake/image1
-- name: 'storage: CreateStoragePool'
-  value: |-
-    <pool type="dir">
-      <name>volumes</name>
-      <target>
-        <path>/var/lib/virtlet/volumes</path>
-      </target>
-    </pool>
-- name: 'storage: volumes: CreateStorageVol'
-  value: |-
-    <volume type="file">
-      <name>virtlet_root_231700d5-c9a6-5a49-738d-99a954c51550</name>
-      <allocation unit="b">0</allocation>
-      <capacity unit="b">424242</capacity>
-      <target>
-        <format type="qcow2"></format>
-      </target>
-      <backingStore>
-        <path>/fake/volume/path</path>
-        <format type="qcow2"></format>
-      </backingStore>
-    </volume>
+- name: CMD
+  value:
+    cmd: blockdev --getsz /fakedev/69eec606-0493-5825-73a4-c5e0c0236155/volumeDevices/kubernetes.io~local-volume/root
+    stdout: "1000"
+- name: CMD
+  value:
+    cmd: dmsetup create virtlet-dm-69eec606-0493-5825-73a4-c5e0c0236155
+    stdin: |
+      0 999 linear /fakedev/69eec606-0493-5825-73a4-c5e0c0236155/volumeDevices/kubernetes.io~local-volume/root 1
+- name: CMD
+  value:
+    cmd: qemu-img convert -O raw /fake/volume/path /dev/mapper/virtlet-dm-69eec606-0493-5825-73a4-c5e0c0236155
 - name: 'domain conn: DefineDomain'
   value: |-
     <domain type="kvm">
@@ -46,24 +36,18 @@
       <on_crash>restart</on_crash>
       <devices>
         <emulator>/vmwrapper</emulator>
-        <disk type="file" device="disk">
-          <driver name="qemu" type="qcow2"></driver>
-          <source file="/var/lib/virtlet/volumes/virtlet_root_231700d5-c9a6-5a49-738d-99a954c51550"></source>
-          <target dev="sda" bus="scsi"></target>
-          <address type="drive" controller="0" bus="0" target="0" unit="0"></address>
-        </disk>
         <disk type="block" device="disk">
           <driver name="qemu" type="raw"></driver>
-          <source dev="/dev/loop0"></source>
-          <target dev="sdb" bus="scsi"></target>
-          <address type="drive" controller="0" bus="0" target="0" unit="1"></address>
+          <source dev="/dev/mapper/virtlet-dm-69eec606-0493-5825-73a4-c5e0c0236155"></source>
+          <target dev="sda" bus="scsi"></target>
+          <address type="drive" controller="0" bus="0" target="0" unit="0"></address>
         </disk>
         <disk type="file" device="cdrom">
           <driver name="qemu" type="raw"></driver>
           <source file="/var/lib/virtlet/config/config-231700d5-c9a6-5a49-738d-99a954c51550.iso"></source>
-          <target dev="sdc" bus="scsi"></target>
+          <target dev="sdb" bus="scsi"></target>
           <readonly></readonly>
-          <address type="drive" controller="0" bus="0" target="0" unit="2"></address>
+          <address type="drive" controller="0" bus="0" target="0" unit="1"></address>
         </disk>
         <controller type="scsi" index="0" model="virtio-scsi">
           <address type="pci" domain="0x0000" bus="0x00" slot="0x01" function="0x0"></address>
@@ -98,5 +82,6 @@
       #cloud-config
 - name: 'domain conn: virtlet-231700d5-c9a6-container1: Destroy'
 - name: 'domain conn: virtlet-231700d5-c9a6-container1: Undefine'
-- name: 'storage: volumes: RemoveVolumeByName'
-  value: virtlet_root_231700d5-c9a6-5a49-738d-99a954c51550
+- name: CMD
+  value:
+    cmd: dmsetup remove virtlet-dm-69eec606-0493-5825-73a4-c5e0c0236155

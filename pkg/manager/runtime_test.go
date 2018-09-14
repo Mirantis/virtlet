@@ -45,6 +45,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/network"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
 	"github.com/Mirantis/virtlet/pkg/utils"
+	fakeutils "github.com/Mirantis/virtlet/pkg/utils/fake"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 	fakevirt "github.com/Mirantis/virtlet/pkg/virt/fake"
 	"github.com/Mirantis/virtlet/tests/criapi"
@@ -236,7 +237,8 @@ func makeVirtletCRITester(t *testing.T) *virtletCRITester {
 		KubeletRootDir:     kubeletRootDir,
 		StreamerSocketPath: streamerSocketPath,
 	}
-	virtTool := libvirttools.NewVirtualizationTool(domainConn, storageConn, imageStore, metadataStore, libvirttools.GetDefaultVolumeSource(), virtConfig, utils.NullMounter)
+	commander := fakeutils.NewFakeCommander(rec, nil)
+	virtTool := libvirttools.NewVirtualizationTool(domainConn, storageConn, imageStore, metadataStore, libvirttools.GetDefaultVolumeSource(), virtConfig, utils.NullMounter, commander)
 	virtTool.SetClock(clock)
 	streamServer := newFakeStreamServer(rec.Child("streamServer"))
 	criHandler := &criHandler{

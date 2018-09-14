@@ -24,6 +24,7 @@ import (
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
 	"github.com/Mirantis/virtlet/pkg/metadata/types"
+	fakeutils "github.com/Mirantis/virtlet/pkg/utils/fake"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 	"github.com/Mirantis/virtlet/pkg/virt/fake"
 	"github.com/Mirantis/virtlet/tests/gm"
@@ -73,7 +74,7 @@ func TestQCOW2VolumeLifeCycle(t *testing.T) {
 		Target: &libvirtxml.StoragePoolTarget{Path: volumesPoolPath},
 	})
 
-	im := NewFakeImageManager(rec.Child("image"))
+	im := newFakeImageManager(rec.Child("image"))
 
 	optsFilePath, err := prepareOptsFileForQcow2Volume()
 	if err != nil {
@@ -85,7 +86,7 @@ func TestQCOW2VolumeLifeCycle(t *testing.T) {
 		TestVolumeName,
 		optsFilePath,
 		&types.VMConfig{DomainUUID: testUUID, Image: "rootfs image name"},
-		newFakeVolumeOwner(spool, im),
+		newFakeVolumeOwner(spool, im, fakeutils.NewFakeCommander(nil, nil)),
 	)
 	if err != nil {
 		t.Fatalf("newQCOW2Volume returned an error: %v", err)

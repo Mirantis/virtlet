@@ -119,12 +119,12 @@ func (s *FakeStore) GC() error {
 }
 
 // GetImagePathAndVirtualSize implements GC method of Store interface.
-func (s *FakeStore) GetImagePathAndVirtualSize(imageName string) (string, uint64, error) {
+func (s *FakeStore) GetImagePathDigestAndVirtualSize(imageName string) (string, digest.Digest, uint64, error) {
 	img, found := s.images[imageName]
 	if !found {
-		return "", 0, fmt.Errorf("image not found: %q", imageName)
+		return "", "", 0, fmt.Errorf("image not found: %q", imageName)
 	}
-	return img.Path, img.Size, nil
+	return img.Path, digest.Digest(img.Digest), img.Size, nil
 }
 
 // SetRefGetter implements SetRefGetter method of Store interface.
