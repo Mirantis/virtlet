@@ -858,6 +858,8 @@ func (v *VirtualizationTool) VMStats(containerID string, name string) (*types.VM
 	}
 	vs.FsBytes = rootDiskSize
 
+	glog.V(4).Infof("VMStats - cpu: %d, mem: %d, disk: %d, timestamp: %d", vs.CpuUsage, vs.MemoryUsage, vs.FsBytes, vs.Timestamp)
+
 	return &vs, nil
 }
 
