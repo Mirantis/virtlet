@@ -17,12 +17,15 @@ limitations under the License.
 package libvirttools
 
 import (
+	"fmt"
 	"testing"
 
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
+	digest "github.com/opencontainers/go-digest"
 
 	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	"github.com/Mirantis/virtlet/pkg/utils"
+	fakeutils "github.com/Mirantis/virtlet/pkg/utils/fake"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 	"github.com/Mirantis/virtlet/pkg/virt"
 	"github.com/Mirantis/virtlet/pkg/virt/fake"
@@ -34,26 +37,49 @@ const (
 	fakeImageVirtualSize     = 424242
 	fakeImageStoreUsedBytes  = 424242
 	fakeImageStoreUsedInodes = 424242
+	fakeImageDigest          = digest.Digest("sha256:c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2")
 )
 
-type FakeImageManager struct {
-	rec testutils.Recorder
+type fakeImageSpec struct {
+	name   string
+	path   string
+	digest digest.Digest
+	size   uint64
 }
 
-var _ ImageManager = &FakeImageManager{}
+type fakeImageManager struct {
+	rec      testutils.Recorder
+	imageMap map[string]fakeImageSpec
+}
 
-func NewFakeImageManager(rec testutils.Recorder) *FakeImageManager {
-	return &FakeImageManager{
-		rec: rec,
+var _ ImageManager = &fakeImageManager{}
+
+func newFakeImageManager(rec testutils.Recorder, extraImages ...fakeImageSpec) *fakeImageManager {
+	m := make(map[string]fakeImageSpec)
+	for _, img := range append(extraImages, fakeImageSpec{
+		name:   "fake/image1",
+		path:   "/fake/volume/path",
+		digest: fakeImageDigest,
+		size:   fakeImageVirtualSize,
+	}) {
+		m[img.name] = img
+	}
+	return &fakeImageManager{
+		rec:      rec,
+		imageMap: m,
 	}
 }
 
-func (im *FakeImageManager) GetImagePathAndVirtualSize(imageName string) (string, uint64, error) {
-	im.rec.Rec("GetImagePathAndVirtualSize", imageName)
-	return "/fake/volume/path", fakeImageVirtualSize, nil
+func (im *fakeImageManager) GetImagePathDigestAndVirtualSize(imageName string) (string, digest.Digest, uint64, error) {
+	im.rec.Rec("GetImagePathDigestAndVirtualSize", imageName)
+	spec, found := im.imageMap[imageName]
+	if !found {
+		return "", "", 0, fmt.Errorf("image %q not found", imageName)
+	}
+	return spec.path, spec.digest, spec.size, nil
 }
 
-func (im *FakeImageManager) FilesystemStats() (*types.FilesystemStats, error) {
+func (im *fakeImageManager) FilesystemStats() (*types.FilesystemStats, error) {
 	return &types.FilesystemStats{
 		Mountpoint: "/some/dir",
 		UsedBytes:  fakeImageStoreUsedBytes,
@@ -61,7 +87,7 @@ func (im *FakeImageManager) FilesystemStats() (*types.FilesystemStats, error) {
 	}, nil
 }
 
-func (im *FakeImageManager) BytesUsedBy(path string) (uint64, error) {
+func (im *fakeImageManager) BytesUsedBy(path string) (uint64, error) {
 	im.rec.Rec("BytesUsedBy", path)
 	return fakeImageVirtualSize, nil
 }
@@ -87,12 +113,11 @@ func getRootVolumeForTest(t *testing.T, vmConfig *types.VMConfig) (*rootVolume, 
 		Name:   "volumes",
 		Target: &libvirtxml.StoragePoolTarget{Path: volumesPoolPath},
 	})
-	im := NewFakeImageManager(rec.Child("image"))
+	im := newFakeImageManager(rec.Child("image"))
 
 	volumes, err := GetRootVolume(
 		vmConfig,
-		newFakeVolumeOwner(spool, im),
-	)
+		newFakeVolumeOwner(spool, im, fakeutils.NewCommander(nil, nil)))
 	if err != nil {
 		t.Fatalf("GetRootVolume returned an error: %v", err)
 	}
@@ -139,7 +164,7 @@ func TestRootVolumeSize(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			rootVol, rec, spool := getRootVolumeForTest(t, &types.VMConfig{
 				DomainUUID: testUUID,
-				Image:      "rootfs image name",
+				Image:      "fake/image1",
 				ParsedAnnotations: &types.VirtletAnnotations{
 					RootVolumeSize: tc.specifiedRootVolumeSize,
 				},
@@ -172,12 +197,16 @@ func TestRootVolumeLifeCycle(t *testing.T) {
 	expectedRootVolumePath := "/fake/volumes/pool/virtlet_root_" + testUUID
 	rootVol, rec, _ := getRootVolumeForTest(t, &types.VMConfig{
 		DomainUUID: testUUID,
-		Image:      "rootfs image name",
+		Image:      "fake/image1",
 	})
 
-	vol, _, err := rootVol.Setup()
+	vol, fs, err := rootVol.Setup()
 	if err != nil {
 		t.Fatalf("Setup returned an error: %v", err)
+	}
+
+	if fs != nil {
+		t.Errorf("Didn't expect a filesystem")
 	}
 
 	if vol.Source.File == nil {
@@ -207,15 +236,17 @@ func TestRootVolumeLifeCycle(t *testing.T) {
 
 type fakeVolumeOwner struct {
 	storagePool  *fake.FakeStoragePool
-	imageManager *FakeImageManager
+	imageManager *fakeImageManager
+	commander    *fakeutils.FakeCommander
 }
 
 var _ volumeOwner = fakeVolumeOwner{}
 
-func newFakeVolumeOwner(storagePool *fake.FakeStoragePool, imageManager *FakeImageManager) *fakeVolumeOwner {
+func newFakeVolumeOwner(storagePool *fake.FakeStoragePool, imageManager *fakeImageManager, commander *fakeutils.FakeCommander) *fakeVolumeOwner {
 	return &fakeVolumeOwner{
 		storagePool:  storagePool,
 		imageManager: imageManager,
+		commander:    commander,
 	}
 }
 
@@ -240,3 +271,5 @@ func (vo fakeVolumeOwner) VolumePoolName() string { return "" }
 func (vo fakeVolumeOwner) Mounter() utils.Mounter { return utils.NullMounter }
 
 func (vo fakeVolumeOwner) SharedFilesystemPath() string { return "/var/lib/virtlet/fs" }
+
+func (vo fakeVolumeOwner) Commander() utils.Commander { return vo.commander }

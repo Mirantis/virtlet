@@ -59,6 +59,9 @@ func (v *blockVolume) Teardown() error {
 func GetBlockVolumes(config *types.VMConfig, owner volumeOwner) ([]VMVolume, error) {
 	var vols []VMVolume
 	for _, dev := range config.VolumeDevices {
+		if dev.DevicePath == "/" {
+			continue
+		}
 		vols = append(vols, &blockVolume{
 			volumeBase: volumeBase{config, owner},
 			dev:        dev,

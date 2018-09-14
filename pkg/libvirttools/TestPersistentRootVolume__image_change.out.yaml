@@ -1,0 +1,52 @@
+- name: setup
+- name: 'image: GetImagePathDigestAndVirtualSize'
+  value: persistent/image1
+- name: CMD
+  value:
+    cmd: blockdev --getsz /dev/rootdev
+    stdout: "32"
+- name: CMD
+  value:
+    cmd: dmsetup create virtlet-dm-77f29a0e-46af-4188-a6af-9ff8b8a65224
+    stdin: |
+      0 31 linear /dev/rootdev 1
+- name: CMD
+  value:
+    cmd: qemu-img convert -O raw /fake/path1 /dev/mapper/virtlet-dm-77f29a0e-46af-4188-a6af-9ff8b8a65224
+- name: end setup -- root disk
+  value: |-
+    <disk type="block" device="disk">
+      <driver name="qemu" type="raw"></driver>
+      <source dev="/dev/mapper/virtlet-dm-77f29a0e-46af-4188-a6af-9ff8b8a65224"></source>
+    </disk>
+- name: teardown
+- name: CMD
+  value:
+    cmd: dmsetup remove virtlet-dm-77f29a0e-46af-4188-a6af-9ff8b8a65224
+- name: end teardown
+- name: setup
+- name: 'image: GetImagePathDigestAndVirtualSize'
+  value: persistent/image2
+- name: CMD
+  value:
+    cmd: blockdev --getsz /dev/rootdev
+    stdout: "32"
+- name: CMD
+  value:
+    cmd: dmsetup create virtlet-dm-77f29a0e-46af-4188-a6af-9ff8b8a65224
+    stdin: |
+      0 31 linear /dev/rootdev 1
+- name: CMD
+  value:
+    cmd: qemu-img convert -O raw /fake/path2 /dev/mapper/virtlet-dm-77f29a0e-46af-4188-a6af-9ff8b8a65224
+- name: end setup -- root disk
+  value: |-
+    <disk type="block" device="disk">
+      <driver name="qemu" type="raw"></driver>
+      <source dev="/dev/mapper/virtlet-dm-77f29a0e-46af-4188-a6af-9ff8b8a65224"></source>
+    </disk>
+- name: teardown
+- name: CMD
+  value:
+    cmd: dmsetup remove virtlet-dm-77f29a0e-46af-4188-a6af-9ff8b8a65224
+- name: end teardown
