@@ -187,9 +187,13 @@ func (tst *ifsTester) verifyListImages(filter string, expectedImages ...*Image) 
 }
 
 func (tst *ifsTester) verifyImage(ref string, expectedContents string) {
-	if path, vsize, err := tst.store.GetImagePathAndVirtualSize(ref); err != nil {
+	if path, digest, vsize, err := tst.store.GetImagePathDigestAndVirtualSize(ref); err != nil {
 		tst.t.Errorf("GetImagePathAndVirtualSize(): %v", err)
 	} else {
+		expectedDigest := "sha256:" + sha256str(expectedContents)
+		if string(digest) != expectedDigest {
+			tst.t.Errorf("bad digest: %s instead of %s", digest, expectedDigest)
+		}
 		tst.verifyFileContents(path, expectedContents)
 		expectedVirtualSize := uint64(len(expectedContents)) + 1000
 		if vsize != expectedVirtualSize {

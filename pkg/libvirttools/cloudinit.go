@@ -506,6 +506,10 @@ func isRegularFile(path string) bool {
 func (g *CloudInitGenerator) generateSymlinkScript(volumeMap diskPathMap) string {
 	var symlinkLines []string
 	for _, dev := range g.config.VolumeDevices {
+		if dev.DevicePath == "/" {
+			// special case for the persistent rootfs
+			continue
+		}
 		dpath, found := volumeMap[dev.UUID()]
 		if !found {
 			glog.Warningf("Couldn't determine the path for device %q inside the VM (target path inside the VM: %q)", dev.HostPath, dev.DevicePath)
@@ -523,6 +527,10 @@ func (g *CloudInitGenerator) generateSymlinkScript(volumeMap diskPathMap) string
 func (g *CloudInitGenerator) fixMounts(volumeMap diskPathMap, mounts []interface{}) []interface{} {
 	devMap := make(map[string]string)
 	for _, dev := range g.config.VolumeDevices {
+		if dev.DevicePath == "/" {
+			// special case for the persistent rootfs
+			continue
+		}
 		dpath, found := volumeMap[dev.UUID()]
 		if !found {
 			glog.Warningf("Couldn't determine the path for device %q inside the VM (target path inside the VM: %q)", dev.HostPath, dev.DevicePath)

@@ -1,6 +1,6 @@
 - name: 'domain conn: ListDomains'
   value: []
-- name: GetImagePathAndVirtualSize
+- name: GetImagePathDigestAndVirtualSize
   value: fake/image1
 - name: 'storage: CreateStoragePool'
   value: |-

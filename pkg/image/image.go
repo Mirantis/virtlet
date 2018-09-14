@@ -81,10 +81,10 @@ type Store interface {
 	// GC removes all unused or partially downloaded images.
 	GC() error
 
-	// GetImagePathAndVirtualSize returns the path to image data
-	// and virtual size for the specified image. It accepts
-	// an image reference or a digest.
-	GetImagePathAndVirtualSize(ref string) (string, uint64, error)
+	// GetImagePathDigestAndVirtualSize returns the path to image
+	// data, the digest and the virtual size for the specified
+	// image. It accepts an image reference or a digest.
+	GetImagePathDigestAndVirtualSize(ref string) (string, digest.Digest, uint64, error)
 
 	// SetRefGetter sets a function that will be used to determine
 	// the set of images that are currently in use.
@@ -472,30 +472,33 @@ func (s *FileStore) GC() error {
 	return nil
 }
 
-// GetImagePathAndVirtualSize implements GC method of Store interface.
-func (s *FileStore) GetImagePathAndVirtualSize(ref string) (string, uint64, error) {
+// GetImagePathDigestAndVirtualSize implements GetImagePathDigestAndVirtualSize method of Store interface.
+func (s *FileStore) GetImagePathDigestAndVirtualSize(ref string) (string, digest.Digest, uint64, error) {
 	s.Lock()
 	defer s.Unlock()
-	glog.V(3).Infof("GetImagePathAndVirtualSize(): %q", ref)
+	glog.V(3).Infof("GetImagePathDigestAndVirtualSize(): %q", ref)
 
 	var pathViaDigest, pathViaName string
 	// parsing digest as ref gives bad results
-	if d, err := digest.Parse(ref); err == nil {
+	d, err := digest.Parse(ref)
+	if err == nil {
 		if d.Algorithm() != digest.SHA256 {
-			return "", 0, fmt.Errorf("bad image digest (need sha256): %q", d)
+			return "", "", 0, fmt.Errorf("bad image digest (need sha256): %q", d)
 		}
 		pathViaDigest = s.dataFileName(d.Hex())
 	} else {
 		parsed, err := reference.Parse(ref)
 		if err != nil {
-			return "", 0, fmt.Errorf("bad image reference %q: %v", ref, err)
+			return "", "", 0, fmt.Errorf("bad image reference %q: %v", ref, err)
 		}
 
+		d = ""
 		if digested, ok := parsed.(reference.Digested); ok {
 			if digested.Digest().Algorithm() != digest.SHA256 {
-				return "", 0, fmt.Errorf("bad image digest (need sha256): %q", digested.Digest())
+				return "", "", 0, fmt.Errorf("bad image digest (need sha256): %q", digested.Digest())
 			}
-			pathViaDigest = s.dataFileName(digested.Digest().Hex())
+			d = digested.Digest()
+			pathViaDigest = s.dataFileName(d.Hex())
 		}
 
 		if named, ok := parsed.(reference.Named); ok && named.Name() != "" {
@@ -504,6 +507,7 @@ func (s *FileStore) GetImagePathAndVirtualSize(ref string) (string, uint64, erro
 				glog.Warningf("error reading link %q: %v", pathViaName, err)
 			} else {
 				pathViaName = filepath.Join(s.linkDir(), pathViaName)
+				d = digest.NewDigestFromHex(string(digest.SHA256), filepath.Base(pathViaName))
 			}
 		}
 	}
@@ -511,28 +515,28 @@ func (s *FileStore) GetImagePathAndVirtualSize(ref string) (string, uint64, erro
 	path := pathViaDigest
 	switch {
 	case pathViaDigest == "" && pathViaName == "":
-		return "", 0, fmt.Errorf("bad image reference %q", ref)
+		return "", "", 0, fmt.Errorf("bad image reference %q", ref)
 	case pathViaDigest == "":
 		path = pathViaName
 	case pathViaName != "":
 		fi1, err := os.Stat(pathViaName)
 		if err != nil {
-			return "", 0, err
+			return "", "", 0, err
 		}
 		fi2, err := os.Stat(pathViaDigest)
 		if err != nil {
-			return "", 0, err
+			return "", "", 0, err
 		}
 		if !os.SameFile(fi1, fi2) {
-			return "", 0, fmt.Errorf("digest / name path mismatch: %q vs %q", pathViaDigest, pathViaName)
+			return "", "", 0, fmt.Errorf("digest / name path mismatch: %q vs %q", pathViaDigest, pathViaName)
 		}
 	}
 
 	vsize, err := s.vsizeFunc(path)
 	if err != nil {
-		return "", 0, fmt.Errorf("error getting image size for %q: %v", path, err)
+		return "", "", 0, fmt.Errorf("error getting image size for %q: %v", path, err)
 	}
-	return path, vsize, nil
+	return path, d, vsize, nil
 }
 
 // SetRefGetter implements SetRefGetter method of Store interface.
