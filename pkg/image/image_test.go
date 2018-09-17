@@ -295,6 +295,8 @@ func TestPullListStatus(t *testing.T) {
 	tst.pullImage(tst.images[2].Name, tst.refs[2])
 	tst.verifyListImages("", tst.images[1], tst.images[0], tst.images[2]) // alphabetically sorted by name
 	tst.verifySubpathContents("links/foobar", "###baz")
+
+	tst.verifyListImages(tst.refs[1], tst.images[1])
 }
 
 func TestReplaceImage(t *testing.T) {
@@ -475,4 +477,36 @@ func TestCancelPullImage(t *testing.T) {
 	if !tst.downloader.cancelled {
 		t.Errorf("the downloader isn't marked as canelled")
 	}
+}
+
+func TestVerifyImageChecksum(t *testing.T) {
+	tst := newIfsTester(t)
+	defer tst.teardown()
+
+	// Use image ref instead of the name.
+	// The ref contains sha256 sum
+	tst.pullImage(tst.refs[0], tst.refs[0])
+	tst.verifyListImages("foobar")
+
+	refWithBadDigest := tst.images[0].Name + "@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+	_, err := tst.store.PullImage(
+		context.Background(),
+		refWithBadDigest,
+		tst.translateImageName)
+	switch {
+	case err == nil:
+		tst.t.Errorf("PullImage() din't return any error for an image with mismatching digest")
+	case !strings.Contains(err.Error(), "image digest mismatch"):
+		t.Errorf("PullImage() is expected to return invalid checksum error but returned %q", err)
+	}
+
+	switch _, err := tst.store.ImageStatus(refWithBadDigest); {
+	case err == nil:
+		tst.t.Errorf("ImageStatus() din't return any error for an image with mismatching digest")
+	case !strings.Contains(err.Error(), "image digest mismatch"):
+		t.Errorf("ImageStatus() is expected to return invalid checksum error but returned %q", err)
+	}
+
+	// the bad digest should not match any images while listing
+	tst.verifyListImages(refWithBadDigest)
 }

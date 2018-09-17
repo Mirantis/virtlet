@@ -44,7 +44,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			vm = controller.VM("ssh-from-cm-impl")
-			Expect(vm.Create(VMOptions{
+			Expect(vm.CreateAndWait(VMOptions{
 				SSHKeySource: "configmap/cm-ssh-key-impl",
 			}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
 		})
@@ -75,7 +75,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			vm = controller.VM("ssh-from-cm-expl")
-			Expect(vm.Create(VMOptions{
+			Expect(vm.CreateAndWait(VMOptions{
 				SSHKeySource: "configmap/cm-ssh-key-expl/myKey",
 			}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
 		})
@@ -106,7 +106,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			vm = controller.VM("ssh-from-secret-impl")
-			Expect(vm.Create(VMOptions{
+			Expect(vm.CreateAndWait(VMOptions{
 				SSHKeySource: "secret/secret-ssh-key-impl",
 			}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
 		})
@@ -137,7 +137,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			vm = controller.VM("ssh-from-secret-expl")
-			Expect(vm.Create(VMOptions{
+			Expect(vm.CreateAndWait(VMOptions{
 				SSHKeySource: "secret/secret-ssh-key-expl/myKey",
 			}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
 		})
@@ -171,7 +171,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			vm = controller.VM("userdata-cm")
-			Expect(vm.Create(VMOptions{
+			Expect(vm.CreateAndWait(VMOptions{
 				UserDataSource: "configmap/cm-userdata",
 			}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
 		})
@@ -206,7 +206,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			vm = controller.VM("userdata-secret")
-			Expect(vm.Create(VMOptions{
+			Expect(vm.CreateAndWait(VMOptions{
 				UserDataSource: "secret/secret-userdata",
 			}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
 		})
@@ -242,7 +242,7 @@ var _ = Describe("Cloud-init related tests", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			vm = controller.VM("userdata-cm-merge")
-			Expect(vm.Create(VMOptions{
+			Expect(vm.CreateAndWait(VMOptions{
 				UserDataSource: "configmap/cm-userdata",
 				UserData:       userData,
 			}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())

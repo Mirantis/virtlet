@@ -46,31 +46,15 @@ func init() {
 	}
 }
 
-type Mounter interface {
-	Mount(source string, target string, fstype string) error
-	Unmount(target string) error
-}
-
-type nullMounter struct{}
-
-func (m *nullMounter) Mount(source string, target string, fstype string) error {
-	return nil
-}
-
-func (m *nullMounter) Unmount(target string) error {
-	return nil
-}
-
-var NullMounter = &nullMounter{}
-
 type UuidGen func() string
 
 type FlexVolumeDriver struct {
 	uuidGen UuidGen
-	mounter Mounter
+	mounter utils.Mounter
 }
 
-func NewFlexVolumeDriver(uuidGen UuidGen, mounter Mounter) *FlexVolumeDriver {
+// NewFlexVolumeDriver creates a FlexVolumeDriver struct
+func NewFlexVolumeDriver(uuidGen UuidGen, mounter utils.Mounter) *FlexVolumeDriver {
 	return &FlexVolumeDriver{uuidGen: uuidGen, mounter: mounter}
 }
 
@@ -132,7 +116,7 @@ func (d *FlexVolumeDriver) mount(targetMountDir, jsonOptions string) (map[string
 		return nil, err
 	}
 
-	if err := d.mounter.Mount("tmpfs", targetMountDir, "tmpfs"); err != nil {
+	if err := d.mounter.Mount("tmpfs", targetMountDir, "tmpfs", false); err != nil {
 		return nil, fmt.Errorf("error mounting tmpfs at %q: %v", targetMountDir, err)
 	}
 
@@ -140,7 +124,7 @@ func (d *FlexVolumeDriver) mount(targetMountDir, jsonOptions string) (map[string
 	defer func() {
 		// try to unmount upon error or panic
 		if !done {
-			d.mounter.Unmount(targetMountDir)
+			d.mounter.Unmount(targetMountDir, true)
 		}
 	}()
 
@@ -154,7 +138,7 @@ func (d *FlexVolumeDriver) mount(targetMountDir, jsonOptions string) (map[string
 
 // Invocation: <driver executable> unmount <mount dir>
 func (d *FlexVolumeDriver) unmount(targetMountDir string) (map[string]interface{}, error) {
-	if err := d.mounter.Unmount(targetMountDir); err != nil {
+	if err := d.mounter.Unmount(targetMountDir, true); err != nil {
 		return nil, fmt.Errorf("unmount %q: %v", targetMountDir, err.Error())
 	}
 
@@ -274,6 +258,10 @@ func formatResult(fields map[string]interface{}, err error) string {
 // means that no partition number was specified.
 func GetFlexvolumeInfo(dir string) (string, int, error) {
 	dataFile := filepath.Join(dir, flexvolumeDataFile)
+	if _, err := os.Stat(dataFile); os.IsNotExist(err) {
+		return "", 0, err
+	}
+
 	var opts map[string]interface{}
 	if err := utils.ReadJSON(dataFile, &opts); err != nil {
 		return "", 0, fmt.Errorf("can't read flexvolume data file %q: %v", dataFile, err)

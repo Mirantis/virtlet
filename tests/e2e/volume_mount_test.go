@@ -177,7 +177,7 @@ var _ = Describe("Container volume mounts", func() {
 				})
 			}
 
-			Expect(vm.Create(VMOptions{}.ApplyDefaults(), time.Minute*5, podCustomization)).To(Succeed())
+			Expect(vm.CreateAndWait(VMOptions{}.ApplyDefaults(), time.Minute*5, podCustomization)).To(Succeed())
 		})
 
 		AfterAll(func() {
@@ -236,7 +236,7 @@ var _ = Describe("Container volume mounts", func() {
 				})
 			}
 
-			Expect(vm.Create(VMOptions{}.ApplyDefaults(), time.Minute*5, podCustomization)).To(Succeed())
+			Expect(vm.CreateAndWait(VMOptions{}.ApplyDefaults(), time.Minute*5, podCustomization)).To(Succeed())
 		})
 
 		AfterAll(func() {
@@ -270,7 +270,7 @@ func addFlexvolMount(pod *framework.PodInterface, name string, mountPath string,
 
 func makeVolumeMountVM(nodeName string, podCustomization func(*framework.PodInterface)) *framework.VMInterface {
 	vm := controller.VM("mount-vm")
-	Expect(vm.Create(VMOptions{
+	Expect(vm.CreateAndWait(VMOptions{
 		NodeName: nodeName,
 		// TODO: should also have an option to test using
 		// ubuntu image with volumes mounted using cloud-init

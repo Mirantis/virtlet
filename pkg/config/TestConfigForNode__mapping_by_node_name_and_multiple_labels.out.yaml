@@ -12,6 +12,7 @@ enableSriov: false
 fdServerSocketPath: /var/lib/virtlet/tapfdserver.sock
 imageDir: /var/lib/virtlet/images
 imageTranslationConfigsDir: /etc/virtlet/images
+kubeletRootDir: /var/lib/kubelet/pods
 libvirtURI: qemu:///system
 logLevel: 1
 rawDevices: vd*

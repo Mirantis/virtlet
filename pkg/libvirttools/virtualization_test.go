@@ -71,7 +71,7 @@ func newContainerTester(t *testing.T, rec *testutils.TopLevelRecorder) *containe
 		t.Fatalf("TempDir(): %v", err)
 	}
 
-	// __config__  is a hint for fake libvirt domain to fix the path
+	// __config__  is a hint for fake libvirt domain to fix the path so it becomes non-volatile
 	SetConfigIsoDir(filepath.Join(ct.tmpDir, "__config__"))
 
 	ct.rec = rec
@@ -91,7 +91,7 @@ func newContainerTester(t *testing.T, rec *testutils.TopLevelRecorder) *containe
 		KubeletRootDir:     ct.kubeletRootDir,
 		StreamerSocketPath: "/var/lib/libvirt/streamer.sock",
 	}
-	ct.virtTool = NewVirtualizationTool(ct.domainConn, ct.storageConn, imageManager, ct.metadataStore, GetDefaultVolumeSource(), virtConfig)
+	ct.virtTool = NewVirtualizationTool(ct.domainConn, ct.storageConn, imageManager, ct.metadataStore, GetDefaultVolumeSource(), virtConfig, utils.NullMounter)
 	ct.virtTool.SetClock(ct.clock)
 
 	return ct
@@ -112,7 +112,7 @@ func (ct *containerTester) teardown() {
 	os.RemoveAll(ct.tmpDir)
 }
 
-func (ct *containerTester) createContainer(sandbox *types.PodSandboxConfig, mounts []types.VMMount) string {
+func (ct *containerTester) createContainer(sandbox *types.PodSandboxConfig, mounts []types.VMMount, volDevs []types.VMVolumeDevice) string {
 	vmConfig := &types.VMConfig{
 		PodSandboxID:         sandbox.Uid,
 		PodName:              sandbox.Name,
@@ -123,6 +123,7 @@ func (ct *containerTester) createContainer(sandbox *types.PodSandboxConfig, moun
 		PodAnnotations:       sandbox.Annotations,
 		ContainerAnnotations: map[string]string{"foo": "bar"},
 		Mounts:               mounts,
+		VolumeDevices:        volDevs,
 		LogDirectory:         fmt.Sprintf("/var/log/pods/%s", sandbox.Uid),
 		LogPath:              fmt.Sprintf("%s_%d.log", fakeContainerName, fakeContainerAttempt),
 	}
@@ -191,7 +192,7 @@ func TestContainerLifecycle(t *testing.T) {
 		t.Errorf("Unexpected containers when no containers are started: %#v", containers)
 	}
 
-	containerID := ct.createContainer(sandbox, nil)
+	containerID := ct.createContainer(sandbox, nil, nil)
 
 	containers = ct.listContainers(nil)
 	if len(containers) != 1 {
@@ -268,7 +269,7 @@ func TestDomainForcedShutdown(t *testing.T) {
 	sandbox := fakemeta.GetSandboxes(1)[0]
 	ct.setPodSandbox(sandbox)
 
-	containerID := ct.createContainer(sandbox, nil)
+	containerID := ct.createContainer(sandbox, nil, nil)
 	ct.clock.Advance(1 * time.Second)
 	ct.startContainer(containerID)
 
@@ -303,7 +304,7 @@ func TestDoubleStartError(t *testing.T) {
 	sandbox := fakemeta.GetSandboxes(1)[0]
 	ct.setPodSandbox(sandbox)
 
-	containerID := ct.createContainer(sandbox, nil)
+	containerID := ct.createContainer(sandbox, nil, nil)
 	ct.clock.Advance(1 * time.Second)
 	ct.startContainer(containerID)
 	if err := ct.virtTool.StartContainer(containerID); err == nil {
@@ -316,16 +317,22 @@ type volMount struct {
 	containerPath string
 }
 
+type volDevice struct {
+	name       string
+	devicePath string
+}
+
 func TestDomainDefinitions(t *testing.T) {
 	flexVolumeDriver := flexvolume.NewFlexVolumeDriver(func() string {
 		// note that this is only good for just one flexvolume
 		return fakeUUID
-	}, flexvolume.NullMounter)
+	}, utils.NullMounter)
 	for _, tc := range []struct {
 		name        string
 		annotations map[string]string
 		flexVolumes map[string]map[string]interface{}
 		mounts      []volMount
+		volDevs     []volDevice
 	}{
 		{
 			name: "plain domain",
@@ -382,6 +389,15 @@ func TestDomainDefinitions(t *testing.T) {
 			},
 		},
 		{
+			name: "raw block volume",
+			volDevs: []volDevice{
+				{
+					name:       "testdev",
+					devicePath: "/dev/tst",
+				},
+			},
+		},
+		{
 			name: "cloud-init",
 			annotations: map[string]string{
 				"VirtletSSHKeys": "key1\nkey2",
@@ -415,7 +431,7 @@ func TestDomainDefinitions(t *testing.T) {
 
 			for name, def := range tc.flexVolumes {
 				targetDir := filepath.Join(ct.kubeletRootDir, sandbox.Uid, "volumes/virtlet~flexvolume_driver", name)
-				resultStr := flexVolumeDriver.Run([]string{"mount", targetDir, utils.MapToJSON(def)})
+				resultStr := flexVolumeDriver.Run([]string{"mount", targetDir, utils.ToJSON(def)})
 				var r map[string]interface{}
 				if err := json.Unmarshal([]byte(resultStr), &r); err != nil {
 					t.Errorf("failed to unmarshal flexvolume definition")
@@ -433,7 +449,28 @@ func TestDomainDefinitions(t *testing.T) {
 					ContainerPath: m.containerPath,
 				})
 			}
-			containerID := ct.createContainer(sandbox, mounts)
+
+			var volDevs []types.VMVolumeDevice
+			for _, d := range tc.volDevs {
+				// __pods__  is a hint for fake libvirt domain to fix the path so it becomes non-volatile
+				baseDir := filepath.Join(ct.kubeletRootDir, "__pods__", sandbox.Uid, "volumeDevices/kubernetes.io~local-volume")
+				if err := os.MkdirAll(baseDir, 0777); err != nil {
+					t.Fatal(err)
+				}
+				hostPath := filepath.Join(baseDir, d.name)
+				if f, err := os.OpenFile(hostPath, os.O_RDONLY|os.O_CREATE, 0666); err != nil {
+					t.Fatal(err)
+				} else {
+					f.Close()
+				}
+				volDevs = append(volDevs, types.VMVolumeDevice{
+					DevicePath: d.devicePath,
+					HostPath:   hostPath,
+				})
+			}
+
+			containerID := ct.createContainer(sandbox, mounts, volDevs)
+
 			// startContainer will cause fake Domain
 			// to dump the cloudinit iso content
 			ct.startContainer(containerID)

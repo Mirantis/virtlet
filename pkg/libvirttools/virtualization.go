@@ -49,8 +49,7 @@ const (
 	domainDestroyTimeout          = 5 * time.Second
 
 	// ContainerNsUUID template for container ns uuid generation
-	ContainerNsUUID       = "67b7fb47-7735-4b64-86d2-6d062d121966"
-	defaultKubeletRootDir = "/var/lib/kubelet/pods"
+	ContainerNsUUID = "67b7fb47-7735-4b64-86d2-6d062d121966"
 
 	// KubernetesPodNameLabel is pod name container label (copied from kubetypes).
 	KubernetesPodNameLabel = "io.kubernetes.pod.name"
@@ -211,12 +210,8 @@ type VirtualizationConfig struct {
 	// of cpu model to be passed in libvirt domain definition.
 	// Empty value denotes libvirt defaults usage.
 	CPUModel string
-}
-
-func (c *VirtualizationConfig) applyDefaults() {
-	if c.KubeletRootDir == "" {
-		c.KubeletRootDir = defaultKubeletRootDir
-	}
+	// Path to the directory used for shared filesystems
+	SharedFilesystemPath string
 }
 
 // VirtualizationTool provides methods to operate on libvirt.
@@ -228,6 +223,7 @@ type VirtualizationTool struct {
 	clock         clockwork.Clock
 	volumeSource  VMVolumeSource
 	config        VirtualizationConfig
+	mounter       utils.Mounter
 }
 
 var _ volumeOwner = &VirtualizationTool{}
@@ -237,8 +233,7 @@ var _ volumeOwner = &VirtualizationTool{}
 func NewVirtualizationTool(domainConn virt.DomainConnection,
 	storageConn virt.StorageConnection, imageManager ImageManager,
 	metadataStore metadata.Store, volumeSource VMVolumeSource,
-	config VirtualizationConfig) *VirtualizationTool {
-	config.applyDefaults()
+	config VirtualizationConfig, mounter utils.Mounter) *VirtualizationTool {
 	return &VirtualizationTool{
 		domainConn:    domainConn,
 		storageConn:   storageConn,
@@ -247,6 +242,7 @@ func NewVirtualizationTool(domainConn virt.DomainConnection,
 		clock:         clockwork.NewRealClock(),
 		volumeSource:  volumeSource,
 		config:        config,
+		mounter:       mounter,
 	}
 }
 
@@ -330,12 +326,11 @@ func (v *VirtualizationTool) CreateContainer(config *types.VMConfig, netFdKey st
 	}
 
 	domainDef := settings.createDomain(config)
-
 	diskList, err := newDiskList(config, v.volumeSource, v)
 	if err != nil {
 		return "", err
 	}
-	domainDef.Devices.Disks, err = diskList.setup()
+	domainDef.Devices.Disks, domainDef.Devices.Filesystems, err = diskList.setup()
 	if err != nil {
 		return "", err
 	}
@@ -564,10 +559,10 @@ func (v *VirtualizationTool) cleanupVolumes(containerID string) error {
 		err = diskList.teardown()
 	}
 
+	var errs []string
 	if err != nil {
 		glog.Errorf("Volume teardown failed for domain %q: %v", containerID, err)
-		return err
-
+		errs = append(errs, err.Error())
 	}
 
 	return nil
@@ -832,6 +827,15 @@ func (v *VirtualizationTool) RawDevices() []string { return v.config.RawDevices 
 
 // KubeletRootDir implements volumeOwner KubeletRootDir method
 func (v *VirtualizationTool) KubeletRootDir() string { return v.config.KubeletRootDir }
+
+// VolumePoolName implements volumeOwner VolumePoolName method
+func (v *VirtualizationTool) VolumePoolName() string { return v.config.VolumePoolName }
+
+// Mounter implements volumeOwner Mounter method
+func (v *VirtualizationTool) Mounter() utils.Mounter { return v.mounter }
+
+// SharedFilesystemPath implements volumeOwner SharedFilesystemPath method
+func (v *VirtualizationTool) SharedFilesystemPath() string { return v.config.SharedFilesystemPath }
 
 func filterContainer(containerInfo *types.ContainerInfo, filter types.ContainerFilter) bool {
 	if filter.Id != "" && containerInfo.Id != filter.Id {

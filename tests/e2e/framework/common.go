@@ -24,6 +24,10 @@ import (
 	"time"
 )
 
+const (
+	NginxImage = "nginx:1.14"
+)
+
 // ErrTimeout is the timeout error returned from functions wrapped by WithTimeout
 var ErrTimeout = fmt.Errorf("timeout")
 

@@ -33,6 +33,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	"github.com/Mirantis/virtlet/pkg/stream"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 const (
@@ -40,6 +41,7 @@ const (
 	tapManagerAttemptCount    = 50
 	streamerSocketPath        = "/var/lib/libvirt/streamer.sock"
 	volumePoolName            = "volumes"
+	virtletSharedFsDir        = "/var/lib/virtlet/fs"
 )
 
 // VirtletManager wraps the Virtlet's Runtime and Image CRI services,
@@ -70,10 +72,10 @@ func (v *VirtletManager) Run() error {
 	if v.fdManager == nil {
 		client := tapmanager.NewFDClient(*v.config.FDServerSocketPath)
 		for i := 0; i < tapManagerAttemptCount; i++ {
-			time.Sleep(tapManagerConnectInterval)
-			if err = client.Connect(); err == nil {
+			if err = client.IsRunning(); err == nil {
 				break
 			}
+			time.Sleep(tapManagerConnectInterval)
 		}
 		if err != nil {
 			return fmt.Errorf("failed to connect to tapmanager: %v", err)
@@ -105,10 +107,12 @@ func (v *VirtletManager) Run() error {
 	v.diagSet.RegisterDiagSource("libvirt-xml", libvirttools.NewLibvirtDiagSource(conn, conn))
 
 	virtConfig := libvirttools.VirtualizationConfig{
-		DisableKVM:     *v.config.DisableKVM,
-		EnableSriov:    *v.config.EnableSriov,
-		CPUModel:       *v.config.CPUModel,
-		VolumePoolName: volumePoolName,
+		DisableKVM:           *v.config.DisableKVM,
+		EnableSriov:          *v.config.EnableSriov,
+		CPUModel:             *v.config.CPUModel,
+		VolumePoolName:       volumePoolName,
+		SharedFilesystemPath: virtletSharedFsDir,
+		KubeletRootDir:       *v.config.KubeletRootDir,
 	}
 	if *v.config.RawDevices != "" {
 		virtConfig.RawDevices = strings.Split(*v.config.RawDevices, ",")
@@ -131,7 +135,7 @@ func (v *VirtletManager) Run() error {
 	}
 
 	volSrc := libvirttools.GetDefaultVolumeSource()
-	v.virtTool = libvirttools.NewVirtualizationTool(conn, conn, v.imageStore, v.metadataStore, volSrc, virtConfig)
+	v.virtTool = libvirttools.NewVirtualizationTool(conn, conn, v.imageStore, v.metadataStore, volSrc, virtConfig, utils.NewMounter())
 
 	runtimeService := NewVirtletRuntimeService(v.virtTool, v.metadataStore, v.fdManager, streamServer, v.imageStore, nil)
 	imageService := NewVirtletImageService(v.imageStore, translator, nil)

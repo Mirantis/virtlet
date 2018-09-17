@@ -1,0 +1,6 @@
+meta-data:
+  instance-id: foobar
+  local-hostname: foo
+  public-keys:
+  - key1
+  - key2

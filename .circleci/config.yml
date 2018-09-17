@@ -66,7 +66,7 @@ extract_binaries_from_the_image: &extract_binaries_from_the_image
     image="mirantis/virtlet:${tag}"
     echo "Extracting binaries from ${image}"
     mkdir -p _output/
-    docker run "${image}" tar -C / -c vmwrapper virtlet-e2e-tests | tar -C _output/ -xv
+    docker run "${image}" tar -C / -c vmwrapper virtlet-e2e-tests virtletctl | tar -C _output/ -xv
 
 push_images: &push_images
   <<: *defaults
@@ -191,19 +191,30 @@ e2e: &e2e
 
   - run:
       name: Run e2e tests
-      # Ceph RBD tests are disabled for now because ceph/demo image is gone
       command: |
         build/portforward.sh 8080&
         mkdir -p ~/junit
-        skip="-ginkgo.skip=\[Heavy\]|\[MultiCNI\]|\[Disruptive\]|RBD volumes"
+        skip="-ginkgo.skip=\[Heavy\]|\[MultiCNI\]|\[Disruptive\]"
         if [[ ${CIRCLE_JOB} = e2e_multi_cni ]]; then
           # per-node config test requires an additional worker node
-          skip="-ginkgo.skip=\[Heavy\]|\[Disruptive\]|Per-node configuration|RBD volumes"
+          skip="-ginkgo.skip=\[Heavy\]|\[Disruptive\]|Per-node configuration"
         fi
         _output/virtlet-e2e-tests -test.v "${skip}" -junitOutput ~/junit/junit.xml -include-unsafe-tests=true
 
   - store_test_results:
       path: ~/junit
+
+  - run:
+      name: Dump the cluster state
+      when: always
+      command: |
+        build/portforward.sh 8080&
+        mkdir -p /tmp/cluster_state
+        bash -x ./dind-cluster*.sh dump | gzip >/tmp/cluster_state/kdc-dump.gz
+        _output/virtletctl diag dump --json | gzip >/tmp/cluster_state/virtlet-dump.json.gz
+
+  - store_artifacts:
+      path: /tmp/cluster_state
 
 version: 2
 jobs:

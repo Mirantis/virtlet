@@ -20,6 +20,7 @@ import (
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
 	"github.com/Mirantis/virtlet/pkg/metadata/types"
+	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/Mirantis/virtlet/pkg/virt"
 )
 
@@ -34,6 +35,9 @@ type volumeOwner interface {
 	ImageManager() ImageManager
 	RawDevices() []string
 	KubeletRootDir() string
+	VolumePoolName() string
+	Mounter() utils.Mounter
+	SharedFilesystemPath() string
 }
 
 // VMVolumeSource is a function that provides `VMVolume`s for VMs
@@ -42,7 +46,7 @@ type VMVolumeSource func(config *types.VMConfig, owner volumeOwner) ([]VMVolume,
 // VMVolume describes a volume provider.
 type VMVolume interface {
 	UUID() string
-	Setup() (*libvirtxml.DomainDisk, error)
+	Setup() (*libvirtxml.DomainDisk, *libvirtxml.DomainFilesystem, error)
 	WriteImage(diskPathMap) error
 	Teardown() error
 }

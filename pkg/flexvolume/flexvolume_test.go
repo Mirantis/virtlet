@@ -41,7 +41,7 @@ type fakeMounter struct {
 	journal []string
 }
 
-var _ Mounter = &fakeMounter{}
+var _ utils.Mounter = &fakeMounter{}
 
 func newFakeMounter(t *testing.T, tmpDir string) *fakeMounter {
 	return &fakeMounter{t: t, tmpDir: tmpDir}
@@ -53,9 +53,9 @@ func (mounter *fakeMounter) validatePath(target string) {
 	}
 }
 
-func (mounter *fakeMounter) Mount(source string, target string, fstype string) error {
+func (mounter *fakeMounter) Mount(source string, target string, fstype string, bind bool) error {
 	mounter.validatePath(target)
-	mounter.journal = append(mounter.journal, fmt.Sprintf("mount: %s %s %s", source, target, fstype))
+	mounter.journal = append(mounter.journal, fmt.Sprintf("mount: %s %s %s %v", source, target, fstype, bind))
 
 	// We want to check directory contents both before & after mount,
 	// see comment in FlexVolumeDriver.mount() in flexvolume.go.
@@ -81,10 +81,10 @@ func (mounter *fakeMounter) Mount(source string, target string, fstype string) e
 	return nil
 }
 
-func (mounter *fakeMounter) Unmount(target string) error {
+func (mounter *fakeMounter) Unmount(target string, detach bool) error {
 	// we make sure that path is under our tmpdir before wiping it
 	mounter.validatePath(target)
-	mounter.journal = append(mounter.journal, fmt.Sprintf("unmount: %s", target))
+	mounter.journal = append(mounter.journal, fmt.Sprintf("unmount: %s %v", target, detach))
 
 	paths, err := filepath.Glob(filepath.Join(target, "*"))
 	if err != nil {
@@ -176,17 +176,17 @@ func TestFlexVolume(t *testing.T) {
 		},
 		{
 			name:   "mount-ceph",
-			args:   []string{"mount", cephDir, utils.MapToJSON(cephJSONOpts)},
+			args:   []string{"mount", cephDir, utils.ToJSON(cephJSONOpts)},
 			status: "Success",
 			subdir: "ceph",
 			files: map[string]interface{}{
-				"virtlet-flexvolume.json": utils.MapToJSONUnindented(cephJSONVolumeInfo),
+				"virtlet-flexvolume.json": utils.ToJSONUnindented(cephJSONVolumeInfo),
 				".shadowed": map[string]interface{}{
-					"virtlet-flexvolume.json": utils.MapToJSONUnindented(cephJSONVolumeInfo),
+					"virtlet-flexvolume.json": utils.ToJSONUnindented(cephJSONVolumeInfo),
 				},
 			},
 			mountJournal: []string{
-				fmt.Sprintf("mount: tmpfs %s tmpfs", cephDir),
+				fmt.Sprintf("mount: tmpfs %s tmpfs false", cephDir),
 			},
 		},
 		{
@@ -195,22 +195,22 @@ func TestFlexVolume(t *testing.T) {
 			status: "Success",
 			subdir: "ceph",
 			mountJournal: []string{
-				fmt.Sprintf("unmount: %s", cephDir),
+				fmt.Sprintf("unmount: %s true", cephDir),
 			},
 		},
 		{
 			name:   "mount-ceph-1",
-			args:   []string{"mount", cephDir, utils.MapToJSON(cephJSONOpts)},
+			args:   []string{"mount", cephDir, utils.ToJSON(cephJSONOpts)},
 			status: "Success",
 			subdir: "ceph",
 			files: map[string]interface{}{
-				"virtlet-flexvolume.json": utils.MapToJSONUnindented(cephJSONVolumeInfo),
+				"virtlet-flexvolume.json": utils.ToJSONUnindented(cephJSONVolumeInfo),
 				".shadowed": map[string]interface{}{
-					"virtlet-flexvolume.json": utils.MapToJSONUnindented(cephJSONVolumeInfo),
+					"virtlet-flexvolume.json": utils.ToJSONUnindented(cephJSONVolumeInfo),
 				},
 			},
 			mountJournal: []string{
-				fmt.Sprintf("mount: tmpfs %s tmpfs", cephDir),
+				fmt.Sprintf("mount: tmpfs %s tmpfs false", cephDir),
 			},
 		},
 		{
@@ -219,7 +219,7 @@ func TestFlexVolume(t *testing.T) {
 			status: "Success",
 			subdir: "ceph",
 			mountJournal: []string{
-				fmt.Sprintf("unmount: %s", cephDir),
+				fmt.Sprintf("unmount: %s true", cephDir),
 			},
 		},
 		{
@@ -296,7 +296,7 @@ func TestFlexVolume(t *testing.T) {
 					t.Fatalf("dirToMap() on %q: %v", subdir, err)
 				}
 				if !reflect.DeepEqual(files, step.files) {
-					t.Errorf("bad file content.\n%s\n-- instead of --\n%s", utils.MapToJSON(files), utils.MapToJSON(step.files))
+					t.Errorf("bad file content.\n%s\n-- instead of --\n%s", utils.ToJSON(files), utils.ToJSON(step.files))
 				}
 			}
 			if !reflect.DeepEqual(mounter.journal, step.mountJournal) {

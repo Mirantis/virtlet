@@ -66,6 +66,8 @@ type VirtletConfig struct {
 	StreamPort *int `json:"streamPort,omitempty"`
 	// LogLevel specifies the log level to use
 	LogLevel *int `json:"logLevel,omitempty"`
+	// Kubelet's root dir
+	KubeletRootDir *string `json:"kubeletRootDir,omitempty"`
 }
 
 // VirtletConfigMappingSpec is the contents of a VirtletConfigMapping.

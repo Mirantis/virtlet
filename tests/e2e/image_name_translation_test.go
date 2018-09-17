@@ -54,7 +54,7 @@ var _ = Describe("Image URL", func() {
 
 	It("Can be specified in CRD [Conformance]", func() {
 		vm := controller.VM("cirros-vm-with-remapped-image")
-		Expect(vm.Create(VMOptions{}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
+		Expect(vm.CreateAndWait(VMOptions{}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
 		_, err := vm.Pod()
 		Expect(err).NotTo(HaveOccurred())
 		deleteVM(vm)

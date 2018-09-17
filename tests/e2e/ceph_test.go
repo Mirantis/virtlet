@@ -65,7 +65,7 @@ var _ = Describe("Ceph volumes tests", func() {
 				})
 			}
 
-			Expect(vm.Create(VMOptions{}.ApplyDefaults(), time.Minute*5, podCustomization)).To(Succeed())
+			Expect(vm.CreateAndWait(VMOptions{}.ApplyDefaults(), time.Minute*5, podCustomization)).To(Succeed())
 			var err error
 			_, err = vm.Pod()
 			Expect(err).NotTo(HaveOccurred())
@@ -141,7 +141,7 @@ var _ = Describe("Ceph volumes tests", func() {
 				})
 			}
 
-			Expect(vm.Create(VMOptions{}.ApplyDefaults(), time.Minute*5, podCustomization)).To(Succeed())
+			Expect(vm.CreateAndWait(VMOptions{}.ApplyDefaults(), time.Minute*5, podCustomization)).To(Succeed())
 			_ = do(vm.Pod()).(*framework.PodInterface)
 		})
 
@@ -191,10 +191,18 @@ func setupCeph() (string, string) {
 	Expect(err).NotTo(HaveOccurred())
 
 	container.Delete()
-	Expect(container.PullImage("docker.io/ceph/demo:tag-stable-3.0-jewel-ubuntu-16.04")).To(Succeed())
-	Expect(container.Run("docker.io/ceph/demo:tag-stable-3.0-jewel-ubuntu-16.04",
-		map[string]string{"MON_IP": monIP, "CEPH_PUBLIC_NETWORK": cephPublicNetwork},
-		"host", nil, false)).To(Succeed())
+	Expect(container.PullImage("docker.io/ceph/daemon:v3.1.0-stable-3.1-mimic-centos-7")).To(Succeed())
+	Expect(container.Run("docker.io/ceph/daemon:v3.1.0-stable-3.1-mimic-centos-7",
+		map[string]string{
+			"MON_IP":               monIP,
+			"CEPH_PUBLIC_NETWORK":  cephPublicNetwork,
+			"CEPH_DEMO_UID":        "foo",
+			"CEPH_DEMO_ACCESS_KEY": "foo",
+			"CEPH_DEMO_SECRET_KEY": "foo",
+			"CEPH_DEMO_BUCKET":     "foo",
+			"DEMO_DAEMONS":         "osd mds",
+		},
+		"host", nil, false, "demo")).To(Succeed())
 
 	cephContainerExecutor := container.Executor(false, "")
 	By("Waiting for ceph cluster")
@@ -211,14 +219,13 @@ func setupCeph() (string, string) {
 
 		// Add rbd pool and volume
 		`ceph osd pool create libvirt-pool 8 8`,
-		`apt-get update && apt-get install -y qemu-utils 2> /dev/null`,
-		`qemu-img create -f rbd rbd:libvirt-pool/rbd-test-image1 10M`,
-		`qemu-img create -f rbd rbd:libvirt-pool/rbd-test-image2 10M`,
-		`qemu-img create -f rbd rbd:libvirt-pool/rbd-test-image-pv 10M`,
+		`rbd create rbd-test-image1 --size 10M --pool libvirt-pool --image-feature layering`,
+		`rbd create rbd-test-image2 --size 10M --pool libvirt-pool --image-feature layering`,
+		`rbd create rbd-test-image-pv --size 10M --pool libvirt-pool --image-feature layering`,
 
 		// Add user for virtlet
 		`ceph auth get-or-create client.libvirt`,
-		`ceph auth caps client.libvirt mon "allow *" osd "allow *" msd "allow *"`,
+		`ceph auth caps client.libvirt mon "allow *" osd "allow *"`,
 		`ceph auth get-key client.libvirt`,
 	}
 	for _, cmd := range commands {

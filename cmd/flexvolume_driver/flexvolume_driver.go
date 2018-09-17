@@ -27,6 +27,6 @@ import (
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
-	driver := flexvolume.NewFlexVolumeDriver(utils.NewUUID, flexvolume.NewLinuxMounter())
+	driver := flexvolume.NewFlexVolumeDriver(utils.NewUUID, utils.NewMounter())
 	os.Stdout.WriteString(driver.Run(os.Args[1:]))
 }

@@ -1,0 +1,111 @@
+- name: GetImagePathAndVirtualSize
+  value: fake/image1
+- name: 'storage: CreateStoragePool'
+  value: |-
+    <pool type="dir">
+      <name>volumes</name>
+      <target>
+        <path>/var/lib/virtlet/volumes</path>
+      </target>
+    </pool>
+- name: 'storage: volumes: CreateStorageVol'
+  value: |-
+    <volume type="file">
+      <name>virtlet_root_231700d5-c9a6-5a49-738d-99a954c51550</name>
+      <allocation unit="b">0</allocation>
+      <capacity unit="b">424242</capacity>
+      <target>
+        <format type="qcow2"></format>
+      </target>
+      <backingStore>
+        <path>/fake/volume/path</path>
+        <format type="qcow2"></format>
+      </backingStore>
+    </volume>
+- name: 'domain conn: DefineDomain'
+  value: |-
+    <domain type="kvm">
+      <name>virtlet-231700d5-c9a6-container1</name>
+      <uuid>231700d5-c9a6-5a49-738d-99a954c51550</uuid>
+      <memory unit="MiB">1024</memory>
+      <vcpu>1</vcpu>
+      <cputune>
+        <shares>0</shares>
+        <period>0</period>
+        <quota>0</quota>
+      </cputune>
+      <os>
+        <type>hvm</type>
+        <boot dev="hd"></boot>
+      </os>
+      <features>
+        <acpi></acpi>
+      </features>
+      <on_poweroff>destroy</on_poweroff>
+      <on_reboot>restart</on_reboot>
+      <on_crash>restart</on_crash>
+      <devices>
+        <emulator>/vmwrapper</emulator>
+        <disk type="file" device="disk">
+          <driver name="qemu" type="qcow2"></driver>
+          <source file="/var/lib/virtlet/volumes/virtlet_root_231700d5-c9a6-5a49-738d-99a954c51550"></source>
+          <target dev="sda" bus="scsi"></target>
+          <address type="drive" controller="0" bus="0" target="0" unit="0"></address>
+        </disk>
+        <disk type="block" device="disk">
+          <driver name="qemu" type="raw"></driver>
+          <source dev="/var/lib/kubelet/pods/69eec606-0493-5825-73a4-c5e0c0236155/volumeDevices/kubernetes.io~local-volume/testdev"></source>
+          <target dev="sdb" bus="scsi"></target>
+          <address type="drive" controller="0" bus="0" target="0" unit="1"></address>
+        </disk>
+        <disk type="file" device="cdrom">
+          <driver name="qemu" type="raw"></driver>
+          <source file="/var/lib/virtlet/config/config-231700d5-c9a6-5a49-738d-99a954c51550.iso"></source>
+          <target dev="sdc" bus="scsi"></target>
+          <readonly></readonly>
+          <address type="drive" controller="0" bus="0" target="0" unit="2"></address>
+        </disk>
+        <controller type="scsi" index="0" model="virtio-scsi">
+          <address type="pci" domain="0x0000" bus="0x00" slot="0x01" function="0x0"></address>
+        </controller>
+        <controller type="pci" model="pci-root"></controller>
+        <serial type="unix">
+          <source mode="connect" path="/var/lib/libvirt/streamer.sock">
+            <reconnect enabled="yes" timeout="1"></reconnect>
+          </source>
+          <target port="0"></target>
+        </serial>
+        <input type="tablet" bus="usb"></input>
+        <graphics type="vnc" port="-1"></graphics>
+        <video>
+          <model type="cirrus"></model>
+        </video>
+      </devices>
+      <commandline xmlns="http://libvirt.org/schemas/domain/qemu/1.0">
+        <env name="VIRTLET_EMULATOR" value="/usr/bin/kvm"></env>
+        <env name="VIRTLET_NET_KEY" value="/tmp/fakenetns"></env>
+        <env name="VIRTLET_CONTAINER_ID" value="231700d5-c9a6-5a49-738d-99a954c51550"></env>
+        <env name="VIRTLET_CONTAINER_LOG_PATH" value="/var/log/pods/69eec606-0493-5825-73a4-c5e0c0236155/container1_42.log"></env>
+      </commandline>
+    </domain>
+- name: 'domain conn: virtlet-231700d5-c9a6-container1: Create'
+- name: 'domain conn: virtlet-231700d5-c9a6-container1: iso image'
+  value:
+    meta-data: '{"instance-id":"testName_0.default","local-hostname":"testName_0"}'
+    network-config: |
+      version: 1
+    user-data: |
+      #cloud-config
+      runcmd:
+      - /etc/cloud/symlink-devs.sh
+      - ln -s /etc/cloud/symlink-devs.sh /var/lib/cloud/scripts/per-boot/
+      write_files:
+      - content: |
+          #!/bin/sh
+          ln -fs /dev/`ls /sys/devices/pci0000:00/0000:00:01.0/virtio*/host*/target*:0:0/*:0:0:1/block/` /dev/tst
+        path: /etc/cloud/symlink-devs.sh
+        permissions: "0755"
+- name: 'domain conn: virtlet-231700d5-c9a6-container1: Destroy'
+- name: 'domain conn: virtlet-231700d5-c9a6-container1: Undefine'
+- name: 'storage: volumes: RemoveVolumeByName'
+  value: virtlet_root_231700d5-c9a6-5a49-738d-99a954c51550

@@ -52,6 +52,7 @@
     PodName: testName_0
     PodNamespace: default
     PodSandboxID: 69eec606-0493-5825-73a4-c5e0c0236155
+    VolumeDevices: null
 - in:
     config:
       image:
@@ -107,6 +108,7 @@
     PodName: testName_0
     PodNamespace: default
     PodSandboxID: 69eec606-0493-5825-73a4-c5e0c0236155
+    VolumeDevices: null
 - in:
     config:
       image:
@@ -167,3 +169,4 @@
     PodName: testName_1
     PodNamespace: default
     PodSandboxID: d25ded14-d35d-510b-5749-f83cc165794e
+    VolumeDevices: null

@@ -1,5 +1,3 @@
-// +build !linux
-
 /*
 Copyright 2018 Mirantis
 
@@ -16,22 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package flexvolume
+package utils
 
-import "errors"
+import "testing"
 
-type LinuxMounter struct{}
-
-var _ Mounter = &LinuxMounter{}
-
-func NewLinuxMounter() *LinuxMounter {
-	return &LinuxMounter{}
-}
-
-func (mounter *LinuxMounter) Mount(source string, target string, fstype string) error {
-	return errors.New("not implemented")
-}
-
-func (mounter *LinuxMounter) Unmount(target string) error {
-	return errors.New("not implemented")
+func TestNewShellTemplate(t *testing.T) {
+	tmpl := NewShellTemplate("mount {{ shq .Foobar }} {{ .Baz }}")
+	out, err := tmpl.ExecuteToString(map[string]string{
+		"Foobar": "abc def",
+		"Baz":    "qqq",
+	})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	expectedText := "mount 'abc def' qqq"
+	if out != expectedText {
+		t.Errorf("Bad template result. Expected:\n%s\nGot:\n%s", expectedText, out)
+	}
 }

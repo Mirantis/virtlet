@@ -57,7 +57,7 @@ func TestCloudInitNoCloud(t *testing.T) {
 		"user-data":      noCloudUserData,
 	}
 	if !reflect.DeepEqual(files, expectedFiles) {
-		t.Errorf("bad nocloud metadata iso:\n%s\n-- instead of --\n%s", utils.MapToJSON(files), utils.MapToJSON(expectedFiles))
+		t.Errorf("bad nocloud metadata iso:\n%s\n-- instead of --\n%s", utils.ToJSON(files), utils.ToJSON(expectedFiles))
 	}
 
 	ct.stopContainer(container.ContainerID)
