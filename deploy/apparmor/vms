@@ -1,6 +1,6 @@
 #include <tunables/global>
 
-profile vms {
+profile vms flags=(attach_disconnected) {
   #include <abstractions/libvirt-qemu>
 
   ptrace trace peer=@{profile_name},
