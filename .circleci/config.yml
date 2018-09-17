@@ -180,6 +180,12 @@ e2e: &e2e
           KUBELET_FEATURE_GATES="BlockVolume=true" \
           BASE_LOCATION="$PWD" \
           deploy/demo.sh
+        # RMME: testing
+        docker exec -i kube-node-1 tee /usr/bin/rbd <<"EOF"
+        #!/bin/bash
+        echo "RUN: $*" >>/tmp/rbd.log
+        DOCKER_HOST=unix:///opt/outer-docker.sock /usr/bin/docker run --rm -v /sys:/sys --net=host --privileged=true ceph/daemon-base rbd "$@"
+        EOF
   - run:
       name: Install kubectl
       command: |
