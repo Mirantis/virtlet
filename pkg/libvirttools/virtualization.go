@@ -841,6 +841,9 @@ func (v *VirtualizationTool) VMStats(containerID string, name string) (*types.VM
 
 	rootDiskLocation := ""
 	for _, disk := range domainxml.Devices.Disks {
+		if disk.Source == nil || disk.Source.File == nil {
+			continue
+		}
 		fname := disk.Source.File.File
 		// TODO: split file name and use HasPrefix on last part
 		// instead of Contains
