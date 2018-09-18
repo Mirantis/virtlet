@@ -105,4 +105,8 @@ type Domain interface {
 	Name() (string, error)
 	// XML retrieves xml definition of the domain
 	XML() (*libvirtxml.Domain, error)
+	// GetRSS returns RSS used by VM in bytes
+	GetRSS() (uint64, error)
+	// GetCPUTime returns cpu time used by VM in nanoseconds per core
+	GetCPUTime() (uint64, error)
 }

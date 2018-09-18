@@ -30,6 +30,7 @@ import (
 	"github.com/golang/glog"
 	digest "github.com/opencontainers/go-digest"
 
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
@@ -56,17 +57,6 @@ type Translator func(context.Context, string) Endpoint
 // RefGetter is a function that returns the list of images
 // that are currently in use.
 type RefGetter func() (map[string]bool, error)
-
-// FilesystemStats contains info about filesystem mountpoint and
-// space/inodes used by images on it
-type FilesystemStats struct {
-	// Mountpoint denotes the filesystem mount point
-	Mountpoint string
-	// UsedBytes is the number of bytes used by images
-	UsedBytes uint64
-	// UsedInodes is the number of inodes used by images
-	UsedInodes uint64
-}
 
 // Store is an interface for the image store.
 type Store interface {
@@ -101,7 +91,10 @@ type Store interface {
 	SetRefGetter(imageRefGetter RefGetter)
 
 	// FilesystemStats returns disk space and inode usage info for this store.
-	FilesystemStats() (*FilesystemStats, error)
+	FilesystemStats() (*types.FilesystemStats, error)
+
+	// BytesUsedBy returns disk usage of the file in this store.
+	BytesUsedBy(path string) (uint64, error)
 }
 
 // VirtualSizeFunc specifies a function that returns the virtual
@@ -594,7 +587,7 @@ func GetHexDigest(imageSpec string) string {
 // TODO: instead of returning data from filesystem we should retrieve from
 // metadata store sizes of images and sum them, or even retrieve precalculated
 // sum. That's because same filesystem could be used by other things than images.
-func (s *FileStore) FilesystemStats() (*FilesystemStats, error) {
+func (s *FileStore) FilesystemStats() (*types.FilesystemStats, error) {
 	occupiedBytes, occupiedInodes, err := utils.GetFsStatsForPath(s.dir)
 	if err != nil {
 		return nil, err
@@ -607,9 +600,18 @@ func (s *FileStore) FilesystemStats() (*FilesystemStats, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &FilesystemStats{
+	return &types.FilesystemStats{
 		Mountpoint: mount.FSRoot,
 		UsedBytes:  occupiedBytes,
 		UsedInodes: occupiedInodes,
 	}, nil
+}
+
+// BytesUsedBy return disk usage of provided file as seen in store
+func (s *FileStore) BytesUsedBy(path string) (uint64, error) {
+	fstat, err := os.Stat(path)
+	if err != nil {
+		return 0, err
+	}
+	return uint64(fstat.Size()), nil
 }

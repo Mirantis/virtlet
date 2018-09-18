@@ -312,6 +312,16 @@ func (d *FakeDomain) XML() (*libvirtxml.Domain, error) {
 	return d.def, nil
 }
 
+// GetCPUTime implements GetCPUTime of Domain interface.
+func (d *FakeDomain) GetCPUTime() (uint64, error) {
+	return 0, nil
+}
+
+// GetRSS implements GetRSS of Domain interface.
+func (d *FakeDomain) GetRSS() (uint64, error) {
+	return 0, nil
+}
+
 // FakeSecret is a fake implementation of Secret interace.
 type FakeSecret struct {
 	rec       testutils.Recorder

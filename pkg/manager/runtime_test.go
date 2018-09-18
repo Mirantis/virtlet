@@ -370,6 +370,10 @@ func (tst *virtletCRITester) listContainers(filter *kubeapi.ContainerFilter) {
 	tst.invoke("ListContainers", &kubeapi.ListContainersRequest{Filter: filter}, true)
 }
 
+func (tst *virtletCRITester) listContainerStats(filter *kubeapi.ContainerStatsFilter) {
+	tst.invoke("ListContainerStats", &kubeapi.ListContainerStatsRequest{Filter: filter}, true)
+}
+
 func (tst *virtletCRITester) createContainer(sandbox *kubeapi.PodSandboxConfig, container *criapi.ContainerTestConfig, imageSpec *kubeapi.ImageSpec, mounts []*kubeapi.Mount) string {
 	req := createContainerRequest(sandbox, container, imageSpec, mounts)
 	resp, err := tst.invoke("CreateContainer", req, true)
@@ -395,6 +399,10 @@ func (tst *virtletCRITester) startContainer(containerID string) {
 
 func (tst *virtletCRITester) stopContainer(containerID string) {
 	tst.invoke("StopContainer", &kubeapi.StopContainerRequest{ContainerId: containerID}, true)
+}
+
+func (tst *virtletCRITester) containerStats(containerID string) {
+	tst.invoke("ContainerStats", &kubeapi.ContainerStatsRequest{ContainerId: containerID}, true)
 }
 
 func (tst *virtletCRITester) removeContainer(containerID string) {
@@ -457,6 +465,8 @@ func TestCRIPods(t *testing.T) {
 	tst.containerStatus(containerId1)
 	tst.startContainer(containerId1)
 	tst.containerStatus(containerId1)
+	tst.containerStats(containerId1)
+	tst.listContainerStats(nil)
 
 	tst.pullImage(ubuntuImg())
 	tst.runPodSandbox(sandboxes[1])
@@ -621,6 +631,37 @@ func TestCRIContainerFilters(t *testing.T) {
 		State: &kubeapi.ContainerStateValue{
 			State: kubeapi.ContainerState_CONTAINER_EXITED,
 		},
+	})
+
+	tst.verify()
+}
+
+func TestContainerListStats(t *testing.T) {
+	tst := makeVirtletCRITester(t)
+	tst.rec.AddFilter("ListContainers")
+	tst.rec.AddFilter("ListContainerStats")
+	defer tst.teardown()
+
+	sandboxes := criapi.GetSandboxes(2)
+	containers := criapi.GetContainersConfig(sandboxes)
+	tst.pullImage(cirrosImg())
+	tst.runPodSandbox(sandboxes[0])
+	containerId1 := tst.createContainer(sandboxes[0], containers[0], cirrosImg(), nil)
+	tst.startContainer(containerId1)
+	tst.pullImage(ubuntuImg())
+	tst.runPodSandbox(sandboxes[1])
+	containerId2 := tst.createContainer(sandboxes[1], containers[1], ubuntuImg(), nil)
+	tst.startContainer(containerId2)
+
+	tst.listContainerStats(nil)
+	tst.listContainerStats(&kubeapi.ContainerStatsFilter{Id: containerId1})
+	tst.listContainerStats(&kubeapi.ContainerStatsFilter{
+		LabelSelector: map[string]string{
+			"io.kubernetes.pod.name": "testName_1",
+		},
+	})
+	tst.listContainerStats(&kubeapi.ContainerStatsFilter{
+		PodSandboxId: sandboxes[0].Metadata.Uid,
 	})
 
 	tst.verify()

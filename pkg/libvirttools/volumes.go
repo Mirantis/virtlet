@@ -27,6 +27,8 @@ import (
 // ImageManager describes a images info provider.
 type ImageManager interface {
 	GetImagePathAndVirtualSize(ref string) (string, uint64, error)
+	FilesystemStats() (*types.FilesystemStats, error)
+	BytesUsedBy(path string) (uint64, error)
 }
 
 type volumeOwner interface {

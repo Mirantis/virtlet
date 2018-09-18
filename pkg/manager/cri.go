@@ -192,6 +192,18 @@ func CRIContainerFilterToContainerFilter(in *kubeapi.ContainerFilter) *types.Con
 	}
 }
 
+// CRIContainerStatsFilterToVMStatsFilter converts CRI ContainerStatsFilter to VMStatsFilter.
+func CRIContainerStatsFilterToVMStatsFilter(in *kubeapi.ContainerStatsFilter) *types.VMStatsFilter {
+	if in == nil {
+		return nil
+	}
+	return &types.VMStatsFilter{
+		Id:            in.Id,
+		PodSandboxID:  in.PodSandboxId,
+		LabelSelector: in.LabelSelector,
+	}
+}
+
 func containerMetadata(in *types.ContainerInfo) *kubeapi.ContainerMetadata {
 	return &kubeapi.ContainerMetadata{
 		Name:    in.Name,

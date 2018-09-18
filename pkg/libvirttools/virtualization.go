@@ -19,6 +19,7 @@ package libvirttools
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -809,9 +810,98 @@ func (v *VirtualizationTool) ContainerInfo(containerID string) (*types.Container
 	return containerInfo, nil
 }
 
+// VMStats returns current cpu/memory/disk usage for VM
+func (v *VirtualizationTool) VMStats(containerID string, name string) (*types.VMStats, error) {
+	domain, err := v.domainConn.LookupDomainByUUIDString(containerID)
+	if err != nil {
+		return nil, err
+	}
+	vs := types.VMStats{
+		Timestamp:   v.clock.Now().UnixNano(),
+		ContainerID: containerID,
+		Name:        name,
+	}
+
+	rss, err := domain.GetRSS()
+	if err != nil {
+		return nil, err
+	}
+	vs.MemoryUsage = rss
+
+	cpuTime, err := domain.GetCPUTime()
+	if err != nil {
+		return nil, err
+	}
+	vs.CpuUsage = cpuTime
+
+	domainxml, err := domain.XML()
+	if err != nil {
+		return nil, err
+	}
+
+	rootDiskLocation := ""
+	for _, disk := range domainxml.Devices.Disks {
+		if disk.Source == nil || disk.Source.File == nil {
+			continue
+		}
+		fname := disk.Source.File.File
+		// TODO: split file name and use HasPrefix on last part
+		// instead of Contains
+		if strings.Contains(fname, "virtlet_root_") {
+			rootDiskLocation = fname
+		}
+	}
+	if rootDiskLocation == "" {
+		return nil, fmt.Errorf("cannot locate root disk in domain definition")
+	}
+
+	rootDiskSize, err := v.ImageManager().BytesUsedBy(rootDiskLocation)
+	if err != nil {
+		return nil, err
+	}
+	vs.FsBytes = rootDiskSize
+
+	glog.V(4).Infof("VMStats - cpu: %d, mem: %d, disk: %d, timestamp: %d", vs.CpuUsage, vs.MemoryUsage, vs.FsBytes, vs.Timestamp)
+
+	return &vs, nil
+}
+
+// ListVMStats returns statistics (same as VMStats) for all containers matching
+// provided filter (id AND podstandboxid AND labels)
+func (v *VirtualizationTool) ListVMStats(filter *types.VMStatsFilter) ([]types.VMStats, error) {
+	var containersFilter *types.ContainerFilter
+	if filter != nil {
+		containersFilter = &types.ContainerFilter{}
+		if filter.Id != "" {
+			containersFilter.Id = filter.Id
+		}
+		if filter.PodSandboxID != "" {
+			containersFilter.PodSandboxID = filter.PodSandboxID
+		}
+		if filter.LabelSelector != nil {
+			containersFilter.LabelSelector = filter.LabelSelector
+		}
+	}
+
+	infos, err := v.ListContainers(containersFilter)
+	if err != nil {
+		return nil, err
+	}
+
+	var statsList []types.VMStats
+	for _, info := range infos {
+		stats, err := v.VMStats(info.Id, info.Name)
+		if err != nil {
+			return nil, err
+		}
+		statsList = append(statsList, *stats)
+	}
+	return statsList, nil
+}
+
 // volumeOwner implementation follows
 
-// StoragePool returns StoragePool for volumes
+// StoragePool implements volumeOwner StoragePool method
 func (v *VirtualizationTool) StoragePool() (virt.StoragePool, error) {
 	return ensureStoragePool(v.storageConn, v.config.VolumePoolName)
 }

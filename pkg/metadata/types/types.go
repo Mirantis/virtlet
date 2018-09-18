@@ -90,6 +90,25 @@ type ContainerInfo struct {
 	Config VMConfig
 }
 
+// VMStats contains cpu/memory/disk usage for VM.
+type VMStats struct {
+	// ContainerID holds identifier of container for which these statistics
+	// were collected
+	ContainerID string
+	// Name holds name of the container
+	Name string
+	// Timestatmp holds an unix timestamp (including nanoseconds)
+	// for stats collection
+	Timestamp int64
+	// CpuUsage in nano seconds per cpu
+	CpuUsage uint64
+	// MemoryUsage is expected to contain the amount of working set memory
+	// in bytes what in our case will be returned using RSS value
+	MemoryUsage uint64
+	// FsBytes represents current size of rootfs in bytes
+	FsBytes uint64
+}
+
 // NamespaceOption provides options for Linux namespaces.
 type NamespaceOption struct {
 	// If set, use the host's network namespace.
@@ -276,4 +295,27 @@ type ContainerFilter struct {
 	// Only api.MatchLabels is supported for now and the requirements
 	// are ANDed. MatchExpressions is not supported yet.
 	LabelSelector map[string]string
+}
+
+// VMStatsFilter is used to filter set of container stats
+// All those fields are combined with 'AND'
+type VMStatsFilter struct {
+	// ID holds of the container.
+	Id string
+	// PodSandboxID holds id of podsandbox.
+	PodSandboxID string
+	// LabelSelector to select matches. Requirementes should be ANDed.
+	// Match Expressions is not supported.
+	LabelSelector map[string]string
+}
+
+// FilesystemStats contains info about filesystem mountpoint and
+// space/inodes used by images on it
+type FilesystemStats struct {
+	// Mountpoint denotes the filesystem mount point
+	Mountpoint string
+	// UsedBytes is the number of bytes used by images
+	UsedBytes uint64
+	// UsedInodes is the number of inodes used by images
+	UsedInodes uint64
 }

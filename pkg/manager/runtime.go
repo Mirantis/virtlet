@@ -456,14 +456,74 @@ func (v *VirtletRuntimeService) Status(context.Context, *kubeapi.StatusRequest) 
 	}, nil
 }
 
-// ContainerStats is a placeholder for an unimplemented CRI method.
+// ContainerStats returns cpu/memory/disk usage for particular container id
 func (v *VirtletRuntimeService) ContainerStats(ctx context.Context, in *kubeapi.ContainerStatsRequest) (*kubeapi.ContainerStatsResponse, error) {
-	return nil, errors.New("ContainerStats() not implemented")
+	info, err := v.virtTool.ContainerInfo(in.ContainerId)
+	if err != nil {
+		return nil, err
+	}
+	vs, err := v.virtTool.VMStats(info.Id, info.Name)
+	if err != nil {
+		return nil, err
+	}
+	fsstats, err := v.virtTool.ImageManager().FilesystemStats()
+	if err != nil {
+		return nil, err
+	}
+	return &kubeapi.ContainerStatsResponse{
+		Stats: VMStatsToCRIContainerStats(*vs, fsstats.Mountpoint),
+	}, nil
 }
 
-// ListContainerStats is a placeholder for an unimplemented CRI method.
+// ListContainerStats returns stats (same as ContainerStats) for containers
+// selected by filter
 func (v *VirtletRuntimeService) ListContainerStats(ctx context.Context, in *kubeapi.ListContainerStatsRequest) (*kubeapi.ListContainerStatsResponse, error) {
-	return nil, errors.New("ListContainerStats() not implemented")
+	filter := CRIContainerStatsFilterToVMStatsFilter(in.GetFilter())
+	vmstatsList, err := v.virtTool.ListVMStats(filter)
+	if err != nil {
+		return nil, err
+	}
+	fsstats, err := v.virtTool.ImageManager().FilesystemStats()
+	if err != nil {
+		return nil, err
+	}
+	var stats []*kubeapi.ContainerStats
+	for _, vs := range vmstatsList {
+		stats = append(stats, VMStatsToCRIContainerStats(vs, fsstats.Mountpoint))
+	}
+
+	return &kubeapi.ListContainerStatsResponse{
+		Stats: stats,
+	}, nil
+}
+
+// VMStatsToCRIContainerStats converts internal representation of vm/container stats
+// to corresponding kubeapi type object
+func VMStatsToCRIContainerStats(vs types.VMStats, mountpoint string) *kubeapi.ContainerStats {
+	return &kubeapi.ContainerStats{
+		Attributes: &kubeapi.ContainerAttributes{
+			Id: vs.ContainerID,
+			Metadata: &kubeapi.ContainerMetadata{
+				Name: vs.ContainerID,
+			},
+		},
+		Cpu: &kubeapi.CpuUsage{
+			Timestamp:            vs.Timestamp,
+			UsageCoreNanoSeconds: &kubeapi.UInt64Value{Value: vs.CpuUsage},
+		},
+		Memory: &kubeapi.MemoryUsage{
+			Timestamp:       vs.Timestamp,
+			WorkingSetBytes: &kubeapi.UInt64Value{Value: vs.MemoryUsage},
+		},
+		WritableLayer: &kubeapi.FilesystemUsage{
+			Timestamp: vs.Timestamp,
+			FsId: &kubeapi.FilesystemIdentifier{
+				Mountpoint: mountpoint,
+			},
+			UsedBytes:  &kubeapi.UInt64Value{Value: vs.FsBytes},
+			InodesUsed: &kubeapi.UInt64Value{Value: 1},
+		},
+	}
 }
 
 // ReopenContainerLog is a placeholder for an unimplemented CRI method.
