@@ -73,7 +73,9 @@ var _ = Describe("Block PVs", func() {
 			}
 		})
 
-		It("Should be accessible from within the VM", func() {
+		// FIXME: the test is marked Disruptive because rbd
+		// hangs on CircleCI for some reason.
+		It("[Disruptive] Should be accessible from within the VM", func() {
 			vm = makeVMWithMountAndSymlinkScript("", []framework.PVCSpec{
 				{
 					Name:           "block-pv",
