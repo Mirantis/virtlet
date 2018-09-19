@@ -30,7 +30,6 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/portforward"
@@ -137,8 +136,8 @@ func (pi *PodInterface) Wait(timing ...time.Duration) error {
 	return pi.WaitForPodStatus(nil, timing...)
 }
 
-// WaitDestruction waits for the pod to be deleted
-func (pi *PodInterface) WaitDestruction(timing ...time.Duration) error {
+// WaitForDestruction waits for the pod to be deleted
+func (pi *PodInterface) WaitForDestruction(timing ...time.Duration) error {
 	timeout := time.Minute * 5
 	pollPeriond := time.Second
 	consistencyPeriod := time.Second * 5
@@ -153,8 +152,7 @@ func (pi *PodInterface) WaitDestruction(timing ...time.Duration) error {
 	}
 
 	return waitForConsistentState(func() error {
-		_, err := pi.controller.client.Pods(pi.Pod.Namespace).Get(pi.Pod.Name, metav1.GetOptions{})
-		if err != nil {
+		if _, err := pi.controller.client.Pods(pi.Pod.Namespace).Get(pi.Pod.Name, metav1.GetOptions{}); err != nil {
 			if k8serrors.IsNotFound(err) {
 				return nil
 			}

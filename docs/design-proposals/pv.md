@@ -412,7 +412,12 @@ MON_IP=$(docker exec kube-master route | grep default | awk '{print $2}')
 CEPH_PUBLIC_NETWORK=${MON_IP}/16
 docker run -d --net=host -e MON_IP=${MON_IP} \
        -e CEPH_PUBLIC_NETWORK=${CEPH_PUBLIC_NETWORK} \
-       --name ceph_cluster docker.io/ceph/demo
+       -e CEPH_DEMO_UID=foo \
+       -e CEPH_DEMO_ACCESS_KEY=foo \
+       -e CEPH_DEMO_SECRET_KEY=foo \
+       -e CEPH_DEMO_BUCKET=foo \
+       -e DEMO_DAEMONS="osd mds" \
+       --name ceph_cluster docker.io/ceph/daemon demo
 ```
 
 Create a pool there:
