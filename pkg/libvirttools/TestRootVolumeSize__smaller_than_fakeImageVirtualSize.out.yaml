@@ -1,5 +1,5 @@
-- name: 'image: GetImagePathAndVirtualSize'
-  value: rootfs image name
+- name: 'image: GetImagePathDigestAndVirtualSize'
+  value: fake/image1
 - name: 'volumes: CreateStorageVol'
   value: |-
     <volume type="file">

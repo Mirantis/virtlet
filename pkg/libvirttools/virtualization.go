@@ -225,6 +225,7 @@ type VirtualizationTool struct {
 	volumeSource  VMVolumeSource
 	config        VirtualizationConfig
 	mounter       utils.Mounter
+	commander     utils.Commander
 }
 
 var _ volumeOwner = &VirtualizationTool{}
@@ -234,7 +235,8 @@ var _ volumeOwner = &VirtualizationTool{}
 func NewVirtualizationTool(domainConn virt.DomainConnection,
 	storageConn virt.StorageConnection, imageManager ImageManager,
 	metadataStore metadata.Store, volumeSource VMVolumeSource,
-	config VirtualizationConfig, mounter utils.Mounter) *VirtualizationTool {
+	config VirtualizationConfig, mounter utils.Mounter,
+	commander utils.Commander) *VirtualizationTool {
 	return &VirtualizationTool{
 		domainConn:    domainConn,
 		storageConn:   storageConn,
@@ -244,6 +246,7 @@ func NewVirtualizationTool(domainConn virt.DomainConnection,
 		volumeSource:  volumeSource,
 		config:        config,
 		mounter:       mounter,
+		commander:     commander,
 	}
 }
 
@@ -926,6 +929,9 @@ func (v *VirtualizationTool) Mounter() utils.Mounter { return v.mounter }
 
 // SharedFilesystemPath implements volumeOwner SharedFilesystemPath method
 func (v *VirtualizationTool) SharedFilesystemPath() string { return v.config.SharedFilesystemPath }
+
+// Commander implements volumeOwner Commander method
+func (v *VirtualizationTool) Commander() utils.Commander { return v.commander }
 
 func filterContainer(containerInfo *types.ContainerInfo, filter types.ContainerFilter) bool {
 	if filter.Id != "" && containerInfo.Id != filter.Id {

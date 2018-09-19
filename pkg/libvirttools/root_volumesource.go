@@ -34,11 +34,22 @@ var _ VMVolume = &rootVolume{}
 
 // GetRootVolume returns volume source for root volume clone.
 func GetRootVolume(config *types.VMConfig, owner volumeOwner) ([]VMVolume, error) {
-	return []VMVolume{
-		&rootVolume{
+	var vol VMVolume
+	for _, dev := range config.VolumeDevices {
+		if dev.DevicePath == "/" {
+			vol = &persistentRootVolume{
+				volumeBase: volumeBase{config, owner},
+				dev:        dev,
+			}
+			break
+		}
+	}
+	if vol == nil {
+		vol = &rootVolume{
 			volumeBase{config, owner},
-		},
-	}, nil
+		}
+	}
+	return []VMVolume{vol}, nil
 }
 
 func (v *rootVolume) volumeName() string {
@@ -46,7 +57,7 @@ func (v *rootVolume) volumeName() string {
 }
 
 func (v *rootVolume) createVolume() (virt.StorageVolume, error) {
-	imagePath, virtualSize, err := v.owner.ImageManager().GetImagePathAndVirtualSize(v.config.Image)
+	imagePath, _, virtualSize, err := v.owner.ImageManager().GetImagePathDigestAndVirtualSize(v.config.Image)
 	if err != nil {
 		return nil, err
 	}
