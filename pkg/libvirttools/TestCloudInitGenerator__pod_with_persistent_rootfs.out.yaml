@@ -1,0 +1,5 @@
+meta-data:
+  instance-id: foo.default
+  local-hostname: foo
+network-config: null
+user-data: null

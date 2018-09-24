@@ -213,6 +213,12 @@ type VMVolumeDevice struct {
 	HostPath string
 }
 
+// IsRoot returns true if this volume device should be used for a
+// persistent root filesystem, that is, its DevicePath is "/"
+func (d VMVolumeDevice) IsRoot() bool {
+	return d.DevicePath == "/"
+}
+
 // UUID returns an uuid that uniquely identifies the block device on
 // the host.
 func (dev VMVolumeDevice) UUID() string {
@@ -269,6 +275,18 @@ type VMConfig struct {
 	// Path relative to LogDirectory for container to store the
 	// log (STDOUT and STDERR) on the host.
 	LogPath string
+}
+
+// RootVolumeDevice returns the volume device that should be used for
+// a persistent root filesystem, that is, its DevicePath is "/"
+func (c *VMConfig) RootVolumeDevice() *VMVolumeDevice {
+	for n, _ := range c.VolumeDevices {
+		dev := &c.VolumeDevices[n]
+		if dev.IsRoot() {
+			return dev
+		}
+	}
+	return nil
 }
 
 // LoadAnnotations parses pod annotations in the VM config an
