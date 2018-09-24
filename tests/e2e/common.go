@@ -189,7 +189,7 @@ func withLoopbackBlockDevice(virtletNodeName, devPath *string) {
 		nodeExecutor, err = controller.DinDNodeExecutor(*virtletNodeName)
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err = framework.RunSimple(nodeExecutor, "dd", "if=/dev/zero", "of=/rawdevtest", "bs=1M", "count=10")
+		_, err = framework.RunSimple(nodeExecutor, "dd", "if=/dev/zero", "of=/rawdevtest", "bs=1M", "count=1000")
 		Expect(err).NotTo(HaveOccurred())
 		// We use mkfs.ext3 here because mkfs.ext4 on
 		// the node may be too new for CirrOS, causing
@@ -254,9 +254,9 @@ func withCeph(monitorIP, secret *string, kubeSecret string) {
 		commands := []string{
 			// Add rbd pool and volume
 			`ceph osd pool create libvirt-pool 8 8`,
-			`rbd create rbd-test-image1 --size 10M --pool libvirt-pool --image-feature layering`,
-			`rbd create rbd-test-image2 --size 10M --pool libvirt-pool --image-feature layering`,
-			`rbd create rbd-test-image-pv --size 10M --pool libvirt-pool --image-feature layering`,
+			`rbd create rbd-test-image1 --size 1G --pool libvirt-pool --image-feature layering`,
+			`rbd create rbd-test-image2 --size 1G --pool libvirt-pool --image-feature layering`,
+			`rbd create rbd-test-image-pv --size 1G --pool libvirt-pool --image-feature layering`,
 
 			// Add user for virtlet
 			`ceph auth get-key client.admin`,

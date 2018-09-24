@@ -17,6 +17,8 @@ limitations under the License.
 package e2e
 
 import (
+	. "github.com/onsi/gomega"
+
 	"github.com/Mirantis/virtlet/tests/e2e/framework"
 	. "github.com/Mirantis/virtlet/tests/e2e/ginkgo-ext"
 )
@@ -26,6 +28,21 @@ var _ = Describe("Block PVs", func() {
 		vm  *framework.VMInterface
 		ssh framework.Executor
 	)
+
+	describePersistentRootfs := func(makePersistentRootVM func()) {
+		It("Should be usable as a persistent root filesystem", func() {
+			makePersistentRootVM()
+			ssh = waitSSH(vm)
+			do(framework.RunSimple(ssh, "echo -n foo | sudo tee /bar.txt"))
+			Expect(ssh.Close()).To(Succeed())
+			deleteVM(vm)
+			makePersistentRootVM()
+			ssh = waitSSH(vm)
+			out, err := framework.RunSimple(ssh, "sudo cat /bar.txt")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(out).To(Equal("foo"))
+		})
+	}
 
 	Context("[Local]", func() {
 		var (
@@ -58,9 +75,22 @@ var _ = Describe("Block PVs", func() {
 			ssh = waitSSH(vm)
 			expectToBeUsableForFilesystem(ssh, "/dev/testpvc")
 		})
+
+		describePersistentRootfs(func() {
+			vm = makeVMWithMountAndSymlinkScript(virtletNodeName, []framework.PVCSpec{
+				{
+					Name:          "block-pv",
+					Size:          "10M",
+					NodeName:      virtletNodeName,
+					Block:         true,
+					LocalPath:     devPath,
+					ContainerPath: "/",
+				},
+			}, nil)
+		})
 	})
 
-	Context("[Ceph RBD]", func() {
+	Context("[Disruptive][Ceph RBD]", func() {
 		var monitorIP string
 		withCeph(&monitorIP, nil, "ceph-admin")
 
@@ -75,7 +105,7 @@ var _ = Describe("Block PVs", func() {
 
 		// FIXME: the test is marked Disruptive because rbd
 		// hangs on CircleCI for some reason.
-		It("[Disruptive] Should be accessible from within the VM", func() {
+		It("Should be accessible from within the VM", func() {
 			vm = makeVMWithMountAndSymlinkScript("", []framework.PVCSpec{
 				{
 					Name:           "block-pv",
@@ -90,6 +120,21 @@ var _ = Describe("Block PVs", func() {
 			}, nil)
 			ssh = waitSSH(vm)
 			expectToBeUsableForFilesystem(ssh, "/dev/testpvc")
+		})
+
+		describePersistentRootfs(func() {
+			vm = makeVMWithMountAndSymlinkScript("", []framework.PVCSpec{
+				{
+					Name:           "block-pv",
+					Size:           "10M",
+					Block:          true,
+					CephRBDImage:   "rbd-test-image1",
+					CephMonitorIP:  monitorIP,
+					CephRBDPool:    "libvirt-pool",
+					CephSecretName: "ceph-admin",
+					ContainerPath:  "/",
+				},
+			}, nil)
 		})
 	})
 })
