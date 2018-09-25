@@ -17,6 +17,7 @@ limitations under the License.
 package types
 
 import (
+	"encoding/base64"
 	"fmt"
 	"strconv"
 	"strings"
@@ -46,6 +47,9 @@ const (
 	CloudInitUserDataSourceKeyName = "VirtletCloudInitUserDataSource"
 	// SSHKeySourceKeyName is the name of ssh key source key in the pod annotations.
 	SSHKeySourceKeyName = "VirtletSSHKeySource"
+
+	cloudInitUserDataSourceKeyKeyName      = "VirtletCloudInitUserDataSourceKey"
+	cloudInitUserDataSourceEncodingKeyName = "VirtletCloudInitUserDataSourceEncoding"
 )
 
 // CloudInitImageType specifies the image type used for cloud-init
@@ -216,6 +220,35 @@ func (va *VirtletAnnotations) parsePodAnnotations(ns string, podAnnotations map[
 	}
 
 	va.UserDataScript = podAnnotations[cloudInitUserDataScriptKeyName]
+
+	encoding := "plain"
+	if encodingStr, found := podAnnotations[cloudInitUserDataSourceEncodingKeyName]; found {
+		encoding = encodingStr
+	}
+	if key, found := podAnnotations[cloudInitUserDataSourceKeyKeyName]; found {
+		data, found := va.UserData[key]
+		if !found {
+			return fmt.Errorf("user-data script source not found under key %q", key)
+		}
+
+		dataStr, ok := data.(string)
+		if !ok {
+			return fmt.Errorf("failed to read user-data script source from key %q", key)
+		}
+
+		switch encoding {
+		case "plain":
+			va.UserDataScript = dataStr
+		case "base64":
+			ud, err := base64.StdEncoding.DecodeString(dataStr)
+			if err != nil {
+				return fmt.Errorf("failed to decode user-data script in base64 encoding: %v", err)
+			}
+			va.UserDataScript = string(ud)
+		default:
+			return fmt.Errorf("failed to decode user-data script: %q is unknown encoding", encoding)
+		}
+	}
 
 	if sshKeysStr, found := podAnnotations[sshKeysKeyName]; found {
 		if va.UserDataOverwrite {
