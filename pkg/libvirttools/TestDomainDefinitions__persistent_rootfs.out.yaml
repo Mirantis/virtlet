@@ -76,8 +76,6 @@
 - name: 'domain conn: virtlet-231700d5-c9a6-container1: iso image'
   value:
     meta-data: '{"instance-id":"testName_0.default","local-hostname":"testName_0"}'
-    network-config: |
-      version: 1
     user-data: |
       #cloud-config
 - name: 'domain conn: virtlet-231700d5-c9a6-container1: Destroy'

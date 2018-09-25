@@ -176,6 +176,12 @@ func (g *CloudInitGenerator) generateUserData(volumeMap diskPathMap) ([]byte, er
 }
 
 func (g *CloudInitGenerator) generateNetworkConfiguration() ([]byte, error) {
+	if g.config.RootVolumeDevice() != nil {
+		// We don't use network config with persistent rootfs
+		// for now because with some cloud-init
+		// implementations it's applied only once
+		return nil, nil
+	}
 	// TODO: get rid of this switch. Use descriptor for cloud-init image types.
 	switch g.config.ParsedAnnotations.CDImageType {
 	case types.CloudInitImageTypeNoCloud:
@@ -464,11 +470,14 @@ func (g *CloudInitGenerator) GenerateImage(volumeMap diskPathMap) error {
 		return fmt.Errorf("unknown cloud-init config image type: %q", g.config.ParsedAnnotations.CDImageType)
 	}
 
-	if err := utils.WriteFiles(tmpDir, map[string][]byte{
-		userDataLocation:      userData,
-		metaDataLocation:      metaData,
-		networkConfigLocation: networkConfiguration,
-	}); err != nil {
+	fileMap := map[string][]byte{
+		userDataLocation: userData,
+		metaDataLocation: metaData,
+	}
+	if networkConfiguration != nil {
+		fileMap[networkConfigLocation] = networkConfiguration
+	}
+	if err := utils.WriteFiles(tmpDir, fileMap); err != nil {
 		return fmt.Errorf("can't write user-data: %v", err)
 	}
 
@@ -506,7 +515,7 @@ func isRegularFile(path string) bool {
 func (g *CloudInitGenerator) generateSymlinkScript(volumeMap diskPathMap) string {
 	var symlinkLines []string
 	for _, dev := range g.config.VolumeDevices {
-		if dev.DevicePath == "/" {
+		if dev.IsRoot() {
 			// special case for the persistent rootfs
 			continue
 		}
@@ -527,7 +536,7 @@ func (g *CloudInitGenerator) generateSymlinkScript(volumeMap diskPathMap) string
 func (g *CloudInitGenerator) fixMounts(volumeMap diskPathMap, mounts []interface{}) []interface{} {
 	devMap := make(map[string]string)
 	for _, dev := range g.config.VolumeDevices {
-		if dev.DevicePath == "/" {
+		if dev.IsRoot() {
 			// special case for the persistent rootfs
 			continue
 		}

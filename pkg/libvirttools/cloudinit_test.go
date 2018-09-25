@@ -371,6 +371,24 @@ func TestCloudInitGenerator(t *testing.T) {
 			verifyUserData: true,
 		},
 		{
+			name: "pod with persistent rootfs",
+			config: &types.VMConfig{
+				PodName:           "foo",
+				PodNamespace:      "default",
+				ParsedAnnotations: &types.VirtletAnnotations{CDImageType: types.CloudInitImageTypeNoCloud},
+				VolumeDevices: []types.VMVolumeDevice{
+					{
+						DevicePath: "/",
+						HostPath:   volDevs[0].HostPath,
+					},
+				},
+			},
+			verifyMetaData: true,
+			verifyUserData: true,
+			// make sure network config is null for the persistent rootfs case
+			verifyNetworkConfig: true,
+		},
+		{
 			name: "injecting mount script into user data script",
 			config: &types.VMConfig{
 				PodName:      "foo",
@@ -700,33 +718,103 @@ func TestCloudInitDiskDef(t *testing.T) {
 }
 
 func TestCloudInitGenerateImage(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "config-")
-	if err != nil {
-		t.Fatalf("Can't create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	for _, tc := range []struct {
+		name          string
+		vmConfig      *types.VMConfig
+		expectedFiles map[string]interface{}
+	}{
+		{
+			name: "nocloud",
+			vmConfig: &types.VMConfig{
+				PodName:           "foo",
+				PodNamespace:      "default",
+				ParsedAnnotations: &types.VirtletAnnotations{CDImageType: types.CloudInitImageTypeNoCloud},
+			},
+			expectedFiles: map[string]interface{}{
+				"meta-data":      "{\"instance-id\":\"foo.default\",\"local-hostname\":\"foo\"}",
+				"network-config": "version: 1\n",
+				"user-data":      "#cloud-config\n",
+			},
+		},
+		{
+			name: "nocloud with persistent rootfs",
+			vmConfig: &types.VMConfig{
+				PodName:      "foo",
+				PodNamespace: "default",
+				VolumeDevices: []types.VMVolumeDevice{
+					{
+						DevicePath: "/",
+						HostPath:   "/dev/loop0",
+					},
+				},
+				ParsedAnnotations: &types.VirtletAnnotations{CDImageType: types.CloudInitImageTypeNoCloud},
+			},
+			expectedFiles: map[string]interface{}{
+				"meta-data": "{\"instance-id\":\"foo.default\",\"local-hostname\":\"foo\"}",
+				"user-data": "#cloud-config\n",
+			},
+		},
+		{
+			name: "configdrive",
+			vmConfig: &types.VMConfig{
+				PodName:           "foo",
+				PodNamespace:      "default",
+				ParsedAnnotations: &types.VirtletAnnotations{CDImageType: types.CloudInitImageTypeConfigDrive},
+			},
+			expectedFiles: map[string]interface{}{
+				"openstack": map[string]interface{}{
+					"latest": map[string]interface{}{
+						"meta_data.json":    "{\"hostname\":\"foo\",\"instance-id\":\"foo.default\",\"local-hostname\":\"foo\",\"uuid\":\"foo.default\"}",
+						"network_data.json": "{}",
+						"user_data":         "#cloud-config\n",
+					},
+				},
+			},
+		},
+		{
+			name: "configdrive with persistent rootfs",
+			vmConfig: &types.VMConfig{
+				PodName:      "foo",
+				PodNamespace: "default",
+				VolumeDevices: []types.VMVolumeDevice{
+					{
+						DevicePath: "/",
+						HostPath:   "/dev/loop0",
+					},
+				},
+				ParsedAnnotations: &types.VirtletAnnotations{CDImageType: types.CloudInitImageTypeConfigDrive},
+			},
+			expectedFiles: map[string]interface{}{
+				"openstack": map[string]interface{}{
+					"latest": map[string]interface{}{
+						"meta_data.json": "{\"hostname\":\"foo\",\"instance-id\":\"foo.default\",\"local-hostname\":\"foo\",\"uuid\":\"foo.default\"}",
+						"user_data":      "#cloud-config\n",
+					},
+				},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir, err := ioutil.TempDir("", "config-")
+			if err != nil {
+				t.Fatalf("Can't create temp dir: %v", err)
+			}
+			defer os.RemoveAll(tmpDir)
 
-	g := NewCloudInitGenerator(&types.VMConfig{
-		PodName:           "foo",
-		PodNamespace:      "default",
-		ParsedAnnotations: &types.VirtletAnnotations{CDImageType: types.CloudInitImageTypeNoCloud},
-	}, tmpDir)
+			g := NewCloudInitGenerator(tc.vmConfig, tmpDir)
+			if err := g.GenerateImage(nil); err != nil {
+				t.Fatalf("GenerateImage(): %v", err)
+			}
 
-	if err := g.GenerateImage(nil); err != nil {
-		t.Fatalf("GenerateImage(): %v", err)
-	}
+			m, err := testutils.IsoToMap(g.IsoPath())
+			if err != nil {
+				t.Fatalf("IsoToMap(): %v", err)
+			}
 
-	m, err := testutils.IsoToMap(g.IsoPath())
-	if err != nil {
-		t.Fatalf("IsoToMap(): %v", err)
-	}
-
-	if !reflect.DeepEqual(m, map[string]interface{}{
-		"meta-data":      "{\"instance-id\":\"foo.default\",\"local-hostname\":\"foo\"}",
-		"network-config": "version: 1\n",
-		"user-data":      "#cloud-config\n",
-	}) {
-		t.Errorf("Bad iso content:\n%s", spew.Sdump(m))
+			if !reflect.DeepEqual(m, tc.expectedFiles) {
+				t.Errorf("Bad iso content:\n%s", spew.Sdump(m))
+			}
+		})
 	}
 }
 
