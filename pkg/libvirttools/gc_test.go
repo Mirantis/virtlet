@@ -17,6 +17,7 @@ limitations under the License.
 package libvirttools
 
 import (
+	"crypto/sha256"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -24,12 +25,15 @@ import (
 
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
+	blockdev "github.com/Mirantis/virtlet/pkg/blockdev"
+	fakeblockdev "github.com/Mirantis/virtlet/pkg/blockdev/fake"
+	fakeutils "github.com/Mirantis/virtlet/pkg/utils/fake"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 	"github.com/Mirantis/virtlet/tests/gm"
 )
 
 var (
-	randomUUIDs = [...]string{
+	testUUIDs = [...]string{
 		"5edfe2ad-9852-439b-bbfb-3fe8b7c72906",
 		"8a6163c3-e4ee-488f-836a-d2abe92d0744",
 		"13f51f8d-0f4e-4538-9db0-413380ff9c84",
@@ -40,12 +44,12 @@ func TestDomainCleanup(t *testing.T) {
 	ct := newContainerTester(t, testutils.NewToplevelRecorder(), nil)
 	defer ct.teardown()
 
-	for _, uuid := range randomUUIDs {
+	for _, uuid := range testUUIDs {
 		if _, err := ct.domainConn.DefineDomain(&libvirtxml.Domain{
 			Name: "virtlet-" + uuid[:13] + "-container1",
 			UUID: uuid,
 		}); err != nil {
-			t.Fatalf("Cannot define new fake domain: %v", err)
+			t.Fatalf("Cannot define the fake domain: %v", err)
 		}
 	}
 	if _, err := ct.domainConn.DefineDomain(&libvirtxml.Domain{
@@ -60,9 +64,8 @@ func TestDomainCleanup(t *testing.T) {
 	}
 
 	// this should remove all domains (including other than virlet defined)
-	// with an exception of the last listed in randomUUIDs slice
-	errors := ct.virtTool.removeOrphanDomains(randomUUIDs[2:])
-	if errors != nil {
+	// with an exception of the last listed in testUUIDs slice
+	if errors := ct.virtTool.removeOrphanDomains(testUUIDs[2:]); len(errors) != 0 {
 		t.Errorf("removeOrphanDomains returned errors: %v", errors)
 	}
 
@@ -82,7 +85,7 @@ func TestRootVolumesCleanup(t *testing.T) {
 		t.Fatalf("StoragePool(): %v", err)
 	}
 
-	for _, uuid := range randomUUIDs {
+	for _, uuid := range testUUIDs {
 		if _, err := pool.CreateStorageVol(&libvirtxml.StorageVolume{
 			Name:   "root for " + uuid,
 			Target: &libvirtxml.StorageVolumeTarget{Path: "/some/path/virtlet_root_" + uuid},
@@ -102,9 +105,8 @@ func TestRootVolumesCleanup(t *testing.T) {
 	}
 
 	// this should remove only root volumes corresponding to the two first
-	// elements of randomUUIDs slice, keeping others
-	errors := ct.virtTool.removeOrphanRootVolumes(randomUUIDs[2:])
-	if errors != nil {
+	// elements of testUUIDs slice, keeping others
+	if errors := ct.virtTool.removeOrphanRootVolumes(testUUIDs[2:]); len(errors) != 0 {
 		t.Errorf("removeOrphanRootVolumes returned errors: %v", errors)
 	}
 
@@ -124,7 +126,7 @@ func TestQcow2VolumesCleanup(t *testing.T) {
 		t.Fatalf("StoragePool(): %v", err)
 	}
 
-	for _, uuid := range randomUUIDs {
+	for _, uuid := range testUUIDs {
 		if _, err := pool.CreateStorageVol(&libvirtxml.StorageVolume{
 			Name:   "qcow flexvolume for " + uuid,
 			Target: &libvirtxml.StorageVolumeTarget{Path: "/some/path/virtlet-" + uuid},
@@ -144,9 +146,8 @@ func TestQcow2VolumesCleanup(t *testing.T) {
 	}
 
 	// this should remove only ephemeral qcow2 volumes corresponding to
-	// the two first elements of randomUUIDs slice, keeping others
-	errors := ct.virtTool.removeOrphanQcow2Volumes(randomUUIDs[2:])
-	if errors != nil {
+	// the two first elements of testUUIDs slice, keeping others
+	if errors := ct.virtTool.removeOrphanQcow2Volumes(testUUIDs[2:]); len(errors) != 0 {
 		t.Errorf("removeOrphanRootVolumes returned errors: %v", errors)
 	}
 
@@ -167,7 +168,7 @@ func TestConfigISOsCleanup(t *testing.T) {
 	}
 	defer os.RemoveAll(directory)
 
-	for _, uuid := range randomUUIDs {
+	for _, uuid := range testUUIDs {
 		fname := filepath.Join(directory, "config-"+uuid+".iso")
 		if file, err := os.Create(fname); err != nil {
 			t.Fatalf("Cannot create fake iso with name %q: %v", fname, err)
@@ -191,9 +192,8 @@ func TestConfigISOsCleanup(t *testing.T) {
 	}
 
 	// this should remove only config iso file corresponding to the first
-	// element of randomUUIDs slice, keeping other files
-	errors := ct.virtTool.removeOrphanConfigImages(randomUUIDs[1:], directory)
-	if errors != nil {
+	// element of testUUIDs slice, keeping other files
+	if errors := ct.virtTool.removeOrphanConfigImages(testUUIDs[1:], directory); len(errors) != 0 {
 		t.Errorf("removeOrphanConfigImages returned errors: %v", errors)
 	}
 
@@ -207,12 +207,59 @@ func TestConfigISOsCleanup(t *testing.T) {
 		t.Fatalf("Expected removeOrphanConfigImages to remove single file, but it removed %d files", len(diff))
 	}
 
-	expectedPath := filepath.Join(directory, "config-"+randomUUIDs[0]+".iso")
+	expectedPath := filepath.Join(directory, "config-"+testUUIDs[0]+".iso")
 	if diff[0] != expectedPath {
 		t.Fatalf("Expected removeOrphanConfigImages to remove only %q file, but it also removed: %q", expectedPath, diff[0])
 	}
 
 	// no gm validation, because we are testing only file operations in this test
+}
+
+func TestDeviceMapperCleanup(t *testing.T) {
+	fakeblockdev.WithFakeRootDevsAndSysfs(t, func(devPaths []string, table, devDir, sysfsDir string) {
+		dmRemoveCmd := "dmsetup remove virtlet-dm-9a322047-1f0d-4395-8e43-6e1b310ce6f3"
+		ct := newContainerTester(t, testutils.NewToplevelRecorder(), []fakeutils.CmdSpec{
+			{
+				Match:  "^dmsetup table$",
+				Stdout: table,
+			},
+			{
+				Match: "^" + dmRemoveCmd + "$",
+			},
+		})
+		defer ct.teardown()
+
+		ldh := blockdev.NewLogicalDeviceHandler(ct.virtTool.commander, devDir, sysfsDir)
+		for _, devPath := range devPaths {
+			if _, err := ldh.EnsureDevHeaderMatches(devPath, sha256.Sum256([]byte("foobar"))); err != nil {
+				t.Fatalf("EnsureDevHeaderMatches(): %v", err)
+			}
+		}
+
+		for _, uuid := range testUUIDs {
+			if _, err := ct.domainConn.DefineDomain(&libvirtxml.Domain{
+				Name: "virtlet-" + uuid[:13] + "-container1",
+				UUID: uuid,
+			}); err != nil {
+				t.Fatalf("Cannot define the fake domain: %v", err)
+			}
+		}
+
+		if errors := ct.virtTool.removeOrphanVirtualBlockDevices(testUUIDs[:], devDir, sysfsDir); len(errors) != 0 {
+			t.Errorf("removeOrphanDomains returned errors: %v", errors)
+		}
+
+		n := 0
+		for _, r := range ct.rec.Content() {
+			if r.Name == "CMD" && r.Value.(map[string]string)["cmd"] == dmRemoveCmd {
+				n++
+			}
+		}
+		if n != 1 {
+			t.Errorf("dmsetup remove for the orphaned volume is expected to be called exactly 1 time, but was called %d times", n)
+		}
+	})
+	// no gm validation b/c we just verify 'dmsetup remove' command above
 }
 
 // https://stackoverflow.com/a/45428032

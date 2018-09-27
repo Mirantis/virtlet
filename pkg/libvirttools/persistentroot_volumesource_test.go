@@ -17,7 +17,6 @@ limitations under the License.
 package libvirttools
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -27,6 +26,7 @@ import (
 	"github.com/Mirantis/virtlet/tests/gm"
 	digest "github.com/opencontainers/go-digest"
 
+	fakeblockdev "github.com/Mirantis/virtlet/pkg/blockdev/fake"
 	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	fakeutils "github.com/Mirantis/virtlet/pkg/utils/fake"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
@@ -98,75 +98,55 @@ func TestPersistentRootVolume(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			rec := testutils.NewToplevelRecorder()
-			im := newFakeImageManager(rec.Child("image"), fakeImages...)
-			if tc.fileSize%512 != 0 {
-				t.Fatalf("block device size must be a multiple of 512")
-			}
+			fakeblockdev.WithFakeRootDev(t, tc.fileSize, func(devPath, devDir string) {
+				rec := testutils.NewToplevelRecorder()
+				im := newFakeImageManager(rec.Child("image"), fakeImages...)
+				if tc.fileSize%512 != 0 {
+					t.Fatalf("block device size must be a multiple of 512")
+				}
 
-			tmpDir, err := ioutil.TempDir("", "fake-persistent-rootfs")
-			if err != nil {
-				t.Fatalf("TempDir(): %v", err)
-			}
-			defer os.RemoveAll(tmpDir)
-			fakeDevDir := filepath.Join(tmpDir, "__dev__")
-			if err := os.Mkdir(fakeDevDir, 0777); err != nil {
-				t.Fatalf("Mkdir(): %v", err)
-			}
+				devPathToUse := devPath
+				if tc.useSymlink {
+					devPathToUse = filepath.Join(devDir, "rootdevlink")
+					if err := os.Symlink(devPath, devPathToUse); err != nil {
+						t.Fatalf("Symlink(): %v", err)
+					}
+				}
 
-			devPath := filepath.Join(fakeDevDir, "rootdev")
-			devFile, err := os.Create(devPath)
-			if err != nil {
-				t.Fatalf("Create(): %v", err)
-			}
-			if _, err := devFile.Write(make([]byte, tc.fileSize)); err != nil {
-				devFile.Close()
-				t.Fatalf("Write(): %v", err)
-			}
-			if err := devFile.Close(); err != nil {
-				t.Fatalf("devFile.Close()")
-			}
-			devPathToUse := devPath
-			if tc.useSymlink {
-				devPathToUse := filepath.Join(fakeDevDir, "rootdevlink")
-				if err := os.Symlink(devPath, devPathToUse); err != nil {
-					t.Fatalf("Symlink(): %v", err)
+				for n, imageName := range []string{tc.imageName, tc.secondImageName} {
+					if imageName == "" {
+						continue
+					}
+					cmdSpecs := []fakeutils.CmdSpec{
+						{
+							Match:  "blockdev --getsz",
+							Stdout: strconv.Itoa(int(tc.fileSize / 512)),
+						},
+						{
+							Match: "dmsetup create",
+						},
+						{
+							Match: "dmsetup remove",
+						},
+					}
+					if n == 0 || tc.imageWrittenAgain {
+						// qemu-img convert is used to write the image to the block device.
+						// It should only be called if the image changes.
+						cmdSpecs = append(cmdSpecs, fakeutils.CmdSpec{
+							Match: "qemu-img convert",
+						})
+					}
+					cmd := fakeutils.NewCommander(rec, cmdSpecs)
+					cmd.ReplaceTempPath("__dev__", "/dev")
+					owner := newFakeVolumeOwner(nil, im, cmd)
+					rootVol := getPersistentRootVolume(t, imageName, devPathToUse, owner)
+					verifyRootVolumeSetup(t, rec, rootVol, tc.errors[n])
+					if tc.errors[n] == "" {
+						verifyRootVolumeTeardown(t, rec, rootVol)
+					}
 				}
-			}
-
-			for n, imageName := range []string{tc.imageName, tc.secondImageName} {
-				if imageName == "" {
-					continue
-				}
-				cmdSpecs := []fakeutils.CmdSpec{
-					{
-						Match:  "blockdev --getsz",
-						Stdout: strconv.Itoa(int(tc.fileSize / 512)),
-					},
-					{
-						Match: "dmsetup create",
-					},
-					{
-						Match: "dmsetup remove",
-					},
-				}
-				if n == 0 || tc.imageWrittenAgain {
-					// qemu-img convert is used to write the image to the block device.
-					// It should only be called if the image changes.
-					cmdSpecs = append(cmdSpecs, fakeutils.CmdSpec{
-						Match: "qemu-img convert",
-					})
-				}
-				cmd := fakeutils.NewCommander(rec, cmdSpecs)
-				cmd.ReplaceTempPath("__dev__", "/dev")
-				owner := newFakeVolumeOwner(nil, im, cmd)
-				rootVol := getPersistentRootVolume(t, imageName, devPathToUse, owner)
-				verifyRootVolumeSetup(t, rec, rootVol, tc.errors[n])
-				if tc.errors[n] == "" {
-					verifyRootVolumeTeardown(t, rec, rootVol)
-				}
-			}
-			gm.Verify(t, gm.NewYamlVerifier(rec.Content()))
+				gm.Verify(t, gm.NewYamlVerifier(rec.Content()))
+			})
 		})
 	}
 }
@@ -223,8 +203,8 @@ func verifyRootVolumeTeardown(t *testing.T, rec testutils.Recorder, rootVol *per
 func getPersistentRootVolume(t *testing.T, imageName, devHostPath string, owner volumeOwner) *persistentRootVolume {
 	volumes, err := GetRootVolume(
 		&types.VMConfig{
-			PodSandboxID: testUUID,
-			Image:        imageName,
+			DomainUUID: testUUID,
+			Image:      imageName,
 			VolumeDevices: []types.VMVolumeDevice{
 				{
 					DevicePath: "/",

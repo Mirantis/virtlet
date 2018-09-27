@@ -3,7 +3,7 @@
   value: persistent/image1
 - name: CMD
   value:
-    cmd: blockdev --getsz /dev/rootdev
+    cmd: blockdev --getsz /dev/rootdevlink
     stdout: "17"
 - name: CMD
   value:
@@ -29,7 +29,7 @@
   value: persistent/image1
 - name: CMD
   value:
-    cmd: blockdev --getsz /dev/rootdev
+    cmd: blockdev --getsz /dev/rootdevlink
     stdout: "17"
 - name: CMD
   value:
