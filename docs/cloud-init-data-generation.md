@@ -68,6 +68,14 @@ metadata:
     # parts of user-data
     VirtletCloudInitUserDataSource: configmap/vm-user-data
 
+    # it's also possible to specify that the whole user-data contents
+    # are stored in a ConfigMap under the specified key:
+    # VirtletCloudInitUserDataSourceKey: user-data
+
+    # by default, the contents of user-data in a ConfigMap key is specified
+    # as plain text, but it can also be encoded using base64:
+    # VirtletCloudInitUserDataSourceEncoding: base64
+
     # Virtlet-specific annotations follow
     # Specify some ssh keys directly
     VirtletSSHKeys: |
@@ -250,6 +258,9 @@ all its keys into the `user-data` dictionary. This is done at the very beginning
 If the pod definition has both `VirtletCloudInitUserData` and `VirtletCloudInitUserDataSource` annotations, the `virtlet`
 will load `user-data` from kubernetes object and then will merge it with that from `VirtletCloudInitUserData` (unless
 `VirtletCloudInitUserDataOverwrite` is set to `"true"`, in which case `VirtletCloudInitUserData` will overwrite it).
+There's also an option to store the whole contents of `user-data` in a single key of ConfigMap which can be specified using
+`VirtletCloudInitUserDataSourceKey`. By default, the data are stored there as plain text but you can also specify `base64`
+encoding via `VirtletCloudInitUserDataSourceEncoding` annotation.
 
 Similar approach is taken with SSH keys. It is possible to provide VM with a list of SSH keys obtained from `ConfigMap` or `Secret`
 kubernetes objects. In order to do so, one uses `VirtletSSHKeySource` annotation with the following format: `kind/name/key`.

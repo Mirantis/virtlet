@@ -39,29 +39,24 @@ func loadExternalUserData(va *types.VirtletAnnotations, ns string, podAnnotation
 		return nil
 	}
 	var clientset *kubernetes.Clientset
+	var err error
 	userDataSourceKey := podAnnotations[types.CloudInitUserDataSourceKeyName]
-	if userDataSourceKey != "" {
-		var err error
+	sshKeySourceKey := podAnnotations[types.SSHKeySourceKeyName]
+	if userDataSourceKey != "" || sshKeySourceKey != "" {
 		if clientset == nil {
 			clientset, err = utils.GetK8sClientset(nil)
 			if err != nil {
 				return err
 			}
 		}
+	}
+	if userDataSourceKey != "" {
 		err = loadUserDataFromDataSource(va, ns, userDataSourceKey, clientset)
 		if err != nil {
 			return err
 		}
 	}
-	sshKeySourceKey := podAnnotations[types.SSHKeySourceKeyName]
 	if sshKeySourceKey != "" {
-		var err error
-		if clientset == nil {
-			clientset, err = utils.GetK8sClientset(nil)
-			if err != nil {
-				return err
-			}
-		}
 		err = loadSSHKeysFromDataSource(va, ns, sshKeySourceKey, clientset)
 		if err != nil {
 			return err
