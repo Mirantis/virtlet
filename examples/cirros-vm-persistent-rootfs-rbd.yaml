@@ -1,63 +1,51 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: test-block-pv
+spec:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 10Mi
+  claimRef:
+    name: ceph-block-pvc
+    namespace: default
+  persistentVolumeReclaimPolicy: Delete
+  volumeMode: Block
+  rbd:
+    image: tstimg
+    monitors:
+    - 10.192.0.1:6789
+    pool: kube
+    secretRef:
+      name: ceph-admin
 ---
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: local-block-pvc
+  name: ceph-block-pvc
 spec:
   accessModes:
   - ReadWriteOnce
-  # Set volumeMode to Block so the VM can consume this PVC
-  # as a block device
   volumeMode: Block
-  storageClassName: local-storage
+  # storageClassName: ceph-testnew
   resources:
     requests:
-      storage: 100Mi
----
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: local-block-pv
-spec:
-  capacity:
-    storage: 100Mi
-  accessModes:
-  - ReadWriteOnce
-  persistentVolumeReclaimPolicy: Retain
-  storageClassName: local-storage
-  # Set volumeMode to Block so the VM can consume this PV
-  # as a block device
-  volumeMode: Block
-  local:
-    # Use a path to a file that's visible inside the Virtlet pod.
-    # When using kubeadm-dind-cluster, set it up with:
-    # docker exec kube-node-1 dd if=/dev/zero of=/var/lib/virtlet/looptest bs=1M count=1000
-    # docker exec kube-node-1 mkfs.ext4 /var/lib/virtlet/looptest
-    path: /var/lib/virtlet/looptest
-  claimRef:
-    name: local-block-pvc
-    namespace: default
-  nodeAffinity:
-    required:
-      nodeSelectorTerms:
-      - matchExpressions:
-        - key: kubernetes.io/hostname
-          operator: In
-          values:
-          - kube-node-1
+      storage: 10Mi
 ---
 apiVersion: v1
 kind: Pod
 metadata:
-  name: ubuntu-vm
+  name: cirros-vm-p
   annotations:
     kubernetes.io/target-runtime: virtlet.cloud
+    # CirrOS doesn't load nocloud data from SCSI CD-ROM for some reason
+    VirtletDiskDriver: virtio
     VirtletSSHKeys: |
       ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCaJEcFDXEK2ZbX0ZLS1EIYFZRbDAcRfuVjpstSc0De8+sV1aiu+dePxdkuDRwqFtCyk6dEZkssjOkBXtri00MECLkir6FcH3kKOJtbJ6vy3uaJc9w1ERo+wyl6SkAh/+JTJkp7QRXj8oylW5E20LsbnA/dIwWzAF51PPwF7A7FtNg9DnwPqMkxFo1Th/buOMKbP5ZA1mmNNtmzbMpMfJATvVyiv3ccsSJKOiyQr6UG+j7sc/7jMVz5Xk34Vd0l8GwcB0334MchHckmqDB142h/NCWTr8oLakDNvkfC1YneAfAO41hDkUbxPtVBG5M/o7P4fxoqiHEX+ZLfRxDtHB53 me@localhost
-    # Here we use Cloud-Init mounts to mount the block device under /mnt
-    VirtletCloudInitUserData: |
-      mounts:
-      - ["/dev/testpvc", "/mnt"]
+    # VirtletCloudInitUserData: |
+    #   mounts:
+    #   - ["/dev/testpvc", "/mnt"]
 spec:
   affinity:
     nodeAffinity:
@@ -73,16 +61,17 @@ spec:
   # low for VM, so overriding it here is strongly advised.
   terminationGracePeriodSeconds: 120
   containers:
-  - name: ubuntu-vm
-    image: virtlet.cloud/cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img
+  - name: cirros-vm
+    image: virtlet.cloud/download.cirros-cloud.net/0.3.5/cirros-0.3.5-x86_64-disk.img
     imagePullPolicy: IfNotPresent
     # tty and stdin required for `kubectl attach -t` to work
     tty: true
     stdin: true
     volumeDevices:
-    - devicePath: /dev/testpvc
+    # Use persistent rootfs on testpvc
+    - devicePath: /
       name: testpvc
   volumes:
   - name: testpvc
     persistentVolumeClaim:
-      claimName: local-block-pvc
+      claimName: ceph-block-pvc
