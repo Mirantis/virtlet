@@ -457,7 +457,44 @@ VirtletCloudInitUserData: |
   - ["/dev/testpvc", "/mnt"]
 ```
 
-See [local block PV example](../examples/ubuntu-vm-local-block-pv.yaml).
+See also [block PV examples](../examples#using-block-pvs).
+
+## Using block PVs for persistent root filesystem
+
+If a persistent block volume is specified for a pod and listed in
+container's `volumeDevices` with `devicePath` of `/`:
+```yaml
+volumeDevices:
+- devicePath: /
+  name: testpvc
+```
+the corresponding PV will be used as a persistent root filesystem for
+a pod. The persistent root filesystem is reused as long as the image
+SHA256 hash doesn't change. Upon the change of SHA256 hash of the VM
+image, the PV will be overwritten again. Internally, Virtlet uses
+sector 0 of the block device to store persistent root filesystem
+metadata, and the block device visible inside the VM will use
+the sectors starting from sector 1. Overall, the following algorithm
+is used:
+1. The block device is checked for the presence of Virtlet header.
+2. If there's no Virtlet header, a new header is written to the sector
+   0 and the device is overwritten with the contents of the image.
+3. If the header contains a future persistent root filesystem metadata
+   version number, an error is logged and container creation fails.
+4. If the header contains mismatching image SHA256 hash, a new header
+   is written to the sector 0 and the device is overwritten with the
+   contents of the image.
+
+Unless this algorithm fails on step 3, the VM is booted using the
+block PV starting from sector 1 as it's boot device.
+
+*IMPORTANT NOTE:* in case if persistent root filesystem is used,
+cloud-init based network setup is disabled for the VM. This is done
+because some cloud-init implementations only apply cloud-init network
+configuration once, but the IP address given to the VM may change if
+the persistent root filesystem is reused by another pod.
+
+See also [block PV examples](../examples#using-the-persistent-root-filesystem).
 
 ## Consuming other types of Kubernetes volumes
 
