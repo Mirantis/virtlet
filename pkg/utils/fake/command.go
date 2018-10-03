@@ -53,20 +53,20 @@ func (c *fakeCommand) Run(stdin []byte) ([]byte, error) {
 	r := map[string]string{
 		"cmd": fullCmd,
 	}
-	defer c.rec.Rec("CMD", r)
+	if c.rec != nil {
+		defer c.rec.Rec("CMD", r)
+	}
 	for _, spec := range c.commander.specs {
 		matched, err := regexp.MatchString(spec.Match, fullCmd)
 		if err != nil {
 			return nil, fmt.Errorf("failed to match regexp %q: %v", spec.Match, err)
 		}
 		if matched {
-			if c.rec != nil {
-				if stdin != nil {
-					r["stdin"] = c.subst(string(stdin))
-				}
-				if spec.Stdout != "" {
-					r["stdout"] = spec.Stdout
-				}
+			if stdin != nil {
+				r["stdin"] = c.subst(string(stdin))
+			}
+			if spec.Stdout != "" {
+				r["stdout"] = spec.Stdout
 			}
 			return []byte(spec.Stdout), nil
 		}

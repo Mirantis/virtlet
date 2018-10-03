@@ -21,6 +21,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/Mirantis/virtlet/pkg/blockdev"
 )
 
 const (
@@ -43,6 +45,7 @@ func (v *VirtualizationTool) GarbageCollect() (allErrors []error) {
 	allErrors = append(allErrors, v.removeOrphanRootVolumes(ids)...)
 	allErrors = append(allErrors, v.removeOrphanQcow2Volumes(ids)...)
 	allErrors = append(allErrors, v.removeOrphanConfigImages(ids, configIsoDir)...)
+	allErrors = append(allErrors, v.removeOrphanVirtualBlockDevices(ids, "", "")...)
 
 	return
 }
@@ -258,6 +261,36 @@ func (v *VirtualizationTool) removeOrphanConfigImages(ids []string, directory st
 					),
 				)
 			}
+		}
+	}
+
+	return allErrors
+}
+
+func (v *VirtualizationTool) removeOrphanVirtualBlockDevices(ids []string, devPath, sysfsPath string) []error {
+	idsInUse := make(map[string]bool)
+	for _, id := range ids {
+		idsInUse[id] = true
+	}
+	ldh := blockdev.NewLogicalDeviceHandler(v.Commander(), devPath, sysfsPath)
+	dmNames, err := ldh.ListVirtletLogicalDevices()
+	if err != nil {
+		return []error{err}
+	}
+
+	var allErrors []error
+	for _, dmName := range dmNames {
+		if !strings.HasPrefix(dmName, blockdev.VirtletLogicalDevicePrefix) {
+			panic("bad dmname " + dmName)
+		}
+		id := dmName[len(blockdev.VirtletLogicalDevicePrefix):]
+		if idsInUse[id] {
+			continue
+		}
+		if err := ldh.Unmap(dmName); err != nil {
+			allErrors = append(
+				allErrors,
+				fmt.Errorf("error unmapping %q: %v", dmName, err))
 		}
 	}
 
