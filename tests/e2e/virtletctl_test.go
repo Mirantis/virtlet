@@ -18,8 +18,10 @@ package e2e
 
 import (
 	"context"
+	"encoding/json"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -109,10 +111,40 @@ var _ = Describe("virtletctl", func() {
 			localExecutor := framework.LocalExecutor(ctx)
 
 			By("Calling virtletctl diag dump")
-			output := callVirtletctl(localExecutor, "diag", "dump", "--json")
-			Expect(output).To(ContainSubstring("cirros-vm"))
-		}, 60)
+			tempDir, err := ioutil.TempDir("", "diag-out")
+			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				os.RemoveAll(tempDir)
+			}()
+			callVirtletctl(localExecutor, "diag", "dump", tempDir)
+			metadataFiles, err := filepath.Glob(filepath.Join(tempDir, "nodes/*/metadata.txt"))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(metadataFiles).NotTo(BeEmpty())
+			content, err := ioutil.ReadFile(metadataFiles[0])
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(content)).To(ContainSubstring("Sandboxes:"))
 
+			By("Calling virtletctl diag dump --json")
+			output := callVirtletctl(localExecutor, "diag", "dump", "--json")
+			var decoded map[string]interface{}
+			Expect(json.Unmarshal([]byte(output), &decoded)).To(Succeed())
+			Expect(decoded["name"]).To(Equal("nodes"))
+			Expect(decoded["children"]).To(BeAssignableToTypeOf(map[string]interface{}{}))
+			m := decoded["children"].(map[string]interface{})
+			nodeName := ""
+			for name := range m {
+				nodeName = name
+				break
+			}
+			Expect(nodeName).NotTo(BeEmpty())
+			Expect(m[nodeName]).To(BeAssignableToTypeOf(map[string]interface{}{}))
+			m = m[nodeName].(map[string]interface{})
+			Expect(m["children"]).To(BeAssignableToTypeOf(map[string]interface{}{}))
+			m = m["children"].(map[string]interface{})
+			Expect(m["metadata"]).To(BeAssignableToTypeOf(map[string]interface{}{}))
+			m = m["metadata"].(map[string]interface{})
+			Expect(m["data"]).To(ContainSubstring("Sandboxes:"))
+		}, 60)
 	})
 
 	It("Should return libvirt version on virsh subcommand", func(done Done) {
