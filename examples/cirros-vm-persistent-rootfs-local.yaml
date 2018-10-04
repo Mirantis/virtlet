@@ -43,7 +43,7 @@ spec:
 apiVersion: v1
 kind: Pod
 metadata:
-  name: cirros-vm-p
+  name: cirros-vm-pl
   annotations:
     kubernetes.io/target-runtime: virtlet.cloud
     # CirrOS doesn't load nocloud data from SCSI CD-ROM for some reason

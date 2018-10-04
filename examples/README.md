@@ -247,7 +247,7 @@ After the VM boots, we can log into it and create a file on the root
 filesystem:
 
 ```console
-$ virtletctl ssh cirros@cirros-vm-p -- -i examples/vmkey
+$ virtletctl ssh cirros@cirros-vm-pl -- -i examples/vmkey
 ...
 $ echo foo >bar.txt
 ```
@@ -261,7 +261,7 @@ kubectl apply -f examples/cirros-vm-persistent-rootfs-local.yaml
 After logging into the new VM pod, we see that the file is still
 there:
 ```console
-$ virtletctl ssh cirros@cirros-vm-p -- -i examples/vmkey
+$ virtletctl ssh cirros@cirros-vm-pl -- -i examples/vmkey
 ...
 $ cat bar.txt
 foo
@@ -280,4 +280,5 @@ kubectl apply -f examples/cirros-vm-persistent-rootfs-rbd.yaml
 ```
 
 After that, you can verify that the persistent rootfs indeed works
-using the same approach as with local PVs.
+using the same approach as with local PVs, but using name `cirros-vm-pr`
+in place of `cirros-vm-pl`.
