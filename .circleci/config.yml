@@ -6,6 +6,7 @@ defaults: &defaults
     DOCKER_VERSION: "17.03.0-ce"
     KUBECTL_VERSION: "v1.9.3"
     KUBECTL_SHA1: "a27d808eb011dbeea876fe5326349ed167a7ed28"
+    # E2E_FOCUS: "Should be usable as a persistent root filesystem"
 
 prereqs: &prereqs
   name: Install prerequisites
@@ -197,12 +198,15 @@ e2e: &e2e
       command: |
         build/portforward.sh 8080&
         mkdir -p ~/junit
-        skip="-ginkgo.skip=\[Heavy\]|\[MultiCNI\]|\[Disruptive\]"
+        skip_focus=("-ginkgo.skip=\[Heavy\]|\[MultiCNI\]|\[Disruptive\]")
         if [[ ${CIRCLE_JOB} = e2e_multi_cni ]]; then
           # per-node config test requires an additional worker node
-          skip="-ginkgo.skip=\[Heavy\]|\[Disruptive\]|Per-node configuration"
+          skip_focus="-ginkgo.skip=\[Heavy\]|\[Disruptive\]|Per-node configuration"
         fi
-        _output/virtlet-e2e-tests -test.v "${skip}" -junitOutput ~/junit/junit.xml -include-unsafe-tests=true
+        if [[ ${E2E_FOCUS:-} ]]; then
+          skip_focus+=("-ginkgo.focus=${E2E_FOCUS}")
+        fi
+        _output/virtlet-e2e-tests -test.v "${skip_focus[@]}" -junitOutput ~/junit/junit.xml -include-unsafe-tests=true
 
   - store_test_results:
       path: ~/junit

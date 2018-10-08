@@ -362,6 +362,20 @@ function demo::start-virtlet {
     fi
   fi
 
+  demo::step "Deploying Virtlet CRDs"
+  docker run --rm "mirantis/virtlet:${virtlet_docker_tag}" virtletctl gen --crd |
+      "${kubectl}" apply -f -
+  "${kubectl}" apply -f - <<EOF
+---
+apiVersion: "virtlet.k8s/v1"
+kind: VirtletConfigMapping
+metadata:
+  name: test-labels
+  namespace: kube-system
+spec:
+  config:
+    logLevel: 6
+EOF
   demo::step "Deploying Virtlet DaemonSet with docker tag ${virtlet_docker_tag}"
   docker run --rm "mirantis/virtlet:${virtlet_docker_tag}" virtletctl gen --tag "${virtlet_docker_tag}" |
       "${kubectl}" apply -f -
