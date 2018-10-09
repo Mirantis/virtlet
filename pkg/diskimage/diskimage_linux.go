@@ -20,32 +20,27 @@ package diskimage
 
 import (
 	"errors"
+	"path/filepath"
 
 	"github.com/Mirantis/virtlet/pkg/diskimage/guestfs"
 )
 
-func initLibForImage(path string) (*guestfs.Guestfs, error) {
-	g, err := guestfs.Create()
-	if err != nil {
-		return nil, err
-	}
-
-	/* Set the trace flag so that we can see each libguestfs call. */
-	g.Set_trace(true)
-
-	return g, nil
-}
-
 // FormatDisk partitions the specified image file by writing an MBR with
 // a single partition and then formatting that partition as an ext4 filesystem.
 func FormatDisk(path string) error {
-	g, err := initLibForImage(path)
+	g, err := guestfs.Create()
 	if err != nil {
 		return err
 	}
-	defer g.Close()
+	defer func() {
+		g.Shutdown()
+		g.Close()
+	}()
 
-	/* Attach the disk image to libguestfs. */
+	// Set the trace flag so that we can see each libguestfs call.
+	g.Set_trace(true)
+
+	// Attach the disk image to libguestfs.
 	optargs := guestfs.OptargsAdd_drive{
 		Format_is_set:   true,
 		Format:          "qcow2",
@@ -57,32 +52,30 @@ func FormatDisk(path string) error {
 		return errors.New(gErr.String())
 	}
 
-	/* Run the libguestfs back-end. */
+	// Run the libguestfs back-end.
 	if gErr := g.Launch(); gErr != nil {
 		return errors.New(gErr.String())
 	}
 
-	/* Get the list of devices.  Because we only added one drive
-	 * above, we expect that this list should contain a single
-	 * element.
-	 */
+	// Get the list of devices.  Because we only added one drive
+	// above, we expect that this list should contain a single
+	// element.
 	devices, gErr := g.List_devices()
-	if err != nil {
+	if gErr != nil {
 		return errors.New(gErr.String())
 	}
 	if len(devices) != 1 {
 		return errors.New("expected a single device from list-devices")
 	}
 
-	/* Partition the disk as one single MBR partition. */
+	// Partition the disk as one single MBR partition.
 	gErr = g.Part_disk(devices[0], "mbr")
 	if gErr != nil {
 		return errors.New(gErr.String())
 	}
 
-	/* Get the list of partitions.  We expect a single element, which
-	 * is the partition we have just created.
-	 */
+	// Get the list of partitions.  We expect a single element, which
+	// is the partition we have just created.
 	partitions, gErr := g.List_partitions()
 	if gErr != nil {
 		return errors.New(gErr.String())
@@ -91,7 +84,7 @@ func FormatDisk(path string) error {
 		return errors.New("expected a single partition from list-partitions")
 	}
 
-	/* Create a filesystem on the partition. */
+	// Create a filesystem on the partition.
 	gErr = g.Mkfs("ext4", partitions[0], nil)
 	if gErr != nil {
 		return errors.New(gErr.String())
