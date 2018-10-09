@@ -13,4 +13,4 @@ This directory contains the Virtlet documentation.
     * [Image Handling](images.md)
     * [Image Name Translation](image-name-translation.md)
 * [Diagnostics](diagnostics.md)
-* [Update notes](update-notes.md)
+* [Writing files to root filesystem before VM boot](writing-files-to-rootfs.md)
