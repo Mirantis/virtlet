@@ -50,8 +50,6 @@ var _ = Describe("Block PVs", func() {
 			devPath         string
 		)
 
-		withLoopbackBlockDevice(&virtletNodeName, &devPath)
-
 		AfterEach(func() {
 			if ssh != nil {
 				ssh.Close()
@@ -61,32 +59,38 @@ var _ = Describe("Block PVs", func() {
 			}
 		})
 
-		It("Should be accessible from within the VM", func() {
-			vm = makeVMWithMountAndSymlinkScript(virtletNodeName, []framework.PVCSpec{
-				{
-					Name:          "block-pv",
-					Size:          "10M",
-					NodeName:      virtletNodeName,
-					Block:         true,
-					LocalPath:     devPath,
-					ContainerPath: "/dev/testpvc",
-				},
-			}, nil)
-			ssh = waitSSH(vm)
-			expectToBeUsableForFilesystem(ssh, "/dev/testpvc")
+		Context("[Non-root]", func() {
+			withLoopbackBlockDevice(&virtletNodeName, &devPath, true)
+			It("Should be accessible from within the VM", func() {
+				vm = makeVMWithMountAndSymlinkScript(virtletNodeName, []framework.PVCSpec{
+					{
+						Name:          "block-pv",
+						Size:          "10M",
+						NodeName:      virtletNodeName,
+						Block:         true,
+						LocalPath:     devPath,
+						ContainerPath: "/dev/testpvc",
+					},
+				}, nil)
+				ssh = waitSSH(vm)
+				expectToBeUsableForFilesystem(ssh, "/dev/testpvc")
+			})
 		})
 
-		describePersistentRootfs(func() {
-			vm = makeVMWithMountAndSymlinkScript(virtletNodeName, []framework.PVCSpec{
-				{
-					Name:          "block-pv",
-					Size:          "10M",
-					NodeName:      virtletNodeName,
-					Block:         true,
-					LocalPath:     devPath,
-					ContainerPath: "/",
-				},
-			}, nil)
+		Context("[Root]", func() {
+			withLoopbackBlockDevice(&virtletNodeName, &devPath, false)
+			describePersistentRootfs(func() {
+				vm = makeVMWithMountAndSymlinkScript(virtletNodeName, []framework.PVCSpec{
+					{
+						Name:          "block-pv",
+						Size:          "10M",
+						NodeName:      virtletNodeName,
+						Block:         true,
+						LocalPath:     devPath,
+						ContainerPath: "/",
+					},
+				}, nil)
+			})
 		})
 	})
 
