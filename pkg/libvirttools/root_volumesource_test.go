@@ -196,8 +196,9 @@ func TestRootVolumeSize(t *testing.T) {
 func TestRootVolumeLifeCycle(t *testing.T) {
 	expectedRootVolumePath := "/fake/volumes/pool/virtlet_root_" + testUUID
 	rootVol, rec, _ := getRootVolumeForTest(t, &types.VMConfig{
-		DomainUUID: testUUID,
-		Image:      "fake/image1",
+		DomainUUID:        testUUID,
+		Image:             "fake/image1",
+		ParsedAnnotations: &types.VirtletAnnotations{},
 	})
 
 	vol, fs, err := rootVol.Setup()

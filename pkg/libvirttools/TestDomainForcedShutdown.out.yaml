@@ -131,6 +131,7 @@
         CPUModel: ""
         CPUSetting: null
         DiskDriver: scsi
+        FilesForRootfs: null
         MetaData: null
         RootVolumeSize: 0
         SSHKeys: null
