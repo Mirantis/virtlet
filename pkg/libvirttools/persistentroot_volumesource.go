@@ -21,8 +21,10 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/golang/glog"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 	digest "github.com/opencontainers/go-digest"
+	"golang.org/x/sys/unix"
 
 	"github.com/Mirantis/virtlet/pkg/blockdev"
 	"github.com/Mirantis/virtlet/pkg/metadata/types"
@@ -54,24 +56,33 @@ func (v *persistentRootVolume) dmPath() string {
 }
 
 func (v *persistentRootVolume) copyImageToDev(imagePath string) error {
-	_, err := v.owner.Commander().Command("qemu-img", "convert", "-O", "raw", imagePath, v.dmPath()).Run(nil)
-	return err
+	syncFiles(imagePath, v.dev.HostPath, v.dmPath())
+	if _, err := v.owner.Commander().Command("qemu-img", "convert", "-O", "raw", imagePath, v.dmPath()).Run(nil); err != nil {
+		return err
+	}
+	syncFiles(v.dmPath())
+	return nil
 }
 
 func (v *persistentRootVolume) Setup() (*libvirtxml.DomainDisk, *libvirtxml.DomainFilesystem, error) {
+	glog.V(4).Infof("Persistent rootfs setup on %q", v.dev.HostPath)
 	imagePath, imageDigest, imageSize, err := v.owner.ImageManager().GetImagePathDigestAndVirtualSize(v.config.Image)
 	if err != nil {
+		glog.V(4).Infof("Persistent rootfs setup on %q: image info error: %v", v.dev.HostPath, err)
 		return nil, nil, err
 	}
 
 	if imageDigest.Algorithm() != digest.SHA256 {
+		glog.V(4).Infof("Persistent rootfs setup on %q: image info error: %v", v.dev.HostPath, err)
 		return nil, nil, fmt.Errorf("unsupported digest algorithm %q", imageDigest.Algorithm())
 	}
 	imageHash, err := hex.DecodeString(imageDigest.Hex())
 	if err != nil {
+		glog.V(4).Infof("Persistent rootfs setup on %q: bad digest hex: %q", v.dev.HostPath, imageDigest.Hex())
 		return nil, nil, fmt.Errorf("bad digest hex: %q", imageDigest.Hex())
 	}
 	if len(imageHash) != sha256.Size {
+		glog.V(4).Infof("Persistent rootfs setup on %q: bad digest size: %q", v.dev.HostPath, imageDigest.Hex())
 		return nil, nil, fmt.Errorf("bad digest size: %q", imageDigest.Hex())
 	}
 
@@ -81,14 +92,21 @@ func (v *persistentRootVolume) Setup() (*libvirtxml.DomainDisk, *libvirtxml.Doma
 	headerMatches, err := ldh.EnsureDevHeaderMatches(v.dev.HostPath, hash)
 
 	if err == nil {
+		glog.V(4).Infof("Persistent rootfs setup on %q: headerMatches: %v", v.dev.HostPath, headerMatches)
 		err = ldh.Map(v.dev.HostPath, v.dmName(), imageSize)
 	}
 
-	if err == nil && !headerMatches {
-		err = v.copyImageToDev(imagePath)
+	if err == nil {
+		if headerMatches {
+			glog.V(4).Infof("Persistent rootfs setup on %q: header matches image %q, not overwriting", v.dev.HostPath, imagePath)
+		} else {
+			glog.V(4).Infof("Persistent rootfs setup on %q: writing image from %q", v.dev.HostPath, imagePath)
+			err = v.copyImageToDev(imagePath)
+		}
 	}
 
 	if err != nil {
+		glog.V(4).Infof("Persistent rootfs setup on %q: error: %v", v.dev.HostPath, err)
 		return nil, nil, err
 	}
 
@@ -101,4 +119,23 @@ func (v *persistentRootVolume) Setup() (*libvirtxml.DomainDisk, *libvirtxml.Doma
 
 func (v *persistentRootVolume) Teardown() error {
 	return v.devHandler().Unmap(v.dmName())
+}
+
+func syncFiles(paths ...string) error {
+	// https://www.redhat.com/archives/libguestfs/2012-July/msg00009.html
+	unix.Sync()
+	for _, p := range paths {
+		fd, err := unix.Open(p, unix.O_RDWR|unix.O_SYNC, 0)
+		if err != nil {
+			return err
+		}
+		if err := unix.Fsync(fd); err != nil {
+			unix.Close(fd)
+			return err
+		}
+		if err := unix.Close(fd); err != nil {
+			return err
+		}
+	}
+	return nil
 }
