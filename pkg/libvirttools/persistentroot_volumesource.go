@@ -27,6 +27,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/Mirantis/virtlet/pkg/blockdev"
+	"github.com/Mirantis/virtlet/pkg/diskimage"
 	"github.com/Mirantis/virtlet/pkg/metadata/types"
 )
 
@@ -108,6 +109,10 @@ func (v *persistentRootVolume) Setup() (*libvirtxml.DomainDisk, *libvirtxml.Doma
 	if err != nil {
 		glog.V(4).Infof("Persistent rootfs setup on %q: error: %v", v.dev.HostPath, err)
 		return nil, nil, err
+	}
+
+	if err := diskimage.Put(v.dmPath(), v.config.ParsedAnnotations.FilesForRootfs); err != nil {
+		return nil, nil, fmt.Errorf("error tuning rootfs with files from configmap: %v", err)
 	}
 
 	return &libvirtxml.DomainDisk{

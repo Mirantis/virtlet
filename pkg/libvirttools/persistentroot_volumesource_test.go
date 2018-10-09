@@ -211,6 +211,7 @@ func getPersistentRootVolume(t *testing.T, imageName, devHostPath string, owner 
 					HostPath:   devHostPath,
 				},
 			},
+			ParsedAnnotations: &types.VirtletAnnotations{},
 		}, owner)
 	if err != nil {
 		t.Fatalf("GetRootVolume returned an error: %v", err)
