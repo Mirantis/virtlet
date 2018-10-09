@@ -52,14 +52,13 @@ func FormatDisk(path string) error {
 		return errors.New(gErr.String())
 	}
 
-	// Run the libguestfs back-end.
+	// Run the libguestfs backend.
 	if gErr := g.Launch(); gErr != nil {
 		return errors.New(gErr.String())
 	}
 
-	// Get the list of devices.  Because we only added one drive
-	// above, we expect that this list should contain a single
-	// element.
+	// Get the list of devices.  As we've added just one drive above, we
+	// expect this list to contain just one item.
 	devices, gErr := g.List_devices()
 	if gErr != nil {
 		return errors.New(gErr.String())
@@ -88,6 +87,68 @@ func FormatDisk(path string) error {
 	gErr = g.Mkfs("ext4", partitions[0], nil)
 	if gErr != nil {
 		return errors.New(gErr.String())
+	}
+
+	return nil
+}
+
+// Put writes files to the image, making all the necessary subdirs
+func Put(image string, files map[string][]byte) error {
+	g, err := guestfs.Create()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		g.Shutdown()
+		g.Close()
+	}()
+
+	// Set the trace flag so that we can see each libguestfs call.
+	g.Set_trace(true)
+
+	if gErr := g.Add_drive(image, nil); gErr != nil {
+		return errors.New(gErr.String())
+	}
+
+	// Run the libguestfs backend.
+	if gErr := g.Launch(); gErr != nil {
+		return errors.New(gErr.String())
+	}
+
+	// Get the list of devices.  As we've added just one drive above, we
+	// expect this list to contain just one item.
+	devices, gErr := g.List_devices()
+	if gErr != nil {
+		return errors.New(gErr.String())
+	}
+	if len(devices) != 1 {
+		return errors.New("expected a single device from list-devices")
+	}
+
+	partitions, gErr := g.List_partitions()
+	if gErr != nil {
+		return errors.New(gErr.String())
+	}
+	if len(partitions) < 1 {
+		return errors.New("expected a single partition from list-partitions")
+	}
+
+	// Try to mount the fist partition of the image as /.
+	if gErr := g.Mount(partitions[0], "/"); gErr != nil {
+		return errors.New(gErr.String())
+	}
+
+	for path, content := range files {
+		dir, _ := filepath.Split(path)
+		if len(dir) > 1 {
+			// Make sure all the containing directories exist.
+			if gErr := g.Mkdir_p(dir); gErr != nil {
+				return errors.New(gErr.String())
+			}
+		}
+		if gErr := g.Write(path, content); gErr != nil {
+			return errors.New(gErr.String())
+		}
 	}
 
 	return nil
