@@ -50,6 +50,8 @@ const (
 
 	cloudInitUserDataSourceKeyKeyName      = "VirtletCloudInitUserDataSourceKey"
 	cloudInitUserDataSourceEncodingKeyName = "VirtletCloudInitUserDataSourceEncoding"
+
+	configMapAsFilesKeyName = "VirtletConfigMapAsFiles"
 )
 
 // CloudInitImageType specifies the image type used for cloud-init
@@ -107,18 +109,27 @@ type VirtletAnnotations struct {
 	RootVolumeSize int64
 	// VirtletChown9pfsMounts indicates if chown is enabled for 9pfs mounts.
 	VirtletChown9pfsMounts bool
+	// FilesForRootfs specifies files to be put on rootfs using libguestfs.
+	FilesForRootfs map[string][]byte
 }
 
-// ExternalDataLoader is a function that loads external data that's specified
+// ExternalUserDataLoader is a function that loads external user data that's specified
 // in the pod annotations.
-type ExternalDataLoader func(va *VirtletAnnotations, Namespace string, podAnnotations map[string]string) error
+type ExternalUserDataLoader func(va *VirtletAnnotations, Namespace string, podAnnotations map[string]string) error
 
-var externalDataLoader ExternalDataLoader
+var externalUserDataLoader ExternalUserDataLoader
 
-// SetExternalDataLoader sets the external data loader function that
-// loads external data that's specified in the pod annotations.
-func SetExternalDataLoader(loader ExternalDataLoader) {
-	externalDataLoader = loader
+// ConfigMapLoader is a function that loads config map to be used as files source.
+type ConfigMapLoader func(Namespace, ConfigMapName string) (map[string][]byte, error)
+
+var externalConfigMapLoader ConfigMapLoader
+
+// SetExternalDataLoaders sets the external data loader functions that
+// loads external data that's specified in the pod annotations and pointed by
+// them config map.
+func SetExternalDataLoaders(userDataLoader ExternalUserDataLoader, configMapLoader ConfigMapLoader) {
+	externalUserDataLoader = userDataLoader
+	externalConfigMapLoader = configMapLoader
 }
 
 func (va *VirtletAnnotations) applyDefaults() {
@@ -188,9 +199,20 @@ func (va *VirtletAnnotations) parsePodAnnotations(ns string, podAnnotations map[
 	if podAnnotations[cloudInitUserDataOverwriteKeyName] == "true" {
 		va.UserDataOverwrite = true
 	}
-	if externalDataLoader != nil {
-		if err := externalDataLoader(va, ns, podAnnotations); err != nil {
-			return fmt.Errorf("error loading data via external data loader: %v", err)
+	if externalUserDataLoader != nil {
+		if err := externalUserDataLoader(va, ns, podAnnotations); err != nil {
+			return fmt.Errorf("error loading data via external user data loader: %v", err)
+		}
+	}
+
+	if configMapAsFilesStr, found := podAnnotations[configMapAsFilesKeyName]; found {
+		if externalConfigMapLoader != nil {
+			var err error
+			va.FilesForRootfs, err = externalConfigMapLoader(ns, configMapAsFilesStr)
+			if err != nil {
+				return fmt.Errorf("error loading config map %q as files: %v",
+					configMapAsFilesStr, err)
+			}
 		}
 	}
 

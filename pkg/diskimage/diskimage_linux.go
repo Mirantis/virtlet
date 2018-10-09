@@ -95,6 +95,9 @@ func FormatDisk(path string) error {
 
 // Put insert files to image creating all necessary subdirs
 func Put(image string, files map[string][]byte) error {
+	if len(files) < 1 {
+		return nil
+	}
 	g, err := guestfs.Create()
 	if err != nil {
 		return err

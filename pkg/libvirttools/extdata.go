@@ -31,7 +31,7 @@ import (
 )
 
 func init() {
-	types.SetExternalDataLoader(loadExternalUserData)
+	types.SetExternalDataLoaders(loadExternalUserData, loadConfigMapAsFilesMap)
 }
 
 func loadExternalUserData(va *types.VirtletAnnotations, ns string, podAnnotations map[string]string) error {
@@ -43,11 +43,9 @@ func loadExternalUserData(va *types.VirtletAnnotations, ns string, podAnnotation
 	userDataSourceKey := podAnnotations[types.CloudInitUserDataSourceKeyName]
 	sshKeySourceKey := podAnnotations[types.SSHKeySourceKeyName]
 	if userDataSourceKey != "" || sshKeySourceKey != "" {
-		if clientset == nil {
-			clientset, err = utils.GetK8sClientset(nil)
-			if err != nil {
-				return err
-			}
+		clientset, err = utils.GetK8sClientset(nil)
+		if err != nil {
+			return err
 		}
 	}
 	if userDataSourceKey != "" {
@@ -63,6 +61,28 @@ func loadExternalUserData(va *types.VirtletAnnotations, ns string, podAnnotation
 		}
 	}
 	return nil
+}
+
+func loadConfigMapAsFilesMap(ns, name string) (map[string][]byte, error) {
+	if ns == "" {
+		return nil, nil
+	}
+	clientset, err := utils.GetK8sClientset(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	cm, err := readK8sKeySource("configmap", name, ns, "", clientset)
+	if err != nil {
+		return nil, err
+	}
+
+	var cmAsFiles map[string][]byte
+	for k, v := range cm {
+		cmAsFiles[k] = []byte(v)
+	}
+
+	return cmAsFiles, nil
 }
 
 func loadUserDataFromDataSource(va *types.VirtletAnnotations, ns, key string, clientset *kubernetes.Clientset) error {
