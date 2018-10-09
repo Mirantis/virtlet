@@ -17,6 +17,7 @@ limitations under the License.
 package libvirttools
 
 import (
+	"encoding/base64"
 	"fmt"
 	"strings"
 
@@ -31,7 +32,7 @@ import (
 )
 
 func init() {
-	types.SetExternalDataLoader(loadExternalUserData)
+	types.SetExternalDataLoaders(loadExternalUserData, loadDSAsFileMap)
 }
 
 func loadExternalUserData(va *types.VirtletAnnotations, ns string, podAnnotations map[string]string) error {
@@ -43,11 +44,9 @@ func loadExternalUserData(va *types.VirtletAnnotations, ns string, podAnnotation
 	userDataSourceKey := podAnnotations[types.CloudInitUserDataSourceKeyName]
 	sshKeySourceKey := podAnnotations[types.SSHKeySourceKeyName]
 	if userDataSourceKey != "" || sshKeySourceKey != "" {
-		if clientset == nil {
-			clientset, err = utils.GetK8sClientset(nil)
-			if err != nil {
-				return err
-			}
+		clientset, err = utils.GetK8sClientset(nil)
+		if err != nil {
+			return err
 		}
 	}
 	if userDataSourceKey != "" {
@@ -140,6 +139,60 @@ func readK8sKeySource(sourceType, sourceName, ns, key string, clientset *kuberne
 	default:
 		return nil, fmt.Errorf("unsupported source kind %s. Must be one of (secret, configmap)", sourceType)
 	}
+}
+
+func loadDSAsFileMap(ns, key string) (map[string][]byte, error) {
+	if ns == "" {
+		return nil, nil
+	}
+	parts := strings.Split(key, "/")
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid %s annotation format. Expected kind/name, but insted got %s", types.FilesFromDSKeyName, key)
+	}
+	clientset, err := utils.GetK8sClientset(nil)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read files from data source %q: %v", key, err)
+	}
+
+	data, err := readK8sKeySource(parts[0], parts[1], ns, "", clientset)
+	if err != nil {
+		return nil, err
+	}
+
+	return parseDataAsFileMap(data)
+}
+
+func parseDataAsFileMap(data map[string]string) (map[string][]byte, error) {
+	var files map[string][]byte
+	for k, v := range data {
+		if strings.HasSuffix(k, "_path") || strings.HasSuffix(k, "_encoding") {
+			continue
+		}
+
+		path, pOk := data[k+"_path"]
+		if !pOk {
+			return nil, fmt.Errorf("missing path for %q entry", k)
+		}
+
+		encoding, eOk := data[k+"_encoding"]
+		if !eOk {
+			encoding = "base64"
+		}
+
+		switch encoding {
+		case "plain":
+			files[path] = []byte(v)
+		case "base64":
+			data, err := base64.StdEncoding.DecodeString(v)
+			if err != nil {
+				return nil, fmt.Errorf("cannot decode data under %q key as base64 encoded: %v", k, err)
+			}
+			files[path] = data
+		default:
+			return nil, fmt.Errorf("unkonwn encoding %q for %q", encoding, k)
+		}
+	}
+	return files, nil
 }
 
 // TODO: create a test for loadExternalUserData
