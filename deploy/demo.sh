@@ -20,6 +20,7 @@ VIRTLET_ON_MASTER="${VIRTLET_ON_MASTER:-}"
 VIRTLET_MULTI_NODE="${VIRTLET_MULTI_NODE:-}"
 IMAGE_REGEXP_TRANSLATION="${IMAGE_REGEXP_TRANSLATION:-1}"
 MULTI_CNI="${MULTI_CNI:-}"
+DEMO_LOG_LEVEL="${DEMO_LOG_LEVEL:-}"
 # Convenience setting for local testing:
 # BASE_LOCATION="${HOME}/work/kubernetes/src/github.com/Mirantis/virtlet"
 cirros_key="demo-cirros-private-key"
@@ -362,6 +363,22 @@ function demo::start-virtlet {
     fi
   fi
 
+  if [[ ${DEMO_LOG_LEVEL} ]]; then
+      demo::step "Deploying Virtlet CRDs"
+      docker run --rm "mirantis/virtlet:${virtlet_docker_tag}" virtletctl gen --crd |
+          "${kubectl}" apply -f -
+      "${kubectl}" apply -f - <<EOF
+---
+apiVersion: "virtlet.k8s/v1"
+kind: VirtletConfigMapping
+metadata:
+  name: demo-log-level
+  namespace: kube-system
+spec:
+  config:
+    logLevel: ${DEMO_LOG_LEVEL}
+EOF
+  fi
   demo::step "Deploying Virtlet DaemonSet with docker tag ${virtlet_docker_tag}"
   docker run --rm "mirantis/virtlet:${virtlet_docker_tag}" virtletctl gen --tag "${virtlet_docker_tag}" |
       "${kubectl}" apply -f -

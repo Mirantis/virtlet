@@ -176,6 +176,7 @@ e2e: &e2e
           INJECT_LOCAL_IMAGE=1 \
           VIRTLET_DEMO_BRANCH=master \
           ENABLE_CEPH=1 \
+          DEMO_LOG_LEVEL=6 \
           FEATURE_GATES="BlockVolume=true" \
           KUBELET_FEATURE_GATES="BlockVolume=true" \
           BASE_LOCATION="$PWD" \
