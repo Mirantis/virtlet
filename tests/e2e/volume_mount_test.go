@@ -36,7 +36,7 @@ var _ = Describe("Container volume mounts", func() {
 			ssh             framework.Executor
 		)
 
-		withLoopbackBlockDevice(&virtletNodeName, &devPath)
+		withLoopbackBlockDevice(&virtletNodeName, &devPath, true)
 
 		AfterEach(func() {
 			if ssh != nil {
