@@ -92,3 +92,67 @@ func FormatDisk(path string) error {
 
 	return nil
 }
+
+// Put insert files to image creating all necessary subdirs
+func Put(image string, files map[string][]byte) error {
+	g, err := guestfs.Create()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		g.Shutdown()
+		g.Close()
+	}()
+
+	// Set the trace flag so that we can see each libguestfs call.
+	g.Set_trace(true)
+
+	if gErr := g.Add_drive(image, nil); gErr != nil {
+		return errors.New(gErr.String())
+	}
+
+	// Run the libguestfs back-end.
+	if gErr := g.Launch(); gErr != nil {
+		return errors.New(gErr.String())
+	}
+
+	// Get the list of devices.  Because we only added one drive
+	// above, we expect that this list should contain a single
+	// element.
+	devices, gErr := g.List_devices()
+	if gErr != nil {
+		return errors.New(gErr.String())
+	}
+	if len(devices) != 1 {
+		return errors.New("expected a single device from list-devices")
+	}
+
+	partitions, gErr := g.List_partitions()
+	if gErr != nil {
+		return errors.New(gErr.String())
+	}
+	if len(partitions) < 1 {
+		return errors.New("expected a single partition from list-partitions")
+	}
+
+	// Try to mount fist partition of image as /.
+	if gErr := g.Mount(partitions[0], "/"); gErr != nil {
+		return errors.New(gErr.String())
+	}
+
+	for path, content := range files {
+		dir, _ := filepath.Split(path)
+		if len(dir) > 1 {
+			// Just in case - try to create directory structure
+			// as it can be missing.
+			if gErr := g.Mkdir_p(dir); gErr != nil {
+				return errors.New(gErr.String())
+			}
+		}
+		if gErr := g.Write(path, content); gErr != nil {
+			return errors.New(gErr.String())
+		}
+	}
+
+	return nil
+}
