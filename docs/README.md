@@ -13,4 +13,4 @@ This directory contains the Virtlet documentation.
     * [Image Handling](images.md)
     * [Image Name Translation](image-name-translation.md)
 * [Diagnostics](diagnostics.md)
-* [Update notes](update-notes.md)
+* [Tuning rootfs of VM using config map as files](configmap-as-files.md)
