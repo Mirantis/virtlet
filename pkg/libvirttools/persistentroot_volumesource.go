@@ -25,6 +25,7 @@ import (
 	digest "github.com/opencontainers/go-digest"
 
 	"github.com/Mirantis/virtlet/pkg/blockdev"
+	"github.com/Mirantis/virtlet/pkg/diskimage"
 	"github.com/Mirantis/virtlet/pkg/metadata/types"
 )
 
@@ -90,6 +91,10 @@ func (v *persistentRootVolume) Setup() (*libvirtxml.DomainDisk, *libvirtxml.Doma
 
 	if err != nil {
 		return nil, nil, err
+	}
+
+	if err := diskimage.Put(v.dmPath(), v.config.ParsedAnnotations.FilesForRootfs); err != nil {
+		return nil, nil, fmt.Errorf("error tuning rootfs with files from configmap: %v", err)
 	}
 
 	return &libvirtxml.DomainDisk{
