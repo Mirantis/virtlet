@@ -37,7 +37,8 @@ import (
 
 const (
 	cephContainerName = "ceph_cluster"
-	loopDeviceTestDir = "/virtlet-e2e-tests"
+	// avoid having the loop device on top of overlay2/aufs when using k-d-c
+	loopDeviceTestDir = "/dind/virtlet-e2e-tests"
 )
 
 var (
