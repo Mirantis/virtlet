@@ -57,8 +57,8 @@ func (v *persistentRootVolume) dmPath() string {
 }
 
 func (v *persistentRootVolume) copyImageToDev(imagePath string) error {
-	unix.Sync()
-	exec.Command("/bin/bash", "-c", "echo 1 > /proc/sys/vm/drop_caches").Run()
+	// unix.Sync()
+	// exec.Command("/bin/bash", "-c", "echo 1 > /proc/sys/vm/drop_caches").Run()
 	if _, err := v.owner.Commander().Command("qemu-img", "convert", "-O", "raw", imagePath, v.dmPath()).Run(nil); err != nil {
 		return err
 	}
