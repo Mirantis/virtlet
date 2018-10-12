@@ -19,6 +19,7 @@ package e2e
 import (
 	"flag"
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -34,7 +35,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const cephContainerName = "ceph_cluster"
+const (
+	cephContainerName = "ceph_cluster"
+	// avoid having the loop device on top of overlay2/aufs when using k-d-c
+	loopDeviceTestDir = "/dind/virtlet-e2e-tests"
+)
 
 var (
 	vmImageLocation       = flag.String("image", defaultVMImageLocation, "VM image URL (*without http(s)://*")
@@ -180,35 +185,47 @@ func includeUnsafe() {
 	}
 }
 
-func withLoopbackBlockDevice(virtletNodeName, devPath *string) {
+func withLoopbackBlockDevice(virtletNodeName, devPath *string, mkfs bool) {
 	var nodeExecutor framework.Executor
-	BeforeAll(func() {
+	var filename string
+	BeforeEach(func() {
 		var err error
 		*virtletNodeName, err = controller.VirtletNodeName()
 		Expect(err).NotTo(HaveOccurred())
 		nodeExecutor, err = controller.DinDNodeExecutor(*virtletNodeName)
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err = framework.RunSimple(nodeExecutor, "dd", "if=/dev/zero", "of=/rawdevtest", "bs=1M", "count=1000")
+		_, err = framework.RunSimple(nodeExecutor, "mkdir", "-p", loopDeviceTestDir)
 		Expect(err).NotTo(HaveOccurred())
-		// We use mkfs.ext3 here because mkfs.ext4 on
-		// the node may be too new for CirrOS, causing
-		// errors like this in VM's dmesg:
-		// [    1.316395] EXT3-fs (vdb): error: couldn't mount because of unsupported optional features (2c0)
-		// [    1.320222] EXT4-fs (vdb): couldn't mount RDWR because of unsupported optional features (400)
-		// [    1.339594] EXT3-fs (vdc1): error: couldn't mount because of unsupported optional features (240)
-		// [    1.342850] EXT4-fs (vdc1): mounted filesystem with ordered data mode. Opts: (null)
-		_, err = framework.RunSimple(nodeExecutor, "mkfs.ext3", "/rawdevtest")
+
+		filename, err = framework.RunSimple(nodeExecutor, "tempfile", "-d", loopDeviceTestDir, "--prefix", "ve2e-")
 		Expect(err).NotTo(HaveOccurred())
-		*devPath, err = framework.RunSimple(nodeExecutor, "losetup", "-f", "/rawdevtest", "--show")
+
+		_, err = framework.RunSimple(nodeExecutor, "dd", "if=/dev/zero", "of="+filename, "bs=1M", "count=1000")
+		Expect(err).NotTo(HaveOccurred())
+		if mkfs {
+			// We use mkfs.ext3 here because mkfs.ext4 on
+			// the node may be too new for CirrOS, causing
+			// errors like this in VM's dmesg:
+			// [    1.316395] EXT3-fs (vdb): error: couldn't mount because of unsupported optional features (2c0)
+			// [    1.320222] EXT4-fs (vdb): couldn't mount RDWR because of unsupported optional features (400)
+			// [    1.339594] EXT3-fs (vdc1): error: couldn't mount because of unsupported optional features (240)
+			// [    1.342850] EXT4-fs (vdc1): mounted filesystem with ordered data mode. Opts: (null)
+			_, err = framework.RunSimple(nodeExecutor, "mkfs.ext3", filename)
+			Expect(err).NotTo(HaveOccurred())
+		}
+		_, err = framework.RunSimple(nodeExecutor, "sync")
+		Expect(err).NotTo(HaveOccurred())
+		*devPath, err = framework.RunSimple(nodeExecutor, "losetup", "-f", filename, "--show")
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	AfterAll(func() {
+	AfterEach(func() {
 		// The loopback device is detached by itself upon
 		// success (TODO: check why it happens), so we
 		// ignore errors here
 		framework.RunSimple(nodeExecutor, "losetup", "-d", *devPath)
+		Expect(os.RemoveAll(loopDeviceTestDir)).To(Succeed())
 	})
 }
 
