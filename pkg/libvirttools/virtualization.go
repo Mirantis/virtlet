@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 
+	vconfig "github.com/Mirantis/virtlet/pkg/config"
 	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	"github.com/Mirantis/virtlet/pkg/utils"
@@ -140,10 +141,11 @@ func (ds *domainSettings) createDomain(config *types.VMConfig) *libvirtxml.Domai
 
 		QEMUCommandline: &libvirtxml.DomainQEMUCommandline{
 			Envs: []libvirtxml.DomainQEMUCommandlineEnv{
-				{Name: "VIRTLET_EMULATOR", Value: emulator},
-				{Name: "VIRTLET_NET_KEY", Value: ds.netFdKey},
-				{Name: "VIRTLET_CONTAINER_ID", Value: config.DomainUUID},
-				{Name: "VIRTLET_CONTAINER_LOG_PATH", Value: filepath.Join(config.LogDirectory, config.LogPath)},
+				{Name: vconfig.EmulatorEnvVarName, Value: emulator},
+				{Name: vconfig.NetKeyEnvVarName, Value: ds.netFdKey},
+				{Name: vconfig.ContainerIDEnvVarName, Value: config.DomainUUID},
+				{Name: vconfig.LogPathEnvVarName,
+					Value: filepath.Join(config.LogDirectory, config.LogPath)},
 			},
 		},
 	}
@@ -811,6 +813,43 @@ func (v *VirtualizationTool) ContainerInfo(containerID string) (*types.Container
 		containerInfo.State = containerState
 	}
 	return containerInfo, nil
+}
+
+// UpdateCpusetsInContainerDefinition updates domain definition in libvirt for the VM
+// setting environment variable for vmwrapper with info about to which cpuset it should
+// pin itself
+func (v *VirtualizationTool) UpdateCpusetsInContainerDefinition(containerID, cpusets string) error {
+	domain, err := v.domainConn.LookupDomainByUUIDString(containerID)
+	if err != nil {
+		return err
+	}
+
+	domainxml, err := domain.XML()
+	if err != nil {
+		return err
+	}
+
+	found := false
+	envvars := domainxml.QEMUCommandline.Envs
+	for _, envvar := range envvars {
+		if envvar.Name == vconfig.CpusetsEnvVarName {
+			envvar.Value = cpusets
+			found = true
+		}
+	}
+	if !found && cpusets != "" {
+		domainxml.QEMUCommandline.Envs = append(envvars, libvirtxml.DomainQEMUCommandlineEnv{
+			Name:  vconfig.CpusetsEnvVarName,
+			Value: cpusets,
+		})
+	}
+
+	if err := domain.Undefine(); err != nil {
+		return err
+	}
+
+	_, err = v.domainConn.DefineDomain(domainxml)
+	return err
 }
 
 // VMStats returns current cpu/memory/disk usage for VM
