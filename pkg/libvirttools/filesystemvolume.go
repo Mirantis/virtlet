@@ -26,7 +26,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/metadata/types"
 )
 
-// rootVolume denotes the root disk of the VM
+// filesystemVolume denotes the filesystem mount of the VM
 type filesystemVolume struct {
 	volumeBase
 	mount            types.VMMount
