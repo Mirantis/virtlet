@@ -430,8 +430,12 @@ func (v *VirtletRuntimeService) UpdateRuntimeConfig(context.Context, *kubeapi.Up
 	return &kubeapi.UpdateRuntimeConfigResponse{}, nil
 }
 
-// UpdateContainerResources is a placeholder for an unimplemented CRI method.
-func (v *VirtletRuntimeService) UpdateContainerResources(context.Context, *kubeapi.UpdateContainerResourcesRequest) (*kubeapi.UpdateContainerResourcesResponse, error) {
+// UpdateContainerResources passes info about Cpusets for particular container
+// to virttool
+func (v *VirtletRuntimeService) UpdateContainerResources(ctx context.Context, req *kubeapi.UpdateContainerResourcesRequest) (*kubeapi.UpdateContainerResourcesResponse, error) {
+	if err := v.virtTool.UpdateCpusetsInContainerDefinition(req.GetContainerId(), req.GetLinux().CpusetCpus); err != nil {
+		return nil, err
+	}
 	return &kubeapi.UpdateContainerResourcesResponse{}, nil
 }
 
