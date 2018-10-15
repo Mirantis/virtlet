@@ -23,6 +23,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"strings"
 
@@ -304,14 +305,18 @@ func (s *Server) getStaticRoutes(ip net.IPNet) (router, routes []byte, err error
 				continue
 			}
 		}
-		b.Write(toDestinationDescriptor(route.Dst))
-		if gw != nil {
-			b.Write(gw)
-		} else {
-			b.Write([]byte{0, 0, 0, 0})
-		}
+		writeRoute(&b, route.Dst, gw)
 	}
 
+	// XXX: classless routes apparently cause a problem:
+	// https://askubuntu.com/questions/767002/dhcp-connection-does-not-set-default-gateway-automatically
+	if b.Len() != 0 && router != nil {
+		writeRoute(&b, net.IPNet{
+			IP:   net.IPv4zero,
+			Mask: net.IPv4Mask(0, 0, 0, 0),
+		}, router)
+		router = nil
+	}
 	routes = b.Bytes()
 	return
 }
@@ -325,6 +330,15 @@ func toDestinationDescriptor(network net.IPNet) []byte {
 		[]byte{byte(s)},
 		ipAsBytes[:widthOfMaskToSignificantOctets(s)]...,
 	)
+}
+
+func writeRoute(w io.Writer, dst net.IPNet, gw net.IP) {
+	w.Write(toDestinationDescriptor(dst))
+	if gw != nil {
+		w.Write(gw)
+	} else {
+		w.Write([]byte{0, 0, 0, 0})
+	}
 }
 
 func widthOfMaskToSignificantOctets(mask int) int {
