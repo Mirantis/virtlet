@@ -175,7 +175,7 @@ function demo::fix-mounts {
   docker exec "${virtlet_node}" mount --make-shared /sys/fs/cgroup
   demo::step "Bind-mounting /var/lib/virtlet from a docker volume"
   docker exec "${virtlet_node}" mkdir -p /dind/virtlet /var/lib/virtlet
-  docker exec "${virtlet_node}" mount --bind /var/lib/virtlet /dind/virtlet
+  docker exec "${virtlet_node}" mount --bind /dind/virtlet /var/lib/virtlet
 }
 
 function demo::inject-local-image {
