@@ -49,7 +49,7 @@ spec:
 apiVersion: v1
 kind: Pod
 metadata:
-  name: ubuntu-vm
+  name: ubuntu-vm-local-block-pv
   annotations:
     kubernetes.io/target-runtime: virtlet.cloud
     VirtletSSHKeys: |

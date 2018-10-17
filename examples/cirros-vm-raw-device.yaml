@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: cirros-vm
+  name: cirros-vm-raw-device
   annotations:
     kubernetes.io/target-runtime: virtlet.cloud
 spec:

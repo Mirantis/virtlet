@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: ubuntu-vm
+  name: ubuntu-multi-cni
   annotations:
     multi-ip-preferences: |
       {
