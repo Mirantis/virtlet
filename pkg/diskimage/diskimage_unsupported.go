@@ -22,6 +22,14 @@ import (
 	"errors"
 )
 
+// FormatDisk is fake implementation to satisfy syntax checkers
+// on non linux systems
 func FormatDisk(path string) error {
+	return errors.New("not implemented")
+}
+
+// Put is fake implementation to satisfy syntax checkers
+// on non linux systems
+func Put(image string, files map[string][]byte) error {
 	return errors.New("not implemented")
 }

@@ -50,6 +50,10 @@ const (
 
 	cloudInitUserDataSourceKeyKeyName      = "VirtletCloudInitUserDataSourceKey"
 	cloudInitUserDataSourceEncodingKeyName = "VirtletCloudInitUserDataSourceEncoding"
+
+	// FilesFromDSKeyName is the name of data source key in the pod annotations
+	// for files to be written on rootfs.
+	FilesFromDSKeyName = "VirtletFilesFromDataSource"
 )
 
 // CloudInitImageType specifies the image type used for cloud-init
@@ -107,18 +111,27 @@ type VirtletAnnotations struct {
 	RootVolumeSize int64
 	// VirtletChown9pfsMounts indicates if chown is enabled for 9pfs mounts.
 	VirtletChown9pfsMounts bool
+	// FilesForRootfs specifies files to be put on rootfs using libguestfs.
+	FilesForRootfs map[string][]byte
 }
 
-// ExternalDataLoader is a function that loads external data that's specified
+// ExternalUserDataLoader is a function that loads external user data that's specified
 // in the pod annotations.
-type ExternalDataLoader func(va *VirtletAnnotations, Namespace string, podAnnotations map[string]string) error
+type ExternalUserDataLoader func(va *VirtletAnnotations, Namespace string, podAnnotations map[string]string) error
 
-var externalDataLoader ExternalDataLoader
+var externalUserDataLoader ExternalUserDataLoader
 
-// SetExternalDataLoader sets the external data loader function that
-// loads external data that's specified in the pod annotations.
-func SetExternalDataLoader(loader ExternalDataLoader) {
-	externalDataLoader = loader
+// DSLoader is a function that loads files from config map or secret to write on rootfs
+type DSLoader func(Namespace, DSName string) (map[string][]byte, error)
+
+var externalDSLoader DSLoader
+
+// SetExternalDataLoaders sets the external data loader functions that
+// loads external data that's specified in the pod annotations and pointed by
+// them data source.
+func SetExternalDataLoaders(userDataLoader ExternalUserDataLoader, dsLoader DSLoader) {
+	externalUserDataLoader = userDataLoader
+	externalDSLoader = dsLoader
 }
 
 func (va *VirtletAnnotations) applyDefaults() {
@@ -188,9 +201,18 @@ func (va *VirtletAnnotations) parsePodAnnotations(ns string, podAnnotations map[
 	if podAnnotations[cloudInitUserDataOverwriteKeyName] == "true" {
 		va.UserDataOverwrite = true
 	}
-	if externalDataLoader != nil {
-		if err := externalDataLoader(va, ns, podAnnotations); err != nil {
-			return fmt.Errorf("error loading data via external data loader: %v", err)
+	if externalUserDataLoader != nil {
+		if err := externalUserDataLoader(va, ns, podAnnotations); err != nil {
+			return fmt.Errorf("error loading data via external user data loader: %v", err)
+		}
+	}
+
+	if filesFromDSstr, found := podAnnotations[FilesFromDSKeyName]; found && externalDSLoader != nil {
+		var err error
+		va.FilesForRootfs, err = externalDSLoader(ns, filesFromDSstr)
+		if err != nil {
+			return fmt.Errorf("error loading data source %q as files: %v",
+				filesFromDSstr, err)
 		}
 	}
 
