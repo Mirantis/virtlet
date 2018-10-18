@@ -271,10 +271,9 @@ func TestVmNetwork(t *testing.T) {
 	vnt.addTcpdump(hostVeth, "10.1.90.1.4243 > 10.1.90.5.4242: UDP", "BOOTP/DHCP")
 	vnt.g.Add(contNS, NewDhcpServerTester(csn))
 	vnt.verifyDhcp("tap0", []string{
-		"new_classless_static_routes='10.10.42.0/24 10.1.90.90'",
+		"new_classless_static_routes='10.10.42.0/24 10.1.90.90 0.0.0.0/0 10.1.90.1'",
 		"new_ip_address='10.1.90.5'",
 		"new_network_number='10.1.90.0'",
-		"new_routers='10.1.90.1'",
 		"new_subnet_mask='255.255.255.0'",
 		"tap0: offered 10.1.90.5 from 169.254.254.2",
 	})
@@ -424,10 +423,9 @@ func TestTapFDSource(t *testing.T) {
 			tcpdumpStopOn:  "10.1.90.1.4243 > 10.1.90.5.4242: UDP",
 			dhcpExpectedSubstrings: [][]string{
 				{
-					"new_classless_static_routes='10.10.42.0/24 10.1.90.90'",
+					"new_classless_static_routes='10.10.42.0/24 10.1.90.90 0.0.0.0/0 10.1.90.1'",
 					"new_ip_address='10.1.90.5'",
 					"new_network_number='10.1.90.0'",
-					"new_routers='10.1.90.1'",
 					"new_subnet_mask='255.255.255.0'",
 					"tap0: offered 10.1.90.5 from 169.254.254.2",
 				},
@@ -498,10 +496,9 @@ func TestTapFDSource(t *testing.T) {
 			tcpdumpStopOn: "10.1.90.1.4243 > 10.1.90.5.4242: UDP",
 			dhcpExpectedSubstrings: [][]string{
 				{
-					"new_classless_static_routes='10.10.42.0/24 10.1.90.90'",
+					"new_classless_static_routes='10.10.42.0/24 10.1.90.90 0.0.0.0/0 10.1.90.1'",
 					"new_ip_address='10.1.90.5'",
 					"new_network_number='10.1.90.0'",
-					"new_routers='10.1.90.1'",
 					"new_subnet_mask='255.255.255.0'",
 					"tap0: offered 10.1.90.5 from 169.254.254.2",
 				},
@@ -633,10 +630,9 @@ func TestTapFDSource(t *testing.T) {
 			tcpdumpStopOn: "10.1.90.1.4243 > 10.1.90.5.4242: UDP",
 			dhcpExpectedSubstrings: [][]string{
 				{
-					"new_classless_static_routes='10.10.42.0/24 10.1.90.90'",
+					"new_classless_static_routes='10.10.42.0/24 10.1.90.90 0.0.0.0/0 10.1.90.1'",
 					"new_ip_address='10.1.90.5'",
 					"new_network_number='10.1.90.0'",
-					"new_routers='10.1.90.1'",
 					"new_subnet_mask='255.255.255.0'",
 					"tap0: offered 10.1.90.5 from 169.254.254.2",
 				},
@@ -671,10 +667,9 @@ func TestTapFDSource(t *testing.T) {
 			tcpdumpStopOn:  "10.1.90.1.4243 > 10.1.90.5.4242: UDP",
 			dhcpExpectedSubstrings: [][]string{
 				{
-					"new_classless_static_routes='10.10.42.0/24 10.1.90.90'",
+					"new_classless_static_routes='10.10.42.0/24 10.1.90.90 0.0.0.0/0 10.1.90.1'",
 					"new_ip_address='10.1.90.5'",
 					"new_network_number='10.1.90.0'",
-					"new_routers='10.1.90.1'",
 					"new_subnet_mask='255.255.255.0'",
 					"tap0: offered 10.1.90.5 from 169.254.254.2",
 				},
