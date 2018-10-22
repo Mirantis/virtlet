@@ -17,6 +17,7 @@ limitations under the License.
 package utils
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -34,4 +35,22 @@ func GetBoolFromString(str string) bool {
 		b = true
 	}
 	return b
+}
+
+// Stringify returns string representation for provided value.
+func Stringify(value interface{}) (string, error) {
+	var sValue string
+
+	switch v := value.(type) {
+	case string:
+		sValue = v
+	case fmt.Stringer:
+		sValue = v.String()
+	case int:
+		sValue = strconv.Itoa(v)
+	default:
+		return "", fmt.Errorf("expected value to be int, string or implementing Stringer interface while it's: %T", v)
+	}
+
+	return sValue, nil
 }
