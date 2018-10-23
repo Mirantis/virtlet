@@ -1,0 +1,75 @@
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: nfs-dir-pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  # Set Filesystem to Filesystem so the VM can consume this PVC
+  # as a Filesystem device
+  volumeMode: Filesystem
+  storageClassName: local-storage
+  resources:
+    requests:
+      storage: 100Mi
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: nfs-dir-pv
+spec:
+  capacity:
+    storage: 100Mi
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  # Set volumeMode to Filesystem so the VM can consume this PV
+  # as a Filesystem device
+  volumeMode: Filesystem
+  nfs:
+    # Use a path exposed in nfs server which has a ip 172.21.0.2(command: showmount -e 172.21.0.2)
+    # 9p mode must be supported in host kernel(command: modinfo 9p)
+    server: 172.21.0.2
+    path: /home/ubuntu/nfs/ubuntu-nfs
+  claimRef:
+    name: nfs-dir-pvc
+    namespace: default
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ubuntu-vm-nfs-dir-pv
+  annotations:
+    kubernetes.io/target-runtime: virtlet.cloud
+    VirtletSSHKeys: |
+      ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCaJEcFDXEK2ZbX0ZLS1EIYFZRbDAcRfuVjpstSc0De8+sV1aiu+dePxdkuDRwqFtCyk6dEZkssjOkBXtri00MECLkir6FcH3kKOJtbJ6vy3uaJc9w1ERo+wyl6SkAh/+JTJkp7QRXj8oylW5E20LsbnA/dIwWzAF51PPwF7A7FtNg9DnwPqMkxFo1Th/buOMKbP5ZA1mmNNtmzbMpMfJATvVyiv3ccsSJKOiyQr6UG+j7sc/7jMVz5Xk34Vd0l8GwcB0334MchHckmqDB142h/NCWTr8oLakDNvkfC1YneAfAO41hDkUbxPtVBG5M/o7P4fxoqiHEX+ZLfRxDtHB53 me@localhost
+spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: extraRuntime
+            operator: In
+            values:
+            - virtlet
+  # This is the number of seconds Virtlet gives the VM to shut down cleanly.
+  # The default value of 30 seconds is ok for containers but probably too
+  # low for VM, so overriding it here is strongly advised.
+  terminationGracePeriodSeconds: 120
+  containers:
+  - name: ubuntu-vm
+    image: virtlet.cloud/cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img
+    imagePullPolicy: IfNotPresent
+    # tty and stdin required for `kubectl attach -t` to work
+    tty: true
+    stdin: true
+    volumeMounts:
+    - mountPath: /home/ubuntu/nfspath
+      name: nfspvc
+  volumes:
+  - name: nfspvc
+    persistentVolumeClaim:
+      claimName: nfs-dir-pvc
