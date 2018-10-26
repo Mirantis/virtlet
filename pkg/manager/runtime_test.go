@@ -238,7 +238,7 @@ func makeVirtletCRITester(t *testing.T) *virtletCRITester {
 		StreamerSocketPath: streamerSocketPath,
 	}
 	commander := fakeutils.NewCommander(rec, nil)
-	virtTool := libvirttools.NewVirtualizationTool(domainConn, storageConn, imageStore, metadataStore, libvirttools.GetDefaultVolumeSource(), virtConfig, utils.NullMounter, commander)
+	virtTool := libvirttools.NewVirtualizationTool(domainConn, storageConn, imageStore, metadataStore, libvirttools.GetDefaultVolumeSource(), virtConfig, utils.NullMounter, utils.FakeMountPointChecker, commander)
 	virtTool.SetClock(clock)
 	streamServer := newFakeStreamServer(rec.Child("streamServer"))
 	criHandler := &criHandler{

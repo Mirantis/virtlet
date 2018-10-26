@@ -217,15 +217,16 @@ type VirtualizationConfig struct {
 
 // VirtualizationTool provides methods to operate on libvirt.
 type VirtualizationTool struct {
-	domainConn    virt.DomainConnection
-	storageConn   virt.StorageConnection
-	imageManager  ImageManager
-	metadataStore metadata.Store
-	clock         clockwork.Clock
-	volumeSource  VMVolumeSource
-	config        VirtualizationConfig
-	mounter       utils.Mounter
-	commander     utils.Commander
+	domainConn        virt.DomainConnection
+	storageConn       virt.StorageConnection
+	imageManager      ImageManager
+	metadataStore     metadata.Store
+	clock             clockwork.Clock
+	volumeSource      VMVolumeSource
+	config            VirtualizationConfig
+	mounter           utils.Mounter
+	mountPointChecker utils.MountPointChecker
+	commander         utils.Commander
 }
 
 var _ volumeOwner = &VirtualizationTool{}
@@ -236,17 +237,19 @@ func NewVirtualizationTool(domainConn virt.DomainConnection,
 	storageConn virt.StorageConnection, imageManager ImageManager,
 	metadataStore metadata.Store, volumeSource VMVolumeSource,
 	config VirtualizationConfig, mounter utils.Mounter,
+	mountPointChecker utils.MountPointChecker,
 	commander utils.Commander) *VirtualizationTool {
 	return &VirtualizationTool{
-		domainConn:    domainConn,
-		storageConn:   storageConn,
-		imageManager:  imageManager,
-		metadataStore: metadataStore,
-		clock:         clockwork.NewRealClock(),
-		volumeSource:  volumeSource,
-		config:        config,
-		mounter:       mounter,
-		commander:     commander,
+		domainConn:        domainConn,
+		storageConn:       storageConn,
+		imageManager:      imageManager,
+		metadataStore:     metadataStore,
+		clock:             clockwork.NewRealClock(),
+		volumeSource:      volumeSource,
+		config:            config,
+		mounter:           mounter,
+		mountPointChecker: mountPointChecker,
+		commander:         commander,
 	}
 }
 
