@@ -127,15 +127,20 @@ func (v *VirtletManager) Run() error {
 
 		err = s.Start()
 		if err != nil {
-			glog.Warningf("Could not start stream server: %s", err)
+			glog.Warningf("Could not start stream server: %v", err)
 
 		}
 		streamServer = s
 		virtConfig.StreamerSocketPath = streamerSocketPath
 	}
 
+	mpc, err := utils.NewMountPointChecker()
+	if err != nil {
+		return fmt.Errorf("couldn't create mountpoint checker: %v", err)
+	}
+
 	volSrc := libvirttools.GetDefaultVolumeSource()
-	v.virtTool = libvirttools.NewVirtualizationTool(conn, conn, v.imageStore, v.metadataStore, volSrc, virtConfig, utils.NewMounter(), utils.DefaultCommander)
+	v.virtTool = libvirttools.NewVirtualizationTool(conn, conn, v.imageStore, v.metadataStore, volSrc, virtConfig, utils.NewMounter(), mpc, utils.DefaultCommander)
 
 	runtimeService := NewVirtletRuntimeService(v.virtTool, v.metadataStore, v.fdManager, streamServer, v.imageStore, nil)
 	imageService := NewVirtletImageService(v.imageStore, translator, nil)
