@@ -23,6 +23,8 @@ import (
 	"strings"
 
 	"github.com/Mirantis/virtlet/pkg/blockdev"
+	"github.com/Mirantis/virtlet/pkg/metadata"
+	"github.com/Mirantis/virtlet/pkg/metadata/types"
 )
 
 const (
@@ -62,6 +64,11 @@ func (v *VirtualizationTool) retrieveListOfContainerIDs() ([]string, bool, []err
 
 	var allErrors []error
 	for _, sandbox := range sandboxes {
+		if err := v.checkSandboxNetNs(sandbox); err != nil {
+			allErrors = append(allErrors, err)
+			continue
+		}
+
 		containers, err := v.metadataStore.ListPodContainers(sandbox.GetID())
 		if err != nil {
 			allErrors = append(
@@ -80,6 +87,42 @@ func (v *VirtualizationTool) retrieveListOfContainerIDs() ([]string, bool, []err
 	}
 
 	return containerIDs, false, allErrors
+}
+
+func (v *VirtualizationTool) checkSandboxNetNs(sandbox metadata.PodSandboxMetadata) error {
+	sinfo, err := sandbox.Retrieve()
+	if err != nil {
+		return err
+	}
+
+	if !netNsExists(sinfo.ContainerSideNetwork.NsPath) {
+		containers, err := v.metadataStore.ListPodContainers(sandbox.GetID())
+		if err != nil {
+			return err
+		}
+		for _, container := range containers {
+			// remove container from metadata store
+			if err := container.Save(func(*types.ContainerInfo) (*types.ContainerInfo, error) {
+				return nil, nil
+			}); err != nil {
+				return err
+			}
+		}
+
+		// remove sandbox from metadata store
+		if err := sandbox.Save(func(*types.PodSandboxInfo) (*types.PodSandboxInfo, error) {
+			return nil, nil
+		}); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func netNsExists(path string) bool {
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
 }
 
 func inList(list []string, filter func(string) bool) bool {
