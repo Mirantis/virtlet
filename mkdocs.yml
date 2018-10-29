@@ -7,6 +7,9 @@ nav:
 - Reference:
   - "Defining a VM Pod": reference/vm-pod-spec.md
   - "Working with VM Pods": reference/vm-pod.md
+  - "Volumes": reference/volumes.md
+  - "VM Image Handling": reference/images.md
+  - "Injecting Files into the VM": reference/injecting-files.md
   - "Cloud-Init": reference/cloud-init.md
   - "Configuration": reference/config.md
   - "Networking": reference/networking.md
