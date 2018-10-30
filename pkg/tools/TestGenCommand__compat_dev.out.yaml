@@ -62,6 +62,7 @@ spec:
         - mountPath: /var/log/libvirt
           name: libvirt-log
         - mountPath: /dev
+          mountPropagation: HostToContainer
           name: dev
         - mountPath: /dind
           name: dind
@@ -87,6 +88,7 @@ spec:
           name: boot
           readOnly: true
         - mountPath: /dev
+          mountPropagation: HostToContainer
           name: dev
         - mountPath: /var/lib/virtlet
           mountPropagation: Bidirectional
@@ -129,6 +131,7 @@ spec:
         - mountPath: /var/lib/kubelet/pods:shared
           name: k8s-pods-dir
         - mountPath: /dev
+          mountPropagation: HostToContainer
           name: dev
         - mountPath: /lib/modules
           name: modules
@@ -226,6 +229,7 @@ spec:
         - mountPath: /host-var-lib
           name: var-lib
         - mountPath: /dev
+          mountPropagation: HostToContainer
           name: dev
         - mountPath: /var/lib/virtlet
           name: virtlet

@@ -57,6 +57,7 @@ spec:
           mountPath: /host-var-lib
         - name: dev
           mountPath: /dev
+          mountPropagation: HostToContainer
         - mountPath: /var/lib/virtlet
           name: virtlet
         securityContext:
@@ -164,6 +165,7 @@ spec:
           mountPath: /var/log/libvirt
         - name: dev
           mountPath: /dev
+          mountPropagation: HostToContainer
         securityContext:
           privileged: true
         readinessProbe:
@@ -189,6 +191,7 @@ spec:
           readOnly: true
         - name: dev
           mountPath: /dev
+          mountPropagation: HostToContainer
         - mountPath: /var/lib/virtlet
           name: virtlet
           mountPropagation: Bidirectional
@@ -239,6 +242,7 @@ spec:
           mountPropagation: HostToContainer
         - name: dev
           mountPath: /dev
+          mountPropagation: HostToContainer
         - name: modules
           mountPath: /lib/modules
       volumes:
