@@ -20,7 +20,7 @@ setup_env: &setup_env
   name: Set up the environment
   command: |
     # Install Docker client
-    curl -sSL -o "/tmp/docker-${DOCKER_VERSION}.tgz" "https://get.docker.com/builds/Linux/x86_64/docker-${DOCKER_VERSION}.tgz"
+    curl -sSL -o "/tmp/docker-${DOCKER_VERSION}.tgz" "https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz"
     tar -xz -C /tmp -f "/tmp/docker-${DOCKER_VERSION}.tgz"
     mv /tmp/docker/* /usr/bin
 
