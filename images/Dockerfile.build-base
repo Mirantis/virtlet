@@ -6,9 +6,9 @@ MAINTAINER Ivan Shvedunov <ishvedunov@mirantis.com>
 
 LABEL virtlet.image="build-base"
 
-ENV DOCKER_CLIENT_VERSION 1.12.6
-ENV DOCKER_CLIENT_DOWNLOAD_URL_BASE https://get.docker.com/builds
-ENV DOCKER_CLIENT_SHA256 cce8aa52a33f007673b9c7ed0cb786359aa6f3f8a9875aaf69799c71f86e8a43
+ENV DOCKER_CLIENT_VERSION 17.03.0-ce
+ENV DOCKER_CLIENT_DOWNLOAD_URL_BASE https://download.docker.com/linux/static/stable
+ENV DOCKER_CLIENT_SHA256 27f6cbbe189fd6374bedbc406df48462e34d7e6ab2c8c6cc4135c38eb63b0b5d
 # TODO: bump kubectl
 ENV KUBECTL_VERSION v1.9.3
 ENV KUBECTL_SHA1 a27d808eb011dbeea876fe5326349ed167a7ed28
@@ -40,7 +40,7 @@ RUN apt-get update && \
 
 # Install docker client
 RUN mkdir -p /usr/local/bin && \
-    curl -sSL "${DOCKER_CLIENT_DOWNLOAD_URL_BASE}/$(uname -s)/$(uname -m)/docker-${DOCKER_CLIENT_VERSION}.tgz" | \
+    curl -sSL "${DOCKER_CLIENT_DOWNLOAD_URL_BASE}/$(uname -m)/docker-${DOCKER_CLIENT_VERSION}.tgz" | \
     tar -C /usr/local/bin -xz --strip-components=1 docker/docker && \
     echo "${DOCKER_CLIENT_SHA256}  /usr/local/bin/docker" | sha256sum -c -
 
