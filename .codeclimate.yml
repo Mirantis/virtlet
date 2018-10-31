@@ -2,7 +2,7 @@ version: "2"
 checks:
   argument-count:
     config:
-      threshold: 8
+      threshold: 9
   complex-logic:
     config:
       threshold: 8
