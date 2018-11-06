@@ -924,3 +924,45 @@ func TestAddingFileLikeMount(t *testing.T) {
 		})
 	})
 }
+
+func TestMtuForMacAddress(t *testing.T) {
+	interfaces := []*network.InterfaceDescription{
+		&network.InterfaceDescription{
+			MTU:          1234,
+			HardwareAddr: net.HardwareAddr{0, 0, 0, 0, 0xa, 0xb},
+		},
+	}
+
+	for _, tc := range []struct {
+		mac             string
+		shouldHaveError bool
+		value           uint16
+	}{
+		{
+			mac:             "00:00:00:00:0a:0b",
+			shouldHaveError: false,
+			value:           1234,
+		},
+		{
+			mac:             "00:00:00:00:0A:0B",
+			shouldHaveError: false,
+			value:           1234,
+		},
+		{
+			mac:             "00:00:00:0a:0b:0c",
+			shouldHaveError: true,
+			value:           0,
+		},
+	} {
+		value, err := mtuForMacAddress(tc.mac, interfaces)
+		if err == nil && tc.shouldHaveError {
+			t.Errorf("Missing expected error")
+		}
+		if err != nil && !tc.shouldHaveError {
+			t.Errorf("Received unexpected error: %v", err)
+		}
+		if value != tc.value {
+			t.Errorf("Received value %q is diffrent from expected %q", value, tc.value)
+		}
+	}
+}
