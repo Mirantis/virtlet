@@ -404,7 +404,7 @@ func routesForIP(sourceIP net.IPNet, allRoutes []*cnitypes.Route) []map[string]i
 
 func mtuForMacAddress(mac string, ifaces []*network.InterfaceDescription) (uint16, error) {
 	for _, iface := range ifaces {
-		if iface.HardwareAddr.String() == mac {
+		if iface.HardwareAddr.String() == strings.ToLower(mac) {
 			return iface.MTU, nil
 		}
 	}
