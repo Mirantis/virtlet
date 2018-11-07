@@ -25,17 +25,17 @@ import (
 
 	"github.com/golang/glog"
 
+	"github.com/Mirantis/virtlet/pkg/config"
 	"github.com/Mirantis/virtlet/pkg/network"
 	"github.com/Mirantis/virtlet/pkg/nsfix"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
 	"github.com/Mirantis/virtlet/pkg/utils"
+	"github.com/Mirantis/virtlet/pkg/utils/cgroups"
 )
 
 const (
 	fdSocketPath    = "/var/lib/virtlet/tapfdserver.sock"
 	defaultEmulator = "/usr/bin/qemu-system-x86_64" // FIXME
-	emulatorVar     = "VIRTLET_EMULATOR"
-	netKeyEnvVar    = "VIRTLET_NET_KEY"
 	vmsProcFile     = "/var/lib/virtlet/vms.procfile"
 )
 
@@ -71,7 +71,7 @@ func main() {
 		}
 	}
 
-	emulator := os.Getenv(emulatorVar)
+	emulator := os.Getenv(config.EmulatorEnvVarName)
 	emulatorArgs := os.Args[1:]
 	var netArgs []string
 	if emulator == "" {
@@ -79,7 +79,7 @@ func main() {
 		// (capability check)
 		emulator = defaultEmulator
 	} else {
-		netFdKey := os.Getenv(netKeyEnvVar)
+		netFdKey := os.Getenv(config.NetKeyEnvVarName)
 		nextToUseHostdevNo := 0
 
 		if netFdKey != "" {
@@ -140,6 +140,10 @@ func main() {
 			glog.Fatalf("Error reexecuting vmwrapper: %v", err)
 		}
 	} else {
+		if err := setupCPUSets(); err != nil {
+			glog.Errorf("Can't set cpusets for emulator: %v", err)
+			os.Exit(1)
+		}
 		// this log hides errors returned by libvirt virError
 		// because of libvirt's output parsing approach
 		// glog.V(0).Infof("Executing emulator: %s", strings.Join(args, " "))
@@ -148,4 +152,18 @@ func main() {
 			os.Exit(1)
 		}
 	}
+}
+
+func setupCPUSets() error {
+	cpusets := os.Getenv(config.CpusetsEnvVarName)
+	if cpusets == "" {
+		return nil
+	}
+
+	controller, err := cgroups.GetProcessController("self", "cpuset")
+	if err != nil {
+		return err
+	}
+
+	return controller.Set("cpus", cpusets)
 }

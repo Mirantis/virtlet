@@ -17,6 +17,7 @@ limitations under the License.
 package utils
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -34,4 +35,9 @@ func GetBoolFromString(str string) bool {
 		b = true
 	}
 	return b
+}
+
+// Stringify returns string representation for provided value.
+func Stringify(value interface{}) string {
+	return fmt.Sprintf("%v", value)
 }
