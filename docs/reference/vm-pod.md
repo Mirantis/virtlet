@@ -8,9 +8,9 @@ pods. Still, there are some important differences, including:
 1. Some container-specific settings such as network/PID/IPC
    namespaces, SELinux/AppArmor settings, privileged flag etc. aren't
    applicable to VM pods
-1. Volume mounts are handled differently for VM pods (although an
-   effort is made to lessen the difference). For more information,
-   see [Volumes](../volumes/).
+1. Some volume types are handled differently. There are
+   VM-pod-specific settings such as Cloud-Init, persistent rootfs, etc.
+   For more information, see [Volumes](../volumes/).
 1. `kubectl exec` and exec readiness/liveness probes aren't supported
    for VM pods yet
 1. There are VM-pod-specific settings such as
