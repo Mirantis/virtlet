@@ -13,19 +13,24 @@ spec:
   selector:
     app: inner-k8s
 ---
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: k8s
 spec:
   serviceName: k8s
   replicas: 3
+  selector:
+    matchLabels:
+      app: inner-k8s
   template:
     metadata:
       labels:
         app: inner-k8s
       annotations:
         kubernetes.io/target-runtime: virtlet.cloud
+        # set root volume size
+        VirtletRootVolumeSize: 4Gi
         VirtletCloudInitUserData: |
           write_files:
           - path: /etc/systemd/system/docker.service.d/env.conf
@@ -57,7 +62,7 @@ spec:
                 export KUBECONFIG=/etc/kubernetes/admin.conf
                 export kubever=$(kubectl version | base64 | tr -d '\n')
                 kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$kubever"
-                while ! kubectl get pods -n kube-system -l k8s-app=kube-dns|grep ' 3/3'; do
+                while ! kubectl get pods -n kube-system -l k8s-app=kube-dns|grep ' 1/1'; do
                   sleep 1
                 done
                 mkdir -p /root/.kube
@@ -74,19 +79,11 @@ spec:
             # VirtletSSHKeys only affects 'ubuntu' user for this image, but we want root access
             ssh-authorized-keys:
             - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCaJEcFDXEK2ZbX0ZLS1EIYFZRbDAcRfuVjpstSc0De8+sV1aiu+dePxdkuDRwqFtCyk6dEZkssjOkBXtri00MECLkir6FcH3kKOJtbJ6vy3uaJc9w1ERo+wyl6SkAh/+JTJkp7QRXj8oylW5E20LsbnA/dIwWzAF51PPwF7A7FtNg9DnwPqMkxFo1Th/buOMKbP5ZA1mmNNtmzbMpMfJATvVyiv3ccsSJKOiyQr6UG+j7sc/7jMVz5Xk34Vd0l8GwcB0334MchHckmqDB142h/NCWTr8oLakDNvkfC1YneAfAO41hDkUbxPtVBG5M/o7P4fxoqiHEX+ZLfRxDtHB53 me@localhost
-          ssh_pwauth: True
           runcmd:
           - /usr/local/bin/provision.sh
     spec:
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-            - matchExpressions:
-              - key: extraRuntime
-                operator: In
-                values:
-                - virtlet
+      nodeSelector:
+        extraRuntime: virtlet
       containers:
       - name: ubuntu-vm
         image: virtlet.cloud/cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img
@@ -98,13 +95,3 @@ spec:
           tcpSocket:
             port: 22
           initialDelaySeconds: 5
-        volumeMounts:
-        - name: docker
-          mountPath: /var/lib/docker
-      volumes:
-      - name: docker
-        flexVolume:
-          driver: "virtlet/flexvolume_driver"
-          options:
-            type: qcow2
-            capacity: 4096MB
