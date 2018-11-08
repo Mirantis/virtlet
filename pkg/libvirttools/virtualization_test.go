@@ -96,7 +96,8 @@ func newContainerTester(t *testing.T, rec *testutils.TopLevelRecorder, cmds []fa
 	fakeCommander.ReplaceTempPath("__pods__", "/fakedev")
 	ct.virtTool = NewVirtualizationTool(
 		ct.domainConn, ct.storageConn, imageManager, ct.metadataStore,
-		GetDefaultVolumeSource(), virtConfig, utils.NullMounter, fakeCommander)
+		GetDefaultVolumeSource(), virtConfig, utils.NullMounter,
+		utils.FakeMountPointChecker, fakeCommander)
 	ct.virtTool.SetClock(ct.clock)
 
 	return ct
