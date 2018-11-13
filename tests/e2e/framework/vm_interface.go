@@ -70,6 +70,8 @@ type VMOptions struct {
 	MultiCNI string
 	// PVCs (with corresponding PVs) to use
 	PVCs []PVCSpec
+	// ConfigMap of Secret to use as source for tuning rootfs content
+	RootfsFilesSource string
 }
 
 func newVMInterface(controller *Controller, name string) *VMInterface {
@@ -209,6 +211,9 @@ func (vmi *VMInterface) buildVMPod(options VMOptions) *v1.Pod {
 	}
 	if options.MultiCNI != "" {
 		annotations["cni"] = options.MultiCNI
+	}
+	if options.RootfsFilesSource != "" {
+		annotations["VirtletFilesFromDataSource"] = options.RootfsFilesSource
 	}
 
 	limits := v1.ResourceList{}
