@@ -89,7 +89,7 @@ spec:
         memory: 160Mi
 ```
 
-# Annotations recognized by Virtlet
+# <a name="annotations"></a>Annotations recognized by Virtlet
 
 The annotations can be specified under `annotations` key of the
 `metadata` part of the pod spec. Note that the values are always
@@ -107,21 +107,21 @@ are described in detail in the
 | --- | --- | --- | --- |
 | <sub>[kubernetes.io/target-runtime](#cri-proxy-annotation)</sub> | [CRI runtime setting for CRI Proxy](#cri-proxy-annotation) | `virtlet.cloud` | `virtlet.cloud` |
 | <sub>[VirtletChown9pfsMounts](../volumes/#9pfs-mounts)</sub> | [Recursively chown 9pfs mounts](../volumes/#9pfs-mounts) | boolean | `""` |
-| <sub>[VirtletCloudInitImageType](../cloud-init/)</sub> | [Cloud-Init](../cloud-init/) image type to use | `"nocloud"` `"configdrive"` | `""` |
-| <sub>[VirtletCloudInitMetaData](../cloud-init/)</sub> | The contents of [Cloud-Init](../cloud-init/) metadata | json / yaml | `""` |
-| <sub>[VirtletCloudInitUserData](../cloud-init/)</sub> | The contents of [Cloud-Init](../cloud-init/) user-data (mergeable) | json / yaml | `""` |
-| <sub>[VirtletCloudInitUserDataOverwrite](../cloud-init/)</sub> | Disable merging of [Cloud-Init](../cloud-init) user-data keys | boolean | `""` |
-| <sub>[VirtletCloudInitUserDataScript](../cloud-init/)</sub> | The contents of [Cloud-Init](../cloud-init/) user-data as a script | text | `""` |
-| <sub>[VirtletCloudInitUserDataSource](../cloud-init/)</sub> | Data source for [Cloud-Init](../cloud-init/) user-data | `"configmap/..."` `"secret/..."` | `""` |
-| <sub>[VirtletCloudInitUserDataSourceEncoding](../cloud-init/)</sub> | Encoding to use for loading [Cloud-Init](../cloud-init/) user-data from a ConfigMap key | `"plain"` | `"base|4"` | `"plain"` |
-| <sub>[VirtletCloudInitUserDataSourceKey](../cloud-init/)</sub> | ConfigMap key to load [Cloud-Init](../cloud-init/) user-data from | | `""` |
+| <sub>[VirtletCloudInitImageType](../cloud-init/##output-iso-image-format)</sub> | [Cloud-Init](../cloud-init/##output-iso-image-format) image type to use | `"nocloud"` `"configdrive"` | `""` |
+| <sub>[VirtletCloudInitMetaData](../cloud-init/#detailed-structure-of-the-generated-files)</sub> | The contents of [Cloud-Init](../cloud-init/) metadata | json / yaml | `""` |
+| <sub>[VirtletCloudInitUserData](../cloud-init/#detailed-structure-of-the-generated-files)</sub> | The contents of [Cloud-Init](../cloud-init/) user-data (mergeable) | json / yaml | `""` |
+| <sub>[VirtletCloudInitUserDataOverwrite](../cloud-init/#detailed-structure-of-the-generated-files)</sub> | Disable merging of [Cloud-Init](../cloud-init/) user-data keys | boolean | `""` |
+| <sub>[VirtletCloudInitUserDataScript](../cloud-init/#detailed-structure-of-the-generated-files)</sub> | The contents of [Cloud-Init](../cloud-init/) user-data as a script | text | `""` |
+| <sub>[VirtletCloudInitUserDataSource](../cloud-init/#detailed-structure-of-the-generated-files)</sub> | Data source for [Cloud-Init](../cloud-init/) user-data | `"configmap/..."` `"secret/..."` | `""` |
+| <sub>[VirtletCloudInitUserDataSourceEncoding](../cloud-init/#propagating-user-data-from-kubernetes-objects)</sub> | Encoding to use for loading [Cloud-Init](../cloud-init/) user-data from a ConfigMap key | `"plain"` | `"base|4"` | `"plain"` |
+| <sub>[VirtletCloudInitUserDataSourceKey](../cloud-init/#propagating-user-data-from-kubernetes-objects)</sub> | ConfigMap key to load [Cloud-Init](../cloud-init/) user-data from | | `""` |
 | <sub>[VirtletCPUModel](#cpu-model)</sub> | [CPU model to use](#cpu-model) | `""` `"host-model"` | `""` |
 | <sub>[VirtletDiskDriver](#disk-driver)</sub> | [Disk driver to use](#disk-driver) | `"scsi"` `"virtio"` | `"scsi"` |
 | <sub>[VirtletFilesFromDataSource](#injecting-files-into-the-image)</sub> | Inject files from a ConfigMap or a Secret into the image | `"configmap/..."` `"secret/..."` | `""` |
 | <sub>[VirtletLibvirtCPUSetting](#cpu-model)</sub> | libvirt [CPU model](#cpu-model) setting | yaml | `""`
 | <sub>[VirtletRootVolumeSize](../volumes/#root-volume-size)</sub> | [Root volume size](../volumes/#root-volume-size) | quantity | `""` |
-| <sub>[VirtletSSHKeys](../cloud-init)</sub> | SSH keys to add to the VM injected via [Cloud-Init](../cloud-init/) | a list of strings | `""` |
-| <sub>[VirtletSSHKeySource](../cloud-init)</sub> | Data source for ssh keys injected via [Cloud-Init](../cloud-init/) | `"configmap/..."` `"secret/..."` | `""` |
+| <sub>[VirtletSSHKeys](../cloud-init/#detailed-structure-of-the-generated-files)</sub> | SSH keys to add to the VM injected via [Cloud-Init](../cloud-init/) | a list of strings | `""` |
+| <sub>[VirtletSSHKeySource](../cloud-init/#detailed-structure-of-the-generated-files)</sub> | Data source for ssh keys injected via [Cloud-Init](../cloud-init/) | `"configmap/..."` `"secret/..."` | `""` |
 | <sub>[VirtletVCPUCount](#vcpu-count)</sub> | [The number of vCPUs to assign to the VM pod](#vcpu-count) | integer | `"1"` |
 
 ## CRI Proxy annotation
