@@ -163,7 +163,7 @@ func loadDSAsFileMap(ns, key string) (map[string][]byte, error) {
 }
 
 func parseDataAsFileMap(data map[string]string) (map[string][]byte, error) {
-	var files map[string][]byte
+	files := make(map[string][]byte)
 	for k, v := range data {
 		if strings.HasSuffix(k, "_path") || strings.HasSuffix(k, "_encoding") {
 			continue
