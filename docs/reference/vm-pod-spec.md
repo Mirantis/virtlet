@@ -89,7 +89,7 @@ spec:
         memory: 160Mi
 ```
 
-# <a name="annotations"></a>Annotations recognized by Virtlet
+# Annotations recognized by Virtlet
 
 The annotations can be specified under `annotations` key of the
 `metadata` part of the pod spec. Note that the values are always

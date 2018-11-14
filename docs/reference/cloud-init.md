@@ -11,7 +11,8 @@ data generation mechanism for the following purposes:
 * setting up block devices based on PVs
 * adding user-defined Cloud-Init settings such as startup scripts
 
-See also the list of [annotations](../vm-pod-spec/#annotations) for
+See also the list of
+[annotations](../vm-pod-spec/#annotations-recognized-by-virtlet) for
 the list of annotations that are used for Cloud-Init.
 
 # Example
