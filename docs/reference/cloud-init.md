@@ -239,7 +239,7 @@ The `user-data` content is generated as follows:
   VM and Virtlet mounts them into appropriate directories
 * `write_files` are generated based on configmaps and secrets mounted
   into the container. It also includes `/etc/cloud/environment` file
-  (see [Environment variable support](environment-variables.md) for
+  (see [Environment variable support](../vm-pod-spec/#environment-variables) for
   more info) and optionally `/etc/cloud/mount-volumes.sh` that can be
   used to mount volumes on systems without udev (see
   [Workarounds for volume mounting](#workarounds-for-volume-mounting-and-raw-block-volumes) below)
