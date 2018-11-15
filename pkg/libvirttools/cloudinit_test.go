@@ -535,6 +535,14 @@ func TestCloudInitGenerator(t *testing.T) {
 						},
 						GW: net.IPv4(1, 2, 3, 4),
 					},
+					// additional route like in flannel case
+					{
+						Dst: net.IPNet{
+							IP:   net.IPv4(1, 2, 0, 0),
+							Mask: net.CIDRMask(16, 32),
+						},
+						GW: net.IPv4(1, 2, 3, 4),
+					},
 				},
 				DNS: cnitypes.DNS{
 					Nameservers: []string{"1.2.3.4"},

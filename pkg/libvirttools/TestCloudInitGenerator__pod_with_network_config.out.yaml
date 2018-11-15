@@ -6,11 +6,12 @@ network-config:
     subnets:
     - address: 1.1.1.1
       netmask: 255.0.0.0
+      routes:
+      - gateway: 1.2.3.4
+        netmask: 0.0.0.0
+        network: 0.0.0.0
       type: static
     type: physical
-  - destination: 0.0.0.0/0
-    gateway: 1.2.3.4
-    type: route
   - address:
     - 1.2.3.4
     search:
