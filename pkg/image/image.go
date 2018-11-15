@@ -315,7 +315,10 @@ func (s *FileStore) imageInfo(fi os.FileInfo) (*Image, error) {
 }
 
 func (s *FileStore) listImagesUnlocked(filter string) ([]*Image, error) {
-	filter, digestSpec := SplitImageName(filter)
+	var digestSpec digest.Digest
+	if filter != "" {
+		filter, digestSpec = SplitImageName(filter)
+	}
 
 	if linkDirExists, err := s.linkDirExists(); err != nil {
 		return nil, err
