@@ -26,15 +26,9 @@ spec:
   # pod only on the nodes that have extraRuntime=virtlet label.
   # This label is used by Virtlet DaemonSet to select nodes
   # that must have Virtlet runtime
-  affinity:
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-        - matchExpressions:
-          - key: extraRuntime
-            operator: In
-            values:
-            - virtlet
+  nodeSelector:
+    extraRuntime: virtlet
+
   containers:
   - name: cirros-vm
     # This specifies the image to use.
