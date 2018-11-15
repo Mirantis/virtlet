@@ -13,19 +13,13 @@ metadata:
     # set root volume size
     VirtletRootVolumeSize: 1Gi
 spec:
-  # This nodeAffinity specification tells Kubernetes to run this
+  # This nodeSelector specification tells Kubernetes to run this
   # pod only on the nodes that have extraRuntime=virtlet label.
   # This label is used by Virtlet DaemonSet to select nodes
   # that must have Virtlet runtime
-  affinity:
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-        - matchExpressions:
-          - key: extraRuntime
-            operator: In
-            values:
-            - virtlet
+  nodeSelector:
+    extraRuntime: virtlet
+
   containers:
   - name: cirros-vm
     # This specifies the image to use.

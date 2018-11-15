@@ -13,15 +13,9 @@ metadata:
     # volumes into this VM
     VirtletCloudInitUserDataScript: "@virtlet-mount-script@"
 spec:
-  affinity:
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-        - matchExpressions:
-          - key: extraRuntime
-            operator: In
-            values:
-            - virtlet
+  nodeSelector:
+    extraRuntime: virtlet
+
   containers:
   - name: cirros-vm
     image: virtlet.cloud/cirros
