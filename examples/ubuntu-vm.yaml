@@ -9,15 +9,9 @@ metadata:
     # set root volume size
     VirtletRootVolumeSize: 4Gi
 spec:
-  affinity:
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-        - matchExpressions:
-          - key: extraRuntime
-            operator: In
-            values:
-            - virtlet
+  nodeSelector:
+    extraRuntime: virtlet
+
   # This is the number of seconds Virtlet gives the VM to shut down cleanly.
   # The default value of 30 seconds is ok for containers but probably too
   # low for VM, so overriding it here is strongly advised.
