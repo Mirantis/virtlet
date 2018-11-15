@@ -72,8 +72,8 @@ func NewVNCCmd(client KubeClient, output io.Writer, waitForInterrupt bool) *cobr
 			case len(args) == 2:
 				// port should be unprivileged and below the high ports
 				// range
-				var port int
-				if port, err := strconv.Atoi(args[1]); err != nil || port < 1024 || port > 61000 {
+				port, err := strconv.Atoi(args[1])
+				if err != nil || port < 1024 || port > 61000 {
 					return errors.New("port parameter must be an integer number in range 1000-61000")
 				}
 				vnc.port = uint16(port)
