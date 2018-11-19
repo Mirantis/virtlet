@@ -47,7 +47,7 @@ func describeInjectingFiles(what, source, podName string, createSource, delSourc
 
 		It("should put files onto the rootfs [Conformance]", func() {
 			ssh := waitSSH(vm)
-			Expect(framework.RunSimple(ssh, "cat", "/tmp/test-file1", "/tmp/test-file2")).To(Equal("Hello World!"))
+			Expect(framework.RunSimple(ssh, "cat", "/test-file1", "/test-file2")).To(Equal("Hello World!"))
 		})
 	})
 }
@@ -56,11 +56,11 @@ var _ = Describe("Injecting files into rootfs", func() {
 	testData := map[string]string{
 		// plain encoding
 		"test_file1":          "Hello ",
-		"test_file1_path":     "/tmp/test-file1",
+		"test_file1_path":     "/test-file1",
 		"test_file1_encoding": "plain",
 		// base64 encoding - encoded string: "World!"
 		"test_file2":      "V29ybGQh",
-		"test_file2_path": "/tmp/test-file2",
+		"test_file2_path": "/test-file2",
 	}
 
 	describeInjectingFiles("ConfigMap", "configmap/files", "rootfs-cm", func() error {
