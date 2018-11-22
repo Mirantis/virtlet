@@ -242,11 +242,12 @@
         subnets:
         - address: 10.1.90.5
           netmask: 255.255.255.0
+          routes:
+          - gateway: 10.1.90.1
+            netmask: 0.0.0.0
+            network: 0.0.0.0
           type: static
         type: physical
-      - destination: 0.0.0.0/0
-        gateway: 10.1.90.1
-        type: route
     user-data: |
       #cloud-config
       mounts:

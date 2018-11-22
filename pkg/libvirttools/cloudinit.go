@@ -202,7 +202,6 @@ func (g *CloudInitGenerator) generateNetworkConfigurationNoCloud() ([]byte, erro
 	cniResult := g.config.ContainerSideNetwork.Result
 
 	var config []map[string]interface{}
-	var gateways []net.IP
 
 	// physical interfaces
 	for i, iface := range cniResult.Interfaces {
@@ -210,8 +209,7 @@ func (g *CloudInitGenerator) generateNetworkConfigurationNoCloud() ([]byte, erro
 			// skip host interfaces
 			continue
 		}
-		subnets, curGateways := g.getSubnetsAndGatewaysForNthInterface(i, cniResult)
-		gateways = append(gateways, curGateways...)
+		subnets := g.getSubnetsForNthInterface(i, cniResult)
 		mtu, err := mtuForMacAddress(iface.Mac, g.config.ContainerSideNetwork.Interfaces)
 		if err != nil {
 			return nil, err
@@ -224,37 +222,6 @@ func (g *CloudInitGenerator) generateNetworkConfigurationNoCloud() ([]byte, erro
 			"mtu":         mtu,
 		}
 		config = append(config, interfaceConf)
-	}
-
-	// routes
-	gotDefault := false
-	for _, cniRoute := range cniResult.Routes {
-		gw := cniRoute.GW
-		switch {
-		case gw != nil:
-			// ok
-		case len(gateways) == 0:
-			glog.Warning("cloud-init: no gateways specified but got a route with empty gateway")
-			continue
-		case len(gateways) > 1:
-			gw = gateways[0]
-			glog.Warningf("cloud-init: got more than one gateway and a route with empty gateway, using the first gateway: %q", gw)
-		default:
-			gw = gateways[0]
-		}
-		if ones, _ := cniRoute.Dst.Mask.Size(); ones == 0 {
-			if gotDefault {
-				glog.Warning("cloud-init: got more than one default route, using only the first one")
-				continue
-			}
-			gotDefault = true
-		}
-		route := map[string]interface{}{
-			"type":        "route",
-			"destination": cniRoute.Dst.String(),
-			"gateway":     gw.String(),
-		}
-		config = append(config, route)
 	}
 
 	// dns
@@ -272,9 +239,10 @@ func (g *CloudInitGenerator) generateNetworkConfigurationNoCloud() ([]byte, erro
 	return []byte("version: 1\n" + string(r)), nil
 }
 
-func (g *CloudInitGenerator) getSubnetsAndGatewaysForNthInterface(interfaceNo int, cniResult *cnicurrent.Result) ([]map[string]interface{}, []net.IP) {
+func (g *CloudInitGenerator) getSubnetsForNthInterface(interfaceNo int, cniResult *cnicurrent.Result) []map[string]interface{} {
 	var subnets []map[string]interface{}
-	var gateways []net.IP
+	routes := append(cniResult.Routes[:0:0], cniResult.Routes...)
+	gotDefault := false
 	for _, ipConfig := range cniResult.IPs {
 		if ipConfig.Interface == interfaceNo {
 			subnet := map[string]interface{}{
@@ -282,14 +250,40 @@ func (g *CloudInitGenerator) getSubnetsAndGatewaysForNthInterface(interfaceNo in
 				"address": ipConfig.Address.IP.String(),
 				"netmask": net.IP(ipConfig.Address.Mask).String(),
 			}
-			if !ipConfig.Gateway.IsUnspecified() {
-				gateways = append(gateways, ipConfig.Gateway)
-				// Note that we can't use ipConfig.Gateway as
-				// subnet["gateway"] because according CNI spec,
-				// it must not be used to produce any routes by itself.
-				// The routes must be specified in Routes field
-				// of the CNI result.
+
+			var subnetRoutes []map[string]interface{}
+			// iterate on routes slice in reverse order because at
+			// the end of loop found element will be removed from slice
+			allRoutesLen := len(routes)
+			for i := range routes {
+				cniRoute := routes[allRoutesLen-1-i]
+				var gw net.IP
+				if cniRoute.GW != nil && ipConfig.Address.Contains(cniRoute.GW) {
+					gw = cniRoute.GW
+				} else if cniRoute.GW == nil && !ipConfig.Gateway.IsUnspecified() {
+					gw = ipConfig.Gateway
+				} else {
+					continue
+				}
+				if ones, _ := cniRoute.Dst.Mask.Size(); ones == 0 {
+					if gotDefault {
+						glog.Warning("cloud-init: got more than one default route, using only the first one")
+						continue
+					}
+					gotDefault = true
+				}
+				route := map[string]interface{}{
+					"network": cniRoute.Dst.IP.String(),
+					"netmask": net.IP(cniRoute.Dst.Mask).String(),
+					"gateway": gw.String(),
+				}
+				subnetRoutes = append(subnetRoutes, route)
+				routes = append(routes[:allRoutesLen-1-i], routes[allRoutesLen-i:]...)
 			}
+			if subnetRoutes != nil {
+				subnet["routes"] = subnetRoutes
+			}
+
 			subnets = append(subnets, subnet)
 		}
 	}
@@ -301,7 +295,7 @@ func (g *CloudInitGenerator) getSubnetsAndGatewaysForNthInterface(interfaceNo in
 		})
 	}
 
-	return subnets, gateways
+	return subnets
 }
 
 func getDNSData(cniDNS cnitypes.DNS) []map[string]interface{} {

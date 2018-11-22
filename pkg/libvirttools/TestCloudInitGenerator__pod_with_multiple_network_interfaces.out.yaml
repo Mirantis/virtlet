@@ -6,6 +6,13 @@ network-config:
     subnets:
     - address: 1.1.1.1
       netmask: 255.0.0.0
+      routes:
+      - gateway: 1.2.3.4
+        netmask: 255.255.0.0
+        network: 1.2.0.0
+      - gateway: 1.2.3.4
+        netmask: 0.0.0.0
+        network: 0.0.0.0
       type: static
     type: physical
   - mac_address: 00:11:22:33:ab:cd
@@ -16,9 +23,6 @@ network-config:
       netmask: 255.255.255.0
       type: static
     type: physical
-  - destination: 0.0.0.0/0
-    gateway: 1.2.3.4
-    type: route
   - address:
     - 1.2.3.4
     search:
