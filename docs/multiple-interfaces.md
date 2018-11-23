@@ -11,7 +11,7 @@ Thanks to [CNI-Genie](https://github.com/Huawei-PaaS/CNI-Genie), Virtlet can use
 
 ## CNI-genie
 
-Before you proceed, read the CNI Genie [documentation](https://github.com/mirantis/CNI-Genie/blob/master/docs/CNIGenieFeatureSet.md)
+Before you proceed, read the CNI Genie [documentation](https://github.com/Huawei-PaaS/CNI-Genie/blob/master/docs/CNIGenieFeatureSet.md)
 
 There are two ways to tell CNI Genie which CNI networks to use:
 * by setting `cni: <plugins list>` in pods annotation
