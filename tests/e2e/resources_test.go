@@ -62,7 +62,8 @@ var _ = Describe("VM resources", func() {
 			Expect(m).To(HaveLen(2))
 			total += do(strconv.Atoi(m[1])).(int)
 		}
-		Expect(total).To(Equal(1024*(*memoryLimit) - 128))
+		Expect(total).To(BeNumerically(">", 1024*(*memoryLimit-1)))
+		Expect(total).To(BeNumerically("<", 1024*(*memoryLimit)))
 	})
 
 	It("Should grow the root volume size if requested", func() {
