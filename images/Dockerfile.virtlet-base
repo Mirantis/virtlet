@@ -1,37 +1,17 @@
 FROM ubuntu:16.04
 MAINTAINER Ivan Shvedunov <ishvedunov@mirantis.com>
 
-# BUMP 24.05.2018
+# BUMP 23.11.2018
 
 ENV DEBIAN_FRONTEND noninteractive
 
-RUN echo deb-src http://archive.ubuntu.com/ubuntu/ xenial main restricted >>/etc/apt/sources.list && \
-    echo deb-src http://archive.ubuntu.com/ubuntu/ xenial-updates main restricted >>/etc/apt/sources.list
+RUN echo deb-src http://archive.ubuntu.com/ubuntu/ xenial main universe restricted >>/etc/apt/sources.list && \
+    echo deb-src http://archive.ubuntu.com/ubuntu/ xenial-updates main universe restricted >>/etc/apt/sources.list
 
 RUN apt-get -y update && \
-    apt-get -y build-dep libvirt && \
     apt-get -y build-dep libguestfs && \
     apt-get -y build-dep supermin && \
     apt-get -y install git libjansson-dev libhivex-ocaml-dev
-
-RUN git clone https://github.com/libvirt/libvirt.git /libvirt && \
-    cd /libvirt && \
-    git checkout v3.7.0 && \
-    ./autogen.sh --prefix=/usr/local \
-                 --localstatedir=/var \
-                 --sysconfdir=/etc \
-                 --without-polkit \
-                 --without-esx \
-                 --without-vbox \
-                 --without-xen \
-                 --without-libxl \
-                 --with-qemu \
-                 --with-qemu-user=libvirt-qemu \
-                 --with-qemu-group=kvm \
-                 --without-lxc \
-                 --without-nwfilter && \
-    make -j$(grep -c ^processor /proc/cpuinfo) && \
-    make -j$(grep -c ^processor /proc/cpuinfo) install
 
 RUN git clone https://github.com/libguestfs/supermin.git && \
     cd supermin && \
@@ -57,8 +37,11 @@ COPY --from=0 /usr/local /usr/local
 
 ENV DEBIAN_FRONTEND noninteractive
 
-RUN apt-get update && \
-    apt-get install -y bridge-utils \
+RUN apt-get update && apt-get install -y curl && \
+    echo deb http://mirror.mirantis.com/proposed/openstack-queens/xenial xenial main >>/etc/apt/sources.list && \
+    curl http://mirror.mirantis.com/proposed/openstack-queens/xenial/archive-queens.key | apt-key add - && \
+    apt-get update && \
+    apt-get install -y libvirt-bin libvirt-daemon libvirt-dev bridge-utils \
                        openssl qemu-kvm \
                        netbase iptables ebtables vncsnapshot \
                        socat netcat-openbsd \
@@ -76,15 +59,6 @@ RUN apt-get update && \
                        udev xz-utils zerofree libjansson4 \
                        dnsmasq libpcap0.8 libnetcf1 dmidecode && \
     apt-get clean
-
-RUN if ! getent group libvirtd >/dev/null; then addgroup --system libvirtd; fi && \
-    for u in $(getent group admin | sed -e "s/^.*://" -e "s/,/ /g"); do adduser "$u" libvirtd >/dev/null || true; done && \
-    for u in $(getent group sudo | sed -e "s/^.*://" -e "s/,/ /g"); do adduser "$u" libvirtd >/dev/null || true; done && \
-    if ! getent group kvm >/dev/null; then addgroup --quiet --system kvm; fi && \
-    adduser --quiet --system --ingroup kvm --quiet --disabled-login --disabled-password \
-            --home /var/lib/libvirt --no-create-home -gecos "Libvirt Qemu" --uid 64055 libvirt-qemu && \
-    adduser --quiet --system --ingroup libvirtd --quiet --disabled-login --disabled-password \
-            --home /var/lib/libvirt/dnsmasq --no-create-home -gecos "Libvirt Dnsmasq" libvirt-dnsmasq
 
 # TODO: try to go back to alpine
 # TODO: check which libs are really needed for libvirt / libguestfs / supermin
