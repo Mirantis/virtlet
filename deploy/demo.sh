@@ -6,7 +6,7 @@ set -o pipefail
 set -o errtrace
 
 KUBE_VERSION="${KUBE_VERSION:-1.11}"
-CRIPROXY_DEB_URL="${CRIPROXY_DEB_URL:-https://github.com/Mirantis/criproxy/releases/download/v0.12.0/criproxy-nodeps_0.12.0_amd64.deb}"
+CRIPROXY_DEB_URL="${CRIPROXY_DEB_URL:-https://github.com/Mirantis/criproxy/releases/download/v0.13.0/criproxy-nodeps_0.13.0_amd64.deb}"
 NONINTERACTIVE="${NONINTERACTIVE:-}"
 NO_VM_CONSOLE="${NO_VM_CONSOLE:-}"
 INJECT_LOCAL_IMAGE="${INJECT_LOCAL_IMAGE:-}"
@@ -161,7 +161,10 @@ function demo::install-cni-genie {
 function demo::install-cri-proxy {
   local virtlet_node="${1}"
   demo::step "Installing CRI proxy package on ${virtlet_node} container"
-  docker exec "${virtlet_node}" /bin/bash -c "curl -sSL '${CRIPROXY_DEB_URL}' >/criproxy.deb && dpkg -i /criproxy.deb && rm /criproxy.deb"
+  if [[ ${DIND_CRI:-} = containerd ]]; then
+    docker exec "${virtlet_node}" /bin/bash -c 'echo criproxy-nodeps criproxy/primary_cri select containerd | debconf-set-selections'
+  fi
+  docker exec "${virtlet_node}" /bin/bash -c "curl -sSL '${CRIPROXY_DEB_URL}' >/criproxy.deb && DEBIAN_FRONTEND=noninteractive dpkg -i /criproxy.deb && rm /criproxy.deb"
 }
 
 function demo::fix-mounts {
