@@ -26,7 +26,7 @@ You can watch and listen to Virtlet demo video that was recorded on Kubernetes C
 
 Virtlet comes with a helper tool,
 [virtletctl](docs/virtletctl/virtletctl.md), that helps managing the VM pods. The binaries are available for Linux and Mac OS X in the [Releases](https://github.com/Mirantis/virtlet/releases) section.
-If you're using Kubernetes 1.9, you can install virtletctl as a kubectl plugin:
+If you're using Kubernetes 1.9 or newer, you can install virtletctl as a kubectl plugin:
 ```
 virtletctl install
 ```
@@ -69,7 +69,7 @@ The demo script will check for KVM support on the host and will make Virtlet use
 
 The demo is based on [kubeadm-dind-cluster](https://github.com/kubernetes-sigs/kubeadm-dind-cluster) project. **Docker btrfs storage driver is currently unsupported.** Please refer to `kubeadm-dind-cluster` documentation for more info.
 
-You can remove the test cluster with `./dind-cluster-v1.9.sh clean` when you no longer need it.
+You can remove the test cluster with `./dind-cluster-v1.11.sh clean` when you no longer need it.
 
 ## External projects using Virtlet
 There are some external projects using Virtlet already.
