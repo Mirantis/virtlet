@@ -38,8 +38,8 @@ COPY --from=0 /usr/local /usr/local
 ENV DEBIAN_FRONTEND noninteractive
 
 RUN apt-get update && apt-get install -y curl && \
-    echo deb http://mirror.mirantis.com/proposed/openstack-queens/xenial xenial main >>/etc/apt/sources.list && \
-    curl http://mirror.mirantis.com/proposed/openstack-queens/xenial/archive-queens.key | apt-key add - && \
+    echo deb http://mirror.mirantis.com/stable/openstack-queens/xenial xenial main >>/etc/apt/sources.list && \
+    curl http://mirror.mirantis.com/stable/openstack-queens/xenial/archive-queens.key | apt-key add - && \
     apt-get update && \
     apt-get install -y libvirt-bin libvirt-daemon libvirt-dev bridge-utils \
                        openssl qemu-kvm \
