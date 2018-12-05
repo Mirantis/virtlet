@@ -61,7 +61,7 @@ type VirtletManager struct {
 
 // NewVirtletManager creates a new VirtletManager.
 func NewVirtletManager(config *v1.VirtletConfig, fdManager tapmanager.FDManager, clientCfg clientcmd.ClientConfig, diagSet *diag.Set) *VirtletManager {
-	return &VirtletManager{config: config, fdManager: fdManager, diagSet: diagSet}
+	return &VirtletManager{config: config, fdManager: fdManager, diagSet: diagSet, clientCfg: clientCfg}
 }
 
 // Run sets up the environment for the runtime and image services and
