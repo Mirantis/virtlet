@@ -30,15 +30,14 @@ import (
 
 var _ = Describe("Virtlet restart [Disruptive]", func() {
 	var (
-		vm    *framework.VMInterface
-		vmPod *framework.PodInterface
+		vm *framework.VMInterface
 	)
 
 	BeforeAll(func() {
 		vm = controller.VM("cirros-vm")
 		vm.CreateAndWait(VMOptions{}.ApplyDefaults(), time.Minute*5, nil)
 		var err error
-		vmPod, err = vm.Pod()
+		_, err = vm.Pod()
 		Expect(err).NotTo(HaveOccurred())
 
 		// restart virtlet before all tests

@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"regexp"
 	"time"
 
 	. "github.com/onsi/gomega"
@@ -27,9 +28,17 @@ import (
 )
 
 var _ = Describe("Image URL", func() {
-	var vimName string
+	var vimName, digestSuffix string
 
 	BeforeAll(func() {
+		re := regexp.MustCompile("^(.*?)(@.*)?$")
+		m := re.FindStringSubmatch(*vmImageLocation)
+		if m == nil {
+			panic("impossible regexp failure")
+		}
+		url := "https://" + m[1] // FIXME: this will only work if Virtlet uses https by default
+		digestSuffix = m[2]
+
 		vim, err := controller.CreateVirtletImageMapping(virtlet_v1.VirtletImageMapping{
 			ObjectMeta: meta_v1.ObjectMeta{
 				GenerateName: "virtlet-e2e-",
@@ -38,7 +47,7 @@ var _ = Describe("Image URL", func() {
 				Rules: []virtlet_v1.TranslationRule{
 					{
 						Name: "test-image",
-						URL:  *vmImageLocation,
+						URL:  url,
 					},
 				},
 			},
@@ -54,7 +63,9 @@ var _ = Describe("Image URL", func() {
 
 	It("Can be specified in CRD [Conformance]", func() {
 		vm := controller.VM("cirros-vm-with-remapped-image")
-		Expect(vm.CreateAndWait(VMOptions{}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
+		Expect(vm.CreateAndWait(VMOptions{
+			Image: "test-image" + digestSuffix,
+		}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
 		_, err := vm.Pod()
 		Expect(err).NotTo(HaveOccurred())
 		deleteVM(vm)
