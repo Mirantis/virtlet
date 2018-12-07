@@ -33,7 +33,7 @@ The steps described here are performed automatically by
    ```
 1. Install CRI proxy on the node:
    ```bash
-   CRIPROXY_DEB_URL="https://github.com/Mirantis/criproxy/releases/download/v0.11.1/criproxy-nodeps_0.11.1_amd64.deb"
+   CRIPROXY_DEB_URL="https://github.com/Mirantis/criproxy/releases/download/v0.14.0/criproxy-nodeps_0.14.0_amd64.deb"
    docker exec kube-node-1 /bin/bash -c "curl -sSL '${CRIPROXY_DEB_URL}' >/criproxy.deb && dpkg -i /criproxy.deb && rm /criproxy.deb"
    ```
 1. Download `virtletctl` binary for `virtlet` release you need (replace `N.N.N` in the command below accordingly):
