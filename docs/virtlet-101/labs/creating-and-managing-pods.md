@@ -16,7 +16,8 @@ kubectl get pod
 kubectl get svc
 ```
 
-Now go back to the first console where you are logged in the `cirros-vm`. Check that you have internet access:
+Now go back to the first console where you are logged in the `cirros-vm`. If you disconnected from it you can reconnect with `virtletctl ssh cirros@cirros-vm -- -i virtlet/examples/vmkey`.
+Check that you have internet access:
 
 ```bash
 ping 8.8.8.8
@@ -26,7 +27,7 @@ ping mirantis.com
 Make sure that the cluster network is also accessible from within the pod. Retrieve some data:
 
 ```bash
-curl <nginx_service_ip>
+curl nginx
 ```
 
 Disconnect from the VM using Ctrl-D.
@@ -50,6 +51,8 @@ Use the `kubectl attach` command to attach to the VM console:
 ```
 kubectl attach -it cirros-vm
 ```
+
+To exit use `CTRL-]` key combination.
 
 ## Create new Ubuntu VM
 
@@ -81,12 +84,13 @@ Because Virtlet VMs are just normal pods you can create Deployment, DaemonSet or
 
 ```bash
 cat examples/deploy-cirros-vm.yaml
-kubectl apply -f examples/deploy-cirros-vm.yaml
+kubectl apply -f examples/cirros-vm-deployment.yaml
 ```
 
 When it's ready you can scale it:
 
 ```bash
-kubectl scale --replicas=2 deploy/cirros
+kubectl scale --replicas=2 deploy/cirros-deployment
 ```
 
+Next [Virtual Machines Network](network.md)
