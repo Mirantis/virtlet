@@ -374,7 +374,7 @@ docker exec kube-node-1 /bin/bash -c 'sed -i "s/MountPropagation/BlockVolume/" /
 
 Install CRI Proxy so we can grab the logs:
 ```bash
-CRIPROXY_DEB_URL="${CRIPROXY_DEB_URL:-https://github.com/Mirantis/criproxy/releases/download/v0.11.1/criproxy-nodeps_0.11.1_amd64.deb}"
+CRIPROXY_DEB_URL="${CRIPROXY_DEB_URL:-https://github.com/Mirantis/criproxy/releases/download/v0.14.0/criproxy-nodeps_0.14.0_amd64.deb}"
 docker exec kube-node-1 /bin/bash -c "curl -sSL '${CRIPROXY_DEB_URL}' >/criproxy.deb && dpkg -i /criproxy.deb && rm /criproxy.deb"
 ```
 

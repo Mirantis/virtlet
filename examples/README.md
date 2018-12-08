@@ -87,7 +87,7 @@ for testing, you can use this command to start the cluster with
 FEATURE_GATES="BlockVolume=true" \
     KUBELET_FEATURE_GATES="BlockVolume=true" \
     ENABLE_CEPH=1 \
-    ./dind-cluster-v1.11.sh up
+    ./dind-cluster-v1.12.sh up
 ```
 
 [ubuntu-vm-local-block-pv.yaml](ubuntu-vm-local-block-pv.yaml)

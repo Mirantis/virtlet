@@ -5,8 +5,8 @@ set -o nounset
 set -o pipefail
 set -o errtrace
 
-KUBE_VERSION="${KUBE_VERSION:-1.11}"
-CRIPROXY_DEB_URL="${CRIPROXY_DEB_URL:-https://github.com/Mirantis/criproxy/releases/download/v0.13.0/criproxy-nodeps_0.13.0_amd64.deb}"
+KUBE_VERSION="${KUBE_VERSION:-1.12}"
+CRIPROXY_DEB_URL="${CRIPROXY_DEB_URL:-https://github.com/Mirantis/criproxy/releases/download/v0.14.0/criproxy-nodeps_0.14.0_amd64.deb}"
 NONINTERACTIVE="${NONINTERACTIVE:-}"
 NO_VM_CONSOLE="${NO_VM_CONSOLE:-}"
 INJECT_LOCAL_IMAGE="${INJECT_LOCAL_IMAGE:-}"
