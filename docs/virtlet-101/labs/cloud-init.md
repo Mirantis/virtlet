@@ -45,4 +45,6 @@ VirtletCloudInitUserDataSource: configmap/vm-user-data
 When you are passing [Environment variables](../environment-variables.md) to a Pod Virtlet uses cloud-init to pass it to a VM and store them in a `/etc/cloud/environment` file.
 When you are using ConfigMap or Secret in a Pod then they are passed to the VM using cloud-init by creating new files there. Pod's volumes are also converted to `mounts` and mounted in VM using cloud-init when listed in the `volumeMounts` field.
 
-See `virtlet/examples/k8s.yaml` where `VirtletCloudInitUserData` is used to do some advanced scripting there.
+See `examples/k8s.yaml` where `VirtletCloudInitUserData` is used to do some advanced scripting there.
+
+Next [Rolling out updates](rolling-out-updates.md)

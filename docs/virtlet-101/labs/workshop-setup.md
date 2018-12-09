@@ -13,6 +13,11 @@ chmod +x virtletctl
 wget https://storage.googleapis.com/kubernetes-release/release/v1.11.0/bin/linux/amd64/kubectl
 chmod +x kubectl
 
+mkdir -p ~/bin
 mv virtletctl ~/bin
 mv kubectl ~/bin
+
+cd virtlet
 ```
+
+Next [Provision Virtlet](provision-virtlet.md)

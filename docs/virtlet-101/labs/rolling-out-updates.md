@@ -20,3 +20,5 @@ kubectl attach -it cirros-vm
 and run `uptime` command.
 
 Virtlet updates are done using standard [DaemonSet update mechanism](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/)
+
+Next [Troubleshooting](troubleshooting.md)

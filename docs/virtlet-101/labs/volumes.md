@@ -6,7 +6,7 @@ Virtlet supports Kubernetes Volumes in a several ways:
 
 ## Directory volume with 9pfs
 
-It allows Virtlet to use for example `emptyDir` or `hostPath`. It's a network protocol used over a virtual pci device (does not use networking stack) so when comparing to other options it may have worse performance.
+It allows Virtlet to use for example `emptyDir` or `hostPath`. It is a network protocol used over a virtual pci device (does not use networking stack) so when comparing to other options it may have worse performance.
 
 
 ## Persistent Block Volumes
@@ -24,8 +24,10 @@ It’s possible to use Virtlet’s flexvolume driver to specify mounting of loca
 See how to use flexvolume with VM Pod:
 
 ```bash
-cat virtlet/examples/ubuntu-vm-with-volume.yaml
-kubectl create -f virtlet/examples/ubuntu-vm-with-volume.yaml
+cat examples/ubuntu-vm-with-volume.yaml
+kubectl create -f examples/ubuntu-vm-with-volume.yaml
 ```
 
 There are also plans to work on [CSI](https://kubernetes.io/blog/2018/01/introducing-container-storage-interface/)
+
+Next [Cloudinit support](cloud-init.md)

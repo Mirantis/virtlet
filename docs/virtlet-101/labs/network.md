@@ -47,3 +47,5 @@ In `demo.sh` script default is set also to "calico,flannel":
 ```bash
 docker exec kube-node-1 cat /etc/cni/net.d/00-genie.conf
 ```
+
+Next [Virtual Machines Volumes](volumes.md)
