@@ -40,7 +40,7 @@ func NewLogWriter(stdout <-chan []byte, logFile string, wg *sync.WaitGroup) {
 		file.Close()
 	}
 
-	f, err := os.OpenFile(logFile, os.O_WRONLY, 0777)
+	f, err := os.OpenFile(logFile, os.O_WRONLY|os.O_APPEND, 0777)
 	if err != nil {
 		glog.Error("Failed to open output file:", err)
 		return
