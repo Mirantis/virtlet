@@ -65,19 +65,19 @@ LineReader:
 		case io.EOF:
 			break LineReader
 		case nil:
+			// strip eol
+			line = strings.Trim(line, "\n")
+
+			// split and parse entries acording to section 3.5 in
+			// https://www.kernel.org/doc/Documentation/filesystems/proc.txt
+			// TODO: whitespaces and control chars in names are encoded as
+			// octal values (e.g. for "x x": "x\040x") what should be expanded
+			// in both mount point source and target
+			parts := strings.Split(line, " ")
+			mi[parts[4]] = mountEntry{Source: parts[9], Fs: parts[8]}
+		default:
 			return mountPointChecker{}, err
 		}
-
-		// strip eol
-		line = strings.Trim(line, "\n")
-
-		// split and parse entries acording to section 3.5 in
-		// https://www.kernel.org/doc/Documentation/filesystems/proc.txt
-		// TODO: whitespaces and control chars in names are encoded as
-		// octal values (e.g. for "x x": "x\040x") what should be expanded
-		// in both mount point source and target
-		parts := strings.Split(line, " ")
-		mi[parts[4]] = mountEntry{Source: parts[9], Fs: parts[8]}
 	}
 	return mountPointChecker{mountInfo: mi}, nil
 }
@@ -107,7 +107,7 @@ func (mpc mountPointChecker) IsPathAnNs(path string) bool {
 	if !isMountPoint {
 		return false
 	}
-	return entry.Fs == "nsfs"
+	return entry.Fs == "nsfs" || entry.Fs == "proc"
 }
 
 type fakeMountPointChecker struct{}

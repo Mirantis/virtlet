@@ -34,7 +34,7 @@ mkdir -p /host-var-lib/virtlet/images /hostlog/virtlet/vms /host-var-lib/virtlet
 
 # set up KVM
 if [[ ! ${VIRTLET_DISABLE_KVM:-} ]]; then
-  if ! kvm-ok >&/dev/null; then
+  if ! kvm-ok &>/dev/null; then
     # try to fix the environment by loading appropriate modules
     modprobe kvm || (echo "Missing kvm module on the host" >&2 && exit 1)
     if grep vmx /proc/cpuinfo &>/dev/null; then
