@@ -6,6 +6,10 @@ It is possible to run Virtlet by following the instructions from either [Running
 
 [See here](docs/architecture.md) for the description of Virtlet architecture.
 
+## Description & Documentation
+
+[See here](docs/architecture.md) for user facing Virtlet description and documentation.
+
 ## Community
 
 You can join
