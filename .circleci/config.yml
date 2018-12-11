@@ -199,10 +199,10 @@ e2e: &e2e
       command: |
         build/portforward.sh 8080&
         mkdir -p ~/junit
-        skip_focus=("-ginkgo.skip=\[Heavy\]|\[MultiCNI\]|\[Disruptive\]")
+        skip_focus=("-ginkgo.skip=\[Heavy\]|\[MultiCNI\]|\[Disruptive\]|\[Flaky\]")
         if [[ ${CIRCLE_JOB} = e2e_multi_cni ]]; then
           # per-node config test requires an additional worker node
-          skip_focus="-ginkgo.skip=\[Heavy\]|\[Disruptive\]|Per-node configuration"
+          skip_focus="-ginkgo.skip=\[Heavy\]|\[Disruptive\]|\[Flaky\]|Per-node configuration"
         fi
         if [[ ${E2E_FOCUS:-} ]]; then
           skip_focus+=("-ginkgo.focus=${E2E_FOCUS}")
