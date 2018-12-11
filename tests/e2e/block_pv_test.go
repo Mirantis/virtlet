@@ -30,7 +30,7 @@ var _ = Describe("Block PVs", func() {
 	)
 
 	describePersistentRootfs := func(makePersistentRootVM func()) {
-		It("Should be usable as a persistent root filesystem", func() {
+		It("[Flaky] Should be usable as a persistent root filesystem", func() {
 			makePersistentRootVM()
 			ssh = waitSSH(vm)
 			do(framework.RunSimple(ssh, "echo -n foo | sudo tee /bar.txt"))
