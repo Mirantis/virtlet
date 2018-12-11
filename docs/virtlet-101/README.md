@@ -23,5 +23,6 @@ Virtlet Version: v1.4.1
 
 ## Resources
 
+* [Virtlet user documentation](https://docs.virtlet.cloud)
 * [Virtlet documentation](..)
 * [Virtlet Blog Posts](https://www.mirantis.com/tag/virtlet/)
