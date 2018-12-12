@@ -5,8 +5,8 @@ In this workshop you will learn how to:
 * Deploy Virtlet on [kubeadm-dind-cluster](https://github.com/kubernetes-sigs/kubeadm-dind-cluster)
 * Deploy and manage VMs using kubectl
 
-Kubernetes Version: v1.11
-Virtlet Version: v1.4.1
+Kubernetes Version: v1.12
+Virtlet Version: v1.4.3
 
 ## Virtlet Lab
 
