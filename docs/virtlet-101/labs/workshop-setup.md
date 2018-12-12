@@ -10,7 +10,7 @@ chmod 600 virtlet/examples/vmkey
 wget https://github.com/Mirantis/virtlet/releases/download/v1.4.1/virtletctl
 chmod +x virtletctl
 
-wget https://storage.googleapis.com/kubernetes-release/release/v1.11.0/bin/linux/amd64/kubectl
+wget https://storage.googleapis.com/kubernetes-release/release/v1.12.3/bin/linux/amd64/kubectl
 chmod +x kubectl
 
 mkdir -p ~/bin
