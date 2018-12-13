@@ -36,20 +36,21 @@ mkdir -p /host-var-lib/virtlet/images /hostlog/virtlet/vms /host-var-lib/virtlet
 if [[ ! ${VIRTLET_DISABLE_KVM:-} ]]; then
   if ! kvm-ok &>/dev/null; then
     # try to fix the environment by loading appropriate modules
-    modprobe kvm || (echo "Missing kvm module on the host" >&2 && exit 1)
+    modprobe kvm || (echo "Missing kvm module on the host" >&2 && sleep infinity)
     if grep vmx /proc/cpuinfo &>/dev/null; then
-      modprobe kvm_intel || (echo "Missing kvm_intel module on the host" >&2 && exit 1)
+      modprobe kvm_intel || (echo "Missing kvm_intel module on the host" >&2 && sleep infinity)
     elif grep svm /proc/cpuinfo &>/dev/null; then
-      modprobe kvm_amd || (echo "Missing kvm_amd module on the host" >&2 && exit 1)
+      modprobe kvm_amd || (echo "Missing kvm_amd module on the host" >&2 && sleep infinity)
     fi
   fi
   if [[ ! -e /dev/kvm ]] && ! mknod /dev/kvm c 10 $(grep '\<kvm\>' /proc/misc | cut -d" " -f1); then
     echo "Can't create /dev/kvm" >&2
   fi
-  if ! kvm-ok; then
+  while ! kvm-ok; do
     echo "*** VIRTLET_DISABLE_KVM is not set but KVM extensions are not available ***" >&2
     echo "*** Virtlet startup failed ***" >&2
-    exit 1
-  fi
+    echo "Rechecking in 5 sec." >&2
+    sleep 5
+  done
   chown libvirt-qemu.kvm /dev/kvm
 fi
