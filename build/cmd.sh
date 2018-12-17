@@ -7,6 +7,7 @@ set -o errtrace
 CRIPROXY_DEB_URL="${CRIPROXY_DEB_URL:-https://github.com/Mirantis/criproxy/releases/download/v0.14.0/criproxy-nodeps_0.14.0_amd64.deb}"
 VIRTLET_IMAGE="${VIRTLET_IMAGE:-mirantis/virtlet}"
 VIRTLET_SKIP_RSYNC="${VIRTLET_SKIP_RSYNC:-}"
+VIRTLET_SKIP_VENDOR="${VIRTLET_SKIP_VENDOR:-false}"
 VIRTLET_RSYNC_PORT="${VIRTLET_RSYNC_PORT:-18730}"
 VIRTLET_ON_MASTER="${VIRTLET_ON_MASTER:-}"
 VIRTLET_MULTI_NODE="${VIRTLET_MULTI_NODE:-}"
@@ -178,6 +179,7 @@ function ensure_build_container {
                -e VIRTLET_ON_MASTER="${VIRTLET_ON_MASTER:-}" \
                -e VIRTLET_MULTI_NODE="${VIRTLET_MULTI_NODE:-}" \
                -e GITHUB_TOKEN="${GITHUB_TOKEN:-}" \
+               -e VIRTLET_SKIP_VENDOR="${VIRTLET_SKIP_VENDOR:-false}" \
                ${docker_cert_args[@]+"${docker_cert_args[@]}"} \
                --name virtlet-build \
                --tmpfs /tmp \
@@ -213,7 +215,7 @@ function vcmd {
     cd "${project_dir}"
     if [[ ! ${VIRTLET_SKIP_RSYNC} ]]; then
         local -a filters=(
-            --filter '- /vendor/'
+            #--filter '- /vendor/'
             --filter '- /_output/'
         )
         if [[ ! ${rsync_git} ]]; then
@@ -379,9 +381,14 @@ function build_image_internal {
 }
 
 function install_vendor_internal {
-    if [ ! -d vendor ]; then
-        glide install --strip-vendor
+    if [[ -d vendor ]]; then
+        if [[ ${VIRTLET_SKIP_VENDOR:-false} == "true" ]]; then
+            return 0
+        else
+            rm -rf vendor
+        fi
     fi
+    glide install --strip-vendor
 }
 
 function run_tests_internal {
@@ -435,6 +442,7 @@ function build_internal {
         echo >&2 "${bindata_dir} changed, please re-run ${0} update-bindata"
         exit 1
     fi
+    echo "glide install beginning"
     install_vendor_internal
     ldflags="$(get_ldflags)"
     mkdir -p "${project_dir}/_output"
@@ -515,6 +523,7 @@ function update_docs_internal {
 }
 
 function update_generated_internal {
+  install_vendor_internal
   vendor/k8s.io/code-generator/generate-groups.sh all \
     github.com/Mirantis/virtlet/pkg/client github.com/Mirantis/virtlet/pkg/api \
     virtlet.k8s:v1 \
