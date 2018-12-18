@@ -213,6 +213,8 @@ spec:
         - name: netns-dir
           mountPath: /var/run/netns
           mountPropagation: Bidirectional
+        - name: cgroup
+          mountPath: /sys/fs/cgroup
         securityContext:
           privileged: true
         readinessProbe:
