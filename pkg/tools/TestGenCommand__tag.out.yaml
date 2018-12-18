@@ -109,6 +109,8 @@ spec:
         - mountPath: /var/run/netns
           mountPropagation: Bidirectional
           name: netns-dir
+        - mountPath: /sys/fs/cgroup
+          name: cgroup
       - command:
         - /vms.sh
         image: mirantis/virtlet:0.9.42
