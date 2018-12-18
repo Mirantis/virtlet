@@ -430,10 +430,14 @@ func (v *VirtletRuntimeService) UpdateRuntimeConfig(context.Context, *kubeapi.Up
 	return &kubeapi.UpdateRuntimeConfigResponse{}, nil
 }
 
-// UpdateContainerResources passes info about Cpusets for particular container
-// to virttool
+// UpdateContainerResources stores in domain on libvirt info about Cpuset
+// for container then looks for running emulator and tries to adjust its
+// current settings through cgroups
 func (v *VirtletRuntimeService) UpdateContainerResources(ctx context.Context, req *kubeapi.UpdateContainerResourcesRequest) (*kubeapi.UpdateContainerResourcesResponse, error) {
 	if err := v.virtTool.UpdateCpusetsInContainerDefinition(req.GetContainerId(), req.GetLinux().CpusetCpus); err != nil {
+		return nil, err
+	}
+	if err := v.virtTool.UpdateCpusetsForEmulatorProcess(req.GetContainerId(), req.GetLinux().CpusetCpus); err != nil {
 		return nil, err
 	}
 	return &kubeapi.UpdateContainerResourcesResponse{}, nil
