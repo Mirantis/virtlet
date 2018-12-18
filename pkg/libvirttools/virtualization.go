@@ -818,43 +818,6 @@ func (v *VirtualizationTool) ContainerInfo(containerID string) (*types.Container
 	return containerInfo, nil
 }
 
-// UpdateCpusetsInContainerDefinition updates domain definition in libvirt for the VM
-// setting environment variable for vmwrapper with info about to which cpuset it should
-// pin itself
-func (v *VirtualizationTool) UpdateCpusetsInContainerDefinition(containerID, cpusets string) error {
-	domain, err := v.domainConn.LookupDomainByUUIDString(containerID)
-	if err != nil {
-		return err
-	}
-
-	domainxml, err := domain.XML()
-	if err != nil {
-		return err
-	}
-
-	found := false
-	envvars := domainxml.QEMUCommandline.Envs
-	for _, envvar := range envvars {
-		if envvar.Name == vconfig.CpusetsEnvVarName {
-			envvar.Value = cpusets
-			found = true
-		}
-	}
-	if !found && cpusets != "" {
-		domainxml.QEMUCommandline.Envs = append(envvars, libvirtxml.DomainQEMUCommandlineEnv{
-			Name:  vconfig.CpusetsEnvVarName,
-			Value: cpusets,
-		})
-	}
-
-	if err := domain.Undefine(); err != nil {
-		return err
-	}
-
-	_, err = v.domainConn.DefineDomain(domainxml)
-	return err
-}
-
 // VMStats returns current cpu/memory/disk usage for VM
 func (v *VirtualizationTool) VMStats(containerID string, name string) (*types.VMStats, error) {
 	domain, err := v.domainConn.LookupDomainByUUIDString(containerID)

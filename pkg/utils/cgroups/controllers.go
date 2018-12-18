@@ -37,7 +37,7 @@ const (
 func GetProcessControllers(pid interface{}) (map[string]string, error) {
 	sPid := utils.Stringify(pid)
 
-	file, err := os.Open(filepath.Join("/proc", sPid, "cgroups"))
+	file, err := os.Open(filepath.Join("/proc", sPid, "cgroup"))
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func GetProcessControllers(pid interface{}) (map[string]string, error) {
 
 	reader := bufio.NewReader(file)
 
-	var ctrls map[string]string
+	ctrls := make(map[string]string)
 
 	for {
 		line, err := reader.ReadString('\n')
