@@ -310,15 +310,15 @@ func (s *TapFDSource) Stop() error {
 }
 
 // Recover recovers the state for the netns after Virtlet restart
-func (s *TapFDSource) Recover(key string, data []byte) error {
+func (s *TapFDSource) Recover(key string, data []byte) ([]int, error) {
 	var payload RecoverPayload
 	if err := json.Unmarshal(data, &payload); err != nil {
-		return fmt.Errorf("error unmarshalling GetFD payload: %v", err)
+		return nil, fmt.Errorf("error unmarshalling GetFD payload: %v", err)
 	}
 	pnd := payload.Description
 	csn := payload.ContainerSideNetwork
 	if csn == nil {
-		return fmt.Errorf("ContainerSideNetwork not passed to Recover()")
+		return nil, fmt.Errorf("ContainerSideNetwork not passed to Recover()")
 	}
 	if csn.Result == nil {
 		csn.Result = &cnicurrent.Result{}
@@ -326,19 +326,27 @@ func (s *TapFDSource) Recover(key string, data []byte) error {
 	netNSPath := cni.PodNetNSPath(pnd.PodID)
 	vmNS, err := ns.GetNS(netNSPath)
 	if err != nil {
-		return fmt.Errorf("failed to open network namespace at %q: %v", netNSPath, err)
+		return nil, fmt.Errorf("failed to open network namespace at %q: %v", netNSPath, err)
 	}
 	if !payload.HaveRunningContainers {
 		if err := nettools.ReconstructVFs(csn, vmNS, true); err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return s.setupNetNS(key, pnd, func(netNSPath string, allLinks []netlink.Link, hostNS ns.NetNS) (*network.ContainerSideNetwork, error) {
+	err = s.setupNetNS(key, pnd, func(netNSPath string, allLinks []netlink.Link, hostNS ns.NetNS) (*network.ContainerSideNetwork, error) {
 		if err := nettools.RecoverContainerSideNetwork(csn, netNSPath, allLinks, hostNS); err != nil {
 			return nil, err
 		}
 		return csn, nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	var fds []int
+	for _, ifDesc := range csn.Interfaces {
+		fds = append(fds, int(ifDesc.Fo.Fd()))
+	}
+	return fds, nil
 }
 
 func (s *TapFDSource) setupNetNS(key string, pnd *PodNetworkDesc, initNet func(netNSPath string, allLinks []netlink.Link, hostNS ns.NetNS) (*network.ContainerSideNetwork, error)) error {

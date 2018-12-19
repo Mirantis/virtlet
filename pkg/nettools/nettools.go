@@ -671,7 +671,7 @@ func RecoverContainerSideNetwork(csn *network.ContainerSideNetwork, nsPath strin
 		oldDescs[desc.Name] = desc
 	}
 
-	for _, link := range contLinks {
+	for ifaceNo, link := range contLinks {
 		// Skip missing link which is already used by running VM
 		if link == nil {
 			continue
@@ -704,6 +704,14 @@ func RecoverContainerSideNetwork(csn *network.ContainerSideNetwork, nsPath strin
 			bindDeviceToVFIO(devIdentifier)
 		} else {
 			ifaceType = network.InterfaceTypeTap
+
+			tapInterfaceName := fmt.Sprintf(tapInterfaceNameTemplate, ifaceNo)
+			fo, err := OpenTAP(tapInterfaceName)
+			if err != nil {
+				glog.Errorf("(RecoverContainerSideNetwork) Failed to open %s: %v", ifaceName, err)
+				return err
+			}
+			desc.Fo = fo
 		}
 		if desc.Type != ifaceType {
 			return fmt.Errorf("bad interface type for %q", desc.Name)

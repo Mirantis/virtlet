@@ -105,7 +105,7 @@ type FDSource interface {
 	// Recover recovers FDSource's state regarding the
 	// specified key. It's intended to be called after
 	// Virtlet restart.
-	Recover(key string, data []byte) error
+	Recover(key string, data []byte) ([]int, error)
 	// Stop stops any goroutines associated with FDSource
 	// but doesn't release the namespaces
 	Stop() error
@@ -165,13 +165,13 @@ func (s *FDServer) getFDs(key string) ([]int, error) {
 	return fds, nil
 }
 
-func (s *FDServer) markAsRecovered(key string) error {
+func (s *FDServer) markAsRecovered(key string, fds []int) error {
 	s.Lock()
 	defer s.Unlock()
 	if _, found := s.fds[key]; found {
 		return fmt.Errorf("fd key %q is already present and thus can't be properly recovered", key)
 	}
-	s.fds[key] = nil
+	s.fds[key] = fds
 	return nil
 }
 
@@ -303,10 +303,11 @@ func (s *FDServer) serveRecover(c *net.UnixConn, hdr *fdHeader) (*fdHeader, erro
 		}
 	}
 	key := hdr.getKey()
-	if err := s.source.Recover(key, data); err != nil {
+	fds, err := s.source.Recover(key, data)
+	if err != nil {
 		return nil, fmt.Errorf("error recovering %q: %v", key, err)
 	}
-	if err := s.markAsRecovered(key); err != nil {
+	if err := s.markAsRecovered(key, fds); err != nil {
 		return nil, err
 	}
 	return &fdHeader{
