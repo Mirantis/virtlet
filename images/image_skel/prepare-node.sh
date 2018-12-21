@@ -33,6 +33,13 @@ fi
 mkdir -p /host-var-lib/virtlet/images /hostlog/virtlet/vms /host-var-lib/virtlet/volumes
 
 # set up KVM
+# NOTE: sleep infinity is used there to prevent pod removal/recreation from daemonset
+# in non recoverable situation, allowing user to look on logs for the reason of failure.
+# Also contstant recreations of pod by DS in these situations can lead to saturation
+# of mountpoints doing the node unusable (probably due to bug on kubelet
+# or dockershim - this needs further research).
+# Other option would be to change restart policy in DS definition, but that will
+# block possibility to restart Virtlet by killing its pod.
 if [[ ! ${VIRTLET_DISABLE_KVM:-} ]]; then
   if ! kvm-ok &>/dev/null; then
     # try to fix the environment by loading appropriate modules
