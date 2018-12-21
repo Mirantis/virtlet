@@ -282,6 +282,9 @@ function prepare_node {
     fi
     ensure_build_container
     echo >&2 "Installing CRI proxy package in the node container (${node})..."
+    if [[ ${DIND_CRI:-} = containerd ]]; then
+        docker exec "${node}" /bin/bash -c 'echo criproxy-nodeps criproxy/primary_cri select containerd | debconf-set-selections'
+    fi
     docker exec "${node}" /bin/bash -c "curl -sSL '${CRIPROXY_DEB_URL}' >/criproxy.deb && dpkg -i /criproxy.deb && rm /criproxy.deb"
 
     docker exec "${node}" mount --make-shared /dind
