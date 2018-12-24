@@ -22,7 +22,6 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/cobra/doc"
 
 	"github.com/Mirantis/virtlet/pkg/config"
 )
@@ -65,7 +64,7 @@ func (gd *genDocCommand) Run() error {
 	if gd.config {
 		fmt.Fprint(gd.out, config.GenerateDoc())
 	} else {
-		return doc.GenMarkdownTree(gd.rootCmd, gd.outDir)
+		return GenMarkdownTree(gd.rootCmd, gd.outDir)
 	}
 	return nil
 }
