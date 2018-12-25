@@ -71,6 +71,13 @@ func main() {
 		}
 	}
 
+	// FIXME: move the pid of qemu instance out of /kubepods/podxxxxxxx
+	// Or it will be killed by kubelet after the virtlet pod is deleted
+	err = cgroups.MoveCGroup(os.Getpid(), "hugetlb", "/")
+	if err != nil {
+		glog.Errorf("failed to move pid into hugetlb path /: %v", err)
+	}
+
 	emulator := os.Getenv(config.EmulatorEnvVarName)
 	emulatorArgs := os.Args[1:]
 	var netArgs []string

@@ -99,3 +99,8 @@ func (c *Controller) Set(name string, value interface{}) error {
 	sValue := utils.Stringify(value)
 	return ioutil.WriteFile(filepath.Join(cgroupfs, c.name, c.path, c.name+"."+name), []byte(sValue), 0644)
 }
+
+// MoveCGroup move the process into controller path's cgroup.procs
+func MoveCGroup(pid interface{}, controller, path string) error {
+	return ioutil.WriteFile(filepath.Join(cgroupfs, controller, path, "cgroup.procs"), []byte(utils.Stringify(pid)), 0644)
+}
