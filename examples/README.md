@@ -17,7 +17,7 @@ kubectl get pods -w
 kubectl attach -it cirros-vm
 ```
 4. As soon as the VM has booted, you can use
-[virtletctl tool](../docs/virtletctl/virtletctl.md) (available as part
+[virtletctl tool](../docs/virtletctl.md) (available as part
 of each Virtlet release on GitHub starting from Virtlet 1.0):
 
 ```bash
