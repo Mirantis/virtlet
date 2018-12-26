@@ -29,3 +29,5 @@ nav:
   - "Build Tool": dev/build-tool.md
   - "Virtlet CI": dev/virtlet-ci.md
   - "Building a custom CirrOS image": dev/cirros.md
+  - "Logging architecture": dev/logging.md
+  - "Guidelines": dev/guidelines.md
