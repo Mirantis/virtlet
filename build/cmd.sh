@@ -507,7 +507,7 @@ function update_docs_internal {
   if [[ ! -f _output/virtletctl ]]; then
     echo >&2 "Please run build/cmd.sh build first"
   fi
-  _output/virtletctl gendoc docs/virtletctl
+  _output/virtletctl gendoc docs
   tempfile="$(tempfile)"
   _output/virtletctl gendoc --config >"${tempfile}"
   sed -i "/<!-- begin -->/,/<!-- end -->/{
@@ -606,8 +606,7 @@ case "${cmd}" in
         ;;
     update-docs)
         vcmd "build/cmd.sh update-docs-internal"
-        rm -rf "${project_dir}/docs/virtletctl"
-        docker exec virtlet-build tar -C "${remote_project_dir}" -c docs/config.md docs/virtletctl | tar -C "${project_dir}" -xv
+        docker exec virtlet-build tar -C "${remote_project_dir}" -c docs/config.md docs/virtletctl.md | tar -C "${project_dir}" -xv
         ;;
     update-docs-internal)
         update_docs_internal
