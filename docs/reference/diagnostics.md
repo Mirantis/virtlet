@@ -1,6 +1,6 @@
 # Direct invocation
 
-The most basic diagnostics command is [virtletctl diag dump](virtletctl/virtletctl_diag_dump.md):
+The most basic diagnostics command is [virtletctl diag dump](virtletctl.md#virtletctl-diag-dump):
 ```bash
 $ virtletctl diag out/
 $ ls -lR out
@@ -55,7 +55,7 @@ node that runs Virtlet:
 It's also possible to dump Virtlet diagnostics as JSON to stdout using
 `virtletctl diag dump --json`. The JSON file can be subsequently
 unpacked into the aforementioned directory structure using
-[virtletctl diag unpack](virtletctl/virtletctl_diag_unpack.md).
+[virtletctl diag unpack](virtletctl.md#virtletctl-diag-unpack).
 
 ## Sonobuoy
 
@@ -84,7 +84,7 @@ $ sonobuoy retrieve
 ```
 
 The diagnostics results are placed under `plugins/virtlet/results` and
-can be unpacked using [virtletctl diag unpack](virtletctl/virtletctl_diag_unpack.md):
+can be unpacked using [virtletctl diag unpack](virtletctl.md#virtletctl-diag-unpack):
 ```bash
 $ virtletctl diag unpack out/ <sonobuoy_output_dir/plugins/virtlet/results
 ```

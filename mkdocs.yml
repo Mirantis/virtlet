@@ -1,5 +1,11 @@
 site_name: Virtlet
-theme: readthedocs
+theme:
+  name: readthedocs
+  # FIXME: highlightjs tries to autodetect the languages
+  # which causes somewhat random highlighting in some code blocks.
+  # Should try to enable manual language setting for the
+  # highlighting somehow
+  highlightjs: false
 nav:
 - Home: index.md
 - User Guide:
@@ -15,7 +21,7 @@ nav:
   - "Networking": reference/networking.md
   - "Diagnostics": reference/diagnostics.md
   - "Resource management": reference/resources.md
-  - "Command Line Tool": reference/virtletctl/virtletctl.md
+  - "Command Line Tool": reference/virtletctl.md
 - Development:
   - "Virtlet architecture": dev/architecture.md
   - "Setting up the environment": dev/setup.md
