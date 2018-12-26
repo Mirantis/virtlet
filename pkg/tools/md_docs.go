@@ -30,11 +30,9 @@ import (
 func printOptions(out io.Writer, cmd *cobra.Command, name string) error {
 	if cmd.HasParent() {
 		return printFlagUsages(out, cmd.NonInheritedFlags(), "\n**Options**\n\n", false)
-	} else {
-		return printFlagUsages(out, cmd.NonInheritedFlags(), "\n## Global options\n\n", true)
 	}
 
-	return nil
+	return printFlagUsages(out, cmd.NonInheritedFlags(), "\n## Global options\n\n", true)
 }
 
 func printSubcommands(out io.Writer, cmd *cobra.Command) error {
@@ -74,7 +72,7 @@ func printSubcommands(out io.Writer, cmd *cobra.Command) error {
 	return nil
 }
 
-// GenMarkdownCustom creates custom markdown output.
+// GenMarkdown creates markdown output.
 func GenMarkdown(cmd *cobra.Command, w io.Writer) error {
 	cmd.InitDefaultHelpCmd()
 	cmd.InitDefaultHelpFlag()
@@ -140,10 +138,7 @@ func GenMarkdownTreeCustom(cmd *cobra.Command, dir string) error {
 	}
 	defer f.Close()
 
-	if err := GenMarkdown(cmd, f); err != nil {
-		return err
-	}
-	return nil
+	return GenMarkdown(cmd, f)
 }
 
 type byName []*cobra.Command
