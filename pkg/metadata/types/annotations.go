@@ -52,7 +52,7 @@ const (
 	cloudInitUserDataSourceEncodingKeyName = "VirtletCloudInitUserDataSourceEncoding"
 
 	// FilesFromDSKeyName is the name of data source key in the pod annotations
-	// for files to be written on rootfs.
+	// for the files to be injected into the rootfs.
 	FilesFromDSKeyName = "VirtletFilesFromDataSource"
 )
 
@@ -111,8 +111,9 @@ type VirtletAnnotations struct {
 	RootVolumeSize int64
 	// VirtletChown9pfsMounts indicates if chown is enabled for 9pfs mounts.
 	VirtletChown9pfsMounts bool
-	// FilesForRootfs specifies files to be put on rootfs using libguestfs.
-	FilesForRootfs map[string][]byte
+	// InjectedFiles specifies the files to be injected into VM's
+	// rootfs before booting the VM.
+	InjectedFiles map[string][]byte
 }
 
 // ExternalUserDataLoader is a function that loads external user data that's specified
@@ -209,7 +210,7 @@ func (va *VirtletAnnotations) parsePodAnnotations(ns string, podAnnotations map[
 
 	if filesFromDSstr, found := podAnnotations[FilesFromDSKeyName]; found && externalDSLoader != nil {
 		var err error
-		va.FilesForRootfs, err = externalDSLoader(ns, filesFromDSstr)
+		va.InjectedFiles, err = externalDSLoader(ns, filesFromDSstr)
 		if err != nil {
 			return fmt.Errorf("error loading data source %q as files: %v",
 				filesFromDSstr, err)

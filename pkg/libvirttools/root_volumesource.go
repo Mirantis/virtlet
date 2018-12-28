@@ -21,7 +21,6 @@ import (
 
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
-	"github.com/Mirantis/virtlet/pkg/diskimage"
 	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	"github.com/Mirantis/virtlet/pkg/virt"
 )
@@ -103,8 +102,10 @@ func (v *rootVolume) Setup() (*libvirtxml.DomainDisk, *libvirtxml.DomainFilesyst
 		return nil, nil, fmt.Errorf("error getting root volume path: %v", err)
 	}
 
-	if err := diskimage.Put(volPath, v.config.ParsedAnnotations.FilesForRootfs); err != nil {
-		return nil, nil, fmt.Errorf("error tuning rootfs with files from configmap: %v", err)
+	if len(v.config.ParsedAnnotations.InjectedFiles) > 0 {
+		if err := v.owner.StorageConnection().PutFiles(volPath, v.config.ParsedAnnotations.InjectedFiles); err != nil {
+			return nil, nil, fmt.Errorf("error adding files to rootfs: %v", err)
+		}
 	}
 
 	return &libvirtxml.DomainDisk{

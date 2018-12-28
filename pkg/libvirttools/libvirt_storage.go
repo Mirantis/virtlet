@@ -86,6 +86,10 @@ func (sc *libvirtStorageConnection) ListPools() ([]virt.StoragePool, error) {
 	return r, nil
 }
 
+func (sc *libvirtStorageConnection) PutFiles(imagePath string, files map[string][]byte) error {
+	return diskimage.Put(imagePath, files)
+}
+
 type libvirtStoragePool struct {
 	*sync.Mutex
 	conn libvirtConnection

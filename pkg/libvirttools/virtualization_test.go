@@ -451,6 +451,7 @@ func TestDomainDefinitions(t *testing.T) {
 				},
 			},
 		},
+		// TODO: add test cases for rootfs / persistent rootfs file injection
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := testutils.NewToplevelRecorder()

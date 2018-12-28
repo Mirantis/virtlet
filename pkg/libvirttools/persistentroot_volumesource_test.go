@@ -30,6 +30,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	fakeutils "github.com/Mirantis/virtlet/pkg/utils/fake"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
+	fakevirt "github.com/Mirantis/virtlet/pkg/virt/fake"
 )
 
 func TestPersistentRootVolume(t *testing.T) {
@@ -56,6 +57,7 @@ func TestPersistentRootVolume(t *testing.T) {
 		imageWrittenAgain bool
 		useSymlink        bool
 		errors            [2]string
+		annotations       *types.VirtletAnnotations
 	}{
 		{
 			name:            "image unchanged",
@@ -95,6 +97,17 @@ func TestPersistentRootVolume(t *testing.T) {
 			secondImageName: "persistent/image1",
 			fileSize:        8704,
 			useSymlink:      true,
+		},
+		{
+			name:      "files",
+			imageName: "persistent/image1",
+			fileSize:  8704, // just added a sector
+			annotations: &types.VirtletAnnotations{
+				InjectedFiles: map[string][]byte{
+					"/foo/bar.txt": []byte("bar"),
+					"/foo/baz.txt": []byte("baz"),
+				},
+			},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -138,8 +151,8 @@ func TestPersistentRootVolume(t *testing.T) {
 					}
 					cmd := fakeutils.NewCommander(rec, cmdSpecs)
 					cmd.ReplaceTempPath("__dev__", "/dev")
-					owner := newFakeVolumeOwner(nil, im, cmd)
-					rootVol := getPersistentRootVolume(t, imageName, devPathToUse, owner)
+					owner := newFakeVolumeOwner(fakevirt.NewFakeStorageConnection(rec), nil, im, cmd)
+					rootVol := getPersistentRootVolume(t, imageName, devPathToUse, owner, tc.annotations)
 					verifyRootVolumeSetup(t, rec, rootVol, tc.errors[n])
 					if tc.errors[n] == "" {
 						verifyRootVolumeTeardown(t, rec, rootVol)
@@ -200,7 +213,10 @@ func verifyRootVolumeTeardown(t *testing.T, rec testutils.Recorder, rootVol *per
 	rec.Rec("end teardown", nil)
 }
 
-func getPersistentRootVolume(t *testing.T, imageName, devHostPath string, owner volumeOwner) *persistentRootVolume {
+func getPersistentRootVolume(t *testing.T, imageName, devHostPath string, owner volumeOwner, annotations *types.VirtletAnnotations) *persistentRootVolume {
+	if annotations == nil {
+		annotations = &types.VirtletAnnotations{}
+	}
 	volumes, err := GetRootVolume(
 		&types.VMConfig{
 			DomainUUID: testUUID,
@@ -211,7 +227,7 @@ func getPersistentRootVolume(t *testing.T, imageName, devHostPath string, owner 
 					HostPath:   devHostPath,
 				},
 			},
-			ParsedAnnotations: &types.VirtletAnnotations{},
+			ParsedAnnotations: annotations,
 		}, owner)
 	if err != nil {
 		t.Fatalf("GetRootVolume returned an error: %v", err)

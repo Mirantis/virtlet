@@ -29,17 +29,6 @@ import (
 	"github.com/Mirantis/virtlet/pkg/virt"
 )
 
-var pathReplacements = [][2]string{
-	{
-		"/__config__/",
-		"/var/lib/virtlet/config/",
-	},
-	{
-		"/__pods__/",
-		"/var/lib/kubelet/pods/",
-	},
-}
-
 func mustMarshal(d libvirtxml.Document) string {
 	s, err := d.Marshal()
 	if err != nil {
@@ -420,11 +409,6 @@ func removeVolatilePathsFromDomainDef(def *libvirtxml.Domain) {
 		default:
 			continue
 		}
-		for _, pr := range pathReplacements {
-			p := strings.Index(*toUpdate, pr[0])
-			if p >= 0 {
-				*toUpdate = pr[1] + (*toUpdate)[p+len(pr[0]):]
-			}
-		}
+		*toUpdate = fixPath(*toUpdate)
 	}
 }

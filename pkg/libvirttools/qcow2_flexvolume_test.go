@@ -69,7 +69,8 @@ func TestQCOW2VolumeLifeCycle(t *testing.T) {
 
 	volumesPoolPath := "/fake/volumes/pool"
 	expectedVolumePath := volumesPoolPath + "/virtlet-" + testUUID + "-" + TestVolumeName
-	spool := fake.NewFakeStoragePool(rec.Child("volumes"), &libvirtxml.StoragePool{
+	sc := fake.NewFakeStorageConnection(rec)
+	spool, err := sc.CreateStoragePool(&libvirtxml.StoragePool{
 		Name:   "volumes",
 		Target: &libvirtxml.StoragePoolTarget{Path: volumesPoolPath},
 	})
@@ -86,7 +87,7 @@ func TestQCOW2VolumeLifeCycle(t *testing.T) {
 		TestVolumeName,
 		optsFilePath,
 		&types.VMConfig{DomainUUID: testUUID, Image: "rootfs image name"},
-		newFakeVolumeOwner(spool, im, fakeutils.NewCommander(nil, nil)),
+		newFakeVolumeOwner(sc, spool.(*fake.FakeStoragePool), im, fakeutils.NewCommander(nil, nil)),
 	)
 	if err != nil {
 		t.Fatalf("newQCOW2Volume returned an error: %v", err)
