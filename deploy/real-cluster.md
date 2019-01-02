@@ -103,7 +103,7 @@ Escape character is ^]
 ### Verifying ssh access to a VM pod
 
 You can also ssh into the VM using
-[virtletctl tool](../docs/virtletctl/virtletctl.md) (available as part
+[virtletctl tool](../docs/virtletctl.md) (available as part
 of each Virtlet release on GitHub starting from Virtlet 1.0).
 
 ```

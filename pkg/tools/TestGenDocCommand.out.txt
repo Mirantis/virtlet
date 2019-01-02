@@ -3,30 +3,20 @@
 
 Topmost command
 
-### Synopsis
+**Synopsis**
 
 Lorem ipsum dolor sit amet
 
-### Options
 
-```
-      --anotherflag int   another flag (default 42)
-  -h, --help              help for topcmd
-  -f, --someflag string   a flag (default "someflagvalue")
-```
+**Subcommands**
 
-### SEE ALSO
-
-* [topcmd bar](topcmd_bar.md)	 - Bar command
-* [topcmd foo](topcmd_foo.md)	 - Foo command
-
-
-# FILE: topcmd_bar.md
+* [topcmd bar](#topcmd-bar) - Bar command
+* [topcmd foo](#topcmd-foo) - Foo command
 ## topcmd bar
 
 Bar command
 
-### Synopsis
+**Synopsis**
 
 Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua
 
@@ -34,23 +24,11 @@ Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua
 topcmd bar [flags]
 ```
 
-### Options
-
-```
-  -h, --help   help for bar
-```
-
-### SEE ALSO
-
-* [topcmd](topcmd.md)	 - Topmost command
-
-
-# FILE: topcmd_foo.md
 ## topcmd foo
 
 Foo command
 
-### Synopsis
+**Synopsis**
 
 Consectetur adipiscing elit
 
@@ -58,21 +36,39 @@ Consectetur adipiscing elit
 topcmd foo [flags]
 ```
 
-### Examples
+**Examples**
 
 ```
 kubectl plugin topcmd foo
 ```
 
-### Options
+
+**Options**
+
 
 ```
-      --fooflag int   foo flag (default 4242)
-  -h, --help          help for foo
+--fooflag int
 ```
+foo flag
+ **(default value:** `4242`)
 
-### SEE ALSO
+## Global options
 
-* [topcmd](topcmd.md)	 - Topmost command
 
+```
+--anotherflag int
+```
+another flag
+ **(default value:** `42`)
+
+```
+-h, --help
+```
+help for topcmd
+
+```
+-f, --someflag string
+```
+a flag
+ **(default value:** `"someflagvalue"`)
 
