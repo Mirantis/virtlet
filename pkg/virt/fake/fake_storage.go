@@ -94,6 +94,19 @@ func (sc *FakeStorageConnection) ListPools() ([]virt.StoragePool, error) {
 	return r, nil
 }
 
+// PutFiles implements PutFiles method of StorageConnection interface.
+func (sc *FakeStorageConnection) PutFiles(imagePath string, files map[string][]byte) error {
+	fileStrs := make(map[string]string)
+	for filename, content := range files {
+		fileStrs[filename] = string(content)
+	}
+	sc.rec.Rec("PutFiles", map[string]interface{}{
+		"imagePath": fixPath(imagePath),
+		"files":     fileStrs,
+	})
+	return nil
+}
+
 // FakeStoragePool is a fake implementation of StoragePool interface.
 type FakeStoragePool struct {
 	rec     testutils.Recorder

@@ -13,7 +13,7 @@
     <volume type="file">
       <name>virtlet_root_77f29a0e-46af-4188-a6af-9ff8b8a65224</name>
       <allocation unit="b">0</allocation>
-      <capacity unit="b">424252</capacity>
+      <capacity unit="b">424242</capacity>
       <target>
         <format type="qcow2"></format>
       </target>
@@ -22,3 +22,9 @@
         <format type="qcow2"></format>
       </backingStore>
     </volume>
+- name: PutFiles
+  value:
+    files:
+      /foo/bar.txt: bar
+      /foo/baz.txt: baz
+    imagePath: /fake/volumes/pool/virtlet_root_77f29a0e-46af-4188-a6af-9ff8b8a65224

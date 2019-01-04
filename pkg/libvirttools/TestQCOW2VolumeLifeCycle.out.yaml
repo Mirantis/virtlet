@@ -1,3 +1,11 @@
+- name: CreateStoragePool
+  value: |-
+    <pool type="">
+      <name>volumes</name>
+      <target>
+        <path>/fake/volumes/pool</path>
+      </target>
+    </pool>
 - name: 'volumes: CreateStorageVol'
   value: |-
     <volume>

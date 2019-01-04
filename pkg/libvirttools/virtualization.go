@@ -917,6 +917,9 @@ func (v *VirtualizationTool) StoragePool() (virt.StoragePool, error) {
 // DomainConnection implements volumeOwner DomainConnection method
 func (v *VirtualizationTool) DomainConnection() virt.DomainConnection { return v.domainConn }
 
+// StorageConnection implements volumeOwner StorageConnection method
+func (v *VirtualizationTool) StorageConnection() virt.StorageConnection { return v.storageConn }
+
 // ImageManager implements volumeOwner ImageManager method
 func (v *VirtualizationTool) ImageManager() ImageManager { return v.imageManager }
 

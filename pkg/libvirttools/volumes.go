@@ -40,6 +40,7 @@ type ImageManager interface {
 type volumeOwner interface {
 	StoragePool() (virt.StoragePool, error)
 	DomainConnection() virt.DomainConnection
+	StorageConnection() virt.StorageConnection
 	ImageManager() ImageManager
 	RawDevices() []string
 	KubeletRootDir() string

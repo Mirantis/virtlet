@@ -115,7 +115,7 @@
         CPUModel: ""
         CPUSetting: null
         DiskDriver: scsi
-        FilesForRootfs: null
+        InjectedFiles: null
         MetaData: null
         RootVolumeSize: 0
         SSHKeys: null
@@ -172,7 +172,7 @@
         CPUModel: ""
         CPUSetting: null
         DiskDriver: scsi
-        FilesForRootfs: null
+        InjectedFiles: null
         MetaData: null
         RootVolumeSize: 0
         SSHKeys: null
@@ -224,7 +224,7 @@
         CPUModel: ""
         CPUSetting: null
         DiskDriver: scsi
-        FilesForRootfs: null
+        InjectedFiles: null
         MetaData: null
         RootVolumeSize: 0
         SSHKeys: null
