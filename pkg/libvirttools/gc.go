@@ -96,22 +96,12 @@ func (v *VirtualizationTool) checkSandboxNetNs(sandbox metadata.PodSandboxMetada
 	}
 
 	if !v.mountPointChecker.IsPathAnNs(sinfo.ContainerSideNetwork.NsPath) {
-		containers, err := v.metadataStore.ListPodContainers(sandbox.GetID())
-		if err != nil {
-			return err
-		}
-		for _, container := range containers {
-			// remove container from metadata store
-			if err := container.Save(func(*types.ContainerInfo) (*types.ContainerInfo, error) {
-				return nil, nil
-			}); err != nil {
-				return err
+		// NS didn't found, need RunSandbox again
+		if err := sandbox.Save(func(s *types.PodSandboxInfo) (*types.PodSandboxInfo, error) {
+			if s != nil {
+				s.State = types.PodSandboxState_SANDBOX_NOTREADY
 			}
-		}
-
-		// remove sandbox from metadata store
-		if err := sandbox.Save(func(*types.PodSandboxInfo) (*types.PodSandboxInfo, error) {
-			return nil, nil
+			return s, nil
 		}); err != nil {
 			return err
 		}

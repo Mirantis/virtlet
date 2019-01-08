@@ -41,6 +41,8 @@ spec:
         securityContext:
           privileged: true
         volumeMounts:
+        - mountPath: /etc/libvirt/qemu
+          name: qemu
         - mountPath: /sys/fs/cgroup
           name: cgroup
         - mountPath: /lib/modules
@@ -76,6 +78,8 @@ spec:
         securityContext:
           privileged: true
         volumeMounts:
+        - mountPath: /etc/libvirt/qemu
+          name: qemu
         - mountPath: /run
           name: run
         - mountPath: /lib/modules
@@ -280,6 +284,9 @@ spec:
       - hostPath:
           path: /var/run/netns
         name: netns-dir
+      - hostPath:
+          path: /etc/libvirt/qemu
+        name: qemu
       - configMap:
           name: virtlet-image-translations
         name: image-name-translations
