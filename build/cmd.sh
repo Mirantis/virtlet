@@ -167,7 +167,6 @@ function ensure_build_container {
                -v /lib/modules:/lib/modules:ro \
                -v /boot:/boot:ro \
                -v "${DOCKER_SOCKET_PATH}:/var/run/docker.sock" \
-               -e DOCKER_HOST="${DOCKER_HOST:-}" \
                -e DOCKER_MACHINE_NAME="${DOCKER_MACHINE_NAME:-}" \
                -e DOCKER_TLS_VERIFY="${DOCKER_TLS_VERIFY:-}" \
                -e TRAVIS="${TRAVIS:-}" \
