@@ -1,7 +1,7 @@
 // +build linux
 
 /*
-Copyright 2016 Mirantis
+Copyright 2019 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -51,14 +51,15 @@ typedef struct _g_file {
     size_t size;
 } g_file;
 
-static void update_error(g_wrapper* w, const char* msg)
+static void update_error(g_wrapper* w, const char* msg, int use_g_err)
 {
 	int n, p;
-	const char *g_err, *err;
+	const char *g_err = 0, *err;
 	if (*w->error)
 		return;
 
-	g_err = guestfs_last_error(w->g);
+	if (use_g_err)
+		g_err = guestfs_last_error(w->g);
 	if (!g_err && !msg)
 		return;
 
@@ -95,7 +96,7 @@ int g_wrapper_setup(g_wrapper* w, const char* path, int trace)
 {
 	w->g = guestfs_create_flags(0);
 	if (!w->g) {
-		update_error(w, "guestfs_create_flags()");
+		update_error(w, "guestfs_create_flags()", 1);
 		return -1;
 	}
 
@@ -104,24 +105,24 @@ int g_wrapper_setup(g_wrapper* w, const char* path, int trace)
 	if (guestfs_add_drive_opts(w->g, path,
 				   GUESTFS_ADD_DRIVE_OPTS_FORMAT, "qcow2",
 				   -1)) {
-		update_error(w, "guestfs_add_drive_opts()");
+		update_error(w, "guestfs_add_drive_opts()", 1);
 		return -1;
 	}
 
 	if (guestfs_launch(w->g) < 0) {
-		update_error(w, "guestfs_launch()");
+		update_error(w, "guestfs_launch()", 1);
 		return -1;
 	}
 	w->launched = 1;
 
 	w->devs = guestfs_list_devices(w->g);
 	if (!w->devs) {
-		update_error(w, "guestfs_list_devices()");
+		update_error(w, "guestfs_list_devices()", 1);
 		return -1;
 	}
 
 	if (!w->devs[0] || w->devs[1]) {
-		update_error(w, "exactly one device is expected");
+		update_error(w, "exactly one device is expected", 0);
 		return -1;
 	}
 
@@ -132,7 +133,7 @@ int g_wrapper_close(g_wrapper* w)
 {
 	int r = 0;
 	if (!w->g) {
-		update_error(w, "guestfs handle already closed");
+		update_error(w, "guestfs handle already closed", 0);
 		return -1;
 	}
 
@@ -144,7 +145,7 @@ int g_wrapper_close(g_wrapper* w)
 		while (*w->files) free(*w->files++);
 
 	if (w->launched && guestfs_shutdown(w->g) < 0) {
-		update_error(w, "guestfs_shutdown()");
+		update_error(w, "guestfs_shutdown()", 1);
 		r = -1;
 	}
 
@@ -159,12 +160,12 @@ int g_wrapper_close(g_wrapper* w)
 static int g_wrapper_part_disk(g_wrapper* w)
 {
 	if (!w->g || !w->devs) {
-		update_error(w, "guestfs setup not done");
+		update_error(w, "guestfs setup not done", 0);
 		return -1;
 	}
 
 	if (guestfs_part_disk(w->g, w->devs[0], "mbr") < 0) {
-		update_error(w, "guestfs_part_disk()");
+		update_error(w, "guestfs_part_disk()", 1);
 		return -1;
 	}
 
@@ -174,18 +175,18 @@ static int g_wrapper_part_disk(g_wrapper* w)
 static int g_wrapper_get_partitions(g_wrapper* w)
 {
 	if (!w->g || !w->devs) {
-		update_error(w, "guestfs setup not done");
+		update_error(w, "guestfs setup not done", 0);
 		return -1;
 	}
 
 	w->parts = guestfs_list_partitions(w->g);
 	if (!w->parts) {
-		update_error(w, "guestfs_list_partitions()");
+		update_error(w, "guestfs_list_partitions()", 1);
 		return -1;
 	}
 
-	if (!w->parts[0] || w->parts[1]) {
-		update_error(w, "exactly one partition is expected");
+	if (!w->parts[0]) {
+		update_error(w, "at least one partition is expected", 0);
 		return -1;
 	}
 
@@ -198,7 +199,7 @@ int g_wrapper_format(g_wrapper* w)
 		return -1;
 
 	if (guestfs_mkfs(w->g, "ext4", w->parts[0]) < 0) {
-		update_error(w, "guestfs_mkfs()");
+		update_error(w, "guestfs_mkfs()", 1);
 		return -1;
 	}
 
@@ -213,25 +214,25 @@ int g_wrapper_put(g_wrapper* w, int n, g_file* files)
 		return -1;
 
 	if (guestfs_mount(w->g, w->parts[0], "/")) {
-		update_error(w, "guestfs_mount()");
+		update_error(w, "guestfs_mount()", 1);
 		return -1;
 	}
 
 	while (n--) {
 		if (strlen(files->path) > PATH_MAX) {
-			update_error(w, "file path too long");
+			update_error(w, "file path too long", 0);
 			return -1;
 		}
 
 		// dirname may modify the string, so we need to clone path
 		strcpy(path, files->path);
 		if (guestfs_mkdir_p(w->g, dirname(path)) < 0) {
-			update_error(w, "guestfs_mkdir_p()");
+			update_error(w, "guestfs_mkdir_p()", 1);
 			return -1;
 		}
 
 		if (guestfs_write(w->g, files->path, files->content, files->size) < 0) {
-			update_error(w, "guestfs_write()");
+			update_error(w, "guestfs_write()", 1);
 			return -1;
 		}
 
@@ -251,13 +252,13 @@ char** g_wrapper_ls(g_wrapper* w, const char* dir)
 		return 0;
 
 	if (guestfs_mount(w->g, w->parts[0], "/")) {
-		update_error(w, "guestfs_mount()");
+		update_error(w, "guestfs_mount()", 1);
 		return 0;
 	}
 
 	w->files = guestfs_ls(w->g, dir);
 	if (!w->files) {
-		update_error(w, "guestfs_ls()");
+		update_error(w, "guestfs_ls()", 1);
 		return 0;
 	}
 
@@ -274,13 +275,13 @@ char* g_wrapper_cat(g_wrapper* w, const char* path)
 		return 0;
 
 	if (guestfs_mount(w->g, w->parts[0], "/")) {
-		update_error(w, "guestfs_mount()");
+		update_error(w, "guestfs_mount()", 1);
 		return 0;
 	}
 
 	w->file_content = guestfs_cat(w->g, path);
 	if (w->file_content == 0) {
-		update_error(w, "guestfs_cat()");
+		update_error(w, "guestfs_cat()", 1);
 		return 0;
 	}
 

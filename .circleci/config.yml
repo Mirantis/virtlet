@@ -194,7 +194,8 @@ e2e: &e2e
   - run:
       name: Prepare all of the nodes for Virtlet pod
       command: |
-        build/cmd.sh prepare-all-nodes
+        build/portforward.sh 8080&
+        VIRTLET_SKIP_RSYNC=1 build/cmd.sh prepare-all-nodes
 
   - run:
       name: Run e2e tests
@@ -215,13 +216,14 @@ e2e: &e2e
       path: ~/junit
 
   - run:
-      name: Dump the cluster state
+      name: Dump the cluster state and display Virtlet version
       when: always
       command: |
         build/portforward.sh 8080&
         mkdir -p /tmp/cluster_state
         bash -x ./dind-cluster*.sh dump | gzip >/tmp/cluster_state/kdc-dump.gz
         _output/virtletctl diag dump --json | gzip >/tmp/cluster_state/virtlet-dump.json.gz
+        _output/virtletctl version
 
   - store_artifacts:
       path: /tmp/cluster_state

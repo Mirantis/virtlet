@@ -15,6 +15,7 @@ DOCKER_SOCKET_PATH="${DOCKER_SOCKET_PATH:-/var/run/docker.sock}"
 FORCE_UPDATE_IMAGE="${FORCE_UPDATE_IMAGE:-}"
 IMAGE_REGEXP_TRANSLATION="${IMAGE_REGEXP_TRANSLATION:-1}"
 GH_RELEASE_TEST_USER="ivan4th"
+DIND_CRI="${DIND_CRI:-containerd}"
 
 # Note that project_dir must not end with slash
 project_dir="$(cd "$(dirname "${BASH_SOURCE}")/.." && pwd)"
@@ -166,7 +167,6 @@ function ensure_build_container {
                -v /lib/modules:/lib/modules:ro \
                -v /boot:/boot:ro \
                -v "${DOCKER_SOCKET_PATH}:/var/run/docker.sock" \
-               -e DOCKER_HOST="${DOCKER_HOST:-}" \
                -e DOCKER_MACHINE_NAME="${DOCKER_MACHINE_NAME:-}" \
                -e DOCKER_TLS_VERIFY="${DOCKER_TLS_VERIFY:-}" \
                -e TRAVIS="${TRAVIS:-}" \
@@ -297,9 +297,13 @@ function prepare_node {
             kubectl taint nodes kube-master node-role.kubernetes.io/master-
         fi
     fi
-    if [[ ${FORCE_UPDATE_IMAGE} ]] || ! docker exec "${node}" docker history -q mirantis/virtlet:latest >&/dev/null; then
+    if [[ ${FORCE_UPDATE_IMAGE} ]] || ! docker exec "${node}" docker history -q "${virtlet_image}:latest" >&/dev/null; then
         echo >&2 "Propagating Virtlet image to the node container..."
-        vcmd "docker save '${virtlet_image}' | docker exec -i '${node}' docker load"
+        if [[ ${DIND_CRI} = containerd ]]; then
+          vcmd "docker save '${virtlet_image}:latest' | docker exec -i '${node}' ctr -n k8s.io images import -"
+        else
+          vcmd "docker save '${virtlet_image}:latest' | docker exec -i '${node}' docker load"
+        fi
     fi
 }
 
