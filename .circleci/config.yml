@@ -194,7 +194,8 @@ e2e: &e2e
   - run:
       name: Prepare all of the nodes for Virtlet pod
       command: |
-        build/cmd.sh prepare-all-nodes
+        build/portforward.sh 8080&
+        VIRTLET_SKIP_RSYNC=1 build/cmd.sh prepare-all-nodes
 
   - run:
       name: Run e2e tests
