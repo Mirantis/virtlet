@@ -21,6 +21,7 @@ VIRTLET_MULTI_NODE="${VIRTLET_MULTI_NODE:-}"
 IMAGE_REGEXP_TRANSLATION="${IMAGE_REGEXP_TRANSLATION:-1}"
 MULTI_CNI="${MULTI_CNI:-}"
 DEMO_LOG_LEVEL="${DEMO_LOG_LEVEL:-}"
+DIND_CRI="${DIND_CRI:-containerd}"
 # Convenience setting for local testing:
 # BASE_LOCATION="${HOME}/work/kubernetes/src/github.com/Mirantis/virtlet"
 cirros_key="demo-cirros-private-key"
@@ -161,7 +162,7 @@ function demo::install-cni-genie {
 function demo::install-cri-proxy {
   local virtlet_node="${1}"
   demo::step "Installing CRI proxy package on ${virtlet_node} container"
-  if [[ ${DIND_CRI:-} = containerd ]]; then
+  if [[ ${DIND_CRI} = containerd ]]; then
     docker exec "${virtlet_node}" /bin/bash -c 'echo criproxy-nodeps criproxy/primary_cri select containerd | debconf-set-selections'
   fi
   docker exec "${virtlet_node}" /bin/bash -c "curl -sSL '${CRIPROXY_DEB_URL}' >/criproxy.deb && DEBIAN_FRONTEND=noninteractive dpkg -i /criproxy.deb && rm /criproxy.deb"
@@ -184,7 +185,12 @@ function demo::fix-mounts {
 function demo::inject-local-image {
   local virtlet_node="${1}"
   demo::step "Copying local mirantis/virtlet image into ${virtlet_node} container"
-  docker save mirantis/virtlet | docker exec -i "${virtlet_node}" docker load
+  docker save mirantis/virtlet |
+    if [[ ${DIND_CRI} = containerd ]]; then
+      docker exec -i "${virtlet_node}" ctr -n k8s.io images import -
+    else
+      docker exec -i "${virtlet_node}" docker load
+    fi
 }
 
 function demo::label-and-untaint-node {
