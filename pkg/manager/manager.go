@@ -173,12 +173,14 @@ func (v *VirtletManager) Stop() {
 // garbage collection for both libvirt and the image store.
 func (v *VirtletManager) recoverAndGC() error {
 	var errors []string
-	for _, err := range v.recoverNetworkNamespaces() {
-		errors = append(errors, fmt.Sprintf("* error recovering VM network namespaces: %v", err))
-	}
 
 	for _, err := range v.virtTool.GarbageCollect() {
 		errors = append(errors, fmt.Sprintf("* error performing libvirt GC: %v", err))
+	}
+
+	// recover network namespace after VM GC
+	for _, err := range v.recoverNetworkNamespaces() {
+		errors = append(errors, fmt.Sprintf("* error recovering VM network namespaces: %v", err))
 	}
 
 	if err := v.imageStore.GC(); err != nil {
@@ -211,6 +213,10 @@ OUTER:
 		}
 		if psi == nil {
 			allErrors = append(allErrors, fmt.Errorf("inconsistent database. Found pod %q sandbox but can not retrive its metadata", s.GetID()))
+			continue
+		}
+		// Don't recover if sandbox is not ready
+		if psi.State != types.PodSandboxState_SANDBOX_READY {
 			continue
 		}
 

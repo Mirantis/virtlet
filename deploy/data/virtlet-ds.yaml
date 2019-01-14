@@ -138,6 +138,8 @@ spec:
         command:
         - /libvirt.sh
         volumeMounts:
+        - mountPath: /etc/libvirt/qemu
+          name: qemu
         - mountPath: /sys/fs/cgroup
           name: cgroup
         - mountPath: /lib/modules
@@ -177,6 +179,8 @@ spec:
         # In case we inject local virtlet image we want to use it not officially available one
         imagePullPolicy: IfNotPresent
         volumeMounts:
+        - mountPath: /etc/libvirt/qemu
+          name: qemu
         - mountPath: /run
           # Don't add "mountPropagation: Bidirectional", it will lack mount entry
           name: run
@@ -299,6 +303,9 @@ spec:
       - hostPath:
           path: /var/run/netns
         name: netns-dir
+      - hostPath:
+          path: /etc/libvirt/qemu
+        name: qemu
       - configMap:
           name: virtlet-image-translations
         name: image-name-translations
