@@ -185,6 +185,7 @@ func (ds *domainSettings) createDomain(config *types.VMConfig) *libvirtxml.Domai
 
 	if ds.systemUUID != nil {
 		domain.SysInfo = &libvirtxml.DomainSysInfo{
+			Type: "smbios",
 			System: &libvirtxml.DomainSysInfoSystem{
 				Entry: []libvirtxml.DomainSysInfoEntry{
 					{
