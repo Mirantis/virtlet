@@ -45,7 +45,7 @@ var _ = Describe("SystemUUID passing", func() {
 
 	scheduleWaitSSH(&vm, &ssh)
 
-	It("Should have particular System UUID set [Conformance]", func() {
+	It("Should have the specified SMBIOS UUID set [Conformance]", func() {
 		uuid := do(framework.RunSimple(ssh, "sudo", "cat", "/sys/class/dmi/id/product_uuid")).(string)
 		Expect(uuid).To(Equal("53008994-44C0-4017-AD44-9C49758083DA"))
 	})

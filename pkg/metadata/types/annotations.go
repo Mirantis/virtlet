@@ -116,9 +116,8 @@ type VirtletAnnotations struct {
 	// InjectedFiles specifies the files to be injected into VM's
 	// rootfs before booting the VM.
 	InjectedFiles map[string][]byte
-	// SystemUUID specifies particular uuid to use as system UUID
-	// in domain definition.  If not set - new one will be generated
-	// basing on pod id.
+	// SystemUUID specifies fixed SMBIOS UUID to be used for the domain.
+	// If not set, the SMBIOS UUID will be automatically generated from the Pod ID.
 	SystemUUID *uuid.UUID
 }
 
@@ -312,7 +311,7 @@ func (va *VirtletAnnotations) parsePodAnnotations(ns string, podAnnotations map[
 	if systemUUIDStr, found := podAnnotations[systemUUIDKeyName]; found {
 		var err error
 		if va.SystemUUID, err = uuid.ParseHex(systemUUIDStr); err != nil {
-			return fmt.Errorf("failed to parse %q as system uuid: %v", systemUUIDStr, err)
+			return fmt.Errorf("failed to parse %q as a UUID: %v", systemUUIDStr, err)
 		}
 	}
 
