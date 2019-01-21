@@ -88,9 +88,8 @@ func (v *validateCommand) Run() error {
 
 	if errsNumber != 0 {
 		return fmt.Errorf("Collected %d errors while running SysCheck pods", errsNumber)
-	} else {
-		v.info("No errors found with")
 	}
+	v.info("No errors found with")
 
 	return nil
 }
@@ -148,12 +147,12 @@ func (v *validateCommand) prepareSysCheckPods(nodes []string) (pods []*v1.Pod, e
 	var wg sync.WaitGroup
 	wg.Add(len(definedPods))
 	for _, def := range definedPods {
-		go func() {
+		go func(podDef *v1.Pod) {
 			for {
 				// TODO: add checking for possible container starting failure, e.g. when there was an error while
 				// downloading container image
-				if pod, err := v.client.GetPod(def.Name, sysCheckNamespace); err != nil {
-					errs = append(errs, fmt.Sprintf("Failure during SysCheck pod %q status checking: %v", def.Name, err))
+				if pod, err := v.client.GetPod(podDef.Name, sysCheckNamespace); err != nil {
+					errs = append(errs, fmt.Sprintf("Failure during SysCheck pod %q status checking: %v", podDef.Name, err))
 					break
 				} else if pod.Status.Phase == v1.PodRunning {
 					pods = append(pods, pod)
@@ -162,7 +161,7 @@ func (v *validateCommand) prepareSysCheckPods(nodes []string) (pods []*v1.Pod, e
 				time.Sleep(250 * time.Millisecond)
 			}
 			wg.Done()
-		}()
+		}(def)
 	}
 	wg.Wait()
 	v.info("SysCheck pods on all Virtlet nodes are running")
@@ -190,10 +189,10 @@ func doInAllPods(pods []*v1.Pod, check func(*v1.Pod) int) int {
 
 	errsNumber := 0
 	for _, pod := range pods {
-		go func() {
-			errsNumber += check(pod)
+		go func(pod_ *v1.Pod) {
+			errsNumber += check(pod_)
 			wg.Done()
-		}()
+		}(pod)
 	}
 
 	wg.Wait()
@@ -213,7 +212,7 @@ func (v *validateCommand) chekcInAllSysChecks(pods []*v1.Pod, description, comma
 		)
 		if err != nil {
 			v.info("Error during verification of %s on node %q: %v", description, pod.Spec.NodeName, err)
-			errsNumber += 1
+			errsNumber++
 		}
 
 		return errsNumber + check(pod.Spec.NodeName, strings.TrimRight(out.String(), "\r\n"))
@@ -228,10 +227,10 @@ func (v *validateCommand) checkCNI(pods []*v1.Pod) int {
 			errsNumber := 0
 			if i, err := strconv.Atoi(out); err != nil {
 				v.info("Internal error during conunting CNI configuration files on %q: %v", nodeName, err)
-				errsNumber += 1
+				errsNumber++
 			} else if i == 0 {
 				v.info("Node %q does not have any CNI configuration in /etc/cni/net.d", nodeName)
-				errsNumber += 1
+				errsNumber++
 			}
 			return errsNumber
 		},
@@ -246,10 +245,10 @@ func (v *validateCommand) checkCRIProxy(pods []*v1.Pod) int {
 			errsNumber := 0
 			if len(out) == 0 {
 				v.info("Node %q does not have CRI Proxy running", nodeName)
-				errsNumber += 1
+				errsNumber++
 			} else if !strings.Contains(out, defaultCRIProxySockLocation) {
 				v.info("CRI Proxy on node %q does not have %q as socket location", nodeName, defaultCRIProxySockLocation)
-				errsNumber += 1
+				errsNumber++
 			}
 			return errsNumber
 		},
@@ -264,7 +263,7 @@ func (v *validateCommand) checkKubeletArgs(pods []*v1.Pod) int {
 			errsNumber := 0
 			if len(out) == 0 {
 				v.info("Internal error - kubelet not found on node %q", nodeName)
-				errsNumber += 1
+				errsNumber++
 			} else {
 				for _, arg := range []string{
 					"--container-runtime=remote",
@@ -274,7 +273,7 @@ func (v *validateCommand) checkKubeletArgs(pods []*v1.Pod) int {
 				} {
 					if !strings.Contains(out, arg) {
 						v.info("kubelet on node %q is missing %q option", nodeName, arg)
-						errsNumber += 1
+						errsNumber++
 					}
 				}
 			}
