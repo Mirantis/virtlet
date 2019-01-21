@@ -16,6 +16,7 @@ Kubernetes cluster.
 * [virtletctl gendoc](#virtletctl-gendoc) - Generate Markdown documentation for the commands
 * [virtletctl install](#virtletctl-install) - Install virtletctl as a kubectl plugin
 * [virtletctl ssh](#virtletctl-ssh) - Connect to a VM pod using ssh
+* [virtletctl validate](#virtletctl-validate) - Validate cluster readiness for Virtlet deployment
 * [virtletctl version](#virtletctl-version) - Display Virtlet version information
 * [virtletctl virsh](#virtletctl-virsh) - Execute a virsh command
 * [virtletctl vnc](#virtletctl-vnc) - Provide access to the VNC console of a VM pod
@@ -168,6 +169,18 @@ This command runs ssh and makes it connect to a VM pod.
 
 ```
 virtletctl ssh [flags] user@pod -- [ssh args...]
+```
+
+## virtletctl validate
+
+Validate cluster readiness for Virtlet deployment
+
+**Synopsis**
+
+Check configuration of cluster nodes valiating its readiness for Virtlet deployment
+
+```
+virtletctl validate [flags]
 ```
 
 ## virtletctl version
