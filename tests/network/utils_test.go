@@ -503,6 +503,60 @@ func addAddress(t *testing.T, netNS ns.NetNS, link netlink.Link, addr string) {
 	}
 }
 
+func getBridgeFromMember(t *testing.T, netNS ns.NetNS, link netlink.Link) netlink.Link {
+	var bridge netlink.Link
+	if err := netNS.Do(func(ns.NetNS) (err error) {
+		link, err = netlink.LinkByName(link.Attrs().Name)
+		if err != nil {
+			return fmt.Errorf("LinkByName(): %v", err)
+		}
+		masterIndex := link.Attrs().MasterIndex
+		if masterIndex == 0 {
+			return fmt.Errorf("link %q doesn't have master", link.Attrs().Name)
+		}
+		bridge, err = netlink.LinkByIndex(masterIndex)
+		if err != nil {
+			return fmt.Errorf("LinkByIndex(): %v", err)
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("getBridgeFromMember(): %v", err)
+	}
+	return bridge
+}
+
+func verifyMTU(t *testing.T, netNS ns.NetNS, link netlink.Link, expectedMTU int) {
+	if link.Type() != "bridge" {
+		link = getBridgeFromMember(t, netNS, link)
+	}
+	if err := netNS.Do(func(ns.NetNS) (err error) {
+		link, err = netlink.LinkByName(link.Attrs().Name)
+		if err != nil {
+			return fmt.Errorf("LinkByName(): %v", err)
+		}
+		if link.Type() != "bridge" {
+			return fmt.Errorf("doVerifyMTU(): %q: bridge expected", link.Attrs().Name)
+		}
+		index := link.Attrs().Index
+		links, err := netlink.LinkList()
+		if err != nil {
+			return fmt.Errorf("LinkList(): %v", err)
+		}
+		for _, link := range links {
+			attrs := link.Attrs()
+			if attrs.MasterIndex != index {
+				continue
+			}
+			if attrs.MTU != expectedMTU {
+				t.Errorf("bad MTU for link %q: %d instead of %d", attrs.Name, attrs.MTU, expectedMTU)
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("verifying mtu failed: %v", err)
+	}
+}
+
 // tapConnector copies frames between tap interfaces. It returns
 // a channel that should be closed to stop copying and close
 // the tap devices

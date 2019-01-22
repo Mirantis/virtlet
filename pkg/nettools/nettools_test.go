@@ -259,9 +259,9 @@ func setupLink(hwAddrAsText string, link netlink.Link) netlink.Link {
 	return link
 }
 
-func withFakeCNIVeth(t *testing.T, toRun func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link)) {
+func withFakeCNIVeth(t *testing.T, mtu int, toRun func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link)) {
 	withHostAndContNS(t, func(hostNS, contNS ns.NetNS) {
-		origHostVeth, origContVeth, err := CreateEscapeVethPair(contNS, "eth0", 1500)
+		origHostVeth, origContVeth, err := CreateEscapeVethPair(contNS, "eth0", mtu)
 		if err != nil {
 			log.Panicf("failed to create veth pair: %v", err)
 		}
@@ -282,8 +282,8 @@ func withFakeCNIVeth(t *testing.T, toRun func(hostNS, contNS ns.NetNS, origHostV
 	})
 }
 
-func withFakeCNIVethAndGateway(t *testing.T, toRun func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link)) {
-	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+func withFakeCNIVethAndGateway(t *testing.T, mtu int, toRun func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link)) {
+	withFakeCNIVeth(t, mtu, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
 		addTestRoute(t, &netlink.Route{
 			Gw:    parseAddr("10.1.90.1/24").IPNet.IP,
 			Scope: SCOPE_UNIVERSE,
@@ -308,7 +308,7 @@ func verifyNoAddressAndRoutes(t *testing.T, link netlink.Link) {
 }
 
 func TestFindVeth(t *testing.T) {
-	withFakeCNIVethAndGateway(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+	withFakeCNIVethAndGateway(t, defaultMTU, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
 		allLinks, err := netlink.LinkList()
 		if err != nil {
 			log.Panicf("LinkList() failed: %v", err)
@@ -325,7 +325,7 @@ func TestFindVeth(t *testing.T) {
 }
 
 func TestStripLink(t *testing.T) {
-	withFakeCNIVethAndGateway(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+	withFakeCNIVethAndGateway(t, defaultMTU, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
 		if err := StripLink(origContVeth); err != nil {
 			log.Panicf("StripLink() failed: %v", err)
 		}
@@ -334,7 +334,7 @@ func TestStripLink(t *testing.T) {
 }
 
 func TestExtractLinkInfo(t *testing.T) {
-	withFakeCNIVethAndGateway(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+	withFakeCNIVethAndGateway(t, defaultMTU, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
 		info, err := ExtractLinkInfo(origContVeth, contNS.Path())
 		if err != nil {
 			log.Panicf("failed to grab interface info: %v", err)
@@ -347,7 +347,7 @@ func TestExtractLinkInfo(t *testing.T) {
 	})
 }
 
-func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, contNsPath string, hostNS ns.NetNS) {
+func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, contNsPath string, hostNS ns.NetNS, mtu int) {
 	allLinks, err := netlink.LinkList()
 	if err != nil {
 		log.Panicf("error listing links: %v", err)
@@ -375,6 +375,9 @@ func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, contNsP
 	if reflect.DeepEqual(origContVeth.Attrs().HardwareAddr, origHwAddr) {
 		t.Errorf("cni veth hardware address didn't change")
 	}
+	if origContVeth.Attrs().MTU != mtu {
+		t.Errorf("bad veth MTU: %d instead of %d", origContVeth.Attrs().MTU, mtu)
+	}
 
 	verifyNoAddressAndRoutes(t, origContVeth)
 
@@ -383,6 +386,9 @@ func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, contNsP
 	tap := verifyBridgeMember(t, "tap0", "tap0", bridge)
 	if tap.Type() != "tun" {
 		t.Errorf("tap0 interface must have type tun, but has %q instead", tap.Type())
+	}
+	if tap.Attrs().MTU != mtu {
+		t.Errorf("bad tap MTU: %d instead of %d", tap.Attrs().MTU, mtu)
 	}
 
 	addrs, err := netlink.AddrList(bridge, FAMILY_V4)
@@ -395,20 +401,33 @@ func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, contNsP
 	} else if addrs[0].String() != expectedAddr {
 		t.Errorf("bad br0 address %q (expected %q)", addrs[0].String(), expectedAddr)
 	}
+
+	if bridge.Attrs().MTU != mtu {
+		t.Errorf("bad bridge MTU: %d instead of %d", bridge.Attrs().MTU, mtu)
+	}
 }
 
 func TestSetUpContainerSideNetworkWithInfo(t *testing.T) {
-	withFakeCNIVethAndGateway(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+	withFakeCNIVethAndGateway(t, defaultMTU, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
 		if err := StripLink(origContVeth); err != nil {
 			log.Panicf("StripLink() failed: %v", err)
 		}
-		verifyContainerSideNetwork(t, origContVeth, contNS.Path(), hostNS)
+		verifyContainerSideNetwork(t, origContVeth, contNS.Path(), hostNS, defaultMTU)
+	})
+}
+
+func TestSetUpContainerSideNetworkMTU(t *testing.T) {
+	withFakeCNIVethAndGateway(t, 9000, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+		if err := StripLink(origContVeth); err != nil {
+			log.Panicf("StripLink() failed: %v", err)
+		}
+		verifyContainerSideNetwork(t, origContVeth, contNS.Path(), hostNS, 9000)
 	})
 }
 
 func TestLoopbackInterface(t *testing.T) {
-	withFakeCNIVethAndGateway(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
-		verifyContainerSideNetwork(t, origContVeth, contNS.Path(), hostNS)
+	withFakeCNIVethAndGateway(t, defaultMTU, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+		verifyContainerSideNetwork(t, origContVeth, contNS.Path(), hostNS, defaultMTU)
 		if out, err := exec.Command("ping", "-c", "1", "127.0.0.1").CombinedOutput(); err != nil {
 			log.Panicf("ping 127.0.0.1 failed:\n%s", out)
 		}
@@ -483,7 +502,7 @@ func verifyVethHaveConfiguration(t *testing.T, info *cnicurrent.Result) {
 }
 
 func TestTeardownContainerSideNetwork(t *testing.T) {
-	withFakeCNIVethAndGateway(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+	withFakeCNIVethAndGateway(t, defaultMTU, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
 		if err := StripLink(origContVeth); err != nil {
 			log.Panicf("StripLink() failed: %v", err)
 		}
@@ -516,7 +535,7 @@ func TestTeardownContainerSideNetwork(t *testing.T) {
 }
 
 func TestFindingLinkByAddress(t *testing.T) {
-	withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+	withFakeCNIVeth(t, defaultMTU, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
 		expectedInfo := expectedExtractedLinkInfo(contNS.Path())
 		allLinks, err := netlink.LinkList()
 		if err != nil {

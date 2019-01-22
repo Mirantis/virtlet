@@ -104,12 +104,12 @@ func sampleCNIResult() *cnicurrent.Result {
 }
 
 type vmNetworkTester struct {
-	t                        *testing.T
-	linkCount                int
-	hostNS, contNS, clientNS ns.NetNS
-	clientTapLinks           []netlink.Link
-	dhcpClientTaps           []*os.File
-	g                        *NetTestGroup
+	t                *testing.T
+	linkCount        int
+	hostNS, clientNS ns.NetNS
+	clientTapLinks   []netlink.Link
+	dhcpClientTaps   []*os.File
+	g                *NetTestGroup
 }
 
 func newVMNetworkTester(t *testing.T, linkCount int) *vmNetworkTester {
@@ -291,9 +291,9 @@ type tapFDSourceTester struct {
 	c          *tapmanager.FDClient
 }
 
-func newTapFDSourceTester(t *testing.T, podId string, info *cnicurrent.Result, hostNS ns.NetNS, extraRoutes map[int][]netlink.Route) *tapFDSourceTester {
+func newTapFDSourceTester(t *testing.T, podId string, info *cnicurrent.Result, hostNS ns.NetNS, extraRoutes map[int][]netlink.Route, mtu int) *tapFDSourceTester {
 	cniClient := NewFakeCNIClient()
-	cniClient.ExpectPod(podId, samplePodName, samplePodNS, info, hostNS, extraRoutes)
+	cniClient.ExpectPod(podId, samplePodName, samplePodNS, info, hostNS, extraRoutes, mtu)
 
 	tmpDir, err := ioutil.TempDir("", "pass-fd-test")
 	if err != nil {
@@ -415,6 +415,8 @@ func TestTapFDSource(t *testing.T) {
 		outerAddrs []string
 		// clientAddrs specifies per-interface VM IPs to ping
 		clientAddrs []string
+		// mtu specifies MTU for the host interface
+		mtu int
 	}{
 		{
 			name:           "single cni",
@@ -428,6 +430,7 @@ func TestTapFDSource(t *testing.T) {
 					"new_network_number='10.1.90.0'",
 					"new_subnet_mask='255.255.255.0'",
 					"tap0: offered 10.1.90.5 from 169.254.254.2",
+					"new_interface_mtu='1500'",
 				},
 			},
 			interfaceDesc: []tapmanager.InterfaceDescription{
@@ -440,6 +443,33 @@ func TestTapFDSource(t *testing.T) {
 			},
 			outerAddrs:  outerAddrs,
 			clientAddrs: clientAddrs,
+		},
+		{
+			name:           "single cni with MTU",
+			interfaceCount: 1,
+			info:           sampleCNIResult(),
+			tcpdumpStopOn:  "10.1.90.1.4243 > 10.1.90.5.4242: UDP",
+			dhcpExpectedSubstrings: [][]string{
+				{
+					"new_classless_static_routes='10.10.42.0/24 10.1.90.90 0.0.0.0/0 10.1.90.1'",
+					"new_ip_address='10.1.90.5'",
+					"new_network_number='10.1.90.0'",
+					"new_subnet_mask='255.255.255.0'",
+					"tap0: offered 10.1.90.5 from 169.254.254.2",
+					"new_interface_mtu='9000'",
+				},
+			},
+			interfaceDesc: []tapmanager.InterfaceDescription{
+				{
+					Type:         network.InterfaceTypeTap,
+					HardwareAddr: mustParseMAC(clientMacAddrs[0]),
+					FdIndex:      0,
+					PCIAddress:   "",
+				},
+			},
+			outerAddrs:  outerAddrs,
+			clientAddrs: clientAddrs,
+			mtu:         9000,
 		},
 		{
 			name:           "multiple cnis",
@@ -949,7 +979,7 @@ func TestTapFDSource(t *testing.T) {
 				vnt := newVMNetworkTester(t, tc.interfaceCount)
 				defer vnt.teardown()
 
-				tst := newTapFDSourceTester(t, podId, tc.info, vnt.hostNS, tc.extraRoutes)
+				tst := newTapFDSourceTester(t, podId, tc.info, vnt.hostNS, tc.extraRoutes, tc.mtu)
 				defer tst.teardown()
 				c := tst.setupServerAndConnectToFDServer()
 				if tc.dummyInfo != nil {
@@ -1048,7 +1078,15 @@ func TestTapFDSource(t *testing.T) {
 					verifyNoDiff(t, "interfaceDesc", tc.interfaceDesc, interfaceDesc)
 				}
 
+				contNS, err := ns.GetNS(csn.NsPath)
+				if err != nil {
+					t.Fatalf("GetNS(): %v", err)
+				}
+
 				for n, veth := range veths {
+					if tc.mtu != 0 {
+						verifyMTU(t, contNS, veth.ContSide, tc.mtu)
+					}
 					addAddress(t, vnt.hostNS, veth.HostSide, tc.outerAddrs[n])
 				}
 
@@ -1079,3 +1117,4 @@ func TestTapFDSource(t *testing.T) {
 
 // TODO: test DNS handling
 // TODO: test SR-IOV (by making a fake sysfs dir)
+// TODO: mtu option over DHCP

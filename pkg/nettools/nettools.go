@@ -55,6 +55,7 @@ import (
 )
 
 const (
+	defaultMTU                  = 1500
 	tapInterfaceNameTemplate    = "tap%d"
 	containerBridgeNameTemplate = "br%d"
 	loopbackInterfaceName       = "lo"
