@@ -127,7 +127,7 @@ func (c *fakeKubeClient) PodLogs(podName, containerName, namespace string, tailL
 	return []byte(l), nil
 }
 
-func (c *fakeKubeClient) GetVirtletNodeNames() ([]string, error) {
+func (c *fakeKubeClient) GetNamesOfNodesMarkedForVirtlet() ([]string, error) {
 	return nil, errors.New("not implemented")
 }
 
