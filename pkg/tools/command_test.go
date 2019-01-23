@@ -17,6 +17,7 @@ limitations under the License.
 package tools
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -24,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+	v1 "k8s.io/api/core/v1"
 )
 
 type fakeKubeClient struct {
@@ -123,6 +125,22 @@ func (c *fakeKubeClient) PodLogs(podName, containerName, namespace string, tailL
 		return []byte{}, nil
 	}
 	return []byte(l), nil
+}
+
+func (c *fakeKubeClient) GetVirtletNodeNames() ([]string, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (c *fakeKubeClient) CreatePod(pod *v1.Pod) (*v1.Pod, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (c *fakeKubeClient) GetPod(name, namespace string) (*v1.Pod, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (c *fakeKubeClient) DeletePod(pod, namespace string) error {
+	return errors.New("not implemented")
 }
 
 func fakeCobraCommand() *cobra.Command {
