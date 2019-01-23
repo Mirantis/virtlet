@@ -124,7 +124,7 @@ func TestCalicoDetection(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+			withFakeCNIVeth(t, defaultMTU, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
 				for _, r := range tc.routes {
 					if r.Scope == SCOPE_LINK {
 						r.LinkIndex = origContVeth.Attrs().Index
@@ -148,7 +148,7 @@ func TestCalicoDetection(t *testing.T) {
 
 func TestFixCalicoNetworking(t *testing.T) {
 	withDummyNetworkNamespace(t, func(dummyNS ns.NetNS, dummyInfo *cnicurrent.Result) {
-		withFakeCNIVeth(t, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+		withFakeCNIVeth(t, defaultMTU, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
 			addCalicoRoutes(t, origContVeth)
 			info, err := ExtractLinkInfo(origContVeth, contNS.Path())
 			if err != nil {

@@ -83,5 +83,10 @@ func CreateTAP(devName string, mtu int) (netlink.Link, error) {
 		return nil, fmt.Errorf("failed to set %q up: %v", devName, err)
 	}
 
+	// NOTE: link mtu in LinkAttrs above is actually ignored
+	if err := netlink.LinkSetMTU(tap, mtu); err != nil {
+		return nil, fmt.Errorf("LinkSetMTU(): %v", err)
+	}
+
 	return tap, nil
 }

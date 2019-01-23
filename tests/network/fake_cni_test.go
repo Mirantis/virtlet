@@ -31,6 +31,10 @@ import (
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
+const (
+	defaultMTU = 1500
+)
+
 // FakeCNIVethPair represents a veth pair created by the fake CNI
 type FakeCNIVethPair struct {
 	HostSide netlink.Link
@@ -46,6 +50,7 @@ type fakeCNIEntry struct {
 	added                   bool
 	removed                 bool
 	useBadResult            bool
+	mtu                     int
 }
 
 func (e *fakeCNIEntry) addSandboxToNetwork(ifaceIndex int) error {
@@ -61,7 +66,7 @@ func (e *fakeCNIEntry) addSandboxToNetwork(ifaceIndex int) error {
 	var vp FakeCNIVethPair
 	if err := e.hostNS.Do(func(ns.NetNS) error {
 		var err error
-		vp.HostSide, vp.ContSide, err = nettools.CreateEscapeVethPair(e.contNS, iface.Name, 1500)
+		vp.HostSide, vp.ContSide, err = nettools.CreateEscapeVethPair(e.contNS, iface.Name, e.mtu)
 		return err
 	}); err != nil {
 		return fmt.Errorf("failed to create escape veth pair: %v", err)
@@ -161,7 +166,10 @@ func NewFakeCNIClient() *FakeCNIClient {
 	}
 }
 
-func (c *FakeCNIClient) ExpectPod(podId, podName, podNS string, info *cnicurrent.Result, hostNS ns.NetNS, extraRoutes map[int][]netlink.Route) {
+func (c *FakeCNIClient) ExpectPod(podId, podName, podNS string, info *cnicurrent.Result, hostNS ns.NetNS, extraRoutes map[int][]netlink.Route, mtu int) {
+	if mtu == 0 {
+		mtu = defaultMTU
+	}
 	c.entries[podKey(podId, podName, podNS)] = &fakeCNIEntry{
 		podId:       podId,
 		podName:     podName,
@@ -169,11 +177,12 @@ func (c *FakeCNIClient) ExpectPod(podId, podName, podNS string, info *cnicurrent
 		info:        info,
 		hostNS:      hostNS,
 		extraRoutes: extraRoutes,
+		mtu:         mtu,
 	}
 }
 
 func (c *FakeCNIClient) ExpectDummyPod(info *cnicurrent.Result, hostNS ns.NetNS, extraRoutes map[int][]netlink.Route) {
-	c.ExpectPod(c.DummyPodId, "", "", info, hostNS, extraRoutes)
+	c.ExpectPod(c.DummyPodId, "", "", info, hostNS, extraRoutes, 0)
 }
 
 func (c *FakeCNIClient) GetDummyNetwork() (*cnicurrent.Result, string, error) {
