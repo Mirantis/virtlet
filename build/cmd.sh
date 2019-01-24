@@ -196,7 +196,7 @@ function ensure_build_container {
             get_rsync_addr
         fi
         if [[ ${DOCKER_CERT_PATH:-} ]]; then
-            tar -C "${DOCKER_CERT_PATH}" -c . | docker exec -i virtlet-build /bin/bash -c 'mkdir /docker-cert && tar -C /docker-cert -xv'
+            tar -C "${DOCKER_CERT_PATH}" -c . | docker exec -i virtlet-build /bin/bash -c 'mkdir /docker-cert && tar -C /docker-cert -x'
         fi
     fi
     if [[ ! ${VIRTLET_SKIP_RSYNC} ]]; then
@@ -229,7 +229,7 @@ function sync_source {
 }
 
 function vcmd {
-    sync_source
+    sync_source >&2
     local t=""
     if [[ ${USE_TERM:-} ]]; then
         t="t"
@@ -550,7 +550,7 @@ function serve_docs_internal {
 function build_docs_internal {
     site_dir="$(mktemp -d)"
     trap 'rm -rf "${site_dir}"' EXIT
-    (cd docs && mkdocs build -d "${site_dir}")
+    (cd docs && mkdocs build -d "${site_dir}" >&2)
     tar -C "${site_dir}" -c .
 }
 
@@ -574,7 +574,7 @@ function build_docs {
     (
         cd _docs
         git add .
-        git commit -m "Update generated docs"
+        git commit -m "Update generated docs [ci skip]"
         # this pushes the changes into the local repo (not github!)
         git push origin gh-pages
     )
