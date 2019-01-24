@@ -1,0 +1,33 @@
+site_name: Virtlet
+theme:
+  name: readthedocs
+  # FIXME: highlightjs tries to autodetect the languages
+  # which causes somewhat random highlighting in some code blocks.
+  # Should try to enable manual language setting for the
+  # highlighting somehow
+  highlightjs: false
+nav:
+- Home: index.md
+- User Guide:
+  - "Installing Virtlet": user-guide/installing-virtlet.md
+- Reference:
+  - "Defining a VM Pod": reference/vm-pod-spec.md
+  - "Working with VM Pods": reference/vm-pod.md
+  - "Volumes": reference/volumes.md
+  - "VM Image Handling": reference/images.md
+  - "Injecting Files into the VM": reference/injecting-files.md
+  - "Cloud-Init": reference/cloud-init.md
+  - "Configuration": reference/config.md
+  - "Networking": reference/networking.md
+  - "Diagnostics": reference/diagnostics.md
+  - "Resource management": reference/resources.md
+  - "Command Line Tool": reference/virtletctl.md
+- Development:
+  - "Virtlet architecture": dev/architecture.md
+  - "Setting up the environment": dev/setup.md
+  - "Running the tests": dev/tests.md
+  - "Build Tool": dev/build-tool.md
+  - "Virtlet CI": dev/virtlet-ci.md
+  - "Building a custom CirrOS image": dev/cirros.md
+  - "Logging architecture": dev/logging.md
+  - "Guidelines": dev/guidelines.md
