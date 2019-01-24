@@ -16,6 +16,7 @@ FORCE_UPDATE_IMAGE="${FORCE_UPDATE_IMAGE:-}"
 IMAGE_REGEXP_TRANSLATION="${IMAGE_REGEXP_TRANSLATION:-1}"
 GH_RELEASE_TEST_USER="ivan4th"
 DIND_CRI="${DIND_CRI:-containerd}"
+MKDOCS_SERVE_ADDRESS="${MKDOCS_SERVE_ADDRESS:-localhost:8042}"
 
 # Note that project_dir must not end with slash
 project_dir="$(cd "$(dirname "${BASH_SOURCE}")/.." && pwd)"
@@ -178,6 +179,7 @@ function ensure_build_container {
                -e VIRTLET_ON_MASTER="${VIRTLET_ON_MASTER:-}" \
                -e VIRTLET_MULTI_NODE="${VIRTLET_MULTI_NODE:-}" \
                -e GITHUB_TOKEN="${GITHUB_TOKEN:-}" \
+               -e MKDOCS_SERVE_ADDRESS="${MKDOCS_SERVE_ADDRESS:-}" \
                ${docker_cert_args[@]+"${docker_cert_args[@]}"} \
                --name virtlet-build \
                --tmpfs /tmp \
@@ -208,7 +210,7 @@ function vsh {
     docker exec -it virtlet-build env TERM=xterm bash
 }
 
-function vcmd {
+function sync_source {
     ensure_build_container
     cd "${project_dir}"
     if [[ ! ${VIRTLET_SKIP_RSYNC} ]]; then
@@ -224,7 +226,15 @@ function vcmd {
               -a --delete --compress-level=9 \
               "${project_dir}/" "rsync://virtlet@${RSYNC_ADDR}/virtlet/"
     fi
-    docker exec -i virtlet-build bash -c "$*"
+}
+
+function vcmd {
+    sync_source
+    local t=""
+    if [[ ${USE_TERM:-} ]]; then
+        t="t"
+    fi
+    docker exec -i"${t}" virtlet-build bash -c "$*"
 }
 
 function vcmd_simple {
@@ -507,17 +517,17 @@ function update_bindata_internal {
     go-bindata -mode 0644 -modtime "${bindata_modtime}" -o "${bindata_out}" -pkg "${bindata_pkg}" "${bindata_dir}"
 }
 
-function update_docs_internal {
+function update_generated_docs_internal {
   if [[ ! -f _output/virtletctl ]]; then
     echo >&2 "Please run build/cmd.sh build first"
   fi
-  _output/virtletctl gendoc docs
+  virtletctl gendoc docs/docs/reference
   tempfile="$(tempfile)"
   _output/virtletctl gendoc --config >"${tempfile}"
   sed -i "/<!-- begin -->/,/<!-- end -->/{
 //!d
 /begin/r ${tempfile}
-}" docs/config.md
+}" docs/docs/reference/config.md
   rm -f "${tempfile}"
 }
 
@@ -533,6 +543,43 @@ function update_generated_internal {
        '{}' \;
 }
 
+function serve_docs_internal {
+    (cd docs && mkdocs serve -a "${MKDOCS_SERVE_ADDRESS}")
+}
+
+function build_docs_internal {
+    site_dir="$(mktemp -d)"
+    trap 'rm -rf "${site_dir}"' EXIT
+    (cd docs && mkdocs build -d "${site_dir}")
+    tar -C "${site_dir}" -c .
+}
+
+function build_docs {
+    cd "${project_dir}"
+    rm -rf _docs
+    git clone -b gh-pages . _docs
+    local docs_hash="$(git ls-tree HEAD -- docs | awk '{print $3}')"
+    if [[ ! -e _docs/source_hash || ${docs_hash} != $(cat _docs/source_hash) ]]; then
+        echo >&2 "docs/ directory changed since the last doc build, rebuilding docs"
+    elif [[ $(git status --porcelain) ]]; then
+        echo >&2 "Source directory dirty, rebuilding docs"
+    else
+        echo >&2 "Docs unchanged, no need to rebuild"
+        return 0
+    fi
+    # clean up _docs except for .git and CNAME
+    find _docs -name .git -prune -o -type f \! -name CNAME -exec rm -f '{}' \;
+    vcmd "build/cmd.sh build-docs-internal" | tar -C _docs -xv
+    echo "${docs_hash}" > _docs/source_hash
+    (
+        cd _docs
+        git add .
+        git commit -m "Update generated docs"
+        # this pushes the changes into the local repo (not github!)
+        git push origin gh-pages
+    )
+}
+
 function usage {
     echo >&2 "Usage:"
     echo >&2 "  $0 build"
@@ -544,11 +591,13 @@ function usage {
     echo >&2 "  $0 stop"
     echo >&2 "  $0 clean"
     echo >&2 "  $0 update-bindata"
-    echo >&2 "  $0 update-docs"
+    echo >&2 "  $0 update-generated-docs"
     echo >&2 "  $0 gotest [TEST_ARGS...]"
     echo >&2 "  $0 gobuild [BUILD_ARGS...]"
     echo >&2 "  $0 run CMD..."
     echo >&2 "  $0 release TAG"
+    echo >&2 "  $0 serve-docs"
+    echo >&2 "  $0 sync"
     exit 1
 }
 
@@ -608,12 +657,12 @@ case "${cmd}" in
     update-generated-internal)
         update_generated_internal
         ;;
-    update-docs)
-        vcmd "build/cmd.sh update-docs-internal"
-        docker exec virtlet-build tar -C "${remote_project_dir}" -c docs/config.md docs/virtletctl.md | tar -C "${project_dir}" -xv
+    update-generated-docs)
+        vcmd "build/cmd.sh update-generated-docs-internal"
+        docker exec virtlet-build tar -C "${remote_project_dir}" -c docs/docs/reference/config.md docs/docs/reference/virtletctl.md | tar -C "${project_dir}" -xv
         ;;
-    update-docs-internal)
-        update_docs_internal
+    update-generated-docs-internal)
+        update_generated_docs_internal
         ;;
     run)
         vcmd "$*"
@@ -666,6 +715,21 @@ case "${cmd}" in
         ;;
     release-internal)
         release_internal "$@"
+        ;;
+    serve-docs-internal)
+        serve_docs_internal
+        ;;
+    serve-docs)
+        ( USE_TERM=1 vcmd "build/cmd.sh serve-docs-internal" )
+        ;;
+    build-docs-internal)
+        build_docs_internal
+        ;;
+    build-docs)
+        build_docs
+        ;;
+    sync)
+        sync_source
         ;;
     *)
         usage
