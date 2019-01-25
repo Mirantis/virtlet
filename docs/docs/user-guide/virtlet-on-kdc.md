@@ -1,4 +1,3 @@
-
 ## Deploying Virtlet as a DaemonSet on kubeadm-dind-cluster
 
 The steps described here are performed automatically by
