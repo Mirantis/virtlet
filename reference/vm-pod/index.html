@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  
+  <link rel="shortcut icon" href="../../img/favicon.ico">
+  <title>Working with VM Pods - Virtlet</title>
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  <link rel="stylesheet" href="../../css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../css/theme_extra.css" type="text/css" />
+  
+  <script>
+    // Current page data
+    var mkdocs_page_name = "Working with VM Pods";
+    var mkdocs_page_input_path = "reference/vm-pod.md";
+    var mkdocs_page_url = null;
+  </script>
+  
+  <script src="../../js/jquery-2.1.1.min.js" defer></script>
+  <script src="../../js/modernizr-2.8.3.min.js" defer></script> 
+  
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+      <div class="wy-side-nav-search">
+        <a href="../.." class="icon icon-home"> Virtlet</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+	<ul class="current">
+	  
+          
+            <li class="toctree-l1">
+		
+    <a class="" href="../..">Home</a>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">User Guide</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../user-guide/virtlet-on-kdc/">Installing Virtlet on kubeadm-dind-cluster</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../user-guide/real-cluster/">Installing Virtlet on a real cluster</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../user-guide/apparmor/">AppArmor profiles</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Virtlet 101</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../101/architecture/">Virtlet architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/workshop-setup/">Workshop setup</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/provision-virtlet/">Virtlet provisioning</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/creating-and-managing-pods/">Creating and managing virtual machines</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/network/">Virtlet networking</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/volumes/">Virtual machine volumes</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/cloud-init/">Cloud-Init support</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/rolling-out-updates/">Rolling out updates</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/troubleshooting/">Troubleshooting</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Reference</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../vm-pod-spec/">Defining a VM Pod</a>
+                </li>
+                <li class=" current">
+                    
+    <a class="current" href="./">Working with VM Pods</a>
+    <ul class="subnav">
+            
+    <li class="toctree-l3"><a href="#differences-between-plain-kubernetes-pods-and-vm-pods">Differences between "plain" Kubernetes pods and VM pods</a></li>
+    
+
+    <li class="toctree-l3"><a href="#supported-kubectl-commands">Supported kubectl commands</a></li>
+    
+
+    <li class="toctree-l3"><a href="#using-higher-level-kubernetes-objects">Using higher-level Kubernetes objects</a></li>
+    
+
+    </ul>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../volumes/">Volumes</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../images/">VM Image Handling</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../injecting-files/">Injecting Files into the VM</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../cloud-init/">Cloud-Init</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../config/">Configuration</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../networking/">Networking</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../diagnostics/">Diagnostics</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../resources/">Resource management</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../virtletctl/">Command Line Tool</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Development</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../dev/architecture/">Virtlet architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/setup/">Setting up the environment</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/tests/">Running the tests</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/build-tool/">Build Tool</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/virtlet-ci/">Virtlet CI</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/cirros/">Building a custom CirrOS image</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/logging/">Logging architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/vm-pod-lifecycle/">Lifecycle of a VM pod</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/guidelines/">Guidelines</a>
+                </li>
+    </ul>
+	    </li>
+          
+        </ul>
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../..">Virtlet</a>
+      </nav>
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../..">Docs</a> &raquo;</li>
+    
+      
+        
+          <li>Reference &raquo;</li>
+        
+      
+    
+    <li>Working with VM Pods</li>
+    <li class="wy-breadcrumbs-aside">
+      
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main">
+            <div class="section">
+              
+                <h1 id="differences-between-plain-kubernetes-pods-and-vm-pods">Differences between "plain" Kubernetes pods and VM pods</h1>
+<p>Virtlet tries hard to make VM pods appear as plain Kubernetes
+pods. Still, there are some important differences, including:</p>
+<ol>
+<li>VM pods can have just one "container"</li>
+<li>You can't use container images for VM pods</li>
+<li>Some container-specific settings such as network/PID/IPC
+   namespaces, SELinux/AppArmor settings, privileged flag etc. aren't
+   applicable to VM pods</li>
+<li>Some volume types are handled differently. There are
+   VM-pod-specific settings such as Cloud-Init, persistent rootfs, etc.
+   For more information, see <a href="../volumes/">Volumes</a>.</li>
+<li><code>kubectl exec</code> and exec readiness/liveness probes aren't supported
+   for VM pods yet</li>
+<li>There are VM-pod-specific settings such as
+   <a href="../cloud-init/">Cloud-Init</a>, persistent rootfs, etc.</li>
+</ol>
+<p>Another important point is that when using a persistent root
+filesystem, the lifetime of the VM is not limited to that of the pod.</p>
+<p>Despite these differences, there are quite a few Kubernetes features
+that work for VM pods just as well as for "plain" pods, for example,
+most <code>kubectl</code> commands, pointing services at VM pods, and so on.</p>
+<p>Besides <code>kubectl</code>, a Virtlet-specific tool called
+<a href="../virtletctl/">virtletctl</a> can be used to perform Virtlet-specific
+actions on VM pods and Virtlet processes in the cluster, such as
+connecting to the VM using SSH and providing VNC connection and
+dumping cluster diagnostic info.</p>
+<h1 id="supported-kubectl-commands">Supported kubectl commands</h1>
+<p>Most <code>kubectl</code> commands' behavior doesn't differ between "plain" and
+VM pods. Exceptions are <code>kubectl exec</code> which isn't supported at the
+moment, and <code>kubectl attach</code> / <code>kubectl logs</code> which work only if the
+VM has serial console configured.</p>
+<p><code>kubectl attach</code> attaches to the VM serial console. Detaching from the
+console is done via <code>Ctrl-]</code>.</p>
+<p><code>kubectl logs</code> displays the logs for the pod. In case of VM pod, the
+log is the serial console output. <code>kubectl logs -f</code>, which follows the
+log as it grows, is supported, too.</p>
+<h1 id="using-higher-level-kubernetes-objects">Using higher-level Kubernetes objects</h1>
+<p>One of the advantages of pod-based approach to running VMs on
+Kubernetes is an ability to use higher-level Kubernetes objects such
+as StatefulSets, Deployments, DaemonSets etc. trivially with VMs.</p>
+<p>Virtlet includes a
+<a href="https://github.com/Mirantis/virtlet/blob/master/examples/k8s.yaml">nested Kubernetes example</a>
+which makes a nested Kubernetes cluster using a
+<a href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/">StatefulSet</a>
+of 3 VM pods, which are initialized using
+<a href="https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/">kubeadm</a>.</p>
+<p>In the k8s-in-k8s example, first we create a
+<a href="https://kubernetes.io/docs/concepts/services-networking/service/#headless-services">headless service</a>
+that will point domain names <code>k8s-0</code>, <code>k8s-1</code> and <code>k8s-2</code> as resolved
+by cluster's DNS to the corresponding StatefulSet replicas:</p>
+<pre><code class="yaml">apiVersion: v1
+kind: Service
+metadata:
+  name: k8s
+  labels:
+    app: k8s
+spec:
+  ports:
+  - port: 22
+    name: ssh
+  clusterIP: None
+  selector:
+    app: inner-k8s
+</code></pre>
+
+<p>Then, we begin defining a StatefulSet with 3 replicas:</p>
+<pre><code>apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: k8s
+spec:
+  serviceName: k8s
+  replicas: 3
+  selector:
+    matchLabels:
+      app: inner-k8s
+</code></pre>
+
+<p>The pods that comprise the StatefulSet are VM pods and thus
+must have <code>kubernetes.io/target-runtime: virtlet.cloud</code> annotation.
+Also, we set the
+root volume size to 4Gi to have some place for Docker images:</p>
+<pre><code class="yaml">  template:
+    metadata:
+      labels:
+        app: inner-k8s
+      annotations:
+        kubernetes.io/target-runtime: virtlet.cloud
+        # set root volume size
+        VirtletRootVolumeSize: 4Gi
+</code></pre>
+
+<p>Then we add another annotation that will contain
+<a href="../cloud-init/">Cloud-Init</a> user-data, in which we write some files
+to adjust Docker settings and add the Kubernetes repository for apt,
+as well as a provisioning script that will install the necessary
+packages and then run <code>kubeadm init</code> on <code>k8s-0</code> and <code>kubeadm join</code> on
+<code>k8s-1</code> and <code>k8s-2</code>. The script makes use of StatefulSet's
+<a href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#stable-network-id">stable network IDs</a>,
+so the nodes have names <code>k8s-0</code>, <code>k8s-1</code> and <code>k8s-2</code> that can be
+resolved by cluster DNS.</p>
+<pre><code class="yaml">        VirtletCloudInitUserData: |
+          write_files:
+          - path: /etc/systemd/system/docker.service.d/env.conf
+            permissions: &quot;0644&quot;
+            owner: root
+            content: |
+              [Service]
+              Environment=&quot;DOCKER_OPTS=--storage-driver=overlay2&quot;
+          - path: /etc/apt/sources.list.d/kubernetes.list
+            permissions: &quot;0644&quot;
+            owner: root
+            content: |
+              deb http://apt.kubernetes.io/ kubernetes-xenial main
+          - path: /usr/local/bin/provision.sh
+            permissions: &quot;0755&quot;
+            owner: root
+            content: |
+              #!/bin/bash
+              set -u -e
+              set -o pipefail
+              curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+              apt-get update
+              apt-get install -y docker.io kubelet kubeadm kubectl kubernetes-cni
+              sed -i 's/--cluster-dns=10\.96\.0\.10/--cluster-dns=10.97.0.10/' \
+                  /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+              systemctl daemon-reload
+              if [[ $(hostname) =~ -0$ ]]; then
+                # master node
+                kubeadm init --token adcb82.4eae29627dc4c5a6 \
+                             --pod-network-cidr=10.200.0.0/16 \
+                             --service-cidr=10.97.0.0/16 \
+                             --apiserver-cert-extra-sans=127.0.0.1,localhost
+                export KUBECONFIG=/etc/kubernetes/admin.conf
+                export kubever=$(kubectl version | base64 | tr -d '\n')
+                kubectl apply -f &quot;https://cloud.weave.works/k8s/net?k8s-version=$kubever&quot;
+                while ! kubectl get pods -n kube-system -l k8s-app=kube-dns |
+                    grep ' 1/1'; do
+                  sleep 1
+                done
+                mkdir -p /root/.kube
+                chmod 700 /root/.kube
+                cp &quot;${KUBECONFIG}&quot; /root/.kube/config
+                echo &quot;Master setup complete.&quot; &gt;&amp;2
+              else
+                # worker node
+                kubeadm join --token adcb82.4eae29627dc4c5a6 \
+                             --discovery-token-unsafe-skip-ca-verification k8s-0.k8s:6443
+                echo &quot;Node setup complete.&quot; &gt;&amp;2
+              fi
+</code></pre>
+
+<p>We then add an ssh public key (corresponding to <code>examples/vmkey</code>) for
+the user <code>root</code>:</p>
+<pre><code>          users:
+          - name: root
+            # VirtletSSHKeys only affects 'ubuntu' user for this image, but we want root access
+            ssh-authorized-keys:
+            - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCaJEcFDXEK2ZbX0ZLS1EIYFZRbDAcRfuVjpstSc0De8+sV1aiu+dePxdkuDRwqFtCyk6dEZkssjOkBXtri00MECLkir6FcH3kKOJtbJ6vy3uaJc9w1ERo+wyl6SkAh/+JTJkp7QRXj8oylW5E20LsbnA/dIwWzAF51PPwF7A7FtNg9DnwPqMkxFo1Th/buOMKbP5ZA1mmNNtmzbMpMfJATvVyiv3ccsSJKOiyQr6UG+j7sc/7jMVz5Xk34Vd0l8GwcB0334MchHckmqDB142h/NCWTr8oLakDNvkfC1YneAfAO41hDkUbxPtVBG5M/o7P4fxoqiHEX+ZLfRxDtHB53 me@localhost
+</code></pre>
+
+<p>and make <a href="../cloud-init/">Cloud-Init</a> run the provisioning script when
+the VM boots:</p>
+<pre><code>          runcmd:
+          - /usr/local/bin/provision.sh
+</code></pre>
+
+<p>After that, we get to the pod spec, in which we limit the
+possibilities of running the pod to the nodes with
+<code>extraRuntime=virtlet</code> label where Virtlet daemon pods are placed and
+use Ubuntu 16.04 image:</p>
+<pre><code class="yaml">    spec:
+      nodeSelector:
+        extraRuntime: virtlet
+      containers:
+      - name: ubuntu-vm
+        image: virtlet.cloud/cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img
+        imagePullPolicy: IfNotPresent
+        # tty and stdin required for `kubectl attach -t` to work
+        tty: true
+        stdin: true
+</code></pre>
+
+<p>We then specify a readiness probe which will mark each pod as <code>Ready</code>
+once its ssh port becomes active:</p>
+<pre><code class="yaml">        readinessProbe:
+          tcpSocket:
+            port: 22
+          initialDelaySeconds: 5
+</code></pre>
+
+<p>We could use a more sophisticated check, e.g. by making sure that
+apiserver is accessible, but for the purpose of the example we use
+this trivial scheme to keep things simple. Note that <code>kubeadm join</code> on
+<code>k8s-1</code> and <code>k8s-2</code> will keep retrying till <code>kubeadm init</code> on <code>k8s-0</code>
+completes its task.</p>
+<p>In order to test the example, we start it and wait till <code>k8s-0</code>,
+<code>k8s-1</code> and <code>k8s-2</code> pods appear:</p>
+<pre><code class="console">$ kubectl apply -f examples/k8s.yaml
+$ kubectl get pods -w
+</code></pre>
+
+<p>Then we can view the logs on each of the node to see the progress
+of Kubernetes setup, e.g.</p>
+<pre><code class="console">$ kubectl logs -f k8s-0
+...
+[  226.115652] cloud-init[1513]: Master setup complete.
+...
+</code></pre>
+
+<p>After the setup is complete, we can use <a href="../virtletctl/">virtletctl</a>
+to ssh into the master VM and check the cluster:</p>
+<pre><code class="console">$ virtletctl ssh root@k8s-0 -- -i examples/vmkey
+Welcome to Ubuntu 16.04.5 LTS (GNU/Linux 4.4.0-138-generic x86_64)
+
+...
+
+root@k8s-0:~# kubectl get pods --all-namespaces
+NAMESPACE     NAME                            READY   STATUS    RESTARTS   AGE
+kube-system   coredns-576cbf47c7-8dnh6        1/1     Running   0          69m
+kube-system   coredns-576cbf47c7-q622f        1/1     Running   0          69m
+kube-system   etcd-k8s-0                      1/1     Running   0          69m
+kube-system   kube-apiserver-k8s-0            1/1     Running   0          68m
+kube-system   kube-controller-manager-k8s-0   1/1     Running   0          68m
+kube-system   kube-proxy-4dgfx                1/1     Running   0          69m
+kube-system   kube-proxy-jmw6c                1/1     Running   0          69m
+kube-system   kube-proxy-qwbw7                1/1     Running   0          69m
+kube-system   kube-scheduler-k8s-0            1/1     Running   0          68m
+kube-system   weave-net-88jv4                 2/2     Running   1          69m
+kube-system   weave-net-kz698                 2/2     Running   0          69m
+kube-system   weave-net-rbnmf                 2/2     Running   1          69m
+root@k8s-0:~# kubectl get nodes
+NAME    STATUS   ROLES    AGE   VERSION
+k8s-0   Ready    master   69m   v1.12.2
+k8s-1   Ready    &lt;none&gt;   69m   v1.12.2
+k8s-2   Ready    &lt;none&gt;   69m   v1.12.2
+</code></pre>
+              
+            </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../volumes/" class="btn btn-neutral float-right" title="Volumes">Next <span class="icon icon-circle-arrow-right"></span></a>
+      
+      
+        <a href="../vm-pod-spec/" class="btn btn-neutral" title="Defining a VM Pod"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+    
+  </div>
+
+  Built with <a href="http://www.mkdocs.org">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+      
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" style="cursor: pointer">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+      
+      
+        <span><a href="../vm-pod-spec/" style="color: #fcfcfc;">&laquo; Previous</a></span>
+      
+      
+        <span style="margin-left: 15px"><a href="../volumes/" style="color: #fcfcfc">Next &raquo;</a></span>
+      
+    </span>
+</div>
+    <script>var base_url = '../..';</script>
+    <script src="../../js/theme.js" defer></script>
+      <script src="../../search/main.js" defer></script>
+
+</body>
+</html>

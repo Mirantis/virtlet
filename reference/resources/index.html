@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  
+  <link rel="shortcut icon" href="../../img/favicon.ico">
+  <title>Resource management - Virtlet</title>
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  <link rel="stylesheet" href="../../css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../css/theme_extra.css" type="text/css" />
+  
+  <script>
+    // Current page data
+    var mkdocs_page_name = "Resource management";
+    var mkdocs_page_input_path = "reference/resources.md";
+    var mkdocs_page_url = null;
+  </script>
+  
+  <script src="../../js/jquery-2.1.1.min.js" defer></script>
+  <script src="../../js/modernizr-2.8.3.min.js" defer></script> 
+  
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+      <div class="wy-side-nav-search">
+        <a href="../.." class="icon icon-home"> Virtlet</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+	<ul class="current">
+	  
+          
+            <li class="toctree-l1">
+		
+    <a class="" href="../..">Home</a>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">User Guide</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../user-guide/virtlet-on-kdc/">Installing Virtlet on kubeadm-dind-cluster</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../user-guide/real-cluster/">Installing Virtlet on a real cluster</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../user-guide/apparmor/">AppArmor profiles</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Virtlet 101</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../101/architecture/">Virtlet architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/workshop-setup/">Workshop setup</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/provision-virtlet/">Virtlet provisioning</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/creating-and-managing-pods/">Creating and managing virtual machines</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/network/">Virtlet networking</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/volumes/">Virtual machine volumes</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/cloud-init/">Cloud-Init support</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/rolling-out-updates/">Rolling out updates</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/troubleshooting/">Troubleshooting</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Reference</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../vm-pod-spec/">Defining a VM Pod</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../vm-pod/">Working with VM Pods</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../volumes/">Volumes</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../images/">VM Image Handling</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../injecting-files/">Injecting Files into the VM</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../cloud-init/">Cloud-Init</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../config/">Configuration</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../networking/">Networking</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../diagnostics/">Diagnostics</a>
+                </li>
+                <li class=" current">
+                    
+    <a class="current" href="./">Resource management</a>
+    <ul class="subnav">
+            
+    <li class="toctree-l3"><a href="#cpu-model">CPU Model</a></li>
+    
+
+    <li class="toctree-l3"><a href="#resource-monitoring-on-the-node">Resource monitoring on the node</a></li>
+    
+
+    <li class="toctree-l3"><a href="#cpu-management">CPU management</a></li>
+    
+        <ul>
+        
+            <li><a class="toctree-l4" href="#cpu-cgroups-facilities">CPU cgroups facilities:</a></li>
+        
+            <li><a class="toctree-l4" href="#k8s-cpu-allocation">K8s CPU allocation:</a></li>
+        
+            <li><a class="toctree-l4" href="#libvirt-cpu-allocation">Libvirt CPU allocation:</a></li>
+        
+            <li><a class="toctree-l4" href="#virtlet-cpu-resources-management">Virtlet CPU resources management</a></li>
+        
+        </ul>
+    
+
+    <li class="toctree-l3"><a href="#memory-management">Memory management</a></li>
+    
+        <ul>
+        
+            <li><a class="toctree-l4" href="#k8s-memory-allocation">K8s memory allocation</a></li>
+        
+            <li><a class="toctree-l4" href="#libvirt-memory-allocation">Libvirt memory allocation</a></li>
+        
+            <li><a class="toctree-l4" href="#virtlet-memory-resources-management">Virtlet Memory resources management</a></li>
+        
+        </ul>
+    
+
+    <li class="toctree-l3"><a href="#future-improvements">Future improvements</a></li>
+    
+
+    </ul>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../virtletctl/">Command Line Tool</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Development</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../dev/architecture/">Virtlet architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/setup/">Setting up the environment</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/tests/">Running the tests</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/build-tool/">Build Tool</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/virtlet-ci/">Virtlet CI</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/cirros/">Building a custom CirrOS image</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/logging/">Logging architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/vm-pod-lifecycle/">Lifecycle of a VM pod</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/guidelines/">Guidelines</a>
+                </li>
+    </ul>
+	    </li>
+          
+        </ul>
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../..">Virtlet</a>
+      </nav>
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../..">Docs</a> &raquo;</li>
+    
+      
+        
+          <li>Reference &raquo;</li>
+        
+      
+    
+    <li>Resource management</li>
+    <li class="wy-breadcrumbs-aside">
+      
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main">
+            <div class="section">
+              
+                <h2 id="cpu-model">CPU Model</h2>
+<p>By default, libvirt runs QEMU with a CPU model that doesn't support nested
+virtualization.  It's possible to change this behavior by using
+<code>VirtletCPUModel: host-model</code> annotation in the pod definition.
+You can also use <code>cpuModel</code> value in Virtlet config to override the value
+globally for the cluster or for a particular subset of nodes.</p>
+<p>If you are familiar with the cpu part in libvirt domain definition, you can
+use <code>VirtletLibvirtCPUSetting</code> annotation, the value is directly passed to
+libvirt after reading it from yaml string.  It is more flexible than usage of
+<code>VirtletCPUModel</code> as it allows to provide more detailed configuration.</p>
+<p>For example:</p>
+<pre><code class="yaml">  annotations:
+    VirtletLibvirtCPUSetting: |
+      mode: custom
+      model:
+        value: Westmere
+      features:
+      - name: avx
+        policy: disable
+</code></pre>
+
+<p>See <a href="https://github.com/Mirantis/virtlet/blob/master/examples/ubuntu-vm-with-libvirt-cpusetting.yaml">cpuSetting</a> for a full example.</p>
+<h2 id="resource-monitoring-on-the-node">Resource monitoring on the node</h2>
+<p>As Kubelet uses <a href="https://github.com/google/cadvisor">cAdvisor</a> to collect
+metrics about running containers and Virtlet doesn't create container per each
+VM, and instead spawns VMs inside Virtlet container.  This leads to all the
+resource usage being lumped together and ascribed to Virtlet pod.</p>
+<h2 id="cpu-management">CPU management</h2>
+<h3 id="cpu-cgroups-facilities">CPU cgroups facilities:</h3>
+<ol>
+<li><code>shares</code> - relative value of cpu time assigned, not recommended for using
+   in production as it's hard to predict the actual performance which highly
+   depends on the neighboring cgroups.</li>
+<li><code>CFS CPU bandwidth control</code> - period and quota - hard limits.
+   <code>Parent_Period/Quota &lt;= Child_1_Period/Quota + .. + Child_N_Period/Quota</code>,
+    where <code>Child_N_Period/Quota &lt;= Parent_Period/Quota</code>.</li>
+</ol>
+<h3 id="k8s-cpu-allocation">K8s CPU allocation:</h3>
+<ol>
+<li><code>shares</code> are set per container.</li>
+<li><code>CFS CPU bandwidth control</code> - period and quota - are set per container.</li>
+</ol>
+<p><strong>Defaults:</strong> In absence of explicitly set values each container has 2 shares
+set by default.</p>
+<h3 id="libvirt-cpu-allocation">Libvirt CPU allocation:</h3>
+<ol>
+<li><code>shares</code> is set per each vCPU.</li>
+<li><code>period</code> and <code>quota</code> are set per each vCPU.  As libvirt imposes limits per
+   each vCPU thread, so actual <code>CPU quota</code> is <code>quota</code> value from the domain
+   definition times the number of vCPUs.  More details re reasons of libvirt
+   per vCPU cgroup approach can be found
+   <a href="https://www.redhat.com/archives/libvir-list/2015-June/msg00923.html">there</a>.</li>
+<li><code>emulator_period</code> and <code>emulator_quota</code> denote the limits for emulator
+   threads (those excluding vcpus).  At the same time for unlimited domains
+   benchmarks show that these activities may measure up to 40-80% of overall
+   physical CPU usage by QEMU/KVM process running the guest VM.</li>
+<li>vCPUs per VM - it's commonly recommended to have vCPU count set to
+   1 (see details in section <strong>"CPU overcommit"</strong> below).</li>
+</ol>
+<p><strong>Defaults:</strong> In absence of explicitly set values each domain has 1024 shares
+set by default.</p>
+<h4 id="cpu-overcommit">CPU overcommit</h4>
+<p>It's outlined that linux scheduler doesn't perform well in case of CPU
+overcommitment and if it's not caused real need (like having multi-core VM to
+perform build/compile, running application inside that can effectively utilize
+multiple cores and was designed for parallel processing) and widely
+recommended to use one vCPU per VM otherwise you can expect performance
+degradation.</p>
+<p>It is not recommended to have more than 10 virtual CPUs per physical processor
+core. Any number of overcommitted virtual CPUs above the number of physical
+processor cores may cause problems with certain virtualized guests, so it's
+always up to cluster administrators how to set up number vCPUs per VMs.</p>
+<p><strong>See more considerations on</strong> <a href="https://docs.fedoraproject.org/en-US/Fedora/13/html/Virtualization_Guide/sect-Virtualization-Virtualization_limitations-KVM_limitations.html">KVM limitations</a>.</p>
+<h3 id="virtlet-cpu-resources-management">Virtlet CPU resources management</h3>
+<ol>
+<li>By default, all VMs are created with 1 vCPU.
+   To change vCPU number for VM-Pod you have to add annotation
+   <code>VirtletVCPUCount</code> with desired number, see <a href="https://github.com/Mirantis/virtlet/blob/master/examples/cirros-vm.yaml">examples/cirros-vm.yaml</a>.</li>
+<li>Due to p.2 in <strong>"Libvirt CPU Allocation"</strong> Virtlet spreads the assigned CPU
+   resource limit equally among VM's vCPU threads.</li>
+<li>According to p.3 in <strong>"Libvirt CPU Allocation"</strong> Virtlet must set limits
+   for emulator threads(those excluding vcpus). At this time Virtlet doesn't
+   support setting these values, but there are plans to fix this in future.</li>
+</ol>
+<h2 id="memory-management">Memory management</h2>
+<h3 id="k8s-memory-allocation">K8s memory allocation</h3>
+<p>Setting memory limit to 0 or omitting it means there's no memory limit for the
+container.  K8s doesn't support swap on the nodes (for example, k8s creates
+docker containers with --memory-swappiness=0, see more at https://github.com/kubernetes/kubernetes/issues/7294).</p>
+<h3 id="libvirt-memory-allocation"><a href="http://libvirt.org/formatdomain.html#elementsMemoryAllocation">Libvirt memory allocation</a></h3>
+<ol>
+<li><code>memory</code> - allocated RAM memory at VM boot.</li>
+<li><code>memtune=&gt;hard_limit</code> - cgroup memory limit on all domain including qemu
+   itself usage. <a href="http://libvirt.org/formatdomain.html#elementsMemoryTuning">However, it's claimed that such limit should be set accurately</a>.</li>
+<li>Swap unlimited by default.</li>
+</ol>
+<h4 id="memory-overcommit">Memory overcommit</h4>
+<p>Overcommit memory value can reach ~150% of physical RAM amount.  This relies
+on assumption that most processes do not access 100% of their allocated memory
+all the time.  So you can grant guest VMs more RAM than actually is available
+on the host.  However, this strongly depends on memory swap size available on
+the node and workloads of VMs memory consumptions.</p>
+<p>For more details check <a href="https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/6/html/Virtualization_Administration_Guide/chap-Virtualization-Tips_and_tricks-Overcommitting_with_KVM.html">Overcommitting with KVM</a>.</p>
+<h3 id="virtlet-memory-resources-management">Virtlet Memory resources management</h3>
+<ol>
+<li>By default, each VM is assigned 1GB of RAM.  To set other value you need
+set resource memory limit for container, see <a href="https://github.com/Mirantis/virtlet/blob/master/examples/cirros-vm.yaml">examples/cirros-vm.yaml</a>.</li>
+<li>Virtlet generates domain XML with memoryBacking=locked setting to prevent
+   swapping out domain's pages.</li>
+</ol>
+<h2 id="future-improvements">Future improvements</h2>
+<ol>
+<li>According to <strong>2</strong> and <strong>3</strong> in <strong>"Libvirt CPU Allocation"</strong> we need
+   to invent some rule of setting CFS CPU bandwidth limit spread among QEMU
+   and vCPU threads, so as to make k8s scheduler have right assumptions about
+   the resources allocated on the node.</li>
+<li>Research how to configure the
+   <a href="http://libvirt.org/formatdomain.html#elementsMemoryTuning">hard limits</a>
+   on memory for VM pod.</li>
+</ol>
+              
+            </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../virtletctl/" class="btn btn-neutral float-right" title="Command Line Tool">Next <span class="icon icon-circle-arrow-right"></span></a>
+      
+      
+        <a href="../diagnostics/" class="btn btn-neutral" title="Diagnostics"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+    
+  </div>
+
+  Built with <a href="http://www.mkdocs.org">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+      
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" style="cursor: pointer">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+      
+      
+        <span><a href="../diagnostics/" style="color: #fcfcfc;">&laquo; Previous</a></span>
+      
+      
+        <span style="margin-left: 15px"><a href="../virtletctl/" style="color: #fcfcfc">Next &raquo;</a></span>
+      
+    </span>
+</div>
+    <script>var base_url = '../..';</script>
+    <script src="../../js/theme.js" defer></script>
+      <script src="../../search/main.js" defer></script>
+
+</body>
+</html>

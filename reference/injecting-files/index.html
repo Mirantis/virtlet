@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  
+  <link rel="shortcut icon" href="../../img/favicon.ico">
+  <title>Injecting Files into the VM - Virtlet</title>
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  <link rel="stylesheet" href="../../css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../css/theme_extra.css" type="text/css" />
+  
+  <script>
+    // Current page data
+    var mkdocs_page_name = "Injecting Files into the VM";
+    var mkdocs_page_input_path = "reference/injecting-files.md";
+    var mkdocs_page_url = null;
+  </script>
+  
+  <script src="../../js/jquery-2.1.1.min.js" defer></script>
+  <script src="../../js/modernizr-2.8.3.min.js" defer></script> 
+  
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+      <div class="wy-side-nav-search">
+        <a href="../.." class="icon icon-home"> Virtlet</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+	<ul class="current">
+	  
+          
+            <li class="toctree-l1">
+		
+    <a class="" href="../..">Home</a>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">User Guide</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../user-guide/virtlet-on-kdc/">Installing Virtlet on kubeadm-dind-cluster</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../user-guide/real-cluster/">Installing Virtlet on a real cluster</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../user-guide/apparmor/">AppArmor profiles</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Virtlet 101</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../101/architecture/">Virtlet architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/workshop-setup/">Workshop setup</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/provision-virtlet/">Virtlet provisioning</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/creating-and-managing-pods/">Creating and managing virtual machines</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/network/">Virtlet networking</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/volumes/">Virtual machine volumes</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/cloud-init/">Cloud-Init support</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/rolling-out-updates/">Rolling out updates</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/troubleshooting/">Troubleshooting</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Reference</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../vm-pod-spec/">Defining a VM Pod</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../vm-pod/">Working with VM Pods</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../volumes/">Volumes</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../images/">VM Image Handling</a>
+                </li>
+                <li class=" current">
+                    
+    <a class="current" href="./">Injecting Files into the VM</a>
+    <ul class="subnav">
+            
+    <li class="toctree-l3"><a href="#injecting-files-into-the-vm">Injecting files into the VM</a></li>
+    
+        <ul>
+        
+            <li><a class="toctree-l4" href="#key-value-conventions">Key-value conventions</a></li>
+        
+            <li><a class="toctree-l4" href="#configmap-example">ConfigMap example</a></li>
+        
+            <li><a class="toctree-l4" href="#secret-example">Secret example</a></li>
+        
+        </ul>
+    
+
+    </ul>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../cloud-init/">Cloud-Init</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../config/">Configuration</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../networking/">Networking</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../diagnostics/">Diagnostics</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../resources/">Resource management</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../virtletctl/">Command Line Tool</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Development</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../dev/architecture/">Virtlet architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/setup/">Setting up the environment</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/tests/">Running the tests</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/build-tool/">Build Tool</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/virtlet-ci/">Virtlet CI</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/cirros/">Building a custom CirrOS image</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/logging/">Logging architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/vm-pod-lifecycle/">Lifecycle of a VM pod</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/guidelines/">Guidelines</a>
+                </li>
+    </ul>
+	    </li>
+          
+        </ul>
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../..">Virtlet</a>
+      </nav>
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../..">Docs</a> &raquo;</li>
+    
+      
+        
+          <li>Reference &raquo;</li>
+        
+      
+    
+    <li>Injecting Files into the VM</li>
+    <li class="wy-breadcrumbs-aside">
+      
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main">
+            <div class="section">
+              
+                <h1 id="injecting-files-into-the-vm">Injecting files into the VM</h1>
+<p>Virtlet makes it possible to write set of files to the root filesystem of a VM using
+<a href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/">Config Map</a>
+or <a href="https://kubernetes.io/docs/concepts/configuration/secret/">Secret</a>
+as a source of data.</p>
+<h2 id="key-value-conventions">Key-value conventions</h2>
+<p>ConfigMap or Secret should contain keys and values according to the
+following convention:</p>
+<pre><code class="yaml">entry: content
+entry_path: encoded/path/in/filesystem
+entry_encoding: encoding_of_content
+second_entry: content
+second_entry_path: encoded/path/in/filesystem
+second_entry_encoding: encoding_of_content
+</code></pre>
+
+<p>where <code>entry</code> is an arbitrary name, <code>entry_name</code> contains the destination
+path on the VM root filesystem, and optional <code>entry_encoding</code>
+denotes the encoding of the file content which can be <code>plain</code> for plain text
+(for use in ConfigMaps) or <code>base64</code> (the default).</p>
+<h2 id="configmap-example">ConfigMap example</h2>
+<p>Create a ConfigMap like this:</p>
+<pre><code class="bash">kubectl apply -f - &lt;&lt;EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-files-set
+data:
+  locale: LANG=&quot;pl_PL.UTF-8&quot;
+  locale_path: /etc/locale.conf
+  locale_encoding: plain
+  host_conf: bXVsdGkgb2ZmCg==
+  host_conf_path: /etc/host.conf
+EOF
+</code></pre>
+
+<p>and then add it to a pod using the following annotation:</p>
+<pre><code class="yaml">...
+metadata:
+  ...
+  annotations:
+    VirtletFilesFromDataSource: configmap/my-files-set
+</code></pre>
+
+<h2 id="secret-example">Secret example</h2>
+<p>Same data as show above can be specified via a <code>Secret</code>:</p>
+<pre><code class="bash">mkdir data
+echo 'LANG=&quot;pl_PL.UTF-8&quot;' &gt;data/locale
+echo /etc/locale.conf &gt;data/locale_path
+echo multi off &gt;data/host_conf
+echo /etc/host.conf &gt;data/host_conf_path
+kubectl create secret generic my-files-set --from-file=data/
+rm -r data/
+</code></pre>
+
+<p>or recreating above using yaml notation (note: secrets use base64 encoding for
+each value stored under each key):</p>
+<pre><code class="bash">kubectl apply -f - &lt;&lt;EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-files-set
+data:
+  locale: TEFORz0icGxfUEwuVVRGLTgiCg==
+  locale_path: L2V0Yy9sb2NhbGUuY29uZgo=
+  host_conf: bXVsdGkgb2ZmCg==
+  host_conf_path: L2V0Yy9ob3N0LmNvbmYK
+EOF
+</code></pre>
+
+<p>The secret can be injected into the root filesystem like that:</p>
+<pre><code class="yaml">...
+metadata:
+  ...
+  annotations:
+    VirtletFilesFromDataSource: secret/my-files-set
+</code></pre>
+              
+            </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../cloud-init/" class="btn btn-neutral float-right" title="Cloud-Init">Next <span class="icon icon-circle-arrow-right"></span></a>
+      
+      
+        <a href="../images/" class="btn btn-neutral" title="VM Image Handling"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+    
+  </div>
+
+  Built with <a href="http://www.mkdocs.org">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+      
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" style="cursor: pointer">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+      
+      
+        <span><a href="../images/" style="color: #fcfcfc;">&laquo; Previous</a></span>
+      
+      
+        <span style="margin-left: 15px"><a href="../cloud-init/" style="color: #fcfcfc">Next &raquo;</a></span>
+      
+    </span>
+</div>
+    <script>var base_url = '../..';</script>
+    <script src="../../js/theme.js" defer></script>
+      <script src="../../search/main.js" defer></script>
+
+</body>
+</html>

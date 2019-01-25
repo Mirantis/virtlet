@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  
+  <link rel="shortcut icon" href="../../img/favicon.ico">
+  <title>Cloud-Init - Virtlet</title>
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  <link rel="stylesheet" href="../../css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../css/theme_extra.css" type="text/css" />
+  
+  <script>
+    // Current page data
+    var mkdocs_page_name = "Cloud-Init";
+    var mkdocs_page_input_path = "reference/cloud-init.md";
+    var mkdocs_page_url = null;
+  </script>
+  
+  <script src="../../js/jquery-2.1.1.min.js" defer></script>
+  <script src="../../js/modernizr-2.8.3.min.js" defer></script> 
+  
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+      <div class="wy-side-nav-search">
+        <a href="../.." class="icon icon-home"> Virtlet</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+	<ul class="current">
+	  
+          
+            <li class="toctree-l1">
+		
+    <a class="" href="../..">Home</a>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">User Guide</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../user-guide/virtlet-on-kdc/">Installing Virtlet on kubeadm-dind-cluster</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../user-guide/real-cluster/">Installing Virtlet on a real cluster</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../user-guide/apparmor/">AppArmor profiles</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Virtlet 101</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../101/architecture/">Virtlet architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/workshop-setup/">Workshop setup</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/provision-virtlet/">Virtlet provisioning</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/creating-and-managing-pods/">Creating and managing virtual machines</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/network/">Virtlet networking</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/volumes/">Virtual machine volumes</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/cloud-init/">Cloud-Init support</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/rolling-out-updates/">Rolling out updates</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/troubleshooting/">Troubleshooting</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Reference</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../vm-pod-spec/">Defining a VM Pod</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../vm-pod/">Working with VM Pods</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../volumes/">Volumes</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../images/">VM Image Handling</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../injecting-files/">Injecting Files into the VM</a>
+                </li>
+                <li class=" current">
+                    
+    <a class="current" href="./">Cloud-Init</a>
+    <ul class="subnav">
+            
+    <li class="toctree-l3"><a href="#cloud-init-options">Cloud-init options</a></li>
+    
+
+    <li class="toctree-l3"><a href="#example">Example</a></li>
+    
+
+    <li class="toctree-l3"><a href="#cloud-init-data-generation">Cloud-init data generation</a></li>
+    
+
+    <li class="toctree-l3"><a href="#output-iso-image-format">Output ISO image format</a></li>
+    
+
+    <li class="toctree-l3"><a href="#detailed-structure-of-the-generated-files">Detailed structure of the generated files</a></li>
+    
+
+    <li class="toctree-l3"><a href="#propagating-user-data-from-kubernetes-objects">Propagating user-data from Kubernetes objects</a></li>
+    
+
+    <li class="toctree-l3"><a href="#workarounds-for-volume-mounting-and-raw-block-volumes">Workarounds for volume mounting and raw block volumes</a></li>
+    
+
+    <li class="toctree-l3"><a href="#additional-links">Additional links</a></li>
+    
+
+    </ul>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../config/">Configuration</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../networking/">Networking</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../diagnostics/">Diagnostics</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../resources/">Resource management</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../virtletctl/">Command Line Tool</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Development</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../dev/architecture/">Virtlet architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/setup/">Setting up the environment</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/tests/">Running the tests</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/build-tool/">Build Tool</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/virtlet-ci/">Virtlet CI</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/cirros/">Building a custom CirrOS image</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/logging/">Logging architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/vm-pod-lifecycle/">Lifecycle of a VM pod</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/guidelines/">Guidelines</a>
+                </li>
+    </ul>
+	    </li>
+          
+        </ul>
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../..">Virtlet</a>
+      </nav>
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../..">Docs</a> &raquo;</li>
+    
+      
+        
+          <li>Reference &raquo;</li>
+        
+      
+    
+    <li>Cloud-Init</li>
+    <li class="wy-breadcrumbs-aside">
+      
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main">
+            <div class="section">
+              
+                <h1 id="cloud-init-options">Cloud-init options</h1>
+<p>Virtlet uses <a href="https://cloudinit.readthedocs.io/en/latest/">Cloud-Init</a>
+data generation mechanism for the following purposes:</p>
+<ul>
+<li>setting the host name based on the name of the pod</li>
+<li>injecting ssh keys</li>
+<li>setting up the VM network</li>
+<li>writing the contents of Secrets and ConfigMaps into the VM</li>
+<li>volume mounting</li>
+<li>setting up block devices based on PVs</li>
+<li>adding user-defined Cloud-Init settings such as startup scripts</li>
+</ul>
+<p>See also the list of
+<a href="../vm-pod-spec/#annotations-recognized-by-virtlet">annotations</a> for
+the list of annotations that are used for Cloud-Init.</p>
+<h1 id="example">Example</h1>
+<p>Below is a pod definition that we'll be using. The <code>annotations:</code>
+part lists the cloud-init related annotations supported by Virtlet.</p>
+<pre><code class="yaml">apiVersion: v1
+kind: Pod
+metadata:
+  name: ubuntu-vm
+  annotations:
+    kubernetes.io/target-runtime: virtlet.cloud
+
+    # override some fields in cloud-init meta-data
+    VirtletCloudInitMetaData: |
+      instance-id: foobar
+
+    # override some fields in cloud-init user-data
+    VirtletCloudInitUserData: |
+      users:
+      - name: cloudy
+        gecos: Magic Cloud App Daemon User
+        inactive: true
+        system: true
+
+    # this option disables merging of user-data keys.
+    # By default the lists and dicts in user-data keys
+    # are merged using the standard method (more on this below)
+    # VirtletCloudInitUserDataOverwrite: &quot;true&quot;
+
+    # this options makes it possible to write a script
+    # in place of the user-data file. In case if this option
+    # is present user-data part is not generated.
+    # VirtletCloudInitUserDataScript: |
+    #   #!/bin/sh
+    #   echo hello world
+
+    # it's also possible to use a configmap to override
+    # parts of user-data
+    VirtletCloudInitUserDataSource: configmap/vm-user-data
+
+    # it's also possible to specify that the whole user-data contents
+    # are stored in a ConfigMap under the specified key:
+    # VirtletCloudInitUserDataSourceKey: user-data
+
+    # by default, the contents of user-data in a ConfigMap key is specified
+    # as plain text, but it can also be encoded using base64:
+    # VirtletCloudInitUserDataSourceEncoding: base64
+
+    # Virtlet-specific annotations follow
+    # Specify some ssh keys directly
+    VirtletSSHKeys: |
+      ssh-rsa AAAA... me@localhost
+      ssh-rsa AAAA... me1@localhost
+
+    # ssh keys may also be pulled from 'authorized_keys' key
+    # in a ConfigMap or a Secret
+    VirtletSSHKeySource: secret/mysecret
+    # can also use the following:
+    # VirtletSSHKeySource: configmap/configmap-with-public-keys
+spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: extraRuntime
+            operator: In
+            values:
+            - virtlet
+
+  containers:
+  - name: ubuntu-vm
+    image: virtlet.cloud/cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img
+    volumeMounts:
+
+    # this will write configmap contents using the `write_file` cloud-init module
+    - name: config
+      mountPath: /etc/foobar
+
+    # this will write secret contents using the `write_file` cloud-init module
+    - name: secret
+      mountPath: /etc/baz
+
+    # mount the qcow2 volume under /var/lib/docker
+    - name: extra
+      mountPath: /var/lib/docker
+
+    # mount a raw device under /var/lib/postgresql
+    - name: raw
+      mountPath: /var/lib/postgresql
+
+    # mount a ceph volume under /cephdata
+    - name: ceph
+      mountPath: /cephdata
+
+  volumes:
+  - name: config
+    configMap:
+      name: someconfig
+  - name: secret
+    secret:
+      secretName: somesecret
+  - name: extra
+    flexVolume:
+      driver: &quot;virtlet/flexvolume_driver&quot;
+      options:
+        type: qcow2
+        capacity: 2048MiB
+  - name: raw
+    flexVolume:
+      driver: &quot;virtlet/flexvolume_driver&quot;
+      options:
+        type: raw
+        path: /dev/mapper/somevg
+  - name: ceph
+    flexVolume:
+      driver: &quot;virtlet/flexvolume_driver&quot;
+      options:
+        type: ceph
+        monitor: 10.0.0.1:6789
+        user: libvirt
+        secret: ....
+        volume: rbd-test-image
+        pool: libvirt-pool
+</code></pre>
+
+<h1 id="cloud-init-data-generation">Cloud-init data generation</h1>
+<p>The <a href="http://cloudinit.readthedocs.io/en/latest/index.html">cloud-init</a>
+data generated by Virtlet consists of <code>meta-data</code>, <code>user-data</code> and <code>network-config</code>
+parts.  It's currently provided by means of
+<a href="http://cloudinit.readthedocs.io/en/latest/topics/datasources/nocloud.html">NoCloud</a>
+and <a href="http://cloudinit.readthedocs.io/en/latest/topics/datasources/configdrive.html">Config Drive</a>
+datasource, which in this case involves making an iso9660 image to be
+mounted by the VM. An implementation of either
+<a href="http://cloudinit.readthedocs.io/en/latest/topics/datasources/ec2.html">Amazon EC2</a>
+or
+<a href="http://cloudinit.readthedocs.io/en/latest/topics/datasources/openstack.html">OpenStack</a>
+datasource can be added later.</p>
+<p>The cloud-init data is generated based on the following sources:</p>
+<ul>
+<li>pod name</li>
+<li>direct user-data/meta-data values from pod definition</li>
+<li>direct user-data/meta-data values from configmap/secret</li>
+<li>pod volumes and container mounts</li>
+<li>pod network configuration</li>
+<li>ssh keys specified either in pod definition or using a configmap/secret</li>
+</ul>
+<h1 id="output-iso-image-format">Output ISO image format</h1>
+<p>Virtlet supports two types of Cloud-init ISO9660-based datasources, NoCloud and
+ConfigDrive. The user may choose an appropriate one using
+<code>VirtletCloudInitImageType</code> annotation, which can have either <code>nocloud</code> or
+<code>configdrive</code> as its value. When there's no <code>VirtletCloudInitImageType</code>
+annotation, Virtlet defaults to <code>nocloud</code>.</p>
+<h1 id="detailed-structure-of-the-generated-files">Detailed structure of the generated files</h1>
+<p>The <code>meta-data</code> part is a piece of JSON that looks like this:</p>
+<pre><code class="json">{
+  &quot;instance-id&quot;: &quot;foobar&quot;,
+  &quot;local-hostname&quot;: &quot;ubuntu-vm&quot;,
+  &quot;public-keys&quot;: [&quot;ssh-rsa AAAA... me@localhost&quot;, &quot;ssh-rsa AAAA... me1@localhost&quot;, &quot;...&quot;]
+}
+</code></pre>
+
+<p>In case of ConfigDrive, this JSON has <code>instance-id</code> repeated as <code>uuid</code> and 
+<code>local-hostname</code> repeated as <code>hostname</code>.</p>
+<p>We're using JSON format here so as to be compatible with older
+cloud-init implementations such as one used in
+<a href="https://launchpad.net/cirros">CirrOS</a> images which are used to test
+Virtlet.
+The following fields are generated by Virtlet:</p>
+<ul>
+<li><code>instance-id</code> by default contains a name generated from pod name and
+  pod namespace name separated with dot (<code>ubuntu-vm.default</code>). In this
+  case it's overridden using <code>VirtletCloudInitMetaData</code> in the pod
+  definition. Most of the time this field doesn't change much
+  in the behavior of Virtlet VMs.</li>
+<li><code>local-hostname</code> contains the name of the pod so VM's hostname
+  defaults just to the pod name</li>
+<li><code>public-keys</code> is a list of ssh public keys to put into the default
+  user's <code>~/.ssh/authorized_keys</code> file. It's taken either from
+  <code>VirtletSSHKeys</code> annotation or from <code>authorized_keys</code> key in a
+  kubernetes Secret on ConfigMap specified via <code>VirtletSSHKeySource</code>.</li>
+</ul>
+<p>The <code>user-data</code> part is only generated if it's not empty. It's a
+YAML file (because CirrOS doesn't support <code>#cloud-config</code> anyway)
+with the following content:</p>
+<pre><code class="yaml">#cloud-config
+mounts:
+- [ /dev/vdc1, /var/lib/docker ]
+- [ /dev/vdd, /var/lib/postgresql ]
+- [ /dev/vde, /cephdata ]
+write_files:
+- path: /etc/foobar/some-file-from-configmap.conf
+  permissions: '0644'
+  encoding: b64
+  content: IyB0aGlzIGlzIGEgc2FtcGxlIGNvbmZpZyBmaWxlCiMgdGFrZW4gZnJvbSBhIGNvbmZpZ21hcAo=
+- path: /etc/baz/a-file-taken-from-secrets.conf
+  permissions: '0600'
+  encoding: b64
+  content: IyBzb21lIHNlY3JldCBjb250ZW50Cg==
+- path: /foobar.txt
+  content: this part is from a configmap specified using VirtletCloudInitUserDataSource
+users:
+- name: cloudy
+  gecos: Magic Cloud App Daemon User
+  inactive: true
+  system: true
+</code></pre>
+
+<p><a href="http://cloudinit.readthedocs.io/en/latest/topics/network-config.html">Network configuration</a>
+uses YAML to provide data in
+<a href="http://cloudinit.readthedocs.io/en/latest/topics/network-config-format-v1.html">Network Config Version 1</a>.</p>
+<p>The <code>user-data</code> content is generated as follows:</p>
+<ul>
+<li><code>mounts</code> are generated based on <code>volumeMount</code> options of the
+  container and pod's volumes that are <code>flexVolume</code>s and use
+  <code>virtlet/flexvolume_driver</code>. These are seen as block devices by the
+  VM and Virtlet mounts them into appropriate directories</li>
+<li><code>write_files</code> are generated based on configmaps and secrets mounted
+  into the container. It also includes <code>/etc/cloud/environment</code> file
+  (see <a href="../vm-pod-spec/#environment-variables">Environment variable support</a> for
+  more info) and optionally <code>/etc/cloud/mount-volumes.sh</code> that can be
+  used to mount volumes on systems without udev (see
+  <a href="#workarounds-for-volume-mounting-and-raw-block-volumes">Workarounds for volume mounting</a> below)</li>
+<li>the yaml content specified using optional <code>VirtletCloudInitUserData</code>
+  annotation as well as the content from Secret or ConfigMap specified
+  using another optional <code>VirtletCloudInitUserDataSource</code> annotation
+  are merged together using a simple algorithm
+  <a href="http://cloudinit.readthedocs.io/en/latest/topics/merging.html">described</a>
+  in cloud-init documentation. During the merge, the autogenerated
+  <code>user-data</code> comes first, then the contents of
+  <code>VirtletCloudInitUserData</code> and finally the data taken from a Secret
+  or ConfigMap specified via <code>VirtletCloudInitUserDataSource</code></li>
+<li>it's possible to disable <code>user-data</code> merge algorithm and use the
+  simple key replacement scheme by adding
+  <code>VirtletCloudInitUserDataOverwrite: true</code> annotation</li>
+<li>it's also possible to replace the <code>user-data</code> file content entirely
+  by adding <code>VirtletCloudInitUserDataScript</code> option. This may be
+  useful if you want to pass a script there which may be necessary for
+  older/simpler cloud-init implementations such as one used by CirrOS.
+  Within the content of this script, <code>@virtlet-mount-script@</code> can be
+  replaced with volume mounting shell commands and commands for making
+  symlinks for raw block volumes (see
+  <a href="#workarounds-for-volume-mounting-and-raw-block-volumes">Workarounds for volume mounting</a> below)</li>
+</ul>
+<h1 id="propagating-user-data-from-kubernetes-objects">Propagating user-data from Kubernetes objects</h1>
+<p>In addition to putting user-data document right in the pod definition
+using <code>VirtletCloudInitUserData</code> annotation, it is possible to have
+this document stored in either <code>ConfigMap</code> or <code>Secret</code> kubernetes
+object. This is achieved with yet another annotation, called
+<code>VirtletCloudInitUserDataSource</code>. It has the following format:
+<code>kind/name</code> where <code>kind</code> is either <code>configmap</code> or <code>secret</code> and <code>name</code>
+is the name of appropriate resource. When <code>virtlet</code> sees this
+annotation, it reads the object it refers to and puts all its keys
+into the <code>user-data</code> dictionary. This is done at the very beginning of
+the <code>user-data</code> generation process.  If the pod definition has both
+<code>VirtletCloudInitUserData</code> and <code>VirtletCloudInitUserDataSource</code>
+annotations, the <code>virtlet</code> will load <code>user-data</code> from kubernetes
+object and then will merge it with that from
+<code>VirtletCloudInitUserData</code> (unless <code>VirtletCloudInitUserDataOverwrite</code>
+is set to <code>"true"</code>, in which case <code>VirtletCloudInitUserData</code> will
+overwrite it).  There's also an option to store the whole contents of
+<code>user-data</code> in a single key of ConfigMap which can be specified using
+<code>VirtletCloudInitUserDataSourceKey</code>. By default, the data are stored
+there as plain text but you can also specify <code>base64</code> encoding via
+<code>VirtletCloudInitUserDataSourceEncoding</code> annotation.</p>
+<p>Similar approach is taken with SSH keys. It is possible to provide VM
+with a list of SSH keys obtained from <code>ConfigMap</code> or <code>Secret</code>
+kubernetes objects. In order to do so, one uses <code>VirtletSSHKeySource</code>
+annotation with the following format: <code>kind/name/key</code>.  As for the
+user-data, <code>kind</code> is one of <code>configmap</code>, <code>secret</code>, <code>name</code> is the name
+of resource and <code>key</code> is the key name in that resource containing SSH
+keys in the same format in <code>VirtletSSHKeys</code>. The <code>key</code> part is
+optional. When using <code>kind/name</code> annotation (without <code>key</code>), <code>virtlet</code>
+will look for the <code>authorized_keys</code> key. As with the <code>user-data</code>
+<code>VirtletSSHKeys</code> keys are going to be appended to those from
+<code>VirtletSSHKeySource</code> unless it is set to overwrite them by
+<code>VirtletCloudInitUserDataOverwrite: "true"</code>.</p>
+<h1 id="workarounds-for-volume-mounting-and-raw-block-volumes">Workarounds for volume mounting and raw block volumes</h1>
+<p>Currenly Virtlet uses <code>/dev/disk/by-path</code> to mount volumes specified
+using Virtlet flexvolume driver. There's a problem with this approach
+however, namely that this depends on <code>udev</code> being used by the guest
+system. Moreover, some images (e.g. CirrOS example image) may have
+limited cloud-init support and may not provide proper <code>user-data</code>
+handling necessary to mount the block devices. To handle the first of
+this problem, Virtlet uses <code>write_files</code> section of <code>user-data</code> to
+write a shell script named <code>/etc/cloud/mount-volumes.sh</code> (the script
+uses <code>/bin/sh</code>) that performs the necessary volume mounts using sysfs
+to look up the proper device names under <code>/dev</code>. The script also
+checks whether the volumes are already mounted so as not to mount them
+several times (so it's idempotent).</p>
+<p>Another slightly related problem is that when raw block volumes are
+used, symlinks must be created inside the VM that lead to the proper
+device files under <code>/dev</code>. This is done by means of
+<code>/etc/cloud/symlink-devs.sh</code> script that's injected via cloud-init.
+It's also automatically added to the <code>runcmd</code> section, so it gets
+executed on the first VM boot and linked from
+<code>/var/lib/cloud/scripts/per-boot/</code> so that it gets executed on
+subsequent VM boots, too. In any case, this script gets executed after
+<code>mounts</code> are processed, so Virtlet updates <code>mounts</code> entries in the
+user-specified <code>user-data</code> that point to the raw block volume devices
+to make them work as if the symlinks were in place during the
+mounting.</p>
+<p>To deal with the systems without proper <code>user-data</code> support such as
+CirrOS, Virtlet makes it possible to specify <code>@virtlet-mount-script@</code>
+inside <code>VirtletCloudInitUserDataScript</code> annotation. This string will
+be replaced with the content that's normally written to
+<code>/etc/cloud/symlink-devs.sh</code> and <code>/etc/cloud/mount-volumes.sh</code> (in
+this order). Given that the script starts with <code>#!/bin/sh</code>, you can
+use the following construct in the pod annotations:</p>
+<pre><code class="yaml">VirtletCloudInitUserDataScript: &quot;@virtlet-mount-script@&quot;
+</code></pre>
+
+<h1 id="additional-links">Additional links</h1>
+<p>These links may help to understand some basics about cloud-init:</p>
+<ul>
+<li><a href="http://cloudinit.readthedocs.io/en/latest/index.html">Cloud-init documentation</a></li>
+<li><a href="http://blog.oddbit.com/2015/03/10/booting-cloud-images-with-libvirt/">Booting cloud images with libvirt</a></li>
+<li><a href="http://www.whiteboardcoder.com/2016/04/install-cloud-init-on-ubuntu-and-use.html">Install cloud-init on Ubuntu and use locally... NoCloud</a></li>
+<li><a href="http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html">EC2 instance metadata</a></li>
+<li><a href="https://raymii.org/s/tutorials/Automating_Openstack_with_Cloud_init_run_a_script_on_VMs_first_boot.html">Automating Openstack with cloud init run a script on VM's first boot</a></li>
+<li><a href="http://giovannitorres.me/create-a-linux-lab-on-kvm-using-cloud-images.html">Create a Linux Lab on KVM Using Cloud Images</a></li>
+</ul>
+              
+            </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../config/" class="btn btn-neutral float-right" title="Configuration">Next <span class="icon icon-circle-arrow-right"></span></a>
+      
+      
+        <a href="../injecting-files/" class="btn btn-neutral" title="Injecting Files into the VM"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+    
+  </div>
+
+  Built with <a href="http://www.mkdocs.org">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+      
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" style="cursor: pointer">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+      
+      
+        <span><a href="../injecting-files/" style="color: #fcfcfc;">&laquo; Previous</a></span>
+      
+      
+        <span style="margin-left: 15px"><a href="../config/" style="color: #fcfcfc">Next &raquo;</a></span>
+      
+    </span>
+</div>
+    <script>var base_url = '../..';</script>
+    <script src="../../js/theme.js" defer></script>
+      <script src="../../search/main.js" defer></script>
+
+</body>
+</html>

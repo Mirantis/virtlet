@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  
+  <link rel="shortcut icon" href="../../img/favicon.ico">
+  <title>Virtlet provisioning - Virtlet</title>
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  <link rel="stylesheet" href="../../css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../css/theme_extra.css" type="text/css" />
+  
+  <script>
+    // Current page data
+    var mkdocs_page_name = "Virtlet provisioning";
+    var mkdocs_page_input_path = "101/provision-virtlet.md";
+    var mkdocs_page_url = null;
+  </script>
+  
+  <script src="../../js/jquery-2.1.1.min.js" defer></script>
+  <script src="../../js/modernizr-2.8.3.min.js" defer></script> 
+  
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+      <div class="wy-side-nav-search">
+        <a href="../.." class="icon icon-home"> Virtlet</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+	<ul class="current">
+	  
+          
+            <li class="toctree-l1">
+		
+    <a class="" href="../..">Home</a>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">User Guide</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../user-guide/virtlet-on-kdc/">Installing Virtlet on kubeadm-dind-cluster</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../user-guide/real-cluster/">Installing Virtlet on a real cluster</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../user-guide/apparmor/">AppArmor profiles</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Virtlet 101</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../architecture/">Virtlet architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../workshop-setup/">Workshop setup</a>
+                </li>
+                <li class=" current">
+                    
+    <a class="current" href="./">Virtlet provisioning</a>
+    <ul class="subnav">
+            
+    <li class="toctree-l3"><a href="#virtlet-provisioning">Virtlet provisioning</a></li>
+    
+        <ul>
+        
+            <li><a class="toctree-l4" href="#using-mcp">Using MCP</a></li>
+        
+            <li><a class="toctree-l4" href="#using-kubeadm-dind-cluster-integration">Using kubeadm-dind-cluster integration</a></li>
+        
+            <li><a class="toctree-l4" href="#other-deployment-options">Other deployment options</a></li>
+        
+        </ul>
+    
+
+    </ul>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../creating-and-managing-pods/">Creating and managing virtual machines</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../network/">Virtlet networking</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../volumes/">Virtual machine volumes</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../cloud-init/">Cloud-Init support</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../rolling-out-updates/">Rolling out updates</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../troubleshooting/">Troubleshooting</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Reference</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../reference/vm-pod-spec/">Defining a VM Pod</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/vm-pod/">Working with VM Pods</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/volumes/">Volumes</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/images/">VM Image Handling</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/injecting-files/">Injecting Files into the VM</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/cloud-init/">Cloud-Init</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/config/">Configuration</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/networking/">Networking</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/diagnostics/">Diagnostics</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/resources/">Resource management</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/virtletctl/">Command Line Tool</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Development</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../dev/architecture/">Virtlet architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/setup/">Setting up the environment</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/tests/">Running the tests</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/build-tool/">Build Tool</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/virtlet-ci/">Virtlet CI</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/cirros/">Building a custom CirrOS image</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/logging/">Logging architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/vm-pod-lifecycle/">Lifecycle of a VM pod</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/guidelines/">Guidelines</a>
+                </li>
+    </ul>
+	    </li>
+          
+        </ul>
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../..">Virtlet</a>
+      </nav>
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../..">Docs</a> &raquo;</li>
+    
+      
+        
+          <li>Virtlet 101 &raquo;</li>
+        
+      
+    
+    <li>Virtlet provisioning</li>
+    <li class="wy-breadcrumbs-aside">
+      
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main">
+            <div class="section">
+              
+                <h2 id="virtlet-provisioning">Virtlet provisioning</h2>
+<h4 id="using-mcp">Using MCP</h4>
+<p>Follow the latest instructions how to <a href="https://docs.mirantis.com/mcp/latest/mcp-deployment-guide/deploy-mcp-cluster-using-drivetrain/deploy-k8s.html">deploy Kubernetes cluster</a> and then deploy Virtlet <a href="https://docs.mirantis.com/mcp/latest/mcp-deployment-guide/deploy-mcp-cluster-manually/deploy-kubernetes-cluster-manually/enable-virtlet/deploy-virtlet.html">Deploy Virtlet on MCP</a></p>
+<h4 id="using-kubeadm-dind-cluster-integration">Using kubeadm-dind-cluster integration</h4>
+<p>For this workshop you will use <a href="https://github.com/kubernetes-sigs/kubeadm-dind-cluster">kubeadm-dind-cluster</a> cluster.
+Use <code>demo.sh</code> script which will deploy Kubernetes and provision Virtlet there.</p>
+<pre><code class="bash">MULTI_CNI=1 ./deploy/demo.sh
+</code></pre>
+
+<p>Answer <code>y</code> to the script’s questions and wait until the script completes. The script will create a CirrOS VM for you and display its shell prompt.</p>
+<h4 id="other-deployment-options">Other deployment options</h4>
+<p>To see how to provision Virtlet on non MCP clusters see the <a href="../../user-guide/real-cluster/">deployment docs</a></p>
+              
+            </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../creating-and-managing-pods/" class="btn btn-neutral float-right" title="Creating and managing virtual machines">Next <span class="icon icon-circle-arrow-right"></span></a>
+      
+      
+        <a href="../workshop-setup/" class="btn btn-neutral" title="Workshop setup"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+    
+  </div>
+
+  Built with <a href="http://www.mkdocs.org">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+      
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" style="cursor: pointer">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+      
+      
+        <span><a href="../workshop-setup/" style="color: #fcfcfc;">&laquo; Previous</a></span>
+      
+      
+        <span style="margin-left: 15px"><a href="../creating-and-managing-pods/" style="color: #fcfcfc">Next &raquo;</a></span>
+      
+    </span>
+</div>
+    <script>var base_url = '../..';</script>
+    <script src="../../js/theme.js" defer></script>
+      <script src="../../search/main.js" defer></script>
+
+</body>
+</html>

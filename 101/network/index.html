@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  
+  <link rel="shortcut icon" href="../../img/favicon.ico">
+  <title>Virtlet networking - Virtlet</title>
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  <link rel="stylesheet" href="../../css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../css/theme_extra.css" type="text/css" />
+  
+  <script>
+    // Current page data
+    var mkdocs_page_name = "Virtlet networking";
+    var mkdocs_page_input_path = "101/network.md";
+    var mkdocs_page_url = null;
+  </script>
+  
+  <script src="../../js/jquery-2.1.1.min.js" defer></script>
+  <script src="../../js/modernizr-2.8.3.min.js" defer></script> 
+  
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+      <div class="wy-side-nav-search">
+        <a href="../.." class="icon icon-home"> Virtlet</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+	<ul class="current">
+	  
+          
+            <li class="toctree-l1">
+		
+    <a class="" href="../..">Home</a>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">User Guide</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../user-guide/virtlet-on-kdc/">Installing Virtlet on kubeadm-dind-cluster</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../user-guide/real-cluster/">Installing Virtlet on a real cluster</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../user-guide/apparmor/">AppArmor profiles</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Virtlet 101</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../architecture/">Virtlet architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../workshop-setup/">Workshop setup</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../provision-virtlet/">Virtlet provisioning</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../creating-and-managing-pods/">Creating and managing virtual machines</a>
+                </li>
+                <li class=" current">
+                    
+    <a class="current" href="./">Virtlet networking</a>
+    <ul class="subnav">
+            
+    <li class="toctree-l3"><a href="#virtlet-networking">Virtlet networking</a></li>
+    
+        <ul>
+        
+            <li><a class="toctree-l4" href="#one-interface">One interface</a></li>
+        
+            <li><a class="toctree-l4" href="#multiple-interfaces">Multiple interfaces</a></li>
+        
+        </ul>
+    
+
+    </ul>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../volumes/">Virtual machine volumes</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../cloud-init/">Cloud-Init support</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../rolling-out-updates/">Rolling out updates</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../troubleshooting/">Troubleshooting</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Reference</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../reference/vm-pod-spec/">Defining a VM Pod</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/vm-pod/">Working with VM Pods</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/volumes/">Volumes</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/images/">VM Image Handling</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/injecting-files/">Injecting Files into the VM</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/cloud-init/">Cloud-Init</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/config/">Configuration</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/networking/">Networking</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/diagnostics/">Diagnostics</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/resources/">Resource management</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/virtletctl/">Command Line Tool</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Development</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../dev/architecture/">Virtlet architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/setup/">Setting up the environment</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/tests/">Running the tests</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/build-tool/">Build Tool</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/virtlet-ci/">Virtlet CI</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/cirros/">Building a custom CirrOS image</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/logging/">Logging architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/vm-pod-lifecycle/">Lifecycle of a VM pod</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/guidelines/">Guidelines</a>
+                </li>
+    </ul>
+	    </li>
+          
+        </ul>
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../..">Virtlet</a>
+      </nav>
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../..">Docs</a> &raquo;</li>
+    
+      
+        
+          <li>Virtlet 101 &raquo;</li>
+        
+      
+    
+    <li>Virtlet networking</li>
+    <li class="wy-breadcrumbs-aside">
+      
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main">
+            <div class="section">
+              
+                <h2 id="virtlet-networking">Virtlet networking</h2>
+<p>Virtlet <a href="../../reference/networking/">Networking docs</a></p>
+<h3 id="one-interface">One interface</h3>
+<p>Virtlet, as other CRI implementations, uses <a href="https://github.com/containernetworking/cni">CNI</a> (Container Network Interface). When only one interface is used then no additional configuration is required.
+As you saw in the previous chapter it just works.</p>
+<h3 id="multiple-interfaces">Multiple interfaces</h3>
+<p>For multiple interfaces Virtlet uses <a href="https://github.com/Huawei-PaaS/CNI-Genie">CNI-Genie</a>. When running <code>demo.sh</code> script you have set <code>MULTI_CNI=1</code> which tells <code>kubeadm-dind-cluster</code> to install CNI-Genie and two network providers: flannel and calico.</p>
+<p>Check that all is already installed:</p>
+<pre><code class="bash">kubectl -n kube-system get pod
+</code></pre>
+
+<p>You should see genie, flannel and calico-related pods in the output.</p>
+<p>See <a href="../../reference/networking#setting-up-multiple-cnis">Virtlet docs</a> for more details about multiple interfaces support.</p>
+<p><code>demo.sh</code> script configured CNI-Genie to create two network interfaces for each newly created pod. That includes docker pods and Virtlet pods.</p>
+<p>Check the ubuntu-vm to see that it has already configured two interfaces. Attach to the VM (log in as testuser/testuser):</p>
+<pre><code class="bash">kubectl attach -it ubuntu-vm-with-testuser
+</code></pre>
+
+<p>and list addresses on interfaces:</p>
+<pre><code class="bash">ip address
+</code></pre>
+
+<p>See how to specify which networks to use:</p>
+<pre><code class="bash">cat examples/ubuntu-multi-cni.yaml
+</code></pre>
+
+<p>See <code>cni: "calico,flannel"</code> annotation. It tells CNI-Genie which networks to use. If no <code>cni</code> annotation is specified then <a href="https://github.com/Huawei-PaaS/CNI-Genie/tree/master/docs/default-plugin">default plugin</a> will be used.
+In <code>demo.sh</code> script default is set also to "calico,flannel":</p>
+<pre><code class="bash">docker exec kube-node-1 cat /etc/cni/net.d/00-genie.conf
+</code></pre>
+              
+            </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../volumes/" class="btn btn-neutral float-right" title="Virtual machine volumes">Next <span class="icon icon-circle-arrow-right"></span></a>
+      
+      
+        <a href="../creating-and-managing-pods/" class="btn btn-neutral" title="Creating and managing virtual machines"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+    
+  </div>
+
+  Built with <a href="http://www.mkdocs.org">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+      
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" style="cursor: pointer">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+      
+      
+        <span><a href="../creating-and-managing-pods/" style="color: #fcfcfc;">&laquo; Previous</a></span>
+      
+      
+        <span style="margin-left: 15px"><a href="../volumes/" style="color: #fcfcfc">Next &raquo;</a></span>
+      
+    </span>
+</div>
+    <script>var base_url = '../..';</script>
+    <script src="../../js/theme.js" defer></script>
+      <script src="../../search/main.js" defer></script>
+
+</body>
+</html>

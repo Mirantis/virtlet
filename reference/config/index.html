@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  
+  <link rel="shortcut icon" href="../../img/favicon.ico">
+  <title>Configuration - Virtlet</title>
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  <link rel="stylesheet" href="../../css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../css/theme_extra.css" type="text/css" />
+  
+  <script>
+    // Current page data
+    var mkdocs_page_name = "Configuration";
+    var mkdocs_page_input_path = "reference/config.md";
+    var mkdocs_page_url = null;
+  </script>
+  
+  <script src="../../js/jquery-2.1.1.min.js" defer></script>
+  <script src="../../js/modernizr-2.8.3.min.js" defer></script> 
+  
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+      <div class="wy-side-nav-search">
+        <a href="../.." class="icon icon-home"> Virtlet</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+	<ul class="current">
+	  
+          
+            <li class="toctree-l1">
+		
+    <a class="" href="../..">Home</a>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">User Guide</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../user-guide/virtlet-on-kdc/">Installing Virtlet on kubeadm-dind-cluster</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../user-guide/real-cluster/">Installing Virtlet on a real cluster</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../user-guide/apparmor/">AppArmor profiles</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Virtlet 101</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../101/architecture/">Virtlet architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/workshop-setup/">Workshop setup</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/provision-virtlet/">Virtlet provisioning</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/creating-and-managing-pods/">Creating and managing virtual machines</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/network/">Virtlet networking</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/volumes/">Virtual machine volumes</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/cloud-init/">Cloud-Init support</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/rolling-out-updates/">Rolling out updates</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/troubleshooting/">Troubleshooting</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Reference</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../vm-pod-spec/">Defining a VM Pod</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../vm-pod/">Working with VM Pods</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../volumes/">Volumes</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../images/">VM Image Handling</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../injecting-files/">Injecting Files into the VM</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../cloud-init/">Cloud-Init</a>
+                </li>
+                <li class=" current">
+                    
+    <a class="current" href="./">Configuration</a>
+    <ul class="subnav">
+            
+    <li class="toctree-l3"><a href="#using-per-node-configuration">Using per-node configuration</a></li>
+    
+
+    <li class="toctree-l3"><a href="#configuration-options-summary">Configuration options summary</a></li>
+    
+
+    </ul>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../networking/">Networking</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../diagnostics/">Diagnostics</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../resources/">Resource management</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../virtletctl/">Command Line Tool</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Development</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../dev/architecture/">Virtlet architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/setup/">Setting up the environment</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/tests/">Running the tests</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/build-tool/">Build Tool</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/virtlet-ci/">Virtlet CI</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/cirros/">Building a custom CirrOS image</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/logging/">Logging architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/vm-pod-lifecycle/">Lifecycle of a VM pod</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/guidelines/">Guidelines</a>
+                </li>
+    </ul>
+	    </li>
+          
+        </ul>
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../..">Virtlet</a>
+      </nav>
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../..">Docs</a> &raquo;</li>
+    
+      
+        
+          <li>Reference &raquo;</li>
+        
+      
+    
+    <li>Configuration</li>
+    <li class="wy-breadcrumbs-aside">
+      
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main">
+            <div class="section">
+              
+                <h1 id="using-per-node-configuration">Using per-node configuration</h1>
+<p>In order to use per-node configuration, you need to create Virtlet
+CRD definitions before you deploy Virtlet:</p>
+<pre><code class="bash">virtletctl gen --crd | kubectl apply -f -
+</code></pre>
+
+<p>After that, you can add one or more Virtlet configuration mappings:</p>
+<pre><code class="bash">kubectl apply -f - &lt;&lt;EOF
+---
+apiVersion: &quot;virtlet.k8s/v1&quot;
+kind: VirtletConfigMapping
+metadata:
+  name: test
+  namespace: kube-system
+spec:
+  nodeName: kube-node-2
+  priority: 1
+  config:
+    disableKVM: true
+    logLevel: 5
+    rawDevices: sda*,loop*
+---
+apiVersion: &quot;virtlet.k8s/v1&quot;
+kind: VirtletConfigMapping
+metadata:
+  name: test-labels
+  namespace: kube-system
+spec:
+  nodeSelector:
+    foo: bar
+  priority: 10
+  config:
+    logLevel: 3
+EOF
+</code></pre>
+
+<p>You can delete Virtlet pods to have them restarted and pick up the
+changes after you add, remove or modify the configuration mappings.</p>
+<p>All the config mappings must reside in <code>kube-system</code> namespace.  Each
+mapping can specify <code>nodeSelector</code> or <code>nodeName</code> to target a subset of
+the nodes. If neither <code>nodeSelector</code> nor <code>nodeName</code> is specified, the
+mapping will target all the nodes. If the several mappings apply to
+the node, their order is determined by <code>priority</code> value, with mappings
+with higher value of <code>priority</code> taking precendence. <code>config</code> specifies
+the list of configuration fields (see the full table of config fields
+in the next section of this document).</p>
+<p>In the example above, for the node named <code>kube-node-2</code>, KVM is
+disabled, log level is set to 5 and the raw device list is set to
+<code>sda*,loop*</code>.  For nodes with <code>foo=bar</code> label, the log level is
+overridden and set to 3.  If <code>kube-node-2</code> node has <code>foo=bar</code> label,
+the log level will be set to 3 there as the label-based mapping has
+higher priority.</p>
+<h1 id="configuration-options-summary">Configuration options summary</h1>
+<p>The table below lists all the Virtlet configuration fields, with their
+corresponding command line flags and environment variables that are
+handled by Virtlet binary. Note that you may only need these
+environment variables and configuration flags if you're not using the
+standard Virtlet deployment YAML as generated by <code>virtletctl gen</code>.</p>
+<!--
+    The part of this file between 'begin' / 'end' comments is updated
+    automatically by build/cmd.sh update-docs
+-->
+
+<!-- begin -->
+
+<table>
+<thead>
+<tr>
+<th>Description</th>
+<th>Config field</th>
+<th>Default value</th>
+<th>Type</th>
+<th>Command line flag / Env</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Path to fd server socket</td>
+<td><code>fdServerSocketPath</code></td>
+<td><code>/var/lib/virtlet/tapfdserver.sock</code></td>
+<td>string</td>
+<td><code>--fd-server-socket-path</code> / <code>VIRTLET_FD_SERVER_SOCKET_PATH</code></td>
+</tr>
+<tr>
+<td>Path to the virtlet database</td>
+<td><code>databasePath</code></td>
+<td><code>/var/lib/virtlet/virtlet.db</code></td>
+<td>string</td>
+<td><code>--database-path</code> / <code>VIRTLET_DATABASE_PATH</code></td>
+</tr>
+<tr>
+<td>Image download protocol. Can be https or http</td>
+<td><code>downloadProtocol</code></td>
+<td><code>https</code></td>
+<td>string</td>
+<td><code>--image-download-protocol</code> / <code>VIRTLET_DOWNLOAD_PROTOCOL</code></td>
+</tr>
+<tr>
+<td>Image directory</td>
+<td><code>imageDir</code></td>
+<td><code>/var/lib/virtlet/images</code></td>
+<td>string</td>
+<td><code>--image-dir</code> / <code>VIRTLET_IMAGE_DIR</code></td>
+</tr>
+<tr>
+<td>Image name translation configs directory</td>
+<td><code>imageTranslationConfigsDir</code></td>
+<td><code>/etc/virtlet/images</code></td>
+<td>string</td>
+<td><code>--image-translation-configs-dir</code> / <code>VIRTLET_IMAGE_TRANSLATIONS_DIR</code></td>
+</tr>
+<tr>
+<td>Libvirt connection URI</td>
+<td><code>libvirtURI</code></td>
+<td><code>qemu:///system</code></td>
+<td>string</td>
+<td><code>--libvirt-uri</code> / <code>VIRTLET_LIBVIRT_URI</code></td>
+</tr>
+<tr>
+<td>Comma separated list of raw device glob patterns which VMs can access (without '/dev/' prefix)</td>
+<td><code>rawDevices</code></td>
+<td><code>loop*</code></td>
+<td>string</td>
+<td><code>--raw-devices</code> / <code>VIRTLET_RAW_DEVICES</code></td>
+</tr>
+<tr>
+<td>The path to UNIX domain socket for CRI service to listen on</td>
+<td><code>criSocketPath</code></td>
+<td><code>/run/virtlet.sock</code></td>
+<td>string</td>
+<td><code>--listen</code> / <code>VIRTLET_CRI_SOCKET_PATH</code></td>
+</tr>
+<tr>
+<td>Display logging and the streamer</td>
+<td><code>disableLogging</code></td>
+<td><code>false</code></td>
+<td>boolean</td>
+<td><code>--disable-logging</code> / <code>VIRTLET_DISABLE_LOGGING</code></td>
+</tr>
+<tr>
+<td>Forcibly disable KVM support</td>
+<td><code>disableKVM</code></td>
+<td><code>false</code></td>
+<td>boolean</td>
+<td><code>--disable-kvm</code> / <code>VIRTLET_DISABLE_KVM</code></td>
+</tr>
+<tr>
+<td>Enable SR-IOV support</td>
+<td><code>enableSriov</code></td>
+<td><code>false</code></td>
+<td>boolean</td>
+<td><code>--enable-sriov</code> / <code>VIRTLET_SRIOV_SUPPORT</code></td>
+</tr>
+<tr>
+<td>Path to CNI plugin binaries</td>
+<td><code>cniPluginDir</code></td>
+<td><code>/opt/cni/bin</code></td>
+<td>string</td>
+<td><code>--cni-bin-dir</code> / <code>VIRTLET_CNI_PLUGIN_DIR</code></td>
+</tr>
+<tr>
+<td>Path to the CNI configuration directory</td>
+<td><code>cniConfigDir</code></td>
+<td><code>/etc/cni/net.d</code></td>
+<td>string</td>
+<td><code>--cni-conf-dir</code> / <code>VIRTLET_CNI_CONFIG_DIR</code></td>
+</tr>
+<tr>
+<td>Calico subnet size to use</td>
+<td><code>calicoSubnetSize</code></td>
+<td><code>24</code></td>
+<td>integer</td>
+<td><code>--calico-subnet-size</code> / <code>VIRTLET_CALICO_SUBNET</code></td>
+</tr>
+<tr>
+<td>Enable regexp image name translation</td>
+<td><code>enableRegexpImageTranslation</code></td>
+<td><code>true</code></td>
+<td>boolean</td>
+<td><code>--enable-regexp-image-translation</code> / <code>IMAGE_REGEXP_TRANSLATION</code></td>
+</tr>
+<tr>
+<td>CPU model to use in libvirt domain definition (libvirt's default value will be used if not set)</td>
+<td><code>cpuModel</code></td>
+<td></td>
+<td>string</td>
+<td><code>--cpu-model</code> / <code>VIRTLET_CPU_MODEL</code></td>
+</tr>
+<tr>
+<td>configurable port to the virtlet server</td>
+<td><code>streamPort</code></td>
+<td><code>10010</code></td>
+<td>integer</td>
+<td><code>--stream-port</code> / <code>VIRTLET_STREAM_PORT</code></td>
+</tr>
+<tr>
+<td>Pod's root dir in kubelet</td>
+<td><code>kubeletRootDir</code></td>
+<td><code>/var/lib/kubelet/pods</code></td>
+<td>string</td>
+<td><code>--kubelet-root-dir</code> / <code>KUBELET_ROOT_DIR</code></td>
+</tr>
+<tr>
+<td>Log level to use</td>
+<td><code>logLevel</code></td>
+<td><code>1</code></td>
+<td>integer</td>
+<td><code>--v</code> / <code>VIRTLET_LOGLEVEL</code></td>
+</tr>
+<tr>
+<td><!-- end --></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Only the following config fields mentioned in this table can be used
+with standard Virtlet deployment YAML: <code>downloadProtocol</code>,
+<code>rawDevices</code>, <code>disableKVM</code>, <code>enableSriov</code>, <code>calicoSubnetSize</code>,
+<code>enableRegexpImageTranslation</code>, <code>cpuModel</code> and <code>logLevel</code>. Other options
+may need adjusting the YAML to change the paths of volume
+mounts. <code>disableLogging</code> option is intended for debugging purposes
+only.</p>
+              
+            </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../networking/" class="btn btn-neutral float-right" title="Networking">Next <span class="icon icon-circle-arrow-right"></span></a>
+      
+      
+        <a href="../cloud-init/" class="btn btn-neutral" title="Cloud-Init"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+    
+  </div>
+
+  Built with <a href="http://www.mkdocs.org">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+      
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" style="cursor: pointer">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+      
+      
+        <span><a href="../cloud-init/" style="color: #fcfcfc;">&laquo; Previous</a></span>
+      
+      
+        <span style="margin-left: 15px"><a href="../networking/" style="color: #fcfcfc">Next &raquo;</a></span>
+      
+    </span>
+</div>
+    <script>var base_url = '../..';</script>
+    <script src="../../js/theme.js" defer></script>
+      <script src="../../search/main.js" defer></script>
+
+</body>
+</html>

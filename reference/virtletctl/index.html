@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  
+  <link rel="shortcut icon" href="../../img/favicon.ico">
+  <title>Command Line Tool - Virtlet</title>
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  <link rel="stylesheet" href="../../css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../css/theme_extra.css" type="text/css" />
+  
+  <script>
+    // Current page data
+    var mkdocs_page_name = "Command Line Tool";
+    var mkdocs_page_input_path = "reference/virtletctl.md";
+    var mkdocs_page_url = null;
+  </script>
+  
+  <script src="../../js/jquery-2.1.1.min.js" defer></script>
+  <script src="../../js/modernizr-2.8.3.min.js" defer></script> 
+  
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+      <div class="wy-side-nav-search">
+        <a href="../.." class="icon icon-home"> Virtlet</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+	<ul class="current">
+	  
+          
+            <li class="toctree-l1">
+		
+    <a class="" href="../..">Home</a>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">User Guide</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../user-guide/virtlet-on-kdc/">Installing Virtlet on kubeadm-dind-cluster</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../user-guide/real-cluster/">Installing Virtlet on a real cluster</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../user-guide/apparmor/">AppArmor profiles</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Virtlet 101</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../101/architecture/">Virtlet architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/workshop-setup/">Workshop setup</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/provision-virtlet/">Virtlet provisioning</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/creating-and-managing-pods/">Creating and managing virtual machines</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/network/">Virtlet networking</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/volumes/">Virtual machine volumes</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/cloud-init/">Cloud-Init support</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/rolling-out-updates/">Rolling out updates</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/troubleshooting/">Troubleshooting</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Reference</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../vm-pod-spec/">Defining a VM Pod</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../vm-pod/">Working with VM Pods</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../volumes/">Volumes</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../images/">VM Image Handling</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../injecting-files/">Injecting Files into the VM</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../cloud-init/">Cloud-Init</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../config/">Configuration</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../networking/">Networking</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../diagnostics/">Diagnostics</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../resources/">Resource management</a>
+                </li>
+                <li class=" current">
+                    
+    <a class="current" href="./">Command Line Tool</a>
+    <ul class="subnav">
+            
+    <li class="toctree-l3"><a href="#virtletctl">virtletctl</a></li>
+    
+
+    <li class="toctree-l3"><a href="#virtletctl-diag">virtletctl diag</a></li>
+    
+
+    <li class="toctree-l3"><a href="#virtletctl-diag-dump">virtletctl diag dump</a></li>
+    
+
+    <li class="toctree-l3"><a href="#virtletctl-diag-sonobuoy">virtletctl diag sonobuoy</a></li>
+    
+
+    <li class="toctree-l3"><a href="#virtletctl-diag-unpack">virtletctl diag unpack</a></li>
+    
+
+    <li class="toctree-l3"><a href="#virtletctl-gen">virtletctl gen</a></li>
+    
+
+    <li class="toctree-l3"><a href="#virtletctl-gendoc">virtletctl gendoc</a></li>
+    
+
+    <li class="toctree-l3"><a href="#virtletctl-install">virtletctl install</a></li>
+    
+
+    <li class="toctree-l3"><a href="#virtletctl-ssh">virtletctl ssh</a></li>
+    
+
+    <li class="toctree-l3"><a href="#virtletctl-validate">virtletctl validate</a></li>
+    
+
+    <li class="toctree-l3"><a href="#virtletctl-version">virtletctl version</a></li>
+    
+
+    <li class="toctree-l3"><a href="#virtletctl-virsh">virtletctl virsh</a></li>
+    
+
+    <li class="toctree-l3"><a href="#virtletctl-vnc">virtletctl vnc</a></li>
+    
+
+    <li class="toctree-l3"><a href="#global-options">Global options</a></li>
+    
+
+    </ul>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Development</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../dev/architecture/">Virtlet architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/setup/">Setting up the environment</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/tests/">Running the tests</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/build-tool/">Build Tool</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/virtlet-ci/">Virtlet CI</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/cirros/">Building a custom CirrOS image</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/logging/">Logging architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/vm-pod-lifecycle/">Lifecycle of a VM pod</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/guidelines/">Guidelines</a>
+                </li>
+    </ul>
+	    </li>
+          
+        </ul>
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../..">Virtlet</a>
+      </nav>
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../..">Docs</a> &raquo;</li>
+    
+      
+        
+          <li>Reference &raquo;</li>
+        
+      
+    
+    <li>Command Line Tool</li>
+    <li class="wy-breadcrumbs-aside">
+      
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main">
+            <div class="section">
+              
+                <h2 id="virtletctl">virtletctl</h2>
+<p>Virtlet control tool</p>
+<p><strong>Synopsis</strong></p>
+<p>virtletctl provides a number of utilities for Virtet-enabled
+Kubernetes cluster.</p>
+<p><strong>Subcommands</strong></p>
+<ul>
+<li><a href="#virtletctl-diag">virtletctl diag</a> - Virtlet diagnostics</li>
+<li><a href="#virtletctl-gen">virtletctl gen</a> - Generate Kubernetes YAML for Virtlet deployment</li>
+<li><a href="#virtletctl-gendoc">virtletctl gendoc</a> - Generate Markdown documentation for the commands</li>
+<li><a href="#virtletctl-install">virtletctl install</a> - Install virtletctl as a kubectl plugin</li>
+<li><a href="#virtletctl-ssh">virtletctl ssh</a> - Connect to a VM pod using ssh</li>
+<li><a href="#virtletctl-validate">virtletctl validate</a> - Make sure the cluster is ready for Virtlet deployment</li>
+<li><a href="#virtletctl-version">virtletctl version</a> - Display Virtlet version information</li>
+<li><a href="#virtletctl-virsh">virtletctl virsh</a> - Execute a virsh command</li>
+<li><a href="#virtletctl-vnc">virtletctl vnc</a> - Provide access to the VNC console of a VM pod</li>
+</ul>
+<h2 id="virtletctl-diag">virtletctl diag</h2>
+<p>Virtlet diagnostics</p>
+<p><strong>Synopsis</strong></p>
+<p>Retrieve and unpack Virtlet diagnostics information</p>
+<p><strong>Subcommands</strong></p>
+<ul>
+<li><a href="#virtletctl-diag-dump">virtletctl diag dump</a> - Dump Virtlet diagnostics information</li>
+<li><a href="#virtletctl-diag-sonobuoy">virtletctl diag sonobuoy</a> - Add Virtlet sonobuoy plugin to the sonobuoy output</li>
+<li><a href="#virtletctl-diag-unpack">virtletctl diag unpack</a> - Unpack Virtlet diagnostics information</li>
+</ul>
+<h2 id="virtletctl-diag-dump">virtletctl diag dump</h2>
+<p>Dump Virtlet diagnostics information</p>
+<p><strong>Synopsis</strong></p>
+<p>Pull Virtlet diagnostics information from the nodes and dump it as a directory tree or JSON</p>
+<pre><code>virtletctl diag dump output_dir [flags]
+</code></pre>
+
+<p><strong>Options</strong></p>
+<pre><code>--json
+</code></pre>
+
+<p>Use JSON output</p>
+<h2 id="virtletctl-diag-sonobuoy">virtletctl diag sonobuoy</h2>
+<p>Add Virtlet sonobuoy plugin to the sonobuoy output</p>
+<p><strong>Synopsis</strong></p>
+<p>Find and patch sonobuoy configmap in the yaml that's read from stdin to include Virtlet sonobuoy plugin</p>
+<pre><code>virtletctl diag sonobuoy [flags]
+</code></pre>
+
+<p><strong>Options</strong></p>
+<pre><code>--tag string
+</code></pre>
+
+<p>Set virtlet image tag for the plugin</p>
+<h2 id="virtletctl-diag-unpack">virtletctl diag unpack</h2>
+<p>Unpack Virtlet diagnostics information</p>
+<p><strong>Synopsis</strong></p>
+<p>Read Virtlet diagnostics information as JSON from stdin and unpacks into a directory tree</p>
+<pre><code>virtletctl diag unpack output_dir [flags]
+</code></pre>
+
+<h2 id="virtletctl-gen">virtletctl gen</h2>
+<p>Generate Kubernetes YAML for Virtlet deployment</p>
+<p><strong>Synopsis</strong></p>
+<p>This command produces YAML suitable for use with kubectl apply -f -</p>
+<pre><code>virtletctl gen [flags]
+</code></pre>
+
+<p><strong>Options</strong></p>
+<pre><code>--compat
+</code></pre>
+
+<p>Produce YAML that's compatible with older Kubernetes versions</p>
+<pre><code>--crd
+</code></pre>
+
+<p>Dump CRD definitions only</p>
+<pre><code>--dev
+</code></pre>
+
+<p>Development mode for use with kubeadm-dind-cluster</p>
+<pre><code>--tag string
+</code></pre>
+
+<p>Set virtlet image tag</p>
+<h2 id="virtletctl-gendoc">virtletctl gendoc</h2>
+<p>Generate Markdown documentation for the commands</p>
+<p><strong>Synopsis</strong></p>
+<p>This command produces documentation for the whole command tree, or the Virtlet configuration data.</p>
+<pre><code>virtletctl gendoc output_dir [flags]
+</code></pre>
+
+<p><strong>Options</strong></p>
+<pre><code>--config
+</code></pre>
+
+<p>Produce documentation for Virtlet config</p>
+<h2 id="virtletctl-install">virtletctl install</h2>
+<p>Install virtletctl as a kubectl plugin</p>
+<p><strong>Synopsis</strong></p>
+<p>This command install virtletctl as a kubectl plugin.</p>
+<p>After running this command, it becomes possible to run virtletctl
+via 'kubectl plugin virt'.</p>
+<pre><code>virtletctl install [flags]
+</code></pre>
+
+<h2 id="virtletctl-ssh">virtletctl ssh</h2>
+<p>Connect to a VM pod using ssh</p>
+<p><strong>Synopsis</strong></p>
+<p>This command runs ssh and makes it connect to a VM pod.</p>
+<pre><code>virtletctl ssh [flags] user@pod -- [ssh args...]
+</code></pre>
+
+<h2 id="virtletctl-validate">virtletctl validate</h2>
+<p>Make sure the cluster is ready for Virtlet deployment</p>
+<p><strong>Synopsis</strong></p>
+<p>Check configuration of the cluster nodes to make sure they're ready for Virtlet deployment</p>
+<pre><code>virtletctl validate [flags]
+</code></pre>
+
+<h2 id="virtletctl-version">virtletctl version</h2>
+<p>Display Virtlet version information</p>
+<p><strong>Synopsis</strong></p>
+<p>Display information about virtletctl version and Virtlet versions on the nodes</p>
+<pre><code>virtletctl version [flags]
+</code></pre>
+
+<p><strong>Options</strong></p>
+<pre><code>--client
+</code></pre>
+
+<p>Print virtletctl version only</p>
+<pre><code>-o, --output string
+</code></pre>
+
+<p>One of 'text', 'short', 'yaml' or 'json'
+ <strong>(default value:</strong> <code>"text"</code>)</p>
+<pre><code>--short
+</code></pre>
+
+<p>Print just the version number(s) (same as -o short)</p>
+<h2 id="virtletctl-virsh">virtletctl virsh</h2>
+<p>Execute a virsh command</p>
+<p><strong>Synopsis</strong></p>
+<p>This command executes libvirt virsh command.</p>
+<p>A VM pod name in the form @podname is translated to the
+corresponding libvirt domain name. If @podname is specified,
+the target k8s node name is inferred automatically based
+on the information of the VM pod. In case if no @podname
+is specified, the command is executed on every node
+and the output for every node is prepended with a line
+with the node name and corresponding Virtlet pod name.</p>
+<pre><code>virtletctl virsh [flags] virsh_command -- [virsh_command_args...]
+</code></pre>
+
+<p><strong>Options</strong></p>
+<pre><code>--node string
+</code></pre>
+
+<p>the name of the target node</p>
+<h2 id="virtletctl-vnc">virtletctl vnc</h2>
+<p>Provide access to the VNC console of a VM pod</p>
+<p><strong>Synopsis</strong></p>
+<p>This command forwards a local port to the VNC port used by the
+specified VM pod. If no local port number is provided, a random
+available port is picked instead. The port number is displayed
+after the forwarding is set up, after which the commands enters
+an endless loop until it's interrupted with Ctrl-C.</p>
+<pre><code>virtletctl vnc pod [port] [flags]
+</code></pre>
+
+<h2 id="global-options">Global options</h2>
+<pre><code>--alsologtostderr
+</code></pre>
+
+<p>log to standard error as well as files</p>
+<pre><code>--as string
+</code></pre>
+
+<p>Username to impersonate for the operation</p>
+<pre><code>--as-group stringArray
+</code></pre>
+
+<p>Group to impersonate for the operation, this flag can be repeated to specify multiple groups.</p>
+<pre><code>--certificate-authority string
+</code></pre>
+
+<p>Path to a cert file for the certificate authority</p>
+<pre><code>--client-certificate string
+</code></pre>
+
+<p>Path to a client certificate file for TLS</p>
+<pre><code>--client-key string
+</code></pre>
+
+<p>Path to a client key file for TLS</p>
+<pre><code>--cluster string
+</code></pre>
+
+<p>The name of the kubeconfig cluster to use</p>
+<pre><code>--context string
+</code></pre>
+
+<p>The name of the kubeconfig context to use</p>
+<pre><code>-h, --help
+</code></pre>
+
+<p>help for virtletctl</p>
+<pre><code>--insecure-skip-tls-verify
+</code></pre>
+
+<p>If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure</p>
+<pre><code>--kubeconfig string
+</code></pre>
+
+<p>Path to the kubeconfig file to use for CLI requests.</p>
+<pre><code>--log-backtrace-at traceLocation
+</code></pre>
+
+<p>when logging hits line file:N, emit a stack trace
+ <strong>(default value:</strong> <code>:0</code>)</p>
+<pre><code>--log-dir string
+</code></pre>
+
+<p>If non-empty, write log files in this directory</p>
+<pre><code>--logtostderr
+</code></pre>
+
+<p>log to standard error instead of files</p>
+<pre><code>-n, --namespace string
+</code></pre>
+
+<p>If present, the namespace scope for this CLI request</p>
+<pre><code>--password string
+</code></pre>
+
+<p>Password for basic authentication to the API server</p>
+<pre><code>--request-timeout string
+</code></pre>
+
+<p>The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests.
+ <strong>(default value:</strong> <code>"0"</code>)</p>
+<pre><code>-s, --server string
+</code></pre>
+
+<p>The address and port of the Kubernetes API server</p>
+<pre><code>--stderrthreshold severity
+</code></pre>
+
+<p>logs at or above this threshold go to stderr
+ <strong>(default value:</strong> <code>2</code>)</p>
+<pre><code>--token string
+</code></pre>
+
+<p>Bearer token for authentication to the API server</p>
+<pre><code>--user string
+</code></pre>
+
+<p>The name of the kubeconfig user to use</p>
+<pre><code>--username string
+</code></pre>
+
+<p>Username for basic authentication to the API server</p>
+<pre><code>-v, --v Level
+</code></pre>
+
+<p>log level for V logs</p>
+<pre><code>--virtlet-runtime string
+</code></pre>
+
+<p>the name of virtlet runtime used in kubernetes.io/target-runtime annotation
+ <strong>(default value:</strong> <code>"virtlet.cloud"</code>)</p>
+<pre><code>--vmodule moduleSpec
+</code></pre>
+
+<p>comma-separated list of pattern=N settings for file-filtered logging</p>
+              
+            </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../../dev/architecture/" class="btn btn-neutral float-right" title="Virtlet architecture">Next <span class="icon icon-circle-arrow-right"></span></a>
+      
+      
+        <a href="../resources/" class="btn btn-neutral" title="Resource management"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+    
+  </div>
+
+  Built with <a href="http://www.mkdocs.org">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+      
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" style="cursor: pointer">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+      
+      
+        <span><a href="../resources/" style="color: #fcfcfc;">&laquo; Previous</a></span>
+      
+      
+        <span style="margin-left: 15px"><a href="../../dev/architecture/" style="color: #fcfcfc">Next &raquo;</a></span>
+      
+    </span>
+</div>
+    <script>var base_url = '../..';</script>
+    <script src="../../js/theme.js" defer></script>
+      <script src="../../search/main.js" defer></script>
+
+</body>
+</html>

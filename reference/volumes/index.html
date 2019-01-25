@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  
+  <link rel="shortcut icon" href="../../img/favicon.ico">
+  <title>Volumes - Virtlet</title>
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  <link rel="stylesheet" href="../../css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../css/theme_extra.css" type="text/css" />
+  
+  <script>
+    // Current page data
+    var mkdocs_page_name = "Volumes";
+    var mkdocs_page_input_path = "reference/volumes.md";
+    var mkdocs_page_url = null;
+  </script>
+  
+  <script src="../../js/jquery-2.1.1.min.js" defer></script>
+  <script src="../../js/modernizr-2.8.3.min.js" defer></script> 
+  
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+      <div class="wy-side-nav-search">
+        <a href="../.." class="icon icon-home"> Virtlet</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+	<ul class="current">
+	  
+          
+            <li class="toctree-l1">
+		
+    <a class="" href="../..">Home</a>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">User Guide</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../user-guide/virtlet-on-kdc/">Installing Virtlet on kubeadm-dind-cluster</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../user-guide/real-cluster/">Installing Virtlet on a real cluster</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../user-guide/apparmor/">AppArmor profiles</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Virtlet 101</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../101/architecture/">Virtlet architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/workshop-setup/">Workshop setup</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/provision-virtlet/">Virtlet provisioning</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/creating-and-managing-pods/">Creating and managing virtual machines</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/network/">Virtlet networking</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/volumes/">Virtual machine volumes</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/cloud-init/">Cloud-Init support</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/rolling-out-updates/">Rolling out updates</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/troubleshooting/">Troubleshooting</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Reference</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../vm-pod-spec/">Defining a VM Pod</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../vm-pod/">Working with VM Pods</a>
+                </li>
+                <li class=" current">
+                    
+    <a class="current" href="./">Volumes</a>
+    <ul class="subnav">
+            
+    <li class="toctree-l3"><a href="#using-volumes">Using volumes</a></li>
+    
+        <ul>
+        
+            <li><a class="toctree-l4" href="#consuming-raw-block-pvs">Consuming raw block PVs</a></li>
+        
+            <li><a class="toctree-l4" href="#persistent-root-filesystem">Persistent root filesystem</a></li>
+        
+            <li><a class="toctree-l4" href="#consuming-configmaps-and-secrets">Consuming ConfigMaps and Secrets</a></li>
+        
+            <li><a class="toctree-l4" href="#9pfs-mounts">9pfs mounts</a></li>
+        
+            <li><a class="toctree-l4" href="#using-flexvolumes">Using FlexVolumes</a></li>
+        
+            <li><a class="toctree-l4" href="#ephemeral-local-storage">Ephemeral Local Storage</a></li>
+        
+            <li><a class="toctree-l4" href="#root-volume-size">Root volume size</a></li>
+        
+            <li><a class="toctree-l4" href="#disk-drivers">Disk drivers</a></li>
+        
+            <li><a class="toctree-l4" href="#caveats-and-limitations">Caveats and limitations</a></li>
+        
+        </ul>
+    
+
+    </ul>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../images/">VM Image Handling</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../injecting-files/">Injecting Files into the VM</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../cloud-init/">Cloud-Init</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../config/">Configuration</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../networking/">Networking</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../diagnostics/">Diagnostics</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../resources/">Resource management</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../virtletctl/">Command Line Tool</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Development</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../dev/architecture/">Virtlet architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/setup/">Setting up the environment</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/tests/">Running the tests</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/build-tool/">Build Tool</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/virtlet-ci/">Virtlet CI</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/cirros/">Building a custom CirrOS image</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/logging/">Logging architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/vm-pod-lifecycle/">Lifecycle of a VM pod</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/guidelines/">Guidelines</a>
+                </li>
+    </ul>
+	    </li>
+          
+        </ul>
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../..">Virtlet</a>
+      </nav>
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../..">Docs</a> &raquo;</li>
+    
+      
+        
+          <li>Reference &raquo;</li>
+        
+      
+    
+    <li>Volumes</li>
+    <li class="wy-breadcrumbs-aside">
+      
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main">
+            <div class="section">
+              
+                <h1 id="using-volumes">Using volumes</h1>
+<p>Virtlet can recognize and handle pod's <code>volumes</code> and container's
+<code>volumeMounts</code> / <code>volumeDevices</code> sections. These can be used to mount
+Kubernetes volumes into the VM, as well as attaching block volumes to
+the VM and specifying a persistent root filesystem for a VM.</p>
+<h2 id="consuming-raw-block-pvs">Consuming raw block PVs</h2>
+<p>Virtlet supports consuming
+<a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes/#raw-block-volume-support">Raw Block Volumes</a>
+in the VMs. In order to do this, you need a PVC with <code>volumeMode:
+Block</code> (let's say its name is <code>testpvc</code>) bound to a PV (which needs
+also to be <code>volumeMode: Block</code>). You can use this mechanism with both
+local and non-local PVs.</p>
+<p>You can then add the following to pod's volumes:</p>
+<pre><code class="yaml">volumes:
+- name: testpvc
+  persistentVolumeClaim:
+    claimName: local-block-pvc
+</code></pre>
+
+<p>and corresponding <code>volumeDevices</code> entry to the container:</p>
+<pre><code class="yaml">volumeDevices:
+- devicePath: /dev/testpvc
+  name: testpvc
+</code></pre>
+
+<p>Virtlet will ensure that <code>/dev/testpvc</code> inside the VM is a symlink
+pointing to the device that corresponds to the block volume (for more
+details on this, see <a href="../cloud-init/">Cloud-Init</a> description.</p>
+<p>You can also mount the block device inside the VM using cloud-init:</p>
+<pre><code class="yaml">VirtletCloudInitUserData: |
+  mounts:
+  - [&quot;/dev/testpvc&quot;, &quot;/mnt&quot;]
+</code></pre>
+
+<p>See also <a href="https://github.com/Mirantis/virtlet/tree/master/examples#using-local-block-pvs">block PV examples</a>.</p>
+<h2 id="persistent-root-filesystem">Persistent root filesystem</h2>
+<p>Although initially Virtlet was only supporting "cattle" VMs that had
+their lifespan limited to the one of the pod, it's now possible to
+have VMs with persistent root filesystem that survives pod removal
+and re-creation, too.</p>
+<p>If a persistent block volume is specified for a pod and listed in
+container's <code>volumeDevices</code> with <code>devicePath</code> of <code>/</code>:</p>
+<pre><code class="yaml">volumeDevices:
+- devicePath: /
+  name: testpvc
+</code></pre>
+
+<p>the corresponding PV will be used as a persistent root filesystem for
+a pod. The persistent root filesystem is reused as long as the image
+SHA256 hash doesn't change. Upon the change of SHA256 hash of the VM
+image, the PV will be overwritten again. Internally, Virtlet uses
+sector 0 of the block device to store persistent root filesystem
+metadata, and the block device visible inside the VM will use
+the sectors starting from sector 1. Overall, the following algorithm
+is used:
+1. The block device is checked for the presence of Virtlet header.
+2. If there's no Virtlet header, a new header is written to the sector
+   0 and the device is overwritten with the contents of the image.
+3. If the header contains a future persistent root filesystem metadata
+   version number, an error is logged and container creation fails.
+4. If the header contains mismatching image SHA256 hash, a new header
+   is written to the sector 0 and the device is overwritten with the
+   contents of the image.</p>
+<p>Unless this algorithm fails on step 3, the VM is booted using the
+block PV starting from sector 1 as it's boot device.</p>
+<p><em>IMPORTANT NOTE:</em> in case if persistent root filesystem is used,
+cloud-init based network setup is disabled for the VM. This is done
+because some cloud-init implementations only apply cloud-init network
+configuration once, but the IP address given to the VM may change if
+the persistent root filesystem is reused by another pod.</p>
+<p>See also <a href="https://github.com/Mirantis/virtlet/tree/master/examples#using-the-persistent-root-filesystem">block PV examples</a>.</p>
+<h2 id="consuming-configmaps-and-secrets">Consuming ConfigMaps and Secrets</h2>
+<p>If a Secret or ConfigMap volume is specified for a Virtlet pod, its
+contents is written to the filesystem of the VM using <code>write_files</code>
+<a href="../cloud-init/">Cloud-Init</a> feature which needs to be supported by
+the VM's Cloud-Init implementation.</p>
+<h2 id="9pfs-mounts">9pfs mounts</h2>
+<p>Specifying <code>volumeMounts</code> with volumes that don't refer to either
+Secrets, ConfigMaps, block PVs or Virtlet-specific flexvolumes causes
+Virtlet to mount them using QEMU's VirtFS (9pfs). Note that this means
+that the performance may be suboptimal in some cases. File permissions
+can also constitute a problem here; you can set
+<code>VirtletChown9pfsMounts</code> pod annotation to <code>true</code> to make Virtlet
+change the owner user/group on the directory recursively to one
+enabling read-write access for the VM.</p>
+<h2 id="using-flexvolumes">Using FlexVolumes</h2>
+<p>Virtlet uses custom
+<a href="https://github.com/kubernetes/community/blob/master/contributors/devel/flexvolume.md">FlexVolume</a>
+driver (<code>virtlet/flexvolume_driver</code>) to specify block devices for the
+VMs. Flexvolume options must include <code>type</code> field with one of the
+following values:</p>
+<ul>
+<li><code>qcow2</code> - ephemeral volume</li>
+<li><code>raw</code> - raw device. This flexvolume type is deprecated in favor of
+  Kubernetes' local PVs consumed in <a href="#consuming-raw-block-pvs">BlockVolume mode</a>.</li>
+<li><code>ceph</code> - Ceph RBD. This flexvolume type is deprecated in favor of
+  Kubernetes' RBD PVs consumed in <a href="#consuming-raw-block-pvs">BlockVolume mode</a>.</li>
+</ul>
+<h2 id="ephemeral-local-storage">Ephemeral Local Storage</h2>
+<p>All ephemeral volumes created by request as well as VM root volumes
+are stored in the local libvirt storage pool "<strong>volumes</strong>" which is
+located at <code>/var/lib/virtlet/volumes</code>. The libvirt volume is named
+using the following scheme:
+<code>&lt;domain-uuid&gt;-&lt;vol-name-specified-in-the-flexvolume&gt;</code>.  The
+flexvolume has <code>capacity</code> option which specifies the size of the
+ephemeral volume and default to 1024 MB.</p>
+<p>See the following example:</p>
+<pre><code class="yaml">apiVersion: v1
+kind: Pod
+metadata:
+  name: test-vm-pod
+  annotations:
+    kubernetes.io/target-runtime: virtlet.cloud
+spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: extraRuntime
+            operator: In
+            values:
+            - virtlet
+  containers:
+    - name: test-vm
+      image: download.cirros-cloud.net/0.3.5/cirros-0.3.5-x86_64-disk.img
+  volumes:
+  - name: vol1
+    flexVolume:
+      driver: &quot;virtlet/flexvolume_driver&quot;
+      options:
+        type: qcow2
+        capacity: 1024MB
+  - name: vol2
+    flexVolume:
+      driver: &quot;virtlet/flexvolume_driver&quot;
+      options:
+        type: qcow2
+</code></pre>
+
+<p>According to this definition will be created VM-POD with VM with 2
+equal volumes, attached, which can be found in "volumes" pool under
+<code>&lt;domain-uuid&gt;-vol1</code> and <code>&lt;domain-uuid&gt;-vol2</code>. The root volume, which
+uses the VM's QCOW2 image as its backing file, is exposed as <code>sda</code>
+device to the guest OS.  On a typical Linux system the additional
+volume disks are assigned to <code>/dev/sdX</code> (<code>/dev/vdX</code> in case of
+<code>virtio-blk</code>) devices in an alphabetical order, so vol1 will be
+<code>/dev/sdb</code> (<code>/dev/vdb</code>) and vol2 will be <code>/dev/sdc</code> (<code>/dev/vdc</code>), but
+please refer to the caveat #3 at the beginning of this document.</p>
+<p>When a pod is removed, all the volumes related to it are removed
+too. This includes the root volume and any additional volumes.</p>
+<h2 id="root-volume-size">Root volume size</h2>
+<p>You can set the size of the root volume of a Virtlet VM by using
+<code>VirtletRootVolumeSize</code> annotation. The specified size must be
+greater than the QCOW2 volume size, otherwise it will be ignored.
+Here's an example:</p>
+<pre><code class="yaml">metadata:
+  name: my-vm
+  annotations:
+    kubernetes.io/target-runtime: virtlet.cloud
+    VirtletRootVolumeSize: 4Gi
+</code></pre>
+
+<p>This sets the root volume size to 4 GiB unless QCOW2 image size is
+larger than 4 GiB, in which case the QCOW2 volume size is used.
+The annotation uses the standard Kubernetes quantity specification
+format, for more info, see <a href="https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory">here</a>.</p>
+<h2 id="disk-drivers">Disk drivers</h2>
+<p>Virtlet volumes can use either <code>virtio-blk</code> or <code>virtio-scsi</code> storage
+backends for the volumes. <code>virtio-scsi</code> is the default, but it can be
+overridden using <code>VirtletDiskDriver</code> annotation, which can have one of
+two values: <code>virtio</code> meaning <code>virtio-blk</code> and <code>scsi</code> meaning
+<code>virtio-scsi</code> (the default). Below is an example of switching a pod
+to <code>virtio-blk</code> driver:</p>
+<pre><code class="yaml">apiVersion: v1
+kind: Pod
+metadata:
+  name: cirros-vm
+  annotations:
+    kubernetes.io/target-runtime: virtlet.cloud
+    VirtletDiskDriver: virtio
+</code></pre>
+
+<p>The values of the <code>VirtletDiskDriver</code> annotation correspond to values
+of <code>bus</code> attribute of libvirt disk target specification.</p>
+<p>The selected mechanism is used for the rootfs, nocloud cloud-init
+CD-ROM and all the flexvolume types that Virtlet supports.</p>
+<p>Most of the time setting the driver is not necessary, but some OS
+images may have problem with the default <code>scsi</code> driver, for example,
+CirrOS can't handle <a href="../cloud-init/">Cloud-Init</a> data unless <code>virtio</code>
+driver is used.</p>
+<h2 id="caveats-and-limitations">Caveats and limitations</h2>
+<ol>
+<li>The total allowed number of volumes that can be attached to a
+   single VM (including implicit volumes for the boot disk and nocloud
+   cloud-init CD-ROM) is 20 in case of <code>virtio-blk</code> and 26 in case of
+   <code>virtio-scsi</code> driver. The limits can be extended in future.</li>
+<li>When generating libvirt domain definition, Virtlet constructs disk
+   names as <code>sd + &lt;disk-char&gt;</code> in case of <code>virtio-scsi</code> and as
+   <code>vd + &lt;disk-char&gt;</code> in case of <code>virtio-blk</code>, where <code>disk-char</code>
+   is a lowercase latin letter starting with 'a'. The first block
+   device, <code>sda</code> or <code>vda</code>, is used for the boot disk.</li>
+</ol>
+<pre><code class="xml">&lt;domain type='qemu' id='2' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'&gt;
+  &lt;name&gt;de0ae972-4154-4f8f-70ff-48335987b5ce-cirros-vm-rbd&lt;/name&gt;
+....
+
+  &lt;devices&gt;
+    &lt;emulator&gt;/vmwrapper&lt;/emulator&gt;
+    &lt;disk type='file' device='disk'&gt;
+      ...
+      &lt;target dev='sda' bus='scsi/'&gt;
+      ...
+    &lt;/disk&gt;
+    &lt;disk type='file' device='disk'&gt;
+      ...
+      &lt;target dev='sdb' bus='scsi'/&gt;
+      ...
+    &lt;/disk&gt;
+    &lt;disk type='network' device='disk'&gt;
+      ...
+      &lt;target dev='sdc' bus='scsi'/&gt;
+      ...
+    &lt;/disk&gt;
+
+    ...
+    &lt;/devices&gt;
+
+...
+&lt;/domain&gt;
+</code></pre>
+
+<ol>
+<li>The attached disks are visible by the OS inside VM as hard disk
+   devices <code>/dev/sdb</code>, <code>/dev/sdc</code> and so on (<code>/dev/vdb</code>, <code>/dev/vdc</code>
+   and so on in case of <code>virtio-blk</code>). Note that the naming of the
+   devices inside guest OS is usually unpredictable.  The use of
+   Virtlet-generated <a href="../cloud-init/">Cloud-Init</a> data is recommended
+   for mounting of the volumes. Virtlet uses udev-provided
+   <code>/dev/disk/by-path/...</code> or, failing that, sysfs information for
+   finding the device inside the virtual machine. Note that both
+   mechanisms are Linux-specific.</li>
+</ol>
+              
+            </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../images/" class="btn btn-neutral float-right" title="VM Image Handling">Next <span class="icon icon-circle-arrow-right"></span></a>
+      
+      
+        <a href="../vm-pod/" class="btn btn-neutral" title="Working with VM Pods"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+    
+  </div>
+
+  Built with <a href="http://www.mkdocs.org">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+      
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" style="cursor: pointer">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+      
+      
+        <span><a href="../vm-pod/" style="color: #fcfcfc;">&laquo; Previous</a></span>
+      
+      
+        <span style="margin-left: 15px"><a href="../images/" style="color: #fcfcfc">Next &raquo;</a></span>
+      
+    </span>
+</div>
+    <script>var base_url = '../..';</script>
+    <script src="../../js/theme.js" defer></script>
+      <script src="../../search/main.js" defer></script>
+
+</body>
+</html>

@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  
+  <link rel="shortcut icon" href="../../img/favicon.ico">
+  <title>Defining a VM Pod - Virtlet</title>
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  <link rel="stylesheet" href="../../css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../css/theme_extra.css" type="text/css" />
+  
+  <script>
+    // Current page data
+    var mkdocs_page_name = "Defining a VM Pod";
+    var mkdocs_page_input_path = "reference/vm-pod-spec.md";
+    var mkdocs_page_url = null;
+  </script>
+  
+  <script src="../../js/jquery-2.1.1.min.js" defer></script>
+  <script src="../../js/modernizr-2.8.3.min.js" defer></script> 
+  
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+      <div class="wy-side-nav-search">
+        <a href="../.." class="icon icon-home"> Virtlet</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+	<ul class="current">
+	  
+          
+            <li class="toctree-l1">
+		
+    <a class="" href="../..">Home</a>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">User Guide</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../user-guide/virtlet-on-kdc/">Installing Virtlet on kubeadm-dind-cluster</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../user-guide/real-cluster/">Installing Virtlet on a real cluster</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../user-guide/apparmor/">AppArmor profiles</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Virtlet 101</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../101/architecture/">Virtlet architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/workshop-setup/">Workshop setup</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/provision-virtlet/">Virtlet provisioning</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/creating-and-managing-pods/">Creating and managing virtual machines</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/network/">Virtlet networking</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/volumes/">Virtual machine volumes</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/cloud-init/">Cloud-Init support</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/rolling-out-updates/">Rolling out updates</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/troubleshooting/">Troubleshooting</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Reference</span>
+    <ul class="subnav">
+                <li class=" current">
+                    
+    <a class="current" href="./">Defining a VM Pod</a>
+    <ul class="subnav">
+            
+    <li class="toctree-l3"><a href="#defining-a-vm-pod">Defining a VM Pod</a></li>
+    
+
+    <li class="toctree-l3"><a href="#annotations-recognized-by-virtlet">Annotations recognized by Virtlet</a></li>
+    
+        <ul>
+        
+            <li><a class="toctree-l4" href="#cri-proxy-annotation">CRI Proxy annotation</a></li>
+        
+            <li><a class="toctree-l4" href="#chowning-9pfs-mounts">Chowning 9pfs mounts</a></li>
+        
+            <li><a class="toctree-l4" href="#cpu-model">CPU Model</a></li>
+        
+            <li><a class="toctree-l4" href="#disk-driver">Disk driver</a></li>
+        
+            <li><a class="toctree-l4" href="#injecting-files-into-the-image">Injecting files into the image</a></li>
+        
+            <li><a class="toctree-l4" href="#vcpu-count">vCPU count</a></li>
+        
+        </ul>
+    
+
+    <li class="toctree-l3"><a href="#volume-handling">Volume handling</a></li>
+    
+
+    <li class="toctree-l3"><a href="#environment-variables">Environment variables</a></li>
+    
+
+    </ul>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../vm-pod/">Working with VM Pods</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../volumes/">Volumes</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../images/">VM Image Handling</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../injecting-files/">Injecting Files into the VM</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../cloud-init/">Cloud-Init</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../config/">Configuration</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../networking/">Networking</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../diagnostics/">Diagnostics</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../resources/">Resource management</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../virtletctl/">Command Line Tool</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Development</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../dev/architecture/">Virtlet architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/setup/">Setting up the environment</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/tests/">Running the tests</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/build-tool/">Build Tool</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/virtlet-ci/">Virtlet CI</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/cirros/">Building a custom CirrOS image</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/logging/">Logging architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/vm-pod-lifecycle/">Lifecycle of a VM pod</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/guidelines/">Guidelines</a>
+                </li>
+    </ul>
+	    </li>
+          
+        </ul>
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../..">Virtlet</a>
+      </nav>
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../..">Docs</a> &raquo;</li>
+    
+      
+        
+          <li>Reference &raquo;</li>
+        
+      
+    
+    <li>Defining a VM Pod</li>
+    <li class="wy-breadcrumbs-aside">
+      
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main">
+            <div class="section">
+              
+                <h1 id="defining-a-vm-pod">Defining a VM Pod</h1>
+<p>The basic idea of a VM pod is that it's a plain Kubernetes pod
+definition with the following conditions satisfied:</p>
+<ol>
+<li>It has <code>kubernetes.io/target-runtime: virtlet.cloud</code>
+   <a href="#cri-proxy-annotation">annotation</a> so it can be recognized by
+   <a href="https://github.com/Mirantis/criproxy">CRI Proxy</a>.</li>
+<li>The pod has exactly one container.</li>
+<li>The container's image has <code>virtlet.cloud/</code> prefix followed by
+   the image name which is recognized according to Virtlet's
+   <a href="../images/">image handling rules</a> and used to download
+   the QCOW2 image for the VM.</li>
+</ol>
+<p>If you have Virtlet running only on some of the nodes in the cluster,
+you also need to specify either <code>nodeSelector</code> or <code>nodeAffinity</code> for
+the pod to have it land on a node with Virtlet. If a VM pod lands on a
+node which doesn't have Virtlet or where Virtlet and
+<a href="https://github.com/Mirantis/criproxy">CRI Proxy</a> aren't configured
+properly, you can see the following messages in <code>kubectl describe</code>
+output for the VM pod (the message can be printed as a single line):</p>
+<pre><code>Warning  Failed     5s (x2 over 17s)  kubelet, kubemaster
+Failed to pull image &quot;virtlet.cloud/cirros&quot;:
+rpc error: code = Unknown desc = Error response from daemon:
+Get https://virtlet.cloud/v2/: dial tcp 50.63.202.10:443:
+connect: connection refused
+</code></pre>
+
+<p>This means that kubelet is trying to pull the VM image from a Docker
+registry.</p>
+<p>It's also possible to construct higher-level Kubernetes objects such
+as Deployment, StatefulSet or DaemonSet out of VM pods, in which case
+the <code>template</code> section of the object must follow the above rules for
+VM pods.</p>
+<p>Below is an example of a Virtlet pod. The comments describe the
+particular parts of the pod spec. The following sections will give
+more details on each part of the spec.</p>
+<pre><code class="yaml"># Standard k8s pod header
+apiVersion: v1
+kind: Pod
+metadata:
+  # the name of the pod
+  name: cirros-vm
+  # See 'Annotations recognized by Virtlet' below
+  annotations:
+    # This tells CRI Proxy that this pod belongs to Virtlet runtime
+    kubernetes.io/target-runtime: virtlet.cloud
+    # An optional annotation specifying the count of virtual CPUs.
+    # Defaults to &quot;1&quot;.
+    VirtletVCPUCount: &quot;1&quot;
+    # CirrOS doesn't load nocloud data from SCSI CD-ROM for some reason
+    VirtletDiskDriver: virtio
+    # inject ssh keys via cloud-init
+    VirtletSSHKeys: |
+      ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCaJEcFDXEK2ZbX0ZLS1EIYFZRbDAcRfuVjpstSc0De8+sV1aiu+dePxdkuDRwqFtCyk6dEZkssjOkBXtri00MECLkir6FcH3kKOJtbJ6vy3uaJc9w1ERo+wyl6SkAh/+JTJkp7QRXj8oylW5E20LsbnA/dIwWzAF51PPwF7A7FtNg9DnwPqMkxFo1Th/buOMKbP5ZA1mmNNtmzbMpMfJATvVyiv3ccsSJKOiyQr6UG+j7sc/7jMVz5Xk34Vd0l8GwcB0334MchHckmqDB142h/NCWTr8oLakDNvkfC1YneAfAO41hDkUbxPtVBG5M/o7P4fxoqiHEX+ZLfRxDtHB53 me@localhost
+    # set root volume size
+    VirtletRootVolumeSize: 1Gi
+spec:
+  # This nodeAffinity specification tells Kubernetes to run this
+  # pod only on the nodes that have extraRuntime=virtlet label.
+  # This label is used by Virtlet DaemonSet to select nodes
+  # that must have Virtlet runtime
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: extraRuntime
+            operator: In
+            values:
+            - virtlet
+  containers:
+  - name: cirros-vm
+    # This specifies the image to use.
+    # virtlet.cloud/ prefix is used by CRI proxy, the remaining part
+    # of the image name is prepended with https:// and used to download the image
+    image: virtlet.cloud/cirros
+    imagePullPolicy: IfNotPresent
+    # tty and stdin required for `kubectl attach -t` to work
+    tty: true
+    stdin: true
+    resources:
+      limits:
+        # This memory limit is applied to the libvirt domain definition
+        memory: 160Mi
+</code></pre>
+
+<h1 id="annotations-recognized-by-virtlet">Annotations recognized by Virtlet</h1>
+<p>The annotations can be specified under <code>annotations</code> key of the
+<code>metadata</code> part of the pod spec. Note that the values are always
+strings, but they can be parsed in different way by Virtlet (see Type
+column).</p>
+<p>For boolean keys, the string <code>"true"</code> (lowercase) is interpreted as a
+true value. All other values are interpreted as false.</p>
+<p>Several keys belong to the <a href="../cloud-init/">Cloud-Init</a> settings which
+are described in detail in the
+<a href="../cloud-init/">corresponding section</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Description</th>
+<th>Value</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><sub><a href="#cri-proxy-annotation">kubernetes.io/target-runtime</a></sub></td>
+<td><a href="#cri-proxy-annotation">CRI runtime setting for CRI Proxy</a></td>
+<td><code>virtlet.cloud</code></td>
+<td><code>virtlet.cloud</code></td>
+</tr>
+<tr>
+<td><sub><a href="../volumes/#9pfs-mounts">VirtletChown9pfsMounts</a></sub></td>
+<td><a href="../volumes/#9pfs-mounts">Recursively chown 9pfs mounts</a></td>
+<td>boolean</td>
+<td><code>""</code></td>
+</tr>
+<tr>
+<td><sub><a href="../cloud-init/##output-iso-image-format">VirtletCloudInitImageType</a></sub></td>
+<td><a href="../cloud-init/##output-iso-image-format">Cloud-Init</a> image type to use</td>
+<td><code>"nocloud"</code> <code>"configdrive"</code></td>
+<td><code>""</code></td>
+</tr>
+<tr>
+<td><sub><a href="../cloud-init/#detailed-structure-of-the-generated-files">VirtletCloudInitMetaData</a></sub></td>
+<td>The contents of <a href="../cloud-init/">Cloud-Init</a> metadata</td>
+<td>json / yaml</td>
+<td><code>""</code></td>
+</tr>
+<tr>
+<td><sub><a href="../cloud-init/#detailed-structure-of-the-generated-files">VirtletCloudInitUserData</a></sub></td>
+<td>The contents of <a href="../cloud-init/">Cloud-Init</a> user-data (mergeable)</td>
+<td>json / yaml</td>
+<td><code>""</code></td>
+</tr>
+<tr>
+<td><sub><a href="../cloud-init/#detailed-structure-of-the-generated-files">VirtletCloudInitUserDataOverwrite</a></sub></td>
+<td>Disable merging of <a href="../cloud-init/">Cloud-Init</a> user-data keys</td>
+<td>boolean</td>
+<td><code>""</code></td>
+</tr>
+<tr>
+<td><sub><a href="../cloud-init/#detailed-structure-of-the-generated-files">VirtletCloudInitUserDataScript</a></sub></td>
+<td>The contents of <a href="../cloud-init/">Cloud-Init</a> user-data as a script</td>
+<td>text</td>
+<td><code>""</code></td>
+</tr>
+<tr>
+<td><sub><a href="../cloud-init/#detailed-structure-of-the-generated-files">VirtletCloudInitUserDataSource</a></sub></td>
+<td>Data source for <a href="../cloud-init/">Cloud-Init</a> user-data</td>
+<td><code>"configmap/..."</code> <code>"secret/..."</code></td>
+<td><code>""</code></td>
+</tr>
+<tr>
+<td><sub><a href="../cloud-init/#propagating-user-data-from-kubernetes-objects">VirtletCloudInitUserDataSourceEncoding</a></sub></td>
+<td>Encoding to use for loading <a href="../cloud-init/">Cloud-Init</a> user-data from a ConfigMap key</td>
+<td><code>"plain"</code></td>
+<td><code>"base|4"</code></td>
+</tr>
+<tr>
+<td><sub><a href="../cloud-init/#propagating-user-data-from-kubernetes-objects">VirtletCloudInitUserDataSourceKey</a></sub></td>
+<td>ConfigMap key to load <a href="../cloud-init/">Cloud-Init</a> user-data from</td>
+<td></td>
+<td><code>""</code></td>
+</tr>
+<tr>
+<td><sub><a href="#cpu-model">VirtletCPUModel</a></sub></td>
+<td><a href="#cpu-model">CPU model to use</a></td>
+<td><code>""</code> <code>"host-model"</code></td>
+<td><code>""</code></td>
+</tr>
+<tr>
+<td><sub><a href="#disk-driver">VirtletDiskDriver</a></sub></td>
+<td><a href="#disk-driver">Disk driver to use</a></td>
+<td><code>"scsi"</code> <code>"virtio"</code></td>
+<td><code>"scsi"</code></td>
+</tr>
+<tr>
+<td><sub><a href="#injecting-files-into-the-image">VirtletFilesFromDataSource</a></sub></td>
+<td>Inject files from a ConfigMap or a Secret into the image</td>
+<td><code>"configmap/..."</code> <code>"secret/..."</code></td>
+<td><code>""</code></td>
+</tr>
+<tr>
+<td><sub><a href="#cpu-model">VirtletLibvirtCPUSetting</a></sub></td>
+<td>libvirt <a href="#cpu-model">CPU model</a> setting</td>
+<td>yaml</td>
+<td><code>""</code></td>
+</tr>
+<tr>
+<td><sub><a href="../volumes/#root-volume-size">VirtletRootVolumeSize</a></sub></td>
+<td><a href="../volumes/#root-volume-size">Root volume size</a></td>
+<td>quantity</td>
+<td><code>""</code></td>
+</tr>
+<tr>
+<td><sub><a href="../cloud-init/#detailed-structure-of-the-generated-files">VirtletSSHKeys</a></sub></td>
+<td>SSH keys to add to the VM injected via <a href="../cloud-init/">Cloud-Init</a></td>
+<td>a list of strings</td>
+<td><code>""</code></td>
+</tr>
+<tr>
+<td><sub><a href="../cloud-init/#detailed-structure-of-the-generated-files">VirtletSSHKeySource</a></sub></td>
+<td>Data source for ssh keys injected via <a href="../cloud-init/">Cloud-Init</a></td>
+<td><code>"configmap/..."</code> <code>"secret/..."</code></td>
+<td><code>""</code></td>
+</tr>
+<tr>
+<td><sub><a href="#vcpu-count">VirtletVCPUCount</a></sub></td>
+<td><a href="#vcpu-count">The number of vCPUs to assign to the VM pod</a></td>
+<td>integer</td>
+<td><code>"1"</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="cri-proxy-annotation">CRI Proxy annotation</h2>
+<p>Besides Virtlet annotations, there's <code>kubernetes.io/target-runtime:
+virtlet.cloud</code> annotation which is handled by
+<a href="https://github.com/Mirantis/criproxy">CRI Proxy</a>.  It's important to
+specify it as well as <code>virtlet.cloud</code> prefix for CRI Proxy to be able
+to direct requests to Virtlet.</p>
+<h2 id="chowning-9pfs-mounts">Chowning 9pfs mounts</h2>
+<p>Setting <code>VirtletChown9pfsMounts</code> to <code>true</code> causes
+<a href="#9pfs-mounts">9pfs mounts</a> to chown their volume contents to make
+it readable and writable by the VM.</p>
+<h2 id="cpu-model">CPU Model</h2>
+<p><code>VirtletCPUModel: host-model</code> annotation enables nested
+virtualization.  <code>VirtletLibvirtCPUSetting</code> is an expert-only
+annotation that sets the CPU options for libvirt. The YAML keys
+correspond to the XML elements and attributes in the
+<a href="https://libvirt.org/formatdomain.html#elementsCPU">libvirt XML definition</a>,
+but are capitalized. The value of <code>Model</code> field goes into the <code>Value</code>
+key. For example:</p>
+<pre><code class="yaml">Match: exact
+Model:
+  Fallback: allow
+  Value: core2duo
+</code></pre>
+
+<h2 id="disk-driver">Disk driver</h2>
+<p>The driver is set using <code>VirtletDiskDriver</code> annotation which may have
+the value of <code>scsi</code> (the default) or <code>virtio</code>.  Some OS images may
+have problem with the default <code>scsi</code> driver, for example, CirrOS
+can't handle <a href="../cloud-init/">Cloud-Init</a> data unless <code>virtio</code> driver
+is used.</p>
+<h2 id="injecting-files-into-the-image">Injecting files into the image</h2>
+<p>By using <code>VirtletFilesFromDataSource</code> annotation, it's possible to
+place the contents of a ConfigMap or a Secret on the image before
+booting the VM. For more information, refer to
+<a href="../injecting-files/">Injecting files into the VM</a>.</p>
+<h2 id="vcpu-count">vCPU count</h2>
+<p>Virtlet defaults to using just one vCPU per VM. You can change this
+value by setting <code>VirtletVCPUCount</code> annotation to the desired value,
+for example, <code>VirtletVCPUCount: "2"</code>.</p>
+<h1 id="volume-handling">Volume handling</h1>
+<p>Virtlet can recognize and handle pod's <code>volumes</code> and container's
+<code>volumeMounts</code> sections. This can also be used to make the VM use a
+persistent root filesystem which will survive pod removal and
+re-creation. For more information on working with volumes, please
+refer to the <a href="../volumes/">Volumes</a> section.</p>
+<h1 id="environment-variables">Environment variables</h1>
+<p>Virtlet supports passing environment variables to the VM using the standard
+<code>env</code> settings in the container definition:</p>
+<pre><code class="yaml">...
+spec:
+...
+containers:
+  - name: cirros-vm
+    ...
+    env:
+    - name: MY_FOO_VAR
+      value: foo
+    - name: MY_FOOBAR_VAR
+      value: foobar
+</code></pre>
+
+<p>Virtlet uses <a href="../cloud-init/">Cloud-Init</a> mechanisms to write the
+values into <code>/etc/cloud/environment</code> file inside the VM which
+has the same <code>key=value</code> per line format as <code>/etc/environment</code>
+and can be either read by an application or sourced by a shell:</p>
+<pre><code class="sh">MY_FOO_VAR=foo
+MY_FOOBAR_VAR=foobar
+</code></pre>
+
+<p>For this environment mechanism to work, the cloud-init implementation
+inside the VM must be able to handle <code>write_files</code> inside the
+Cloud-Init user-data.</p>
+              
+            </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../vm-pod/" class="btn btn-neutral float-right" title="Working with VM Pods">Next <span class="icon icon-circle-arrow-right"></span></a>
+      
+      
+        <a href="../../101/troubleshooting/" class="btn btn-neutral" title="Troubleshooting"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+    
+  </div>
+
+  Built with <a href="http://www.mkdocs.org">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+      
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" style="cursor: pointer">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+      
+      
+        <span><a href="../../101/troubleshooting/" style="color: #fcfcfc;">&laquo; Previous</a></span>
+      
+      
+        <span style="margin-left: 15px"><a href="../vm-pod/" style="color: #fcfcfc">Next &raquo;</a></span>
+      
+    </span>
+</div>
+    <script>var base_url = '../..';</script>
+    <script src="../../js/theme.js" defer></script>
+      <script src="../../search/main.js" defer></script>
+
+</body>
+</html>

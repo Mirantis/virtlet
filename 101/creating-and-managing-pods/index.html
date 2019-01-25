@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  
+  <link rel="shortcut icon" href="../../img/favicon.ico">
+  <title>Creating and managing virtual machines - Virtlet</title>
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  <link rel="stylesheet" href="../../css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../css/theme_extra.css" type="text/css" />
+  
+  <script>
+    // Current page data
+    var mkdocs_page_name = "Creating and managing virtual machines";
+    var mkdocs_page_input_path = "101/creating-and-managing-pods.md";
+    var mkdocs_page_url = null;
+  </script>
+  
+  <script src="../../js/jquery-2.1.1.min.js" defer></script>
+  <script src="../../js/modernizr-2.8.3.min.js" defer></script> 
+  
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+      <div class="wy-side-nav-search">
+        <a href="../.." class="icon icon-home"> Virtlet</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+	<ul class="current">
+	  
+          
+            <li class="toctree-l1">
+		
+    <a class="" href="../..">Home</a>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">User Guide</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../user-guide/virtlet-on-kdc/">Installing Virtlet on kubeadm-dind-cluster</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../user-guide/real-cluster/">Installing Virtlet on a real cluster</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../user-guide/apparmor/">AppArmor profiles</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Virtlet 101</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../architecture/">Virtlet architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../workshop-setup/">Workshop setup</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../provision-virtlet/">Virtlet provisioning</a>
+                </li>
+                <li class=" current">
+                    
+    <a class="current" href="./">Creating and managing virtual machines</a>
+    <ul class="subnav">
+            
+    <li class="toctree-l3"><a href="#creating-and-managing-virtual-machines">Creating and managing virtual machines</a></li>
+    
+        <ul>
+        
+            <li><a class="toctree-l4" href="#view-pod-details">View Pod details</a></li>
+        
+            <li><a class="toctree-l4" href="#view-the-logs-of-a-pod">View the logs of a Pod</a></li>
+        
+            <li><a class="toctree-l4" href="#attach-to-the-vm">Attach to the VM</a></li>
+        
+            <li><a class="toctree-l4" href="#create-new-ubuntu-vm">Create new Ubuntu VM</a></li>
+        
+            <li><a class="toctree-l4" href="#use-in-deployment">Use in Deployment</a></li>
+        
+        </ul>
+    
+
+    </ul>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../network/">Virtlet networking</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../volumes/">Virtual machine volumes</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../cloud-init/">Cloud-Init support</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../rolling-out-updates/">Rolling out updates</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../troubleshooting/">Troubleshooting</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Reference</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../reference/vm-pod-spec/">Defining a VM Pod</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/vm-pod/">Working with VM Pods</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/volumes/">Volumes</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/images/">VM Image Handling</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/injecting-files/">Injecting Files into the VM</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/cloud-init/">Cloud-Init</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/config/">Configuration</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/networking/">Networking</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/diagnostics/">Diagnostics</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/resources/">Resource management</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/virtletctl/">Command Line Tool</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Development</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../dev/architecture/">Virtlet architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/setup/">Setting up the environment</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/tests/">Running the tests</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/build-tool/">Build Tool</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/virtlet-ci/">Virtlet CI</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/cirros/">Building a custom CirrOS image</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/logging/">Logging architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/vm-pod-lifecycle/">Lifecycle of a VM pod</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/guidelines/">Guidelines</a>
+                </li>
+    </ul>
+	    </li>
+          
+        </ul>
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../..">Virtlet</a>
+      </nav>
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../..">Docs</a> &raquo;</li>
+    
+      
+        
+          <li>Virtlet 101 &raquo;</li>
+        
+      
+    
+    <li>Creating and managing virtual machines</li>
+    <li class="wy-breadcrumbs-aside">
+      
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main">
+            <div class="section">
+              
+                <h1 id="creating-and-managing-virtual-machines">Creating and managing virtual machines</h1>
+<p>The <code>demo.sh</code> script which you've run above has set up Virtlet, started virtual machine with cirros image, started a nginx pod which is exposed via Service.
+Let's check how it all works.</p>
+<p>The script will ssh into a <code>cirros-vm</code> before finishing. Switch to another console and list the pods:</p>
+<pre><code class="bash">kubectl get pod
+</code></pre>
+
+<p><code>cirros-vm</code> and <code>nginx</code> pod are both listed. Now list the services:</p>
+<pre><code class="bash">kubectl get svc
+</code></pre>
+
+<p>Now go back to the first console where you are logged in the <code>cirros-vm</code>. If you disconnected from it you can reconnect with <code>virtletctl ssh cirros@cirros-vm -- -i virtlet/examples/vmkey</code>.
+Check that you have internet access:</p>
+<pre><code class="bash">ping 8.8.8.8
+ping mirantis.com
+</code></pre>
+
+<p>Make sure that the cluster network is also accessible from within the pod. Retrieve some data:</p>
+<pre><code class="bash">curl nginx
+</code></pre>
+
+<p>Disconnect from the VM using Ctrl-D.</p>
+<h2 id="view-pod-details">View Pod details</h2>
+<p>Use the <code>kubectl get</code> and <code>kubectl describe</code> commands to view details for the <code>cirros-vm</code> pod:</p>
+<h2 id="view-the-logs-of-a-pod">View the logs of a Pod</h2>
+<p>Use the <code>kubectl logs</code> command to view the logs for the <code>cirros-vm</code> pod:</p>
+<pre><code>kubectl logs cirros-vm
+</code></pre>
+
+<h2 id="attach-to-the-vm">Attach to the VM</h2>
+<p>Use the <code>kubectl attach</code> command to attach to the VM console:</p>
+<pre><code>kubectl attach -it cirros-vm
+</code></pre>
+
+<p>To exit use <code>CTRL-]</code> key combination.</p>
+<h2 id="create-new-ubuntu-vm">Create new Ubuntu VM</h2>
+<p>Now you can create another virtual machine. Let's create Ubuntu VM from Virtlet examples:</p>
+<pre><code class="bash">cat examples/ubuntu-vm-with-testuser.yaml
+kubectl apply -f examples/ubuntu-vm-with-testuser.yaml
+</code></pre>
+
+<p>This example also shows how cloud-init script can be used. Here new user: <code>testuser</code> is created and also an ssh key is injected.
+Wait for ubuntu VM:</p>
+<pre><code class="bash">kubectl get pod -w
+</code></pre>
+
+<p>Now attach to the VM using testuser/testuser credentials:</p>
+<pre><code class="bash">kubectl attach -it ubuntu-vm-with-testuser
+</code></pre>
+
+<p>Check if it also has internet connection using the same method which was used for <code>cirros-vm</code> above.</p>
+<h2 id="use-in-deployment">Use in Deployment</h2>
+<p>Because Virtlet VMs are just normal pods you can create Deployment, DaemonSet or even StatefulSet from Virtual Machines:</p>
+<pre><code class="bash">cat examples/deploy-cirros-vm.yaml
+kubectl apply -f examples/cirros-vm-deployment.yaml
+</code></pre>
+
+<p>When it's ready you can scale it:</p>
+<pre><code class="bash">kubectl scale --replicas=2 deploy/cirros-deployment
+</code></pre>
+              
+            </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../network/" class="btn btn-neutral float-right" title="Virtlet networking">Next <span class="icon icon-circle-arrow-right"></span></a>
+      
+      
+        <a href="../provision-virtlet/" class="btn btn-neutral" title="Virtlet provisioning"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+    
+  </div>
+
+  Built with <a href="http://www.mkdocs.org">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+      
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" style="cursor: pointer">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+      
+      
+        <span><a href="../provision-virtlet/" style="color: #fcfcfc;">&laquo; Previous</a></span>
+      
+      
+        <span style="margin-left: 15px"><a href="../network/" style="color: #fcfcfc">Next &raquo;</a></span>
+      
+    </span>
+</div>
+    <script>var base_url = '../..';</script>
+    <script src="../../js/theme.js" defer></script>
+      <script src="../../search/main.js" defer></script>
+
+</body>
+</html>

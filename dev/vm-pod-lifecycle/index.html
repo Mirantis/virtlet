@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  
+  <link rel="shortcut icon" href="../../img/favicon.ico">
+  <title>Lifecycle of a VM pod - Virtlet</title>
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  <link rel="stylesheet" href="../../css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../css/theme_extra.css" type="text/css" />
+  
+  <script>
+    // Current page data
+    var mkdocs_page_name = "Lifecycle of a VM pod";
+    var mkdocs_page_input_path = "dev/vm-pod-lifecycle.md";
+    var mkdocs_page_url = null;
+  </script>
+  
+  <script src="../../js/jquery-2.1.1.min.js" defer></script>
+  <script src="../../js/modernizr-2.8.3.min.js" defer></script> 
+  
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+      <div class="wy-side-nav-search">
+        <a href="../.." class="icon icon-home"> Virtlet</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+	<ul class="current">
+	  
+          
+            <li class="toctree-l1">
+		
+    <a class="" href="../..">Home</a>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">User Guide</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../user-guide/virtlet-on-kdc/">Installing Virtlet on kubeadm-dind-cluster</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../user-guide/real-cluster/">Installing Virtlet on a real cluster</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../user-guide/apparmor/">AppArmor profiles</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Virtlet 101</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../101/architecture/">Virtlet architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/workshop-setup/">Workshop setup</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/provision-virtlet/">Virtlet provisioning</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/creating-and-managing-pods/">Creating and managing virtual machines</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/network/">Virtlet networking</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/volumes/">Virtual machine volumes</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/cloud-init/">Cloud-Init support</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/rolling-out-updates/">Rolling out updates</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/troubleshooting/">Troubleshooting</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Reference</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../reference/vm-pod-spec/">Defining a VM Pod</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/vm-pod/">Working with VM Pods</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/volumes/">Volumes</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/images/">VM Image Handling</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/injecting-files/">Injecting Files into the VM</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/cloud-init/">Cloud-Init</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/config/">Configuration</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/networking/">Networking</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/diagnostics/">Diagnostics</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/resources/">Resource management</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/virtletctl/">Command Line Tool</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Development</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../architecture/">Virtlet architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../setup/">Setting up the environment</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../tests/">Running the tests</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../build-tool/">Build Tool</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../virtlet-ci/">Virtlet CI</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../cirros/">Building a custom CirrOS image</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../logging/">Logging architecture</a>
+                </li>
+                <li class=" current">
+                    
+    <a class="current" href="./">Lifecycle of a VM pod</a>
+    <ul class="subnav">
+            
+    <li class="toctree-l3"><a href="#lifecycle-of-a-vm-pod">Lifecycle of a VM pod</a></li>
+    
+        <ul>
+        
+            <li><a class="toctree-l4" href="#assumptions">Assumptions</a></li>
+        
+            <li><a class="toctree-l4" href="#lifecycle">Lifecycle</a></li>
+        
+        </ul>
+    
+
+    </ul>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../guidelines/">Guidelines</a>
+                </li>
+    </ul>
+	    </li>
+          
+        </ul>
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../..">Virtlet</a>
+      </nav>
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../..">Docs</a> &raquo;</li>
+    
+      
+        
+          <li>Development &raquo;</li>
+        
+      
+    
+    <li>Lifecycle of a VM pod</li>
+    <li class="wy-breadcrumbs-aside">
+      
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main">
+            <div class="section">
+              
+                <h1 id="lifecycle-of-a-vm-pod">Lifecycle of a VM pod</h1>
+<p>This document describes the lifecycle of VM pod managed by Virtlet.</p>
+<p>This description omits the details of volume setup (using
+<a href="https://kubernetes.io/docs/concepts/storage/volumes/#flexvolume">flexvolumes</a>),
+handling of logs, the VM console and port forwarding (done by
+<a href="https://github.com/Mirantis/virtlet/tree/master/pkg/stream">streaming server</a>),
+ or port forwarding.</p>
+<h2 id="assumptions">Assumptions</h2>
+<p>Communication between kubelet and Virtlet goes through <a href="https://github.com/Mirantis/criproxy">criproxy</a>
+which directs requests to Virtlet only if the requests concern a pod that has
+Virtlet-specific annotation or an image that has Virtlet-specific prefix.</p>
+<h2 id="lifecycle">Lifecycle</h2>
+<h3 id="vm-pod-startup">VM Pod Startup</h3>
+<ul>
+<li>A pod is created in Kubernetes cluster, either directly by the user or via
+   some other mechanism such as a higher-level Kubernetes object managed by
+   <code>kube-controller-manager</code> (ReplicaSet, DaemonSet etc.).</li>
+<li>Scheduler places the pod on a node based on the requested resources
+   (CPU, memory, etc.) as well as pod's nodeSelector and pod/node affinity
+   constraints, taints/tolerations and so on.</li>
+<li><code>kubelet</code> running on the target node accepts the pod.</li>
+<li><code>kubelet</code> invokes a <a href="https://contributor.kubernetes.io/contributors/devel/container-runtime-interface/">CRI</a>
+   call RunPodSandbox to create the pod sandbox which
+   will enclose all the containers in the pod definition. Note that at this
+   point no information about the containers within the pod is passed
+   to the call. <code>kubelet</code> can later request the information about the pod
+   by means of <code>PodSandboxStatus</code> calls.</li>
+<li>If there's a Virtlet-specific annotation <code>kubernetes.io/target-runtime: virtlet.cloud</code>,
+   CRI proxy passes the call to Virtlet.</li>
+<li>Virtlet saves sandbox metadata in its internal database, sets up the
+   network namespace and then uses internal <code>tapmanager</code> mechanism to invoke
+   <code>ADD</code> operation via the CNI plugin as specified by the
+   CNI configuration on the node.</li>
+<li>The CNI plugin configures the network namespace by setting up
+   network interfaces, IP addresses, routes, iptables rules and so on,
+   and returns the network configuration information to the caller as described
+   in the <a href="https://github.com/containernetworking/cni/blob/master/SPEC.md#result">CNI spec</a>.</li>
+<li>Virtlet's <a href="https://github.com/Mirantis/virtlet/tree/master/pkg/tapmanager"><code>tapmanager</code></a>
+   mechanism adjusts the configuration of the network namespace to make it work with the VM.</li>
+<li>After creating the sandbox, kubelet starts the containers defined in
+   the pod sandbox. Currently, Virtlet supports just one container per VM pod.
+   So, the VM pod startup steps after this one describe the startup of this single container.</li>
+<li>Depending on the image pull police of the container, kubelet checks if
+   the image needs to be pulled by means of <code>ImageStatus</code> call and then uses
+   <code>PullImage</code> CRI call to pull the image if it doesn't exist or if
+   <code>imagePullPolicy: Always</code> is used.</li>
+<li>If <code>PullImage</code> is invoked, Virtlet resolves the image location based on the
+   <a href="https://github.com/Mirantis/virtlet/blob/master/docs/image-name-translation.md">image name translation configuration</a>,
+   then downloads the file and stores it in the image store.</li>
+<li>After the image is ready (no pull was needed or the <code>PullImage</code> call completed
+   successfully), kubelet uses <code>CreateContainer</code> CRI call to create
+   the container in the pod sandbox using the specified image.</li>
+<li>Virtlet uses the sandbox and container metadata to generate libvirt domain definition,
+   using <a href="https://github.com/Mirantis/virtlet/tree/master/cmd/vmwrapper"><code>vmwrapper</code></a>
+   binary as the emulator and without specifying any network configuration in the domain.</li>
+<li>After <code>CreateContainer</code> call completes, <code>kubelet</code> invokes <code>StartContainer</code> call
+   on the newly created container.</li>
+<li>Virtlet starts the libvirt domain. libvirt invokes <code>vmwrapper</code> as the emulator,
+   passing it the necessary command line arguments as well as environment variables
+   set by Virtlet. <code>vmwrapper</code> uses the environment variable values passed
+   to Virtlet to communicate with <code>tapmanager</code> over an Unix domain socket,
+   retrieving a file descriptor for a tap device and/or pci address of SR-IOV
+   device set up by <code>tapmanager</code>. <code>tapmanager</code> uses its own simple protocol to
+   communicate with <code>vmwrapper</code> because it needs to send file descriptors over
+   the socket. This is not usually supported by RPC libraries, see e.g.
+   <a href="https://github.com/grpc/grpc/issues/11417">grpc/grpc#11417</a>.
+   <code>vmwrapper</code> then updates the command line arguments to include the network
+   interface information and execs the actual emulator (<code>qemu</code>).</li>
+</ul>
+<p>At this point the VM is running and accessible via the network, and the pod is
+in <code>Running</code> state as well as it's only container.</p>
+<h3 id="deleting-a-pod">Deleting a pod</h3>
+<p>This sequence is initiated when the pod is deleted, either by means of <code>kubectl delete</code>
+or a controller manager action due to deletion or downscaling of a higher-level object.</p>
+<ul>
+<li><code>kubelet</code> notices the pod being deleted.</li>
+<li><code>kubelet</code> invokes <code>StopContainer</code> CRI calls which is getting forwared
+   to Virtlet based on the containing pod sandbox annotations.</li>
+<li>Virtlet stops the libvirt domain. libvirt sends a signal to <code>qemu</code>, which initiates
+   the shutdown. If it doesn't quit in a reasonable time determined by pod's
+   termination grace period, Virtlet will forcibly terminate the domain,
+   thus killing the <code>qemu</code> process.</li>
+<li>After all the containers in the pod (the single container in case of
+   Virtlet VM pod) are stopped, kubelet invokes <code>StopPodSandbox</code> CRI call.</li>
+<li>Virtlet asks its <code>tapmanager</code> to remove pod from the network by means of
+   <code>CNI DEL</code> command.</li>
+<li>after <code>StopPodSandbox</code> returns, the pod sandbox will be eventually GC'd
+   by <code>kubelet</code> by means of <code>RemovePodSandbox</code> CRI call.</li>
+<li>Upon <code>RemovePodSandbox</code>, Virtlet removes the pod metadata from its internal database.</li>
+</ul>
+              
+            </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../guidelines/" class="btn btn-neutral float-right" title="Guidelines">Next <span class="icon icon-circle-arrow-right"></span></a>
+      
+      
+        <a href="../logging/" class="btn btn-neutral" title="Logging architecture"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+    
+  </div>
+
+  Built with <a href="http://www.mkdocs.org">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+      
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" style="cursor: pointer">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+      
+      
+        <span><a href="../logging/" style="color: #fcfcfc;">&laquo; Previous</a></span>
+      
+      
+        <span style="margin-left: 15px"><a href="../guidelines/" style="color: #fcfcfc">Next &raquo;</a></span>
+      
+    </span>
+</div>
+    <script>var base_url = '../..';</script>
+    <script src="../../js/theme.js" defer></script>
+      <script src="../../search/main.js" defer></script>
+
+</body>
+</html>

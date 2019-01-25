@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  
+  <link rel="shortcut icon" href="../../img/favicon.ico">
+  <title>Installing Virtlet on a real cluster - Virtlet</title>
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  <link rel="stylesheet" href="../../css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../css/theme_extra.css" type="text/css" />
+  
+  <script>
+    // Current page data
+    var mkdocs_page_name = "Installing Virtlet on a real cluster";
+    var mkdocs_page_input_path = "user-guide/real-cluster.md";
+    var mkdocs_page_url = null;
+  </script>
+  
+  <script src="../../js/jquery-2.1.1.min.js" defer></script>
+  <script src="../../js/modernizr-2.8.3.min.js" defer></script> 
+  
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+      <div class="wy-side-nav-search">
+        <a href="../.." class="icon icon-home"> Virtlet</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+	<ul class="current">
+	  
+          
+            <li class="toctree-l1">
+		
+    <a class="" href="../..">Home</a>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">User Guide</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../virtlet-on-kdc/">Installing Virtlet on kubeadm-dind-cluster</a>
+                </li>
+                <li class=" current">
+                    
+    <a class="current" href="./">Installing Virtlet on a real cluster</a>
+    <ul class="subnav">
+            
+    <li class="toctree-l3"><a href="#installing-virtlet-on-a-real-cluster">Installing Virtlet on a real cluster</a></li>
+    
+
+    <li class="toctree-l3"><a href="#installing-cri-proxy">Installing CRI Proxy</a></li>
+    
+
+    <li class="toctree-l3"><a href="#deploying-virtlet-daemonset">Deploying Virtlet DaemonSet</a></li>
+    
+        <ul>
+        
+            <li><a class="toctree-l4" href="#applying-apparmor-profiles">Applying apparmor profiles</a></li>
+        
+        </ul>
+    
+
+    <li class="toctree-l3"><a href="#testing-the-installation">Testing the installation</a></li>
+    
+        <ul>
+        
+            <li><a class="toctree-l4" href="#checking-basic-pod-startup">Checking basic pod startup</a></li>
+        
+            <li><a class="toctree-l4" href="#verifying-ssh-access-to-a-vm-pod">Verifying ssh access to a VM pod</a></li>
+        
+            <li><a class="toctree-l4" href="#verifying-accessing-services-from-a-vm-pod">Verifying accessing services from a VM pod</a></li>
+        
+        </ul>
+    
+
+    <li class="toctree-l3"><a href="#removing-virtlet">Removing Virtlet</a></li>
+    
+
+    <li class="toctree-l3"><a href="#customizing-virtlet-per-node-configuration">Customizing Virtlet per-node configuration</a></li>
+    
+
+    </ul>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../apparmor/">AppArmor profiles</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Virtlet 101</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../101/architecture/">Virtlet architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/workshop-setup/">Workshop setup</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/provision-virtlet/">Virtlet provisioning</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/creating-and-managing-pods/">Creating and managing virtual machines</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/network/">Virtlet networking</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/volumes/">Virtual machine volumes</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/cloud-init/">Cloud-Init support</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/rolling-out-updates/">Rolling out updates</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../101/troubleshooting/">Troubleshooting</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Reference</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../reference/vm-pod-spec/">Defining a VM Pod</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/vm-pod/">Working with VM Pods</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/volumes/">Volumes</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/images/">VM Image Handling</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/injecting-files/">Injecting Files into the VM</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/cloud-init/">Cloud-Init</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/config/">Configuration</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/networking/">Networking</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/diagnostics/">Diagnostics</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/resources/">Resource management</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../reference/virtletctl/">Command Line Tool</a>
+                </li>
+    </ul>
+	    </li>
+          
+            <li class="toctree-l1">
+		
+    <span class="caption-text">Development</span>
+    <ul class="subnav">
+                <li class="">
+                    
+    <a class="" href="../../dev/architecture/">Virtlet architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/setup/">Setting up the environment</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/tests/">Running the tests</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/build-tool/">Build Tool</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/virtlet-ci/">Virtlet CI</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/cirros/">Building a custom CirrOS image</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/logging/">Logging architecture</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/vm-pod-lifecycle/">Lifecycle of a VM pod</a>
+                </li>
+                <li class="">
+                    
+    <a class="" href="../../dev/guidelines/">Guidelines</a>
+                </li>
+    </ul>
+	    </li>
+          
+        </ul>
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../..">Virtlet</a>
+      </nav>
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../..">Docs</a> &raquo;</li>
+    
+      
+        
+          <li>User Guide &raquo;</li>
+        
+      
+    
+    <li>Installing Virtlet on a real cluster</li>
+    <li class="wy-breadcrumbs-aside">
+      
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main">
+            <div class="section">
+              
+                <h1 id="installing-virtlet-on-a-real-cluster">Installing Virtlet on a real cluster</h1>
+<p>For Virtlet to work, the following prerequisites have to be fulfilled
+on the nodes which will run them:</p>
+<ol>
+<li>Node names must be resolvable via DNS configured on the nodes</li>
+<li>SELinux must be disabled on the nodes (apparmor is currently supported)</li>
+<li>Kubernetes 1.9 must have the MountPropagation=true feature gate enabled in API server and on all kubelet instances</li>
+</ol>
+<p>Virtlet deployment consists of preparing the nodes and then deploying
+the Virtlet DaemonSet.</p>
+<h1 id="installing-cri-proxy">Installing CRI Proxy</h1>
+<p>Virtlet requires <a href="https://github.com/Mirantis/criproxy">CRI Proxy</a>
+package to be able to run as DaemonSet on the nodes and support
+runnings system pods like <code>kube-proxy</code> there. To install CRI Proxy,
+please follow the steps from its
+<a href="https://github.com/Mirantis/criproxy/blob/master/README.md">documentation</a>.
+Repeat it on each node that's going to run Virtlet.</p>
+<h1 id="deploying-virtlet-daemonset">Deploying Virtlet DaemonSet</h1>
+<h2 id="applying-apparmor-profiles">Applying apparmor profiles</h2>
+<p>Follow <a href="apparmor">this guide</a> if you deploy
+the Virtlet DaemonSet on an apparmor-enabled environment.</p>
+<h2 id="_1"></h2>
+<p>First, you need to apply <code>extraRuntime=virtlet</code> label to each node that will run Virtlet DaemonSet (replace <code>XXXXXX</code> with the node name):</p>
+<pre><code>kubectl label node XXXXXX extraRuntime=virtlet
+</code></pre>
+
+<p>Then you need to install image translations configmap. You can use the default one:</p>
+<pre><code>curl https://raw.githubusercontent.com/Mirantis/virtlet/master/deploy/images.yaml &gt;images.yaml
+kubectl create configmap -n kube-system virtlet-image-translations --from-file images.yaml
+</code></pre>
+
+<p>After that, you need to get <code>virtletctl</code> command line tool (replace <code>N.N.N</code> in the command below accordingly):</p>
+<pre><code>curl -SL -o virtletctl https://github.com/Mirantis/virtlet/releases/download/vN.N.N/virtletctl
+</code></pre>
+
+<p>In case if you're using Mac OS X, you need to use this command instead:</p>
+<pre><code>curl -SL -o virtletctl https://github.com/Mirantis/virtlet/releases/download/vN.N.N/virtletctl.darwin
+</code></pre>
+
+<p>You can also use <code>virtletctl</code> from Virtlet image, see below.</p>
+<p>Then you can deploy Virtlet:</p>
+<pre><code>./virtletctl gen | kubectl apply -f -
+</code></pre>
+
+<p>If you want to use the latest image, you can use <code>virtletctl</code> from that image:</p>
+<pre><code>docker run --rm mirantis/virtlet:latest virtletctl gen --tag latest | kubectl apply -f -
+</code></pre>
+
+<p>You can also use other image tag instead of <code>latest</code>, just replace it in both places
+in the above command.</p>
+<p>By default it has KVM enabled, but you can configure Virtlet to
+disable it.  In order to do so, create a configmap named
+<code>virtlet-config</code> in <code>kube-system</code> prior to creating Virtlet DaemonSet
+that contains key-value pair <code>disable_kvm=y</code>:</p>
+<pre><code>kubectl create configmap -n kube-system virtlet-config --from-literal=disable_kvm=y
+</code></pre>
+
+<p>After completing this step, you can look at the list of pods to see
+when Virtlet DaemonSet is ready:</p>
+<pre><code>kubectl get pods --all-namespaces -o wide -w
+</code></pre>
+
+<h1 id="testing-the-installation">Testing the installation</h1>
+<h2 id="checking-basic-pod-startup">Checking basic pod startup</h2>
+<p>To test your Virtlet installation, start a sample VM:</p>
+<pre><code>kubectl create -f https://raw.githubusercontent.com/Mirantis/virtlet/master/examples/cirros-vm.yaml
+kubectl get pods --all-namespaces -o wide -w
+</code></pre>
+
+<p>And then connect to console:</p>
+<pre><code>$ kubectl attach -it cirros-vm
+If you don't see a command prompt, try pressing enter.
+</code></pre>
+
+<p>Press enter and you will see:</p>
+<pre><code>login as 'cirros' user. default password: 'gosubsgo'. use 'sudo' for root.
+cirros-vm login: cirros
+Password:
+$
+</code></pre>
+
+<p>Escape character is ^]</p>
+<h2 id="verifying-ssh-access-to-a-vm-pod">Verifying ssh access to a VM pod</h2>
+<p>You can also ssh into the VM using
+<a href="../../reference/virtletctl/">virtletctl tool</a> (available as part
+of each Virtlet release on GitHub starting from Virtlet 1.0).</p>
+<pre><code>virtletctl ssh cirros@cirros-vm -- -i examples/vmkey
+</code></pre>
+
+<h2 id="verifying-accessing-services-from-a-vm-pod">Verifying accessing services from a VM pod</h2>
+<p>After connecting to the VM using one of the above methods you can check access
+from the VM to cluster services. To check DNS resolution of cluster services,
+use the following command:</p>
+<pre><code>nslookup kubernetes.default.svc.cluster.local
+</code></pre>
+
+<p>The following command may be used to check service connectivity (note that
+it'll give you an authentication error):</p>
+<pre><code>curl -k https://kubernetes.default.svc.cluster.local
+</code></pre>
+
+<p>You can also verify Internet access from the VM:</p>
+<pre><code>curl -k https://google.com
+ping -c 1 8.8.8.8
+</code></pre>
+
+<p>If you have Kubernetes Dashboard installed (it's present in
+kubeadm-dind-cluster installations for example), you can check
+dashboard access using this command:</p>
+<pre><code>curl http://kubernetes-dashboard.kube-system.svc.cluster.local
+</code></pre>
+
+<p>This should display some html from the dashboard's main page.</p>
+<h1 id="removing-virtlet">Removing Virtlet</h1>
+<p>In order to remove Virtlet, first you need to delete all the VM pods.</p>
+<p>You can remove Virtlet DaemonSet with the following command:</p>
+<pre><code>kubectl delete daemonset -R -n kube-system virtlet
+</code></pre>
+
+<p>After doing this, remove CRI proxy from each node by reverting the
+changes in Kubelet flags, e.g. by removing
+<code>/etc/systemd/system/kubelet.service.d/20-virtlet.conf</code> in case of
+kubeadm scenario described above. After this you need to restart
+kubelet and remove the CRI Proxy binary (<code>/usr/local/bin/criproxy</code>)
+and its node configuration file (<code>/etc/criproxy/node.conf</code>).</p>
+<h1 id="customizing-virtlet-per-node-configuration">Customizing Virtlet per-node configuration</h1>
+<p>It's possible to specify per-node configuration options for Virtlet.
+See <a href="../../reference/config/">this document</a> for more information.</p>
+              
+            </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../apparmor/" class="btn btn-neutral float-right" title="AppArmor profiles">Next <span class="icon icon-circle-arrow-right"></span></a>
+      
+      
+        <a href="../virtlet-on-kdc/" class="btn btn-neutral" title="Installing Virtlet on kubeadm-dind-cluster"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+    
+  </div>
+
+  Built with <a href="http://www.mkdocs.org">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+      
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" style="cursor: pointer">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+      
+      
+        <span><a href="../virtlet-on-kdc/" style="color: #fcfcfc;">&laquo; Previous</a></span>
+      
+      
+        <span style="margin-left: 15px"><a href="../apparmor/" style="color: #fcfcfc">Next &raquo;</a></span>
+      
+    </span>
+</div>
+    <script>var base_url = '../..';</script>
+    <script src="../../js/theme.js" defer></script>
+      <script src="../../search/main.js" defer></script>
+
+</body>
+</html>
