@@ -550,7 +550,9 @@ function serve_docs_internal {
 function build_docs_internal {
     site_dir="$(mktemp -d)"
     trap 'rm -rf "${site_dir}"' EXIT
-    (cd docs && mkdocs build -d "${site_dir}" >&2)
+    # Use strict mode (-s) for mkdocs so that any broken links
+    # etc. are caught
+    (cd docs && mkdocs build -s -d "${site_dir}" >&2)
     tar -C "${site_dir}" -c .
 }
 
