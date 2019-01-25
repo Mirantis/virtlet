@@ -12,7 +12,7 @@ defaults: &defaults
     # Uncomment the following to use ginkgo.focus for e2e
     # E2E_FOCUS: "Specify a regexp.*here"
     # TODO: set DOCS_SOURCE_BRANCH to master
-    DOCS_SOURCE_BRANCH: ivan4th/new_docs
+    DOCS_SOURCE_BRANCH: ivan4th/new-docs
 
 prereqs: &prereqs
   name: Install prerequisites
@@ -419,7 +419,7 @@ jobs:
           git config --global user.name virtlet-bot
           git fetch -f https://github.com/Mirantis/virtlet.git gh-pages:gh-pages
           build/cmd.sh build-docs
-          if [[ ${CIRCLE_BRANCH:-} = ${DOCS_SOURCE_BRANCH} ]]; then
+          if [[ ${CIRCLE_BRANCH:-} != ${DOCS_SOURCE_BRANCH} ]]; then
             echo >&2 "Not updating gh-pages branch: current branch is ${CIRCLE_BRANCH:-} not ${DOCS_SOURCE_BRANCH}"
           elif [[ ! ${GITHUB_TOKEN:-} ]]; then
             echo >&2 "Not updating th-pages branch: missing GITHUB_TOKEN env var"
