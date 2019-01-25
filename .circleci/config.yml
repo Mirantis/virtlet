@@ -427,8 +427,9 @@ jobs:
             # if the docs didn't change, this push will do nothing
             git push https://${GITHUB_TOKEN}@github.com/Mirantis/virtlet.git gh-pages:gh-pages
           fi
+          tar -czf /tmp/docs.tar.gz _docs
     - store_artifacts:
-        path: /root/virtlet/_docs
+        path: /tmp/docs.tar.gz
 
   release:
     <<: *defaults
