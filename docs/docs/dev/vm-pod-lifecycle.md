@@ -76,7 +76,7 @@ Virtlet-specific annotation or an image that has Virtlet-specific prefix.
 At this point the VM is running and accessible via the network, and the pod is
 in `Running` state as well as it's only container.
 
-### Deleting the pod
+### Deleting a pod
 
 This sequence is initiated when the pod is deleted, either by means of `kubectl delete`
 or a controller manager action due to deletion or downscaling of a higher-level object.

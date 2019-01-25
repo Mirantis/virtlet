@@ -1,6 +1,6 @@
-## Virtlet Networking
+## Virtlet networking
 
-Virtlet [Networking docs](../../networking.md)
+Virtlet [Networking docs](../../reference/networking/)
 
 ### One interface
 
@@ -19,7 +19,7 @@ kubectl -n kube-system get pod
 
 You should see genie, flannel and calico-related pods in the output.
 
-See [Virtlet docs](../../multiple-interfaces.md) for more details about multiple interfaces support.
+See [Virtlet docs](../../reference/networking#setting-up-multiple-cnis) for more details about multiple interfaces support.
 
 `demo.sh` script configured CNI-Genie to create two network interfaces for each newly created pod. That includes docker pods and Virtlet pods.
 
@@ -47,5 +47,3 @@ In `demo.sh` script default is set also to "calico,flannel":
 ```bash
 docker exec kube-node-1 cat /etc/cni/net.d/00-genie.conf
 ```
-
-Next [Virtual Machines Volumes](volumes.md)

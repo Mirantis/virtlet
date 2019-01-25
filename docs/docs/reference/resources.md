@@ -115,7 +115,7 @@ set resource memory limit for container, see [examples/cirros-vm.yaml](https://g
 1. Virtlet generates domain XML with memoryBacking=locked setting to prevent
    swapping out domain's pages.
 
-## Summary of the action items:
+## Future improvements
 1. According to **2** and **3** in **"Libvirt CPU Allocation"** we need
    to invent some rule of setting CFS CPU bandwidth limit spread among QEMU
    and vCPU threads, so as to make k8s scheduler have right assumptions about

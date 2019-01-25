@@ -12,3 +12,7 @@ To build html docs, use
 mkdocs build
 ```
 
+# Design proposals
+
+[Design proposals](design-proposals/) aren't built with mkdocs and are
+intended to be viewed on GitHub.

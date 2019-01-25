@@ -29,5 +29,3 @@ kubectl create -f examples/ubuntu-vm-with-volume.yaml
 ```
 
 There are also plans to work on [CSI](https://kubernetes.io/blog/2018/01/introducing-container-storage-interface/)
-
-Next [Cloudinit support](cloud-init.md)

@@ -13,3 +13,5 @@ It will download all required logs and statuses from all nodes where Virtlet is 
 ```bash
 ls dump_data/nodes
 ```
+
+For more info, see [Diagnostics](../../reference/diagnostics/) in Virtlet Reference.

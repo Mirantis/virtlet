@@ -1,4 +1,4 @@
-# Rolling out Updates
+# Rolling out updates
 ## Virtlet Updates
 
 To update Virtlet to the newer or older version just change its image name/tag in DaemonSet definition:
@@ -20,5 +20,3 @@ kubectl attach -it cirros-vm
 and run `uptime` command.
 
 Virtlet updates are done using standard [DaemonSet update mechanism](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/)
-
-Next [Troubleshooting](troubleshooting.md)

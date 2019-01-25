@@ -1,8 +1,8 @@
-# Cloud init support
+# Cloud-Init support
 
-Virtlet is using [cloud-init](https://cloudinit.readthedocs.io/en/latest/) to configure VMs. As always you can check [Virtlet documentation](../cloud-init-data-generation.md) to see exactly how Virtlet uses it.
+Virtlet is using [Cloud-Init](https://cloudinit.readthedocs.io/en/latest/) to configure VMs. As always you can check [Virtlet Cloud-Init documentation](../../reference/cloud-init/) to see exactly how Virtlet uses it.
 
-Cloud-init data is passed to the VM using Pod's annotations.
+Cloud-Init data is passed to the VM using Pod's annotations.
 
 The most common use case is to pass SSH public key to the VM:
 
@@ -42,9 +42,13 @@ It's also possible to use [ConfigMap](https://kubernetes.io/docs/tasks/configure
 VirtletCloudInitUserDataSource: configmap/vm-user-data
 ```
 
-When you are passing [Environment variables](../environment-variables.md) to a Pod Virtlet uses cloud-init to pass it to a VM and store them in a `/etc/cloud/environment` file.
-When you are using ConfigMap or Secret in a Pod then they are passed to the VM using cloud-init by creating new files there. Pod's volumes are also converted to `mounts` and mounted in VM using cloud-init when listed in the `volumeMounts` field.
+When you are passing
+[environment variables](../../reference/vm-pod-spec/#environment-variables) to a Pod Virtlet
+uses Cloud-Init to pass it to a VM and store them in a
+`/etc/cloud/environment` file.  When you are using ConfigMap or Secret
+in a Pod then they are passed to the VM using Cloud-Init by creating
+new files there. Pod's volumes are also converted to `mounts` and
+mounted in VM using cloud-init when listed in the `volumeMounts`
+field.
 
 See `examples/k8s.yaml` where `VirtletCloudInitUserData` is used to do some advanced scripting there.
-
-Next [Rolling out updates](rolling-out-updates.md)

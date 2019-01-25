@@ -9,7 +9,19 @@ theme:
 nav:
 - Home: index.md
 - User Guide:
-  - "Installing Virtlet": user-guide/installing-virtlet.md
+  - "Installing Virtlet on kubeadm-dind-cluster": user-guide/virtlet-on-kdc.md
+  - "Installing Virtlet on a real cluster": user-guide/real-cluster.md
+  - "AppArmor profiles": user-guide/apparmor.md
+- Virtlet 101:
+  - "Virtlet architecture": 101/architecture.md
+  - "Workshop setup": 101/workshop-setup.md
+  - "Virtlet provisioning": 101/provision-virtlet.md
+  - "Creating and managing virtual machines": 101/creating-and-managing-pods.md
+  - "Virtlet networking": 101/network.md
+  - "Virtual machine volumes": 101/volumes.md
+  - "Cloud-Init support": 101/cloud-init.md
+  - "Rolling out updates": 101/rolling-out-updates.md
+  - "Troubleshooting": 101/troubleshooting.md
 - Reference:
   - "Defining a VM Pod": reference/vm-pod-spec.md
   - "Working with VM Pods": reference/vm-pod.md
@@ -30,4 +42,5 @@ nav:
   - "Virtlet CI": dev/virtlet-ci.md
   - "Building a custom CirrOS image": dev/cirros.md
   - "Logging architecture": dev/logging.md
+  - "Lifecycle of a VM pod": dev/vm-pod-lifecycle.md
   - "Guidelines": dev/guidelines.md

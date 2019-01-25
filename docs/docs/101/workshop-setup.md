@@ -19,5 +19,3 @@ mv kubectl ~/bin
 
 cd virtlet
 ```
-
-Next [Provision Virtlet](provision-virtlet.md)

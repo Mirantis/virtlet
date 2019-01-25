@@ -17,6 +17,4 @@ Answer `y` to the script’s questions and wait until the script completes. The 
 
 #### Other deployment options
 
-To see how to provision Virtlet on non MCP clusters see the [deployment docs](../../../deploy/real-cluster.md)
-
-Next [Creating and managing VM pods](creating-and-managing-pods.md)
+To see how to provision Virtlet on non MCP clusters see the [deployment docs](../../user-guide/real-cluster/)

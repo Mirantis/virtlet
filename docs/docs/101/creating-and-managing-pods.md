@@ -92,5 +92,3 @@ When it's ready you can scale it:
 ```bash
 kubectl scale --replicas=2 deploy/cirros-deployment
 ```
-
-Next [Virtual Machines Network](network.md)
