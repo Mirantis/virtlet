@@ -599,6 +599,7 @@ function usage {
     echo >&2 "  $0 run CMD..."
     echo >&2 "  $0 release TAG"
     echo >&2 "  $0 serve-docs"
+    echo >&2 "  $0 build-docs"
     echo >&2 "  $0 sync"
     exit 1
 }

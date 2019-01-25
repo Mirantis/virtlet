@@ -15,10 +15,15 @@ Currently the script supports the following commands:
  * ` ./build/cmd.sh vsh`
  * ` ./build/cmd.sh stop`
  * ` ./build/cmd.sh clean`
+ * ` ./build/cmd.sh update-bindata`
+ * ` ./build/cmd.sh update-generated-docs`
  * ` ./build/cmd.sh gotest [TEST_ARGS...]`
  * ` ./build/cmd.sh gobuild [BUILD_ARGS...]`
  * ` ./build/cmd.sh run CMD...`
  * ` ./build/cmd.sh release TAG`
+ * ` ./build/cmd.sh serve-docs`
+ * ` ./build/cmd.sh build-docs`
+ * ` ./build/cmd.sh sync`
 
 `build`, `test`, `integration`, `run`, `gobuild`, `gotest`, `copy`,
 `copy-back` and `prepare-vendor` commands check whether the build
@@ -96,6 +101,19 @@ Removes the build container.
 Removes the build container and image along with data volumes as well as
 the binaries in local `_output` directory.
 
+### update-bindata
+
+Updates generated binary assets. Currently needed if you edit files
+under
+[deploy/data](https://github.com/Mirantis/virtlet/tree/master/deploy/data)
+directory.
+
+### update-generated-docs
+
+Updates generated documentation (source markdown files). This
+currently includes [virtletctl](../../reference/virtletctl/)
+and [config](../../reference/config/) documentation.
+
 ### gotest
 
 Runs unit tests suite in build container - suitable for use with IDEs/editors.
@@ -131,10 +149,6 @@ anything under `deploy/data`.
 Updates the generated Go files except for bindata. Run this command if
 you modify Virtlet CRD structs.
 
-### update-docs
-
-Updates the documentation on virtletctl an the Virtlet config.
-
 ### e2e
 
 Runs Virtlet e2e tests against the currently running DIND cluster.
@@ -155,6 +169,28 @@ Virtlet e2e tests can produce JUnit-style XML output if asked to do so:
 build/cmd.sh e2e -test.v -junitOutput /tmp/junit.xml
 build/cmd.sh run 'cat /tmp/junit.xml' >junit.xml
 ```
+
+### serve-docs
+
+Starts serving the [MkDocs](https://www.mkdocs.org/)-built
+documentation on the port specified by `MKDOCS_SERVE_ADDRESS`
+environment variable (default 8042). In order to update the docs from
+the current Virtlet working copy, you need to run `build/cmd.sh sync`.
+
+### build-docs
+
+Builds the documentation using [MkDocs](https://www.mkdocs.org/) and
+puts the result into `gh-pages` branch. The copy of MkDocs output is
+stored under `_docs/` subdirectory of the working copy. The build is
+done only if the docs changed since they were last build and stored
+under `gh-docs` branch or if the current working copy is dirty (i.e.
+has uncommitted changes).
+
+### sync
+
+Synchronizes the working copy with the build container, starting the
+build container if it's not present. This command is handy with
+conjunction with `build/cmd.sh`.
 
 ## Control flags
 
