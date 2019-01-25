@@ -11,8 +11,8 @@ defaults: &defaults
     DIND_CRI: containerd
     # Uncomment the following to use ginkgo.focus for e2e
     # E2E_FOCUS: "Specify a regexp.*here"
-    # TODO: set DOCS_SOURCE_BRANCH to master
-    DOCS_SOURCE_BRANCH: ivan4th/new-docs
+    # The branch which is used for publishing docs
+    DOCS_SOURCE_BRANCH: master
 
 prereqs: &prereqs
   name: Install prerequisites
