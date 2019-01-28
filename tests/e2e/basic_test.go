@@ -17,15 +17,14 @@ limitations under the License.
 package e2e
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"strings"
 	"time"
 
 	. "github.com/onsi/gomega"
 
+	"github.com/Mirantis/virtlet/pkg/tools"
 	"github.com/Mirantis/virtlet/tests/e2e/framework"
 	. "github.com/Mirantis/virtlet/tests/e2e/ginkgo-ext"
 )
@@ -130,30 +129,24 @@ var _ = Describe("Virtlet [Basic cirros tests]", func() {
 	It("Should support port forwarding", func(done Done) {
 		defer close(done)
 		podName := "nginx-pf"
-		localPort := rand.Intn(899) + 100
-		portMapping := fmt.Sprintf("18%d:80", localPort)
-
-		ctx, closeFunc := context.WithCancel(context.Background())
-		defer closeFunc()
-		localExecutor := framework.LocalExecutor(ctx)
 
 		By(fmt.Sprintf("Starting nginx pod"))
 		nginxPod, err := controller.RunPod(podName, framework.NginxImage, nil, time.Minute*4, 80)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(nginxPod).NotTo(BeNil())
 
-		By(fmt.Sprintf("Running command: kubectl -n %s port-forward %s %s", controller.Namespace(), podName, portMapping))
-		cmd, err := localExecutor.Start(nil, nil, nil, "kubectl", "-n", controller.Namespace(), "port-forward", podName, portMapping)
+		ports := []*tools.ForwardedPort{
+			{RemotePort: 80},
+		}
+		fwStopCh, err := nginxPod.PortForward(ports)
 		Expect(err).NotTo(HaveOccurred())
-		defer cmd.Kill()
+		defer close(fwStopCh)
 
-		// give it a chance to start
-		time.Sleep(3 * time.Second)
-
-		By(fmt.Sprintf("Checking if nginx is available via localhost"))
-		data, err := framework.Curl(fmt.Sprintf("http://localhost:18%d", localPort))
-		Expect(err).NotTo(HaveOccurred())
-		Expect(data).Should(ContainSubstring("nginx web server"))
+		localPort := ports[0].LocalPort
+		By(fmt.Sprintf("Checking if nginx is available via http://localhost:%d", localPort))
+		Eventually(func() (string, error) {
+			return framework.Curl(fmt.Sprintf("http://localhost:%d", localPort))
+		}, 60).Should(ContainSubstring("nginx web server"))
 
 		Expect(nginxPod.Delete()).To(Succeed())
 	}, 60)
