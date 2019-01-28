@@ -407,6 +407,13 @@ func (tst *virtletCRITester) containerStats(containerID string) {
 	tst.invoke("ContainerStats", &kubeapi.ContainerStatsRequest{ContainerId: containerID}, true)
 }
 
+func (tst *virtletCRITester) updateContainerResources(containerID, cpuSet string) {
+	tst.invoke("UpdateContainerResources", &kubeapi.UpdateContainerResourcesRequest{
+		ContainerId: containerID,
+		Linux:       &kubeapi.LinuxContainerResources{CpusetCpus: cpuSet},
+	}, true)
+}
+
 func (tst *virtletCRITester) removeContainer(containerID string) {
 	tst.invoke("RemoveContainer", &kubeapi.RemoveContainerRequest{ContainerId: containerID}, true)
 }
@@ -700,6 +707,27 @@ func TestCRIAttachPortForward(t *testing.T) {
 		PodSandboxId: sandboxes[0].Metadata.Uid,
 		Port:         []int32{42000},
 	})
+
+	tst.verify()
+}
+
+func TestUpdateResources(t *testing.T) {
+	tst := makeVirtletCRITester(t)
+	tst.rec.AddFilter("UpdateContainerResources")
+	tst.rec.AddFilter("DefineDomain")
+	tst.rec.AddFilter("Undefine")
+	defer tst.teardown()
+
+	sandboxes := criapi.GetSandboxes(1)
+	containers := criapi.GetContainersConfig(sandboxes)
+
+	tst.pullImage(cirrosImg())
+	tst.runPodSandbox(sandboxes[0])
+	tst.podSandboxStatus(sandboxes[0].Metadata.Uid)
+
+	containerId1 := tst.createContainer(sandboxes[0], containers[0], cirrosImg(), nil)
+
+	tst.updateContainerResources(containerId1, "42")
 
 	tst.verify()
 }
