@@ -25,7 +25,7 @@ import (
 )
 
 func TestDump(t *testing.T) {
-	ct := newContainerTester(t, testutils.NewToplevelRecorder(), nil)
+	ct := newContainerTester(t, testutils.NewToplevelRecorder(), nil, nil)
 	defer ct.teardown()
 
 	sandbox := fakemeta.GetSandboxes(1)[0]

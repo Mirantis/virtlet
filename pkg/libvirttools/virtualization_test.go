@@ -60,7 +60,7 @@ type containerTester struct {
 	metadataStore  metadata.Store
 }
 
-func newContainerTester(t *testing.T, rec *testutils.TopLevelRecorder, cmds []fakeutils.CmdSpec) *containerTester {
+func newContainerTester(t *testing.T, rec *testutils.TopLevelRecorder, cmds []fakeutils.CmdSpec, files map[string]string) *containerTester {
 	ct := &containerTester{
 		t:     t,
 		clock: clockwork.NewFakeClockAt(time.Date(2017, 5, 30, 20, 19, 0, 0, time.UTC)),
@@ -94,10 +94,16 @@ func newContainerTester(t *testing.T, rec *testutils.TopLevelRecorder, cmds []fa
 	}
 	fakeCommander := fakeutils.NewCommander(rec, cmds)
 	fakeCommander.ReplaceTempPath("__pods__", "/fakedev")
+	fm := utils.DefaultFilesManipulator
+	if files != nil {
+		fm = fakeutils.NewFakeFilesManipulator(rec, files)
+	}
+
 	ct.virtTool = NewVirtualizationTool(
 		ct.domainConn, ct.storageConn, imageManager, ct.metadataStore,
 		GetDefaultVolumeSource(), virtConfig, utils.NullMounter,
-		utils.FakeMountPointChecker, fakeCommander)
+		utils.FakeMountPointChecker, fm,
+		fakeCommander)
 	ct.virtTool.SetClock(ct.clock)
 
 	return ct
@@ -187,7 +193,7 @@ func (ct *containerTester) verifyContainerRootfsExists(containerInfo *types.Cont
 }
 
 func TestContainerLifecycle(t *testing.T) {
-	ct := newContainerTester(t, testutils.NewToplevelRecorder(), nil)
+	ct := newContainerTester(t, testutils.NewToplevelRecorder(), nil, nil)
 	defer ct.teardown()
 
 	sandbox := fakemeta.GetSandboxes(1)[0]
@@ -269,7 +275,7 @@ func TestContainerLifecycle(t *testing.T) {
 }
 
 func TestDomainForcedShutdown(t *testing.T) {
-	ct := newContainerTester(t, testutils.NewToplevelRecorder(), nil)
+	ct := newContainerTester(t, testutils.NewToplevelRecorder(), nil, nil)
 	defer ct.teardown()
 
 	sandbox := fakemeta.GetSandboxes(1)[0]
@@ -304,7 +310,7 @@ func TestDomainForcedShutdown(t *testing.T) {
 }
 
 func TestDoubleStartError(t *testing.T) {
-	ct := newContainerTester(t, testutils.NewToplevelRecorder(), nil)
+	ct := newContainerTester(t, testutils.NewToplevelRecorder(), nil, nil)
 	defer ct.teardown()
 
 	sandbox := fakemeta.GetSandboxes(1)[0]
@@ -456,7 +462,7 @@ func TestDomainDefinitions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := testutils.NewToplevelRecorder()
 
-			ct := newContainerTester(t, rec, tc.cmds)
+			ct := newContainerTester(t, rec, tc.cmds, nil)
 			defer ct.teardown()
 
 			sandbox := fakemeta.GetSandboxes(1)[0]
@@ -530,7 +536,7 @@ func TestDomainResourceConstraints(t *testing.T) {
 
 	rec := testutils.NewToplevelRecorder()
 	rec.AddFilter("DefineDomain")
-	ct := newContainerTester(t, rec, nil)
+	ct := newContainerTester(t, rec, nil, nil)
 	defer ct.teardown()
 	sandbox := fakemeta.GetSandboxes(1)[0]
 	sandbox.Annotations = map[string]string{

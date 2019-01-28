@@ -228,6 +228,7 @@ type VirtualizationTool struct {
 	config            VirtualizationConfig
 	mounter           utils.Mounter
 	mountPointChecker utils.MountPointChecker
+	filesManipulator  utils.FilesManipulator
 	commander         utils.Commander
 }
 
@@ -240,6 +241,7 @@ func NewVirtualizationTool(domainConn virt.DomainConnection,
 	metadataStore metadata.Store, volumeSource VMVolumeSource,
 	config VirtualizationConfig, mounter utils.Mounter,
 	mountPointChecker utils.MountPointChecker,
+	filesManipulator utils.FilesManipulator,
 	commander utils.Commander) *VirtualizationTool {
 	return &VirtualizationTool{
 		domainConn:        domainConn,
@@ -251,6 +253,7 @@ func NewVirtualizationTool(domainConn virt.DomainConnection,
 		config:            config,
 		mounter:           mounter,
 		mountPointChecker: mountPointChecker,
+		filesManipulator:  filesManipulator,
 		commander:         commander,
 	}
 }

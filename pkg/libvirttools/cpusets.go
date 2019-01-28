@@ -17,12 +17,9 @@ limitations under the License.
 package libvirttools
 
 import (
-	"bytes"
-	"io/ioutil"
+	"fmt"
+	"io"
 	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
 
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
@@ -74,65 +71,49 @@ func (v *VirtualizationTool) UpdateCpusetsInContainerDefinition(containerID, cpu
 // UpdateCpusetsForEmulatorProcess looks through /proc for emulator process
 // to find its cgroup manager for cpusets then uses it to adjust the setting
 func (v *VirtualizationTool) UpdateCpusetsForEmulatorProcess(containerID, cpusets string) (bool, error) {
-	// TODO: replace iterating over the procfs with reading pid from
-	// /run/libvirt/qemu/virtlet-CONTAINER_ID[:12]-DOMAIN_NAME.pid
-	d, err := os.Open(procfsLocation)
-	if err != nil {
-		return false, err
-	}
-	defer d.Close()
-
-	entries, err := d.Readdirnames(-1)
+	pidFilePath, err := v.getEmulatorPidFileLocation(containerID)
 	if err != nil {
 		return false, err
 	}
 
-	for _, name := range entries {
-		_, err := strconv.ParseInt(name, 10, 32)
-		if err != nil {
-			// skip non numeric names
-			continue
+	f, err := v.filesManipulator.FileReader(pidFilePath)
+	if err != nil {
+		// File not found - so there is no emulator yet
+		if _, ok := err.(*os.PathError); ok {
+			return false, nil
 		}
+		return false, err
+	}
+	defer f.Close()
 
-		isContainerPid, err := isEmulatorPid(name, containerID)
-		if err != nil {
+	// there should be only a single line without eol, but use eol as
+	// a marker to read data to EOF.
+	pid, err := f.ReadString('\n')
+	if err != nil {
+		if err != io.EOF {
 			return false, err
 		}
-
-		if isContainerPid {
-			controller, err := cgroups.GetProcessController(name, "cpuset")
-			if err != nil {
-				return false, err
-			}
-
-			if err := controller.Set("cpus", cpusets); err != nil {
-				return false, err
-			}
-			return true, nil
-		}
 	}
 
-	return false, nil
-}
-
-func isEmulatorPid(pid, containerID string) (bool, error) {
-	data, err := ioutil.ReadFile(filepath.Join(procfsLocation, pid, "cmdline"))
+	cm := cgroups.NewCgroupsManager(pid, v.filesManipulator)
+	controller, err := cm.GetProcessController("cpuset")
 	if err != nil {
 		return false, err
 	}
 
-	cmdline := bytes.Split(data, []byte{0})
-
-	if string(cmdline[0]) != emulatorProcessName {
-		return false, nil
+	if err := controller.Set("cpus", cpusets); err != nil {
+		return false, err
 	}
+	return true, nil
+}
 
-	searchTerm := "virtlet-" + containerID[:12]
-	for _, param := range cmdline {
-		if strings.Contains(string(param), searchTerm) {
-			return true, nil
-		}
+func (v *VirtualizationTool) getEmulatorPidFileLocation(containerID string) (string, error) {
+	container, err := v.metadataStore.Container(containerID).Retrieve()
+	if err != nil {
+		return "", err
 	}
-
-	return false, nil
+	return fmt.Sprintf(
+		"/run/libvirt/qemu/virtlet-%s-%s.pid",
+		containerID[:13], container.Config.PodName,
+	), nil
 }

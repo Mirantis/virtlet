@@ -41,7 +41,7 @@ var (
 )
 
 func TestDomainCleanup(t *testing.T) {
-	ct := newContainerTester(t, testutils.NewToplevelRecorder(), nil)
+	ct := newContainerTester(t, testutils.NewToplevelRecorder(), nil, nil)
 	defer ct.teardown()
 
 	for _, uuid := range testUUIDs {
@@ -77,7 +77,7 @@ func TestDomainCleanup(t *testing.T) {
 }
 
 func TestRootVolumesCleanup(t *testing.T) {
-	ct := newContainerTester(t, testutils.NewToplevelRecorder(), nil)
+	ct := newContainerTester(t, testutils.NewToplevelRecorder(), nil, nil)
 	defer ct.teardown()
 
 	pool, err := ct.virtTool.StoragePool()
@@ -118,7 +118,7 @@ func TestRootVolumesCleanup(t *testing.T) {
 }
 
 func TestQcow2VolumesCleanup(t *testing.T) {
-	ct := newContainerTester(t, testutils.NewToplevelRecorder(), nil)
+	ct := newContainerTester(t, testutils.NewToplevelRecorder(), nil, nil)
 	defer ct.teardown()
 
 	pool, err := ct.virtTool.StoragePool()
@@ -159,7 +159,7 @@ func TestQcow2VolumesCleanup(t *testing.T) {
 }
 
 func TestConfigISOsCleanup(t *testing.T) {
-	ct := newContainerTester(t, testutils.NewToplevelRecorder(), nil)
+	ct := newContainerTester(t, testutils.NewToplevelRecorder(), nil, nil)
 	defer ct.teardown()
 
 	directory, err := ioutil.TempDir("", "virtlet-tests-")
@@ -226,7 +226,7 @@ func TestDeviceMapperCleanup(t *testing.T) {
 			{
 				Match: "^" + dmRemoveCmd + "$",
 			},
-		})
+		}, nil)
 		defer ct.teardown()
 
 		ldh := blockdev.NewLogicalDeviceHandler(ct.virtTool.commander, devDir, sysfsDir)

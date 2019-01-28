@@ -140,7 +140,10 @@ func (v *VirtletManager) Run() error {
 	}
 
 	volSrc := libvirttools.GetDefaultVolumeSource()
-	v.virtTool = libvirttools.NewVirtualizationTool(conn, conn, v.imageStore, v.metadataStore, volSrc, virtConfig, utils.NewMounter(), mpc, utils.DefaultCommander)
+	v.virtTool = libvirttools.NewVirtualizationTool(
+		conn, conn, v.imageStore, v.metadataStore, volSrc, virtConfig,
+		utils.NewMounter(), mpc, utils.DefaultFilesManipulator,
+		utils.DefaultCommander)
 
 	runtimeService := NewVirtletRuntimeService(v.virtTool, v.metadataStore, v.fdManager, streamServer, v.imageStore, nil)
 	imageService := NewVirtletImageService(v.imageStore, translator, nil)
