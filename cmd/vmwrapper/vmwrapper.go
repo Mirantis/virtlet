@@ -73,7 +73,7 @@ func main() {
 
 	// FIXME: move the pid of qemu instance out of /kubepods/podxxxxxxx
 	// for some cases it will be killed by kubelet after the virtlet pod is deleted/recreated
-	cm := cgroups.NewCgroupsManager(os.Getpid(), nil)
+	cm := cgroups.NewManager(os.Getpid(), nil)
 	if _, err := cm.GetProcessController("hugetlb"); err == nil {
 		err = cm.MoveProcess("hugetlb", "/")
 		if err != nil {
@@ -164,7 +164,7 @@ func main() {
 	}
 }
 
-func setupCPUSets(cm cgroups.CgroupsManager) error {
+func setupCPUSets(cm cgroups.Manager) error {
 	cpusets := os.Getenv(config.CpusetsEnvVarName)
 	if cpusets == "" {
 		return nil

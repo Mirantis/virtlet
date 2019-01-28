@@ -36,6 +36,8 @@ type FilesManipulator interface {
 
 type realFilesManipulator struct{}
 
+// DefaultFilesManipulator is an implementation of FilesManager which is
+// accessing real filesystem to provide requested data.
 var DefaultFilesManipulator FilesManipulator = &realFilesManipulator{}
 
 // FileReader provides an interface to file reading

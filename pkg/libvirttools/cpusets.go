@@ -95,7 +95,7 @@ func (v *VirtualizationTool) UpdateCpusetsForEmulatorProcess(containerID, cpuset
 		}
 	}
 
-	cm := cgroups.NewCgroupsManager(pid, v.filesManipulator)
+	cm := cgroups.NewManager(pid, v.filesManipulator)
 	controller, err := cm.GetProcessController("cpuset")
 	if err != nil {
 		return false, err

@@ -36,8 +36,8 @@ type Controller struct {
 	path string
 }
 
-// CgroupsManager provides an interface to operate on linux cgroups
-type CgroupsManager interface {
+// Manager provides an interface to operate on linux cgroups
+type Manager interface {
 	// GetProcessControllers returns the mapping between controller types and
 	// their paths inside cgroup fs for the specified PID.
 	GetProcessControllers() (map[string]string, error)
@@ -47,26 +47,26 @@ type CgroupsManager interface {
 	MoveProcess(controller, path string) error
 }
 
-// RealCgroupsManager provides an implementation of CgroupsManager which is
+// RealManager provides an implementation of Manager which is
 // using default linux system paths to access info about cgroups for processes.
-type RealCgroupsManager struct {
+type RealManager struct {
 	fm  utils.FilesManipulator
 	pid string
 }
 
-var _ CgroupsManager = &RealCgroupsManager{}
+var _ Manager = &RealManager{}
 
-// NewRealCgroupsManager returns instance of RealCgroupsManager
-func NewCgroupsManager(pid interface{}, fm utils.FilesManipulator) CgroupsManager {
+// NewManager returns an instance of RealManager
+func NewManager(pid interface{}, fm utils.FilesManipulator) Manager {
 	if fm == nil {
 		fm = utils.DefaultFilesManipulator
 	}
-	return &RealCgroupsManager{fm: fm, pid: utils.Stringify(pid)}
+	return &RealManager{fm: fm, pid: utils.Stringify(pid)}
 }
 
 // GetProcessControllers is an implementation of GetProcessControllers method
-// of CgroupsManager interface.
-func (c *RealCgroupsManager) GetProcessControllers() (map[string]string, error) {
+// of Manager interface.
+func (c *RealManager) GetProcessControllers() (map[string]string, error) {
 	fr, err := c.fm.FileReader(filepath.Join("/proc", c.pid, "cgroup"))
 	if err != nil {
 		return nil, err
@@ -105,8 +105,8 @@ func (c *RealCgroupsManager) GetProcessControllers() (map[string]string, error) 
 }
 
 // GetProcessController is an implementation of GetProcessController method
-// of CgroupsManager interface.
-func (c *RealCgroupsManager) GetProcessController(controllerName string) (*Controller, error) {
+// of Manager interface.
+func (c *RealManager) GetProcessController(controllerName string) (*Controller, error) {
 	controllers, err := c.GetProcessControllers()
 	if err != nil {
 		return nil, err
@@ -124,8 +124,8 @@ func (c *RealCgroupsManager) GetProcessController(controllerName string) (*Contr
 	}, nil
 }
 
-// MoveProcess implements MoveProcess method of CgroupsManager
-func (c *RealCgroupsManager) MoveProcess(controller, path string) error {
+// MoveProcess implements MoveProcess method of Manager
+func (c *RealManager) MoveProcess(controller, path string) error {
 	return c.fm.WriteFile(
 		filepath.Join(cgroupfs, controller, path, "cgroup.procs"),
 		[]byte(utils.Stringify(c.pid)),
