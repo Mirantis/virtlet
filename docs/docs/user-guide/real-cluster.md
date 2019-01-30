@@ -5,7 +5,6 @@ on the nodes which will run them:
 
 1. Node names must be resolvable via DNS configured on the nodes
 1. SELinux must be disabled on the nodes (apparmor is currently supported)
-1. Kubernetes 1.9 must have the MountPropagation=true feature gate enabled in API server and on all kubelet instances
 
 Virtlet deployment consists of preparing the nodes and then deploying
 the Virtlet DaemonSet.

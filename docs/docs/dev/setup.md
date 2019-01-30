@@ -13,7 +13,7 @@ You'll need the following to run the local environment:
   be enough, but please follow the Docker documentation for your Linux
   distribution),
 * [kubeadm-dind-cluster](https://github.com/kubernetes-sigs/kubeadm-dind-cluster/)
-  script for Kubernetes version 1.12 (`dind-cluster-v1.9.sh`).
+  script for Kubernetes version 1.12 (`dind-cluster-v1.12.sh`).
   
 You can get the cluster startup script like this:
 ```
