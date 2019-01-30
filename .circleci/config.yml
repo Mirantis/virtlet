@@ -11,6 +11,8 @@ defaults: &defaults
     DIND_CRI: containerd
     # Uncomment the following to use ginkgo.focus for e2e
     # E2E_FOCUS: "Specify a regexp.*here"
+    # The branch which is used for publishing docs
+    DOCS_SOURCE_BRANCH: master
 
 prereqs: &prereqs
   name: Install prerequisites
@@ -398,6 +400,37 @@ jobs:
   push_tested:
     <<: *push_images
 
+  build_docs:
+    <<: *defaults
+    steps:
+    - run:
+        <<: *prereqs
+    - checkout
+    - setup_remote_docker
+    - run:
+        <<: *setup_env
+    - restore_cache:
+        <<: *restore_image_cache
+    - run:
+        name: Update docs and push them to gh-pages branch
+        command: |
+          build/portforward.sh 18730&
+          git config --global user.email bot@virtlet.cloud
+          git config --global user.name virtlet-bot
+          git fetch -f https://github.com/Mirantis/virtlet.git gh-pages:gh-pages
+          build/cmd.sh build-docs
+          if [[ ${CIRCLE_BRANCH:-} != ${DOCS_SOURCE_BRANCH} ]]; then
+            echo >&2 "Not updating gh-pages branch: current branch is ${CIRCLE_BRANCH:-} not ${DOCS_SOURCE_BRANCH}"
+          elif [[ ! ${GITHUB_TOKEN:-} ]]; then
+            echo >&2 "Not updating gh-pages branch: missing GITHUB_TOKEN env var"
+          else
+            # if the docs didn't change, this push will do nothing
+            git push https://${GITHUB_TOKEN}@github.com/Mirantis/virtlet.git gh-pages:gh-pages
+          fi
+          tar -czf /tmp/docs.tar.gz _docs
+    - store_artifacts:
+        path: /tmp/docs.tar.gz
+
   release:
     <<: *defaults
     steps:
@@ -428,43 +461,47 @@ workflows:
     - prepare_build:
         filters:
           tags:
-            only:
-              - /^v[0-9].*/
+            only: /^v[0-9].*/
     - build:
         requires:
         - prepare_build
         filters:
+          branches:
+            ignore: /^.*-docs$/
           tags:
-            only:
-              - /^v[0-9].*/
+            only: /^v[0-9].*/
     - test:
         requires:
         - prepare_build
         filters:
+          branches:
+            ignore: /^.*-docs$/
           tags:
-            only:
-              - /^v[0-9].*/
+            only: /^v[0-9].*/
     - integration:
         requires:
         - build
         filters:
+          branches:
+            ignore: /^.*-docs$/
           tags:
-            only:
-              - /^v[0-9].*/
+            only: /^v[0-9].*/
     - e2e:
         requires:
         - build
         filters:
+          branches:
+            ignore: /^.*-docs$/
           tags:
-            only:
-              - /^v[0-9].*/
+            only: /^v[0-9].*/
     - e2e_calico:
         requires:
         - build
         filters:
+          branches:
+            ignore: /^.*-docs$/
           tags:
-            only:
-              - /^v[0-9].*/
+            only: /^v[0-9].*/
     - e2e_flannel:
         requires:
         - build
@@ -472,8 +509,7 @@ workflows:
           branches:
             only: /^master$|^.*-net$/
           tags:
-            only:
-              - /^v[0-9].*/
+            only: /^v[0-9].*/
     - e2e_weave:
         requires:
         - build
@@ -481,8 +517,7 @@ workflows:
           branches:
             only: /^master$|^.*-net$/
           tags:
-            only:
-              - /^v[0-9].*/
+            only: /^v[0-9].*/
     - e2e_multi_cni:
         requires:
         - build
@@ -490,22 +525,21 @@ workflows:
           branches:
             only: /^master$|^.*-net$/
           tags:
-            only:
-              - /^v[0-9].*/
+            only: /^v[0-9].*/
     - e2e_1_11:
         requires:
         - build
         filters:
+          branches:
+            ignore: /^.*-docs$/
           tags:
-            only:
-              - /^v[0-9].*/
+            only: /^v[0-9].*/
     - push_branch:
         requires:
         - build
         filters:
           branches:
-            ignore:
-              /^master$|^pull\//
+            ignore: /^master$|^pull\/|^.*-docs$/
     - push_tested:
         requires:
         - test
@@ -520,8 +554,7 @@ workflows:
           branches:
             only: master
           tags:
-            only:
-              - /^v[0-9].*/
+            only: /^v[0-9].*/
     - release:
         requires:
         - push_tested
@@ -529,5 +562,8 @@ workflows:
           branches:
             ignore: /.*/
           tags:
-            only:
-              - /^v[0-9].*/
+            only: /^v[0-9].*/
+    - build_docs:
+        requires:
+        - prepare_build
+            

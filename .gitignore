@@ -76,3 +76,6 @@ test-driver
 
 # build output
 _output
+
+# build docs output
+_docs

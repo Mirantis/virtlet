@@ -30,7 +30,7 @@ You can watch and listen to Virtlet demo video that was recorded on Kubernetes C
 
 Virtlet comes with a helper tool,
 [virtletctl](docs/virtletctl.md), that helps managing the VM pods. The binaries are available for Linux and Mac OS X in the [Releases](https://github.com/Mirantis/virtlet/releases) section.
-If you're using Kubernetes 1.9 or newer, you can install virtletctl as a kubectl plugin:
+You can also install virtletctl as a kubectl plugin:
 ```
 virtletctl install
 ```
