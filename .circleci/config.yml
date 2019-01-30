@@ -422,7 +422,7 @@ jobs:
           if [[ ${CIRCLE_BRANCH:-} != ${DOCS_SOURCE_BRANCH} ]]; then
             echo >&2 "Not updating gh-pages branch: current branch is ${CIRCLE_BRANCH:-} not ${DOCS_SOURCE_BRANCH}"
           elif [[ ! ${GITHUB_TOKEN:-} ]]; then
-            echo >&2 "Not updating th-pages branch: missing GITHUB_TOKEN env var"
+            echo >&2 "Not updating gh-pages branch: missing GITHUB_TOKEN env var"
           else
             # if the docs didn't change, this push will do nothing
             git push https://${GITHUB_TOKEN}@github.com/Mirantis/virtlet.git gh-pages:gh-pages
