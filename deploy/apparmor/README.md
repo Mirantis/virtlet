@@ -3,7 +3,7 @@
 In order to get the Virtlet DaemonSet work in
 an [AppArmor](https://gitlab.com/apparmor/apparmor/wikis/home) enabled environment follow the next steps:
 
-* install the profiles located in [this directory](https://github.com/Mirantis/virtlet/tree/master/deploy/apparmor) into the corresponding directory (/etc/apparmor.d/ if you use Debian or its derivatives)
+* install the profiles located in [this directory](https://github.com/Mirantis/virtlet/tree/master/deploy/apparmor) into the corresponding directory (`/etc/apparmor.d/` if you use Debian or its derivatives)
 
         sudo install -m 0644 libvirtd virtlet vms -t /etc/apparmor.d/
 
