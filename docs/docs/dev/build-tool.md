@@ -180,7 +180,7 @@ the current Virtlet working copy, you need to run `build/cmd.sh sync`.
 ### build-docs
 
 Builds the documentation using [MkDocs](https://www.mkdocs.org/) and
-puts the result into `gh-pages` branch. The copy of MkDocs output is
+puts the result into `docs` branch. The copy of MkDocs output is
 stored under `_docs/` subdirectory of the working copy. The build is
 done only if the docs changed since they were last build and stored
 under `gh-docs` branch or if the current working copy is dirty (i.e.

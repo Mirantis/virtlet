@@ -559,7 +559,7 @@ function build_docs_internal {
 function build_docs {
     cd "${project_dir}"
     rm -rf _docs
-    git clone -b gh-pages . _docs
+    git clone -b docs . _docs
     local docs_hash="$(git ls-tree HEAD -- docs | awk '{print $3}')"
     if [[ ! -e _docs/source_hash || ${docs_hash} != $(cat _docs/source_hash) ]]; then
         echo >&2 "docs/ directory changed since the last doc build, rebuilding docs"
@@ -578,7 +578,7 @@ function build_docs {
         git add .
         git commit -m "Update generated docs [ci skip]"
         # this pushes the changes into the local repo (not github!)
-        git push origin gh-pages
+        git push origin docs
     )
 }
 
