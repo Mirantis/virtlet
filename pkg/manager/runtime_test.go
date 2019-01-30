@@ -283,15 +283,14 @@ func (tst *virtletCRITester) invoke(name string, req interface{}, failOnError bo
 			}
 		}
 		return nil, err
-	} else {
-		resp := vals[0].Interface()
-		tst.rec.Rec("leave: "+name, resp)
-		return resp, nil
 	}
+	resp := vals[0].Interface()
+	tst.rec.Rec("leave: "+name, resp)
+	return resp, nil
 }
 
 func (tst *virtletCRITester) getSampleFlexvolMounts(podSandboxID string) []*kubeapi.Mount {
-	flexVolumeDriver := flexvolume.NewFlexVolumeDriver(func() string {
+	flexVolumeDriver := flexvolume.NewDriver(func() string {
 		return "abb67e3c-71b3-4ddd-5505-8c4215d5c4eb"
 	}, utils.NullMounter)
 	flexVolDir := filepath.Join(tst.kubeletRootDir, podSandboxID, "volumes/virtlet~flexvolume_driver", "vol1")
@@ -385,10 +384,9 @@ func (tst *virtletCRITester) createContainer(sandbox *kubeapi.PodSandboxConfig, 
 	}
 	if r, ok := resp.(*kubeapi.CreateContainerResponse); ok {
 		return r.ContainerId
-	} else {
-		tst.t.Fatalf("bad value returned by CreateContainer: %#v", resp)
-		return "" // unreachable
 	}
+	tst.t.Fatalf("bad value returned by CreateContainer: %#v", resp)
+	return "" // unreachable
 }
 
 func (tst *virtletCRITester) containerStatus(containerID string) {

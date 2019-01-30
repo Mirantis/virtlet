@@ -108,6 +108,7 @@ func Run(controller *framework.Controller, instances []*VMInstance) error {
 		go instance.Test(ctx, instance, testVM, errChan)
 	}
 
+MainLoop:
 	for {
 		select {
 		case err = <-errChan:
@@ -116,7 +117,7 @@ func Run(controller *framework.Controller, instances []*VMInstance) error {
 			return err
 		case <-ctx.Done():
 			glog.Infof("Finishing testing...")
-			return nil
+			break MainLoop
 		}
 	}
 	return nil

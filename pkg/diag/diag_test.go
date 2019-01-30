@@ -100,38 +100,38 @@ func TestDiagServer(t *testing.T) {
 		Name:  "diagnostics",
 		IsDir: true,
 		Children: map[string]Result{
-			"foo": Result{
+			"foo": {
 				Name: "foo",
 				Ext:  "txt",
 				Data: "this is foo",
 			},
-			"bar": Result{
+			"bar": {
 				Name: "bar",
 				Ext:  "log",
 				Data: "this is bar",
 			},
-			"simple_text": Result{
+			"simple_text": {
 				Name: "simple_text",
 				Ext:  "txt",
 				Data: "baz",
 			},
-			"logdir": Result{
+			"logdir": {
 				Name:  "logdir",
 				IsDir: true,
 				Children: map[string]Result{
-					"log1": Result{
+					"log1": {
 						Name: "log1",
 						Ext:  "txt",
 						Data: "log1 contents",
 					},
-					"log2": Result{
+					"log2": {
 						Name: "log2",
 						Ext:  "txt",
 						Data: "log2 contents",
 					},
 				},
 			},
-			"fail": Result{
+			"fail": {
 				Name:  "fail",
 				Error: "oops",
 			},

@@ -32,7 +32,7 @@ import (
 )
 
 const (
-	fakeUuid = "abb67e3c-71b3-4ddd-5505-8c4215d5c4eb"
+	fakeUUID = "abb67e3c-71b3-4ddd-5505-8c4215d5c4eb"
 )
 
 type fakeMounter struct {
@@ -120,7 +120,7 @@ func TestFlexVolume(t *testing.T) {
 		"user":    "libvirt",
 	}
 	cephJSONVolumeInfo := map[string]interface{}{
-		"uuid": fakeUuid,
+		"uuid": fakeUUID,
 	}
 	for k, v := range cephJSONOpts {
 		cephJSONVolumeInfo[k] = v
@@ -257,8 +257,8 @@ func TestFlexVolume(t *testing.T) {
 			var subdir string
 			args := step.args
 			mounter := newFakeMounter(t, tmpDir)
-			d := NewFlexVolumeDriver(func() string {
-				return fakeUuid
+			d := NewDriver(func() string {
+				return fakeUUID
 			}, mounter)
 			result := d.Run(args)
 			var m map[string]interface{}

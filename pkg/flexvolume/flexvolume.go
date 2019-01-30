@@ -46,19 +46,22 @@ func init() {
 	}
 }
 
-type UuidGen func() string
+// UUIDGen type function returns newly generated UUIDv4 as a string
+type UUIDGen func() string
 
-type FlexVolumeDriver struct {
-	uuidGen UuidGen
+// Driver provides a virtlet specific implementation of
+// https://kubernetes.io/docs/concepts/storage/volumes/#flexVolume
+type Driver struct {
+	uuidGen UUIDGen
 	mounter utils.Mounter
 }
 
-// NewFlexVolumeDriver creates a FlexVolumeDriver struct
-func NewFlexVolumeDriver(uuidGen UuidGen, mounter utils.Mounter) *FlexVolumeDriver {
-	return &FlexVolumeDriver{uuidGen: uuidGen, mounter: mounter}
+// NewDriver creates a Driver struct
+func NewDriver(uuidGen UUIDGen, mounter utils.Mounter) *Driver {
+	return &Driver{uuidGen: uuidGen, mounter: mounter}
 }
 
-func (d *FlexVolumeDriver) populateVolumeDir(targetDir string, opts map[string]interface{}) error {
+func (d *Driver) populateVolumeDir(targetDir string, opts map[string]interface{}) error {
 	return utils.WriteJSON(filepath.Join(targetDir, flexvolumeDataFile), opts, 0700)
 }
 
@@ -66,32 +69,32 @@ func (d *FlexVolumeDriver) populateVolumeDir(targetDir string, opts map[string]i
 // keeping them to make it easier to actually implement them
 
 // Invocation: <driver executable> init
-func (d *FlexVolumeDriver) init() (map[string]interface{}, error) {
+func (d *Driver) init() (map[string]interface{}, error) {
 	return nil, nil
 }
 
 // Invocation: <driver executable> attach <json options> <node name>
-func (d *FlexVolumeDriver) attach(jsonOptions, nodeName string) (map[string]interface{}, error) {
+func (d *Driver) attach(jsonOptions, nodeName string) (map[string]interface{}, error) {
 	return nil, nil
 }
 
 // Invocation: <driver executable> detach <mount device> <node name>
-func (d *FlexVolumeDriver) detach(mountDev, nodeName string) (map[string]interface{}, error) {
+func (d *Driver) detach(mountDev, nodeName string) (map[string]interface{}, error) {
 	return nil, nil
 }
 
 // Invocation: <driver executable> waitforattach <mount device> <json options>
-func (d *FlexVolumeDriver) waitForAttach(mountDev, jsonOptions string) (map[string]interface{}, error) {
+func (d *Driver) waitForAttach(mountDev, jsonOptions string) (map[string]interface{}, error) {
 	return map[string]interface{}{"device": mountDev}, nil
 }
 
 // Invocation: <driver executable> isattached <json options> <node name>
-func (d *FlexVolumeDriver) isAttached(jsonOptions, nodeName string) (map[string]interface{}, error) {
+func (d *Driver) isAttached(jsonOptions, nodeName string) (map[string]interface{}, error) {
 	return map[string]interface{}{"attached": true}, nil
 }
 
 //Invocation: <driver executable> mount <target mount dir> <json options>
-func (d *FlexVolumeDriver) mount(targetMountDir, jsonOptions string) (map[string]interface{}, error) {
+func (d *Driver) mount(targetMountDir, jsonOptions string) (map[string]interface{}, error) {
 	var opts map[string]interface{}
 	if err := json.Unmarshal([]byte(jsonOptions), &opts); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal json options: %v", err)
@@ -137,7 +140,7 @@ func (d *FlexVolumeDriver) mount(targetMountDir, jsonOptions string) (map[string
 }
 
 // Invocation: <driver executable> unmount <mount dir>
-func (d *FlexVolumeDriver) unmount(targetMountDir string) (map[string]interface{}, error) {
+func (d *Driver) unmount(targetMountDir string) (map[string]interface{}, error) {
 	if err := d.mounter.Unmount(targetMountDir, true); err != nil {
 		return nil, fmt.Errorf("unmount %q: %v", targetMountDir, err.Error())
 	}
@@ -149,7 +152,7 @@ func (d *FlexVolumeDriver) unmount(targetMountDir string) (map[string]interface{
 	return nil, nil
 }
 
-type driverOp func(*FlexVolumeDriver, []string) (map[string]interface{}, error)
+type driverOp func(*Driver, []string) (map[string]interface{}, error)
 
 type cmdInfo struct {
 	numArgs int
@@ -158,43 +161,43 @@ type cmdInfo struct {
 
 var commands = map[string]cmdInfo{
 	"init": {
-		0, func(d *FlexVolumeDriver, args []string) (map[string]interface{}, error) {
+		0, func(d *Driver, args []string) (map[string]interface{}, error) {
 			return d.init()
 		},
 	},
 	"attach": {
-		2, func(d *FlexVolumeDriver, args []string) (map[string]interface{}, error) {
+		2, func(d *Driver, args []string) (map[string]interface{}, error) {
 			return d.attach(args[0], args[1])
 		},
 	},
 	"detach": {
-		2, func(d *FlexVolumeDriver, args []string) (map[string]interface{}, error) {
+		2, func(d *Driver, args []string) (map[string]interface{}, error) {
 			return d.detach(args[0], args[1])
 		},
 	},
 	"waitforattach": {
-		2, func(d *FlexVolumeDriver, args []string) (map[string]interface{}, error) {
+		2, func(d *Driver, args []string) (map[string]interface{}, error) {
 			return d.waitForAttach(args[0], args[1])
 		},
 	},
 	"isattached": {
-		2, func(d *FlexVolumeDriver, args []string) (map[string]interface{}, error) {
+		2, func(d *Driver, args []string) (map[string]interface{}, error) {
 			return d.isAttached(args[0], args[1])
 		},
 	},
 	"mount": {
-		2, func(d *FlexVolumeDriver, args []string) (map[string]interface{}, error) {
+		2, func(d *Driver, args []string) (map[string]interface{}, error) {
 			return d.mount(args[0], args[1])
 		},
 	},
 	"unmount": {
-		1, func(d *FlexVolumeDriver, args []string) (map[string]interface{}, error) {
+		1, func(d *Driver, args []string) (map[string]interface{}, error) {
 			return d.unmount(args[0])
 		},
 	},
 }
 
-func (d *FlexVolumeDriver) doRun(args []string) (map[string]interface{}, error) {
+func (d *Driver) doRun(args []string) (map[string]interface{}, error) {
 	if len(args) == 0 {
 		return nil, errors.New("no arguments passed to flexvolume driver")
 	}
@@ -203,17 +206,16 @@ func (d *FlexVolumeDriver) doRun(args []string) (map[string]interface{}, error) 
 	if cmdInfo, found := commands[op]; found {
 		if cmdInfo.numArgs == nArgs {
 			return cmdInfo.run(d, args[1:])
-		} else {
-			return nil, fmt.Errorf("unexpected number of args %d (expected %d) for operation %q", nArgs, cmdInfo.numArgs, op)
 		}
-	} else {
-		return map[string]interface{}{
-			"status": "Not supported",
-		}, nil
+		return nil, fmt.Errorf("unexpected number of args %d (expected %d) for operation %q", nArgs, cmdInfo.numArgs, op)
 	}
+	return map[string]interface{}{
+		"status": "Not supported",
+	}, nil
 }
 
-func (d *FlexVolumeDriver) Run(args []string) string {
+// Run runs the driver
+func (d *Driver) Run(args []string) string {
 	r := formatResult(d.doRun(args))
 
 	if flexVolumeDebug {
