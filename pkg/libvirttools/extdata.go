@@ -32,31 +32,29 @@ import (
 )
 
 func init() {
-	types.SetExternalDataLoaders(loadExternalUserData, loadDSAsFileMap)
+	types.SetExternalDataLoader(&defaultExternalDataLoader{})
 }
 
-func loadExternalUserData(va *types.VirtletAnnotations, ns string, podAnnotations map[string]string) error {
-	if ns == "" {
+type defaultExternalDataLoader struct {
+	kubeClient kubernetes.Interface
+}
+
+// LoadCloudInitData implements LoadCloudInitData method of ExternalDataLoader interface.
+func (l *defaultExternalDataLoader) LoadCloudInitData(va *types.VirtletAnnotations, namespace string, podAnnotations map[string]string) error {
+	if namespace == "" {
 		return nil
 	}
-	var clientset *kubernetes.Clientset
 	var err error
 	userDataSourceKey := podAnnotations[types.CloudInitUserDataSourceKeyName]
 	sshKeySourceKey := podAnnotations[types.SSHKeySourceKeyName]
-	if userDataSourceKey != "" || sshKeySourceKey != "" {
-		clientset, err = utils.GetK8sClientset(nil)
-		if err != nil {
-			return err
-		}
-	}
 	if userDataSourceKey != "" {
-		err = loadUserDataFromDataSource(va, ns, userDataSourceKey, clientset)
+		err = l.loadUserDataFromDataSource(va, namespace, userDataSourceKey)
 		if err != nil {
 			return err
 		}
 	}
 	if sshKeySourceKey != "" {
-		err = loadSSHKeysFromDataSource(va, ns, sshKeySourceKey, clientset)
+		err = l.loadSSHKeysFromDataSource(va, namespace, sshKeySourceKey)
 		if err != nil {
 			return err
 		}
@@ -64,12 +62,30 @@ func loadExternalUserData(va *types.VirtletAnnotations, ns string, podAnnotation
 	return nil
 }
 
-func loadUserDataFromDataSource(va *types.VirtletAnnotations, ns, key string, clientset *kubernetes.Clientset) error {
+// LoadFileMap implements LoadFileMap method of ExternalDataLoader interface.
+func (l *defaultExternalDataLoader) LoadFileMap(namespace, dsSpec string) (map[string][]byte, error) {
+	if namespace == "" {
+		return nil, nil
+	}
+	parts := strings.Split(dsSpec, "/")
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid %s annotation format. Expected kind/name, but insted got %q", types.FilesFromDSKeyName, dsSpec)
+	}
+
+	data, err := l.readK8sKeySource(parts[0], parts[1], namespace, "")
+	if err != nil {
+		return nil, err
+	}
+
+	return parseDataAsFileMap(data)
+}
+
+func (l *defaultExternalDataLoader) loadUserDataFromDataSource(va *types.VirtletAnnotations, namespace, key string) error {
 	parts := strings.Split(key, "/")
 	if len(parts) != 2 {
 		return fmt.Errorf("invalid %s annotation format. Expected kind/name, but insted got %s", types.CloudInitUserDataSourceKeyName, key)
 	}
-	ud, err := readK8sKeySource(parts[0], parts[1], ns, "", clientset)
+	ud, err := l.readK8sKeySource(parts[0], parts[1], namespace, "")
 	if err != nil {
 		return err
 	}
@@ -83,7 +99,7 @@ func loadUserDataFromDataSource(va *types.VirtletAnnotations, ns, key string, cl
 	return nil
 }
 
-func loadSSHKeysFromDataSource(va *types.VirtletAnnotations, ns, key string, clientset *kubernetes.Clientset) error {
+func (l *defaultExternalDataLoader) loadSSHKeysFromDataSource(va *types.VirtletAnnotations, namespace, key string) error {
 	parts := strings.Split(key, "/")
 	if len(parts) != 2 && len(parts) != 3 {
 		return fmt.Errorf("invalid %s annotation format. Expected kind/name[/key], but insted got %s", types.SSHKeySourceKeyName, key)
@@ -92,7 +108,7 @@ func loadSSHKeysFromDataSource(va *types.VirtletAnnotations, ns, key string, cli
 	if len(parts) == 3 {
 		dataKey = parts[2]
 	}
-	ud, err := readK8sKeySource(parts[0], parts[1], ns, dataKey, clientset)
+	ud, err := l.readK8sKeySource(parts[0], parts[1], namespace, dataKey)
 	if err != nil {
 		return err
 	}
@@ -107,11 +123,25 @@ func loadSSHKeysFromDataSource(va *types.VirtletAnnotations, ns, key string, cli
 	return nil
 }
 
-func readK8sKeySource(sourceType, sourceName, ns, key string, clientset *kubernetes.Clientset) (map[string]string, error) {
+func (l *defaultExternalDataLoader) ensureKubeClient() error {
+	if l.kubeClient == nil {
+		var err error
+		l.kubeClient, err = utils.GetK8sClientset(nil)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (l *defaultExternalDataLoader) readK8sKeySource(sourceType, sourceName, namespace, key string) (map[string]string, error) {
+	if err := l.ensureKubeClient(); err != nil {
+		return nil, err
+	}
 	sourceType = strings.ToLower(sourceType)
 	switch sourceType {
 	case "secret":
-		secret, err := clientset.CoreV1().Secrets(ns).Get(sourceName, meta_v1.GetOptions{})
+		secret, err := l.kubeClient.CoreV1().Secrets(namespace).Get(sourceName, meta_v1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -124,7 +154,7 @@ func readK8sKeySource(sourceType, sourceName, ns, key string, clientset *kuberne
 		}
 		return result, nil
 	case "configmap":
-		configmap, err := clientset.CoreV1().ConfigMaps(ns).Get(sourceName, meta_v1.GetOptions{})
+		configmap, err := l.kubeClient.CoreV1().ConfigMaps(namespace).Get(sourceName, meta_v1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -139,27 +169,6 @@ func readK8sKeySource(sourceType, sourceName, ns, key string, clientset *kuberne
 	default:
 		return nil, fmt.Errorf("unsupported source kind %s. Must be one of (secret, configmap)", sourceType)
 	}
-}
-
-func loadDSAsFileMap(ns, key string) (map[string][]byte, error) {
-	if ns == "" {
-		return nil, nil
-	}
-	parts := strings.Split(key, "/")
-	if len(parts) != 2 {
-		return nil, fmt.Errorf("invalid %s annotation format. Expected kind/name, but insted got %s", types.FilesFromDSKeyName, key)
-	}
-	clientset, err := utils.GetK8sClientset(nil)
-	if err != nil {
-		return nil, fmt.Errorf("cannot read files from data source %q: %v", key, err)
-	}
-
-	data, err := readK8sKeySource(parts[0], parts[1], ns, "", clientset)
-	if err != nil {
-		return nil, err
-	}
-
-	return parseDataAsFileMap(data)
 }
 
 func parseDataAsFileMap(data map[string]string) (map[string][]byte, error) {
@@ -194,5 +203,3 @@ func parseDataAsFileMap(data map[string]string) (map[string][]byte, error) {
 	}
 	return files, nil
 }
-
-// TODO: create a test for loadExternalUserData

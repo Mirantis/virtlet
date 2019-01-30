@@ -116,23 +116,26 @@ type VirtletAnnotations struct {
 	InjectedFiles map[string][]byte
 }
 
-// ExternalUserDataLoader is a function that loads external user data that's specified
-// in the pod annotations.
-type ExternalUserDataLoader func(va *VirtletAnnotations, Namespace string, podAnnotations map[string]string) error
+// ExternalDataLoader is used to load extra pod data from
+// Kubernetes ConfigMaps and secrets.
+type ExternalDataLoader interface {
+	// LoadCloudInitData loads cloud-init userdata and ssh keys
+	// from the data sources specified in the pod annotations.
+	LoadCloudInitData(va *VirtletAnnotations, namespace string, podAnnotations map[string]string) error
+	// LoadFileMap loads a set of files from the data sources.
+	LoadFileMap(namespace, dsSpec string) (map[string][]byte, error)
+}
 
-var externalUserDataLoader ExternalUserDataLoader
+var externalDataLoader ExternalDataLoader
 
-// DSLoader is a function that loads files from config map or secret to write on rootfs
-type DSLoader func(Namespace, DSName string) (map[string][]byte, error)
+// SetExternalDataLoader sets the ExternalDataLoader to use
+func SetExternalDataLoader(loader ExternalDataLoader) {
+	externalDataLoader = loader
+}
 
-var externalDSLoader DSLoader
-
-// SetExternalDataLoaders sets the external data loader functions that
-// loads external data that's specified in the pod annotations and pointed by
-// them data source.
-func SetExternalDataLoaders(userDataLoader ExternalUserDataLoader, dsLoader DSLoader) {
-	externalUserDataLoader = userDataLoader
-	externalDSLoader = dsLoader
+// GetExternalDataLoader returns the current ExternalDataLoader
+func GetExternalDataLoader() ExternalDataLoader {
+	return externalDataLoader
 }
 
 func (va *VirtletAnnotations) applyDefaults() {
@@ -202,17 +205,17 @@ func (va *VirtletAnnotations) parsePodAnnotations(ns string, podAnnotations map[
 	if podAnnotations[cloudInitUserDataOverwriteKeyName] == "true" {
 		va.UserDataOverwrite = true
 	}
-	if externalUserDataLoader != nil {
-		if err := externalUserDataLoader(va, ns, podAnnotations); err != nil {
+	if externalDataLoader != nil {
+		if err := externalDataLoader.LoadCloudInitData(va, ns, podAnnotations); err != nil {
 			return fmt.Errorf("error loading data via external user data loader: %v", err)
 		}
 	}
 
-	if filesFromDSstr, found := podAnnotations[FilesFromDSKeyName]; found && externalDSLoader != nil {
+	if filesFromDSstr, found := podAnnotations[FilesFromDSKeyName]; found && externalDataLoader != nil {
 		var err error
-		va.InjectedFiles, err = externalDSLoader(ns, filesFromDSstr)
+		va.InjectedFiles, err = externalDataLoader.LoadFileMap(ns, filesFromDSstr)
 		if err != nil {
-			return fmt.Errorf("error loading data source %q as files: %v",
+			return fmt.Errorf("error loading data source %q as a file map: %v",
 				filesFromDSstr, err)
 		}
 	}
