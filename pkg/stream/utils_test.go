@@ -17,6 +17,7 @@ limitations under the License.
 package stream
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
@@ -66,6 +67,7 @@ func TestGetProcessEnvironment(t *testing.T) {
 		"BAR=asd",
 	})
 	defer tc.Stop()
+	waitForChildExec(t, tc.Pid())
 	env, err := getProcessEnvironment(int32(tc.Pid()))
 	if err != nil {
 		t.Error(err)
@@ -78,5 +80,27 @@ func TestGetProcessEnvironment(t *testing.T) {
 		if envVal != v {
 			t.Errorf("%s variable value not equal to %s", k, v)
 		}
+	}
+}
+
+// waitForChildExec waits for a child process to perform exec()
+// by means of waiting when its `/proc/PID/cmdline` becomes different from the
+// cmdline of the current process
+func waitForChildExec(t *testing.T, pid int) {
+	ownPid := os.Getpid()
+	ownCmdline, err := ioutil.ReadFile(fmt.Sprintf("/proc/%d/cmdline", ownPid))
+	if err != nil {
+		t.Fatalf("cannot read own cmdline: %v", err)
+	}
+	processCmdlineLocation := fmt.Sprintf("/proc/%d/cmdline", pid)
+	for {
+		processCmdline, err := ioutil.ReadFile(processCmdlineLocation)
+		if err != nil {
+			t.Fatalf("cannot read cmdline for pid %q: %v", pid, err)
+		}
+		if string(processCmdline) != string(ownCmdline) {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
 	}
 }
