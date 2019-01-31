@@ -447,20 +447,7 @@ func (v *VirtualizationTool) startContainer(containerID string) error {
 // If there was an error it will be returned to caller after an domain removal
 // attempt.  If also it had an error - both of them will be combined.
 func (v *VirtualizationTool) StartContainer(containerID string) error {
-	if err := v.startContainer(containerID); err != nil {
-		// FIXME: we do this here because kubelet may attempt new `CreateContainer()`
-		// calls for this VM after failed `StartContainer()` without first removing it.
-		// Better solution is perhaps moving domain setup logic to `StartContainer()`
-		// and cleaning it all up upon failure, but for now we just remove the VM
-		// so the next `CreateContainer()` call succeeds.
-		if rmErr := v.RemoveContainer(containerID); rmErr != nil {
-			return fmt.Errorf("container start error: %v \n+ container removal error: %v", err, rmErr)
-		}
-
-		return err
-	}
-
-	return nil
+	return v.startContainer(containerID)
 }
 
 // StopContainer calls graceful shutdown of domain and if it was non successful
