@@ -19,9 +19,12 @@ package types
 import (
 	"reflect"
 	"testing"
+
+	uuid "github.com/nu7hatch/gouuid"
 )
 
 func TestVirtletAnnotations(t *testing.T) {
+
 	for _, testCase := range []struct {
 		name        string
 		annotations map[string]string
@@ -142,6 +145,22 @@ func TestVirtletAnnotations(t *testing.T) {
 				UserDataScript: "#!/bin/sh\necho hi\n",
 				DiskDriver:     "scsi",
 				CDImageType:    "nocloud",
+			},
+		},
+		{
+			name: "system UUID",
+			annotations: map[string]string{
+				"VirtletSystemUUID": "53008994-44c0-4017-ad44-9c49758083da",
+			},
+			va: &VirtletAnnotations{
+				VCPUCount: 1,
+				SystemUUID: &uuid.UUID{
+					0x53, 0, 0x89, 0x94,
+					0x44, 0xc0, 0x40, 0x17, 0xad, 0x44,
+					0x9c, 0x49, 0x75, 0x80, 0x83, 0xda,
+				},
+				DiskDriver:  "scsi",
+				CDImageType: "nocloud",
 			},
 		},
 		// bad metadata items follow

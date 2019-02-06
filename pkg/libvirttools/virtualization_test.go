@@ -352,6 +352,12 @@ func TestDomainDefinitions(t *testing.T) {
 			name: "plain domain",
 		},
 		{
+			name: "system UUID",
+			annotations: map[string]string{
+				"VirtletSystemUUID": "53008994-44c0-4017-ad44-9c49758083da",
+			},
+		},
+		{
 			name: "raw devices",
 			flexVolumes: map[string]map[string]interface{}{
 				"raw": {
