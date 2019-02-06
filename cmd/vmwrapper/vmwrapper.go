@@ -73,8 +73,9 @@ func main() {
 
 	// FIXME: move the pid of qemu instance out of /kubepods/podxxxxxxx
 	// for some cases it will be killed by kubelet after the virtlet pod is deleted/recreated
-	if _, err := cgroups.GetProcessController(os.Getpid(), "hugetlb"); err == nil {
-		err = cgroups.MoveProcess(os.Getpid(), "hugetlb", "/")
+	cm := cgroups.NewManager(os.Getpid(), nil)
+	if _, err := cm.GetProcessController("hugetlb"); err == nil {
+		err = cm.MoveProcess("hugetlb", "/")
 		if err != nil {
 			glog.Warningf("failed to move pid into hugetlb path /: %v", err)
 		}
@@ -149,7 +150,7 @@ func main() {
 			glog.Fatalf("Error reexecuting vmwrapper: %v", err)
 		}
 	} else {
-		if err := setupCPUSets(); err != nil {
+		if err := setupCPUSets(cm); err != nil {
 			glog.Errorf("Can't set cpusets for emulator: %v", err)
 			os.Exit(1)
 		}
@@ -163,13 +164,13 @@ func main() {
 	}
 }
 
-func setupCPUSets() error {
+func setupCPUSets(cm cgroups.Manager) error {
 	cpusets := os.Getenv(config.CpusetsEnvVarName)
 	if cpusets == "" {
 		return nil
 	}
 
-	controller, err := cgroups.GetProcessController("self", "cpuset")
+	controller, err := cm.GetProcessController("cpuset")
 	if err != nil {
 		return err
 	}

@@ -1,0 +1,129 @@
+- name: 'domain conn: DefineDomain'
+  value: |-
+    <domain type="kvm">
+      <name>virtlet-231700d5-c9a6-container-for-testName_0</name>
+      <uuid>231700d5-c9a6-5a49-738d-99a954c51550</uuid>
+      <memory unit="MiB">1024</memory>
+      <vcpu>1</vcpu>
+      <cputune>
+        <shares>0</shares>
+        <period>0</period>
+        <quota>0</quota>
+      </cputune>
+      <os>
+        <type>hvm</type>
+        <boot dev="hd"></boot>
+      </os>
+      <features>
+        <acpi></acpi>
+      </features>
+      <on_poweroff>destroy</on_poweroff>
+      <on_reboot>restart</on_reboot>
+      <on_crash>restart</on_crash>
+      <devices>
+        <emulator>/vmwrapper</emulator>
+        <disk type="file" device="disk">
+          <driver name="qemu" type="qcow2"></driver>
+          <source file="/var/lib/virtlet/volumes/virtlet_root_231700d5-c9a6-5a49-738d-99a954c51550"></source>
+          <target dev="sda" bus="scsi"></target>
+          <address type="drive" controller="0" bus="0" target="0" unit="0"></address>
+        </disk>
+        <disk type="file" device="cdrom">
+          <driver name="qemu" type="raw"></driver>
+          <source file="/var/lib/virtlet/config/config-231700d5-c9a6-5a49-738d-99a954c51550.iso"></source>
+          <target dev="sdb" bus="scsi"></target>
+          <readonly></readonly>
+          <address type="drive" controller="0" bus="0" target="0" unit="1"></address>
+        </disk>
+        <controller type="scsi" index="0" model="virtio-scsi">
+          <address type="pci" domain="0x0000" bus="0x00" slot="0x01" function="0x0"></address>
+        </controller>
+        <controller type="pci" model="pci-root"></controller>
+        <serial type="unix">
+          <source mode="connect" path="/var/lib/libvirt/streamer.sock">
+            <reconnect enabled="yes" timeout="1"></reconnect>
+          </source>
+          <target port="0"></target>
+        </serial>
+        <input type="tablet" bus="usb"></input>
+        <graphics type="vnc" port="-1"></graphics>
+        <video>
+          <model type="cirrus"></model>
+        </video>
+      </devices>
+      <commandline xmlns="http://libvirt.org/schemas/domain/qemu/1.0">
+        <env name="VIRTLET_EMULATOR" value="/usr/bin/kvm"></env>
+        <env name="VIRTLET_NET_KEY" value="69eec606-0493-5825-73a4-c5e0c0236155"></env>
+        <env name="VIRTLET_CONTAINER_ID" value="231700d5-c9a6-5a49-738d-99a954c51550"></env>
+        <env name="VIRTLET_CONTAINER_LOG_PATH" value="/var/log/test_log_directory/container-for-testName_0_0.log"></env>
+      </commandline>
+    </domain>
+- name: 'enter: UpdateContainerResources'
+  value:
+    container_id: 231700d5-c9a6-5a49-738d-99a954c51550
+    linux:
+      cpuset_cpus: "42"
+- name: 'domain conn: virtlet-231700d5-c9a6-container-for-testName_0: Undefine'
+- name: 'domain conn: DefineDomain'
+  value: |-
+    <domain type="kvm">
+      <name>virtlet-231700d5-c9a6-container-for-testName_0</name>
+      <uuid>231700d5-c9a6-5a49-738d-99a954c51550</uuid>
+      <memory unit="MiB">1024</memory>
+      <vcpu>1</vcpu>
+      <cputune>
+        <shares>0</shares>
+        <period>0</period>
+        <quota>0</quota>
+      </cputune>
+      <os>
+        <type>hvm</type>
+        <boot dev="hd"></boot>
+      </os>
+      <features>
+        <acpi></acpi>
+      </features>
+      <on_poweroff>destroy</on_poweroff>
+      <on_reboot>restart</on_reboot>
+      <on_crash>restart</on_crash>
+      <devices>
+        <emulator>/vmwrapper</emulator>
+        <disk type="file" device="disk">
+          <driver name="qemu" type="qcow2"></driver>
+          <source file="/var/lib/virtlet/volumes/virtlet_root_231700d5-c9a6-5a49-738d-99a954c51550"></source>
+          <target dev="sda" bus="scsi"></target>
+          <address type="drive" controller="0" bus="0" target="0" unit="0"></address>
+        </disk>
+        <disk type="file" device="cdrom">
+          <driver name="qemu" type="raw"></driver>
+          <source file="/var/lib/virtlet/config/config-231700d5-c9a6-5a49-738d-99a954c51550.iso"></source>
+          <target dev="sdb" bus="scsi"></target>
+          <readonly></readonly>
+          <address type="drive" controller="0" bus="0" target="0" unit="1"></address>
+        </disk>
+        <controller type="scsi" index="0" model="virtio-scsi">
+          <address type="pci" domain="0x0000" bus="0x00" slot="0x01" function="0x0"></address>
+        </controller>
+        <controller type="pci" model="pci-root"></controller>
+        <serial type="unix">
+          <source mode="connect" path="/var/lib/libvirt/streamer.sock">
+            <reconnect enabled="yes" timeout="1"></reconnect>
+          </source>
+          <target port="0"></target>
+        </serial>
+        <input type="tablet" bus="usb"></input>
+        <graphics type="vnc" port="-1"></graphics>
+        <video>
+          <model type="cirrus"></model>
+        </video>
+      </devices>
+      <commandline xmlns="http://libvirt.org/schemas/domain/qemu/1.0">
+        <env name="VIRTLET_EMULATOR" value="/usr/bin/kvm"></env>
+        <env name="VIRTLET_NET_KEY" value="69eec606-0493-5825-73a4-c5e0c0236155"></env>
+        <env name="VIRTLET_CONTAINER_ID" value="231700d5-c9a6-5a49-738d-99a954c51550"></env>
+        <env name="VIRTLET_CONTAINER_LOG_PATH" value="/var/log/test_log_directory/container-for-testName_0_0.log"></env>
+        <env name="VIRTLET_CPUSETS" value="42"></env>
+      </commandline>
+    </domain>
+- name: 'leave: UpdateContainerResources'
+  value: {}
