@@ -330,7 +330,7 @@ type volDevice struct {
 }
 
 func TestDomainDefinitions(t *testing.T) {
-	flexVolumeDriver := flexvolume.NewFlexVolumeDriver(func() string {
+	flexVolumeDriver := flexvolume.NewDriver(func() string {
 		// note that this is only good for just one flexvolume
 		return fakeUUID
 	}, utils.NullMounter)

@@ -66,7 +66,6 @@ var _ = Describe("Virtlet restart [Disruptive]", func() {
 
 		By(fmt.Sprintf("Running command: kubectl logs -n %s %s", controller.Namespace(), vm.Name))
 		err := localExecutor.Run(nil, &stdout, &stdout, "kubectl", "-n", controller.Namespace(), "logs", vm.Name)
-		fmt.Sprintf(stdout.String())
 		Expect(err).NotTo(HaveOccurred())
 		Expect(stdout.String()).Should(ContainSubstring("login as 'cirros' user."))
 

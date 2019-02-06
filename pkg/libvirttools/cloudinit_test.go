@@ -935,7 +935,7 @@ func TestAddingFileLikeMount(t *testing.T) {
 
 func TestMtuForMacAddress(t *testing.T) {
 	interfaces := []*network.InterfaceDescription{
-		&network.InterfaceDescription{
+		{
 			MTU:          1234,
 			HardwareAddr: net.HardwareAddr{0, 0, 0, 0, 0xa, 0xb},
 		},

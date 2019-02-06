@@ -112,9 +112,9 @@ func (pi *PodInterface) WaitForPodStatus(expectedContainerErrors []string, timin
 			case !needErrors && cs.State.Running == nil:
 				return fmt.Errorf("container %s in pod %s is not running: %s", cs.Name, podUpdated.Name, spew.Sdump(cs.State))
 			case !needErrors && !cs.Ready:
-				return fmt.Errorf("container %s in pod %s in not ready", cs.Name, podUpdated.Name)
+				return fmt.Errorf("container %s in pod %s did not passed its readiness probe", cs.Name, podUpdated.Name)
 			case needErrors && cs.State.Waiting == nil:
-				return fmt.Errorf("container %s in pod %s not in waiting state", cs.Name)
+				return fmt.Errorf("container %s in pod %s not in waiting state", cs.Name, podUpdated.Name)
 			case needErrors:
 				for _, errStr := range expectedContainerErrors {
 					if cs.State.Waiting.Reason == errStr {

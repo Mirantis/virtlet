@@ -75,9 +75,8 @@ func (sc *FakeStorageConnection) CreateStoragePool(def *libvirtxml.StoragePool) 
 func (sc *FakeStorageConnection) LookupStoragePoolByName(name string) (virt.StoragePool, error) {
 	if p, found := sc.pools[name]; found {
 		return p, nil
-	} else {
-		return nil, virt.ErrStoragePoolNotFound
 	}
+	return nil, virt.ErrStoragePoolNotFound
 }
 
 // ListPools implements ListPools method of StorageConnection interface.

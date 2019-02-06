@@ -27,12 +27,12 @@ import (
 func configMappingProps() *apiext.JSONSchemaProps {
 	return &apiext.JSONSchemaProps{
 		Properties: map[string]apiext.JSONSchemaProps{
-			"spec": apiext.JSONSchemaProps{
+			"spec": {
 				Properties: map[string]apiext.JSONSchemaProps{
-					"nodeName": apiext.JSONSchemaProps{
+					"nodeName": {
 						Type: "string",
 					},
-					"nodeSelector": apiext.JSONSchemaProps{
+					"nodeSelector": {
 						Type: "object",
 						// FIXME: https://github.com/kubernetes/kubernetes/issues/59485
 						// AdditionalProperties: &apiext.JSONSchemaPropsOrBool{
@@ -42,10 +42,10 @@ func configMappingProps() *apiext.JSONSchemaProps {
 						// 	},
 						// },
 					},
-					"priority": apiext.JSONSchemaProps{
+					"priority": {
 						Type: "integer",
 					},
-					"config": apiext.JSONSchemaProps{
+					"config": {
 						Properties: configFieldSet(&virtlet_v1.VirtletConfig{}).schemaProps(),
 					},
 				},

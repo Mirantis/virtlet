@@ -46,7 +46,7 @@ type containerTester struct {
 	sandboxes            []*kubeapi.PodSandboxConfig
 	containers           []*criapi.ContainerTestConfig
 	imageSpecs           []*kubeapi.ImageSpec
-	fv                   *flexvolume.FlexVolumeDriver
+	fv                   *flexvolume.Driver
 	podDirs              []string
 	volumeDirs           []string
 }
@@ -67,7 +67,7 @@ func newContainerTester(t *testing.T) *containerTester {
 			{Image: imageCirrosUrl},
 			{Image: imageCopyCirrosUrl},
 		},
-		fv: flexvolume.NewFlexVolumeDriver(utils.NewUUID, utils.NewMounter()),
+		fv: flexvolume.NewDriver(utils.NewUUID, utils.NewMounter()),
 	}
 }
 

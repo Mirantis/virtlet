@@ -37,7 +37,7 @@ var (
 			Name:  "diagnostics",
 			IsDir: true,
 			Children: map[string]diag.Result{
-				"foo": diag.Result{
+				"foo": {
 					Name: "foo",
 					Ext:  "txt",
 					Data: "foobar",
@@ -48,12 +48,12 @@ var (
 			Name:  "diagnostics",
 			IsDir: true,
 			Children: map[string]diag.Result{
-				"r1": diag.Result{
+				"r1": {
 					Name: "r1",
 					Ext:  "log",
 					Data: "baz1",
 				},
-				"r2": diag.Result{
+				"r2": {
 					Name: "r2",
 					Ext:  "log",
 					Data: "baz2",
@@ -65,35 +65,35 @@ var (
 		Name:  "nodes",
 		IsDir: true,
 		Children: map[string]diag.Result{
-			"kube-node-1": diag.Result{
+			"kube-node-1": {
 				Name:  "kube-node-1",
 				IsDir: true,
 				Children: map[string]diag.Result{
 					"foo": fakeDiagResults[0].Children["foo"],
-					"virtlet-pod-virtlet": diag.Result{
+					"virtlet-pod-virtlet": {
 						Name: "virtlet-pod-virtlet",
 						Ext:  "log",
 						Data: "foo-logs-virtlet",
 					},
-					"virtlet-pod-libvirt": diag.Result{
+					"virtlet-pod-libvirt": {
 						Name: "virtlet-pod-libvirt",
 						Ext:  "log",
 						Data: "foo-logs-libvirt",
 					},
 				},
 			},
-			"kube-node-2": diag.Result{
+			"kube-node-2": {
 				Name:  "kube-node-2",
 				IsDir: true,
 				Children: map[string]diag.Result{
 					"r1": fakeDiagResults[1].Children["r1"],
 					"r2": fakeDiagResults[1].Children["r2"],
-					"virtlet-pod-virtlet": diag.Result{
+					"virtlet-pod-virtlet": {
 						Name: "virtlet-pod-virtlet",
 						Ext:  "log",
 						Data: "bar-logs-virtlet",
 					},
-					"virtlet-pod-libvirt": diag.Result{
+					"virtlet-pod-libvirt": {
 						Name: "virtlet-pod-libvirt",
 						Ext:  "log",
 						Data: "bar-logs-libvirt",

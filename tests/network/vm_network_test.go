@@ -185,10 +185,7 @@ func (vnt *vmNetworkTester) teardown() {
 			if err := netlink.LinkSetDown(link); err != nil {
 				return err
 			}
-			if err := netlink.LinkDel(link); err != nil {
-				return err
-			}
-			return nil
+			return netlink.LinkDel(link)
 		}); err != nil {
 			vnt.t.Logf("WARNING: error tearing down client tap: %v", err)
 		}

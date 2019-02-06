@@ -280,7 +280,7 @@ type VMConfig struct {
 // RootVolumeDevice returns the volume device that should be used for
 // a persistent root filesystem, that is, its DevicePath is "/"
 func (c *VMConfig) RootVolumeDevice() *VMVolumeDevice {
-	for n, _ := range c.VolumeDevices {
+	for n := range c.VolumeDevices {
 		dev := &c.VolumeDevices[n]
 		if dev.IsRoot() {
 			return dev
