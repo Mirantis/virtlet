@@ -27,6 +27,10 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
+	v1 "k8s.io/api/core/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	fakekube "k8s.io/client-go/kubernetes/fake"
 
 	"github.com/Mirantis/virtlet/pkg/flexvolume"
 	"github.com/Mirantis/virtlet/pkg/fs"
@@ -349,6 +353,7 @@ func TestDomainDefinitions(t *testing.T) {
 		mounts      []volMount
 		volDevs     []volDevice
 		cmds        []fakeutils.CmdSpec
+		objects     []runtime.Object
 	}{
 		{
 			name: "plain domain",
@@ -476,6 +481,64 @@ func TestDomainDefinitions(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "file injection",
+			annotations: map[string]string{
+				"VirtletFilesFromDataSource": "secret/data",
+			},
+			objects: []runtime.Object{
+				&v1.Secret{
+					ObjectMeta: meta_v1.ObjectMeta{
+						Name:      "data",
+						Namespace: "default",
+					},
+					Data: map[string][]byte{
+						"path_to_file_path": []byte("/path/to_file"),
+						"path_to_file":      []byte("Y29udGVudA=="),
+					},
+				},
+			},
+		},
+		{
+			name: "file injection on persistent rootfs",
+			annotations: map[string]string{
+				"VirtletFilesFromDataSource": "secret/data",
+			},
+			volDevs: []volDevice{
+				{
+					name:       "root",
+					devicePath: "/",
+					size:       512000,
+				},
+			},
+			objects: []runtime.Object{
+				&v1.Secret{
+					ObjectMeta: meta_v1.ObjectMeta{
+						Name:      "data",
+						Namespace: "default",
+					},
+					Data: map[string][]byte{
+						"path_to_file_path": []byte("/path/to_file"),
+						"path_to_file":      []byte("Y29udGVudA=="),
+					},
+				},
+			},
+			cmds: []fakeutils.CmdSpec{
+				{
+					Match:  "blockdev --getsz",
+					Stdout: "1000",
+				},
+				{
+					Match: "qemu-img convert",
+				},
+				{
+					Match: "dmsetup create",
+				},
+				{
+					Match: "dmsetup remove",
+				},
+			},
+		},
 		// TODO: add test cases for rootfs / persistent rootfs file injection
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -535,12 +598,19 @@ func TestDomainDefinitions(t *testing.T) {
 				})
 			}
 
+			oldLoader := types.GetExternalDataLoader()
+			if tc.objects != nil {
+				fc := fakekube.NewSimpleClientset(tc.objects...)
+				types.SetExternalDataLoader(&defaultExternalDataLoader{kubeClient: fc})
+			}
+
 			containerID := ct.createContainer(sandbox, mounts, volDevs)
 
 			// startContainer will cause fake Domain
 			// to dump the cloudinit iso content
 			ct.startContainer(containerID)
 			ct.removeContainer(containerID)
+			types.SetExternalDataLoader(oldLoader)
 			gm.Verify(t, gm.NewYamlVerifier(ct.rec.Content()))
 		})
 	}
