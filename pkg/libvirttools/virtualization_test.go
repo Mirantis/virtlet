@@ -27,6 +27,9 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
+	v1 "k8s.io/api/core/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	fakekube "k8s.io/client-go/kubernetes/fake"
 
 	"github.com/Mirantis/virtlet/pkg/flexvolume"
 	"github.com/Mirantis/virtlet/pkg/metadata"
@@ -271,6 +274,35 @@ func TestContainerLifecycle(t *testing.T) {
 		t.Errorf("Rootfs volume was not deleted for the container: %#v", container)
 	}
 
+	gm.Verify(t, gm.NewYamlVerifier(ct.rec.Content()))
+}
+
+func TestFileInjectionHandlingDuringContainerCreation(t *testing.T) {
+	ct := newContainerTester(t, testutils.NewToplevelRecorder(), nil, nil)
+	defer ct.teardown()
+
+	fc := fakekube.NewSimpleClientset(
+		&v1.Secret{
+			ObjectMeta: meta_v1.ObjectMeta{
+				Name:      "data",
+				Namespace: "default",
+			},
+			Data: map[string][]byte{
+				"path_to_file_path": []byte("/path/to_file"),
+				"path_to_file":      []byte("Y29udGVudA=="),
+			},
+		},
+	)
+	oldLoader := types.GetExternalDataLoader()
+	defer func() {
+		types.SetExternalDataLoader(oldLoader)
+	}()
+	types.SetExternalDataLoader(&defaultExternalDataLoader{kubeClient: fc})
+	sandbox := fakemeta.GetSandboxes(1)[0]
+	sandbox.Annotations["VirtletFilesFromDataSource"] = "secret/data"
+	ct.setPodSandbox(sandbox)
+
+	_ = ct.createContainer(sandbox, nil, nil)
 	gm.Verify(t, gm.NewYamlVerifier(ct.rec.Content()))
 }
 
