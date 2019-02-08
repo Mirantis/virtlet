@@ -29,6 +29,10 @@ var pathReplacements = [][2]string{
 		"/__pods__/",
 		"/var/lib/kubelet/pods/",
 	},
+	{
+		"/__fs__/",
+		"/",
+	},
 }
 
 func fixPath(s string) string {

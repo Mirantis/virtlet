@@ -29,6 +29,16 @@ import (
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 )
 
+const pathMarker = "/__fs__/"
+
+func fixPath(s string) string {
+	p := strings.Index(s, pathMarker)
+	if p < 0 {
+		return s
+	}
+	return "/" + s[p+len(pathMarker):]
+}
+
 type fakeDelimitedReader struct {
 	rec      testutils.Recorder
 	fileData string
@@ -83,7 +93,7 @@ func (fs *FakeFileSystem) validateMountPath(target string) {
 // Mount implements the Mount method of FileSystem interface.
 func (fs *FakeFileSystem) Mount(source string, target string, fstype string, bind bool) error {
 	fs.validateMountPath(target)
-	fs.rec.Rec("Mount", []interface{}{source, target, fstype, bind})
+	fs.rec.Rec("Mount", []interface{}{fixPath(source), fixPath(target), fstype, bind})
 
 	// We want to check directory contents both before & after mount,
 	// see comment in FlexVolumeDriver.mount() in flexvolume.go.
@@ -113,7 +123,7 @@ func (fs *FakeFileSystem) Mount(source string, target string, fstype string, bin
 func (fs *FakeFileSystem) Unmount(target string, detach bool) error {
 	// we make sure that path is under our tmpdir before wiping it
 	fs.validateMountPath(target)
-	fs.rec.Rec("Unmount", []interface{}{target, detach})
+	fs.rec.Rec("Unmount", []interface{}{fixPath(target), detach})
 
 	paths, err := filepath.Glob(filepath.Join(target, "*"))
 	if err != nil {
@@ -140,7 +150,7 @@ func (fs *FakeFileSystem) IsPathAnNs(path string) bool {
 
 // ChownForEmulator implements ChownForEmulator method of FileSystem interface.
 func (fs *FakeFileSystem) ChownForEmulator(filePath string, recursive bool) error {
-	fs.rec.Rec("ChownForEmulator", []interface{}{filePath, recursive})
+	fs.rec.Rec("ChownForEmulator", []interface{}{fixPath(filePath), recursive})
 	return nil
 }
 

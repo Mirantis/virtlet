@@ -87,17 +87,19 @@ func newContainerTester(t *testing.T, rec *testutils.TopLevelRecorder, cmds []fa
 	}
 
 	imageManager := newFakeImageManager(ct.rec)
-	ct.kubeletRootDir = filepath.Join(ct.tmpDir, "kubelet-root")
+	ct.kubeletRootDir = filepath.Join(ct.tmpDir, "__fs__/kubelet-root")
+	mountDir := filepath.Join(ct.tmpDir, "__fs__/mounts")
 	virtConfig := VirtualizationConfig{
-		VolumePoolName:     "volumes",
-		RawDevices:         []string{"loop*"},
-		KubeletRootDir:     ct.kubeletRootDir,
-		StreamerSocketPath: "/var/lib/libvirt/streamer.sock",
+		VolumePoolName:       "volumes",
+		RawDevices:           []string{"loop*"},
+		KubeletRootDir:       ct.kubeletRootDir,
+		StreamerSocketPath:   "/var/lib/libvirt/streamer.sock",
+		SharedFilesystemPath: mountDir,
 	}
 	fakeCommander := fakeutils.NewCommander(rec, cmds)
 	fakeCommander.ReplaceTempPath("__pods__", "/fakedev")
 
-	fs := fakefs.NewFakeFileSystem(t, rec, "", files)
+	fs := fakefs.NewFakeFileSystem(t, rec, mountDir, files)
 
 	ct.virtTool = NewVirtualizationTool(
 		ct.domainConn, ct.storageConn, imageManager, ct.metadataStore,
@@ -326,6 +328,7 @@ func TestDoubleStartError(t *testing.T) {
 type volMount struct {
 	name          string
 	containerPath string
+	podSubpath    string
 }
 
 type volDevice struct {
@@ -404,6 +407,7 @@ func TestDomainDefinitions(t *testing.T) {
 				{
 					name:          "ceph",
 					containerPath: "/var/lib/whatever",
+					podSubpath:    "volumes/virtlet~flexvolume_driver",
 				},
 			},
 		},
@@ -462,6 +466,16 @@ func TestDomainDefinitions(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "9pfs volume",
+			mounts: []volMount{
+				{
+					name:          "9pfs-vol",
+					containerPath: "/var/lib/foobar",
+					podSubpath:    "volumes/kubernetes.io~rbd",
+				},
+			},
+		},
 		// TODO: add test cases for rootfs / persistent rootfs file injection
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -490,7 +504,7 @@ func TestDomainDefinitions(t *testing.T) {
 			var mounts []types.VMMount
 			for _, m := range tc.mounts {
 				mounts = append(mounts, types.VMMount{
-					HostPath:      filepath.Join(ct.kubeletRootDir, sandbox.Uid, "volumes/virtlet~flexvolume_driver", m.name),
+					HostPath:      filepath.Join(ct.kubeletRootDir, sandbox.Uid, m.podSubpath, m.name),
 					ContainerPath: m.containerPath,
 				})
 			}
