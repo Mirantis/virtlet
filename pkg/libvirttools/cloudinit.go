@@ -37,6 +37,7 @@ import (
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
 	"github.com/Mirantis/virtlet/pkg/flexvolume"
+	"github.com/Mirantis/virtlet/pkg/fs"
 	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	"github.com/Mirantis/virtlet/pkg/network"
 	"github.com/Mirantis/virtlet/pkg/utils"
@@ -334,10 +335,10 @@ func (g *CloudInitGenerator) generateNetworkConfigurationConfigDrive() ([]byte, 
 			return nil, err
 		}
 		linkConf := map[string]interface{}{
-			"type": "phy",
-			"id":   iface.Name,
+			"type":                 "phy",
+			"id":                   iface.Name,
 			"ethernet_mac_address": iface.Mac,
-			"mtu": mtu,
+			"mtu":                  mtu,
 		}
 		links = append(links, linkConf)
 	}
@@ -471,7 +472,7 @@ func (g *CloudInitGenerator) GenerateImage(volumeMap diskPathMap) error {
 	if networkConfiguration != nil {
 		fileMap[networkConfigLocation] = networkConfiguration
 	}
-	if err := utils.WriteFiles(tmpDir, fileMap); err != nil {
+	if err := fs.WriteFiles(tmpDir, fileMap); err != nil {
 		return fmt.Errorf("can't write user-data: %v", err)
 	}
 
@@ -479,7 +480,7 @@ func (g *CloudInitGenerator) GenerateImage(volumeMap diskPathMap) error {
 		return fmt.Errorf("error making iso directory %q: %v", g.isoDir, err)
 	}
 
-	if err := utils.GenIsoImage(g.IsoPath(), volumeName, tmpDir); err != nil {
+	if err := fs.GenIsoImage(g.IsoPath(), volumeName, tmpDir); err != nil {
 		if rmErr := os.Remove(g.IsoPath()); rmErr != nil {
 			glog.Warningf("Error removing iso file %s: %v", g.IsoPath(), rmErr)
 		}

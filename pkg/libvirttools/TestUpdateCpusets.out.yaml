@@ -83,17 +83,19 @@
       </commandline>
     </domain>
 - name: Calling setting cpuset for emulator proces
-- name: FileReader
+- name: GetDelimitedReader
   value: /run/libvirt/qemu/virtlet-231700d5-c9a6-testName_0.pid
-- name: 'ReadString: 4242'
-  value: {}
-- name: FileReader
+- name: ReadString
+  value: "4242"
+- name: GetDelimitedReader
   value: /proc/4242/cgroup
-- name: |
-    ReadString: 3:cpuset:/somepath/in/cgroups/emulator
-  value: {}
-- name: 'WriteFile: /sys/fs/cgroup/cpuset/somepath/in/cgroups/emulator/cpuset.cpus'
-  value: "42"
+- name: ReadString
+  value: |
+    3:cpuset:/somepath/in/cgroups/emulator
+- name: WriteFile
+  value:
+  - /sys/fs/cgroup/cpuset/somepath/in/cgroups/emulator/cpuset.cpus
+  - "42"
 - name: Calling setting cpuset for domain definition
 - name: 'domain conn: virtlet-231700d5-c9a6-container1: Undefine'
 - name: 'domain conn: DefineDomain'

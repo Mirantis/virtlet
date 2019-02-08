@@ -23,6 +23,7 @@ import (
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 	digest "github.com/opencontainers/go-digest"
 
+	"github.com/Mirantis/virtlet/pkg/fs"
 	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	fakeutils "github.com/Mirantis/virtlet/pkg/utils/fake"
@@ -299,7 +300,7 @@ func (vo fakeVolumeOwner) KubeletRootDir() string { return "" }
 
 func (vo fakeVolumeOwner) VolumePoolName() string { return "" }
 
-func (vo fakeVolumeOwner) Mounter() utils.Mounter { return utils.NullMounter }
+func (vo fakeVolumeOwner) FileSystem() fs.FileSystem { return fs.NullFileSystem }
 
 func (vo fakeVolumeOwner) SharedFilesystemPath() string { return "/var/lib/virtlet/fs" }
 

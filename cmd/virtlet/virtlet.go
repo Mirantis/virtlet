@@ -31,7 +31,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/config"
 	"github.com/Mirantis/virtlet/pkg/diag"
-	"github.com/Mirantis/virtlet/pkg/libvirttools"
+	"github.com/Mirantis/virtlet/pkg/fs"
 	"github.com/Mirantis/virtlet/pkg/manager"
 	"github.com/Mirantis/virtlet/pkg/nsfix"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
@@ -85,7 +85,7 @@ func runTapManager(config *v1.VirtletConfig) {
 		glog.Errorf("FD server returned error: %v", err)
 		os.Exit(1)
 	}
-	if err := libvirttools.ChownForEmulator(*config.FDServerSocketPath, false); err != nil {
+	if err := fs.RealFileSystem.ChownForEmulator(*config.FDServerSocketPath, false); err != nil {
 		glog.Warningf("Couldn't set tapmanager socket permissions: %v", err)
 	}
 	for {

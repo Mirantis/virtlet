@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Mirantis/virtlet/pkg/fs"
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
@@ -31,7 +32,7 @@ const (
 
 // Controller represents a named controller for a process
 type Controller struct {
-	fm   utils.FilesManipulator
+	fsys fs.FileSystem
 	name string
 	path string
 }
@@ -50,24 +51,24 @@ type Manager interface {
 // RealManager provides an implementation of Manager which is
 // using default linux system paths to access info about cgroups for processes.
 type RealManager struct {
-	fm  utils.FilesManipulator
-	pid string
+	fsys fs.FileSystem
+	pid  string
 }
 
 var _ Manager = &RealManager{}
 
 // NewManager returns an instance of RealManager
-func NewManager(pid interface{}, fm utils.FilesManipulator) Manager {
-	if fm == nil {
-		fm = utils.DefaultFilesManipulator
+func NewManager(pid interface{}, fsys fs.FileSystem) Manager {
+	if fsys == nil {
+		fsys = fs.RealFileSystem
 	}
-	return &RealManager{fm: fm, pid: utils.Stringify(pid)}
+	return &RealManager{fsys: fsys, pid: utils.Stringify(pid)}
 }
 
 // GetProcessControllers is an implementation of GetProcessControllers method
 // of Manager interface.
 func (c *RealManager) GetProcessControllers() (map[string]string, error) {
-	fr, err := c.fm.FileReader(filepath.Join("/proc", c.pid, "cgroup"))
+	fr, err := c.fsys.GetDelimitedReader(filepath.Join("/proc", c.pid, "cgroup"))
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +119,7 @@ func (c *RealManager) GetProcessController(controllerName string) (*Controller, 
 	}
 
 	return &Controller{
-		fm:   c.fm,
+		fsys: c.fsys,
 		name: controllerName,
 		path: controllerPath,
 	}, nil
@@ -126,7 +127,7 @@ func (c *RealManager) GetProcessController(controllerName string) (*Controller, 
 
 // MoveProcess implements MoveProcess method of Manager
 func (c *RealManager) MoveProcess(controller, path string) error {
-	return c.fm.WriteFile(
+	return c.fsys.WriteFile(
 		filepath.Join(cgroupfs, controller, path, "cgroup.procs"),
 		[]byte(utils.Stringify(c.pid)),
 		0644,
@@ -135,7 +136,7 @@ func (c *RealManager) MoveProcess(controller, path string) error {
 
 // Set sets the value of a controller setting
 func (c *Controller) Set(name string, value interface{}) error {
-	return c.fm.WriteFile(
+	return c.fsys.WriteFile(
 		filepath.Join(cgroupfs, c.name, c.path, c.name+"."+name),
 		[]byte(utils.Stringify(value)),
 		0644,

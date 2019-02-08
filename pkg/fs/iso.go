@@ -1,7 +1,5 @@
-// +build !linux
-
 /*
-Copyright 2018 Mirantis
+Copyright 2019 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,13 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+package fs
 
 import (
-	"errors"
+	"fmt"
+	"os/exec"
 )
 
-// GetFsStatsForPath is a placeholder for an unimplemented function
-func GetFsStatsForPath(path string) (uint64, uint64, error) {
-	return 0, 0, errors.New("not implemented")
+// GenIsoImage generates an ISO 9660 filesystem image containing
+// files from srcDir. It uses specified volumeID as the volume id.
+func GenIsoImage(isoPath string, volumeID string, srcDir string) error {
+	out, err := exec.Command("genisoimage", "-o", isoPath, "-V", volumeID, "-r", "-J", srcDir).CombinedOutput()
+	if err != nil {
+		outStr := ""
+		if len(out) != 0 {
+			outStr = ". Output:\n" + string(out)
+		}
+		return fmt.Errorf("error generating iso: %v%s", err, outStr)
+	}
+
+	return nil
 }

@@ -30,6 +30,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 
 	vconfig "github.com/Mirantis/virtlet/pkg/config"
+	"github.com/Mirantis/virtlet/pkg/fs"
 	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/metadata/types"
 	"github.com/Mirantis/virtlet/pkg/utils"
@@ -235,17 +236,15 @@ type VirtualizationConfig struct {
 
 // VirtualizationTool provides methods to operate on libvirt.
 type VirtualizationTool struct {
-	domainConn        virt.DomainConnection
-	storageConn       virt.StorageConnection
-	imageManager      ImageManager
-	metadataStore     metadata.Store
-	clock             clockwork.Clock
-	volumeSource      VMVolumeSource
-	config            VirtualizationConfig
-	mounter           utils.Mounter
-	mountPointChecker utils.MountPointChecker
-	filesManipulator  utils.FilesManipulator
-	commander         utils.Commander
+	domainConn    virt.DomainConnection
+	storageConn   virt.StorageConnection
+	imageManager  ImageManager
+	metadataStore metadata.Store
+	clock         clockwork.Clock
+	volumeSource  VMVolumeSource
+	config        VirtualizationConfig
+	fsys          fs.FileSystem
+	commander     utils.Commander
 }
 
 var _ volumeOwner = &VirtualizationTool{}
@@ -255,22 +254,18 @@ var _ volumeOwner = &VirtualizationTool{}
 func NewVirtualizationTool(domainConn virt.DomainConnection,
 	storageConn virt.StorageConnection, imageManager ImageManager,
 	metadataStore metadata.Store, volumeSource VMVolumeSource,
-	config VirtualizationConfig, mounter utils.Mounter,
-	mountPointChecker utils.MountPointChecker,
-	filesManipulator utils.FilesManipulator,
+	config VirtualizationConfig, fsys fs.FileSystem,
 	commander utils.Commander) *VirtualizationTool {
 	return &VirtualizationTool{
-		domainConn:        domainConn,
-		storageConn:       storageConn,
-		imageManager:      imageManager,
-		metadataStore:     metadataStore,
-		clock:             clockwork.NewRealClock(),
-		volumeSource:      volumeSource,
-		config:            config,
-		mounter:           mounter,
-		mountPointChecker: mountPointChecker,
-		filesManipulator:  filesManipulator,
-		commander:         commander,
+		domainConn:    domainConn,
+		storageConn:   storageConn,
+		imageManager:  imageManager,
+		metadataStore: metadataStore,
+		clock:         clockwork.NewRealClock(),
+		volumeSource:  volumeSource,
+		config:        config,
+		fsys:          fsys,
+		commander:     commander,
 	}
 }
 
@@ -944,8 +939,8 @@ func (v *VirtualizationTool) KubeletRootDir() string { return v.config.KubeletRo
 // VolumePoolName implements volumeOwner VolumePoolName method
 func (v *VirtualizationTool) VolumePoolName() string { return v.config.VolumePoolName }
 
-// Mounter implements volumeOwner Mounter method
-func (v *VirtualizationTool) Mounter() utils.Mounter { return v.mounter }
+// FileSystem implements volumeOwner FileSystem method
+func (v *VirtualizationTool) FileSystem() fs.FileSystem { return v.fsys }
 
 // SharedFilesystemPath implements volumeOwner SharedFilesystemPath method
 func (v *VirtualizationTool) SharedFilesystemPath() string { return v.config.SharedFilesystemPath }

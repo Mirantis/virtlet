@@ -1,5 +1,5 @@
 /*
-Copyright 2017 Mirantis
+Copyright 2019 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,13 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+package fs
 
 import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 )
 
@@ -38,20 +37,5 @@ func WriteFiles(targetDir string, content map[string][]byte) error {
 			return fmt.Errorf("error writing %q: %v", fullPath, err)
 		}
 	}
-	return nil
-}
-
-// GenIsoImage generates an ISO 9660 filesystem image containing
-// files from srcDir. It uses specified volumeID as the volume id.
-func GenIsoImage(isoPath string, volumeID string, srcDir string) error {
-	out, err := exec.Command("genisoimage", "-o", isoPath, "-V", volumeID, "-r", "-J", srcDir).CombinedOutput()
-	if err != nil {
-		outStr := ""
-		if len(out) != 0 {
-			outStr = ". Output:\n" + string(out)
-		}
-		return fmt.Errorf("error generating iso: %v%s", err, outStr)
-	}
-
 	return nil
 }

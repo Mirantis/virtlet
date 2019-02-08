@@ -38,6 +38,8 @@ import (
 
 	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/flexvolume"
+	"github.com/Mirantis/virtlet/pkg/fs"
+	fakefs "github.com/Mirantis/virtlet/pkg/fs/fake"
 	"github.com/Mirantis/virtlet/pkg/image"
 	fakeimage "github.com/Mirantis/virtlet/pkg/image/fake"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
@@ -241,8 +243,7 @@ func makeVirtletCRITester(t *testing.T) *virtletCRITester {
 	virtTool := libvirttools.NewVirtualizationTool(
 		domainConn, storageConn, imageStore, metadataStore,
 		libvirttools.GetDefaultVolumeSource(), virtConfig,
-		utils.NullMounter, utils.FakeMountPointChecker,
-		utils.DefaultFilesManipulator, commander)
+		fakefs.NewFakeFileSystem(t, rec, "", nil), commander)
 	virtTool.SetClock(clock)
 	streamServer := newFakeStreamServer(rec.Child("streamServer"))
 	criHandler := &criHandler{
@@ -296,7 +297,7 @@ func (tst *virtletCRITester) invoke(name string, req interface{}, failOnError bo
 func (tst *virtletCRITester) getSampleFlexvolMounts(podSandboxID string) []*kubeapi.Mount {
 	flexVolumeDriver := flexvolume.NewDriver(func() string {
 		return "abb67e3c-71b3-4ddd-5505-8c4215d5c4eb"
-	}, utils.NullMounter)
+	}, fs.NullFileSystem)
 	flexVolDir := filepath.Join(tst.kubeletRootDir, podSandboxID, "volumes/virtlet~flexvolume_driver", "vol1")
 	flexVolDef := map[string]interface{}{
 		"type":     "qcow2",

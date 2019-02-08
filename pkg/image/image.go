@@ -30,8 +30,8 @@ import (
 	"github.com/golang/glog"
 	digest "github.com/opencontainers/go-digest"
 
+	"github.com/Mirantis/virtlet/pkg/fs"
 	"github.com/Mirantis/virtlet/pkg/metadata/types"
-	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 // Image describes an image.
@@ -595,7 +595,7 @@ func GetHexDigest(imageSpec string) string {
 // metadata store sizes of images and sum them, or even retrieve precalculated
 // sum. That's because same filesystem could be used by other things than images.
 func (s *FileStore) FilesystemStats() (*types.FilesystemStats, error) {
-	occupiedBytes, occupiedInodes, err := utils.GetFsStatsForPath(s.dir)
+	occupiedBytes, occupiedInodes, err := fs.GetFsStatsForPath(s.dir)
 	if err != nil {
 		return nil, err
 	}

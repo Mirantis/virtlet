@@ -1,5 +1,7 @@
+// +build !linux
+
 /*
-Copyright 2017 Mirantis
+Copyright 2018 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,20 +16,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package fs
 
 import (
-	"math/rand"
-	"os"
-	"time"
-
-	"github.com/Mirantis/virtlet/pkg/flexvolume"
-	"github.com/Mirantis/virtlet/pkg/fs"
-	"github.com/Mirantis/virtlet/pkg/utils"
+	"errors"
 )
 
-func main() {
-	rand.Seed(time.Now().UnixNano())
-	driver := flexvolume.NewDriver(utils.NewUUID, fs.RealFileSystem)
-	os.Stdout.WriteString(driver.Run(os.Args[1:]))
+// GetFsStatsForPath is a placeholder for an unimplemented function
+func GetFsStatsForPath(path string) (uint64, uint64, error) {
+	return 0, 0, errors.New("not implemented")
 }

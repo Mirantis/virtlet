@@ -1,7 +1,7 @@
 // +build linux
 
 /*
-Copyright 2018 Mirantis
+Copyright 2019 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,20 +16,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+package fs
 
 import "syscall"
 
-type mounter struct{}
-
-var _ Mounter = &mounter{}
-
-// NewMounter creates linux mounter struct
-func NewMounter() Mounter {
-	return &mounter{}
-}
-
-func (mounter *mounter) Mount(source string, target string, fstype string, bind bool) error {
+// Mount inplements Mount method of FileSystem interface.
+func (fs *realFileSystem) Mount(source string, target string, fstype string, bind bool) error {
 	flags := uintptr(0)
 	if bind {
 		flags = syscall.MS_BIND | syscall.MS_REC
@@ -37,7 +29,8 @@ func (mounter *mounter) Mount(source string, target string, fstype string, bind 
 	return syscall.Mount(source, target, fstype, flags, "")
 }
 
-func (mounter *mounter) Unmount(target string, detach bool) error {
+// Unmount inplements Unmount method of FileSystem interface.
+func (fs *realFileSystem) Unmount(target string, detach bool) error {
 	flags := 0
 	if detach {
 		flags = syscall.MNT_DETACH

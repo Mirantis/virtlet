@@ -76,7 +76,7 @@ func (v *VirtualizationTool) UpdateCpusetsForEmulatorProcess(containerID, cpuset
 		return false, err
 	}
 
-	f, err := v.filesManipulator.FileReader(pidFilePath)
+	f, err := v.fsys.GetDelimitedReader(pidFilePath)
 	if err != nil {
 		// File not found - so there is no emulator yet
 		if _, ok := err.(*os.PathError); ok {
@@ -95,7 +95,7 @@ func (v *VirtualizationTool) UpdateCpusetsForEmulatorProcess(containerID, cpuset
 		}
 	}
 
-	cm := cgroups.NewManager(pid, v.filesManipulator)
+	cm := cgroups.NewManager(pid, v.fsys)
 	controller, err := cm.GetProcessController("cpuset")
 	if err != nil {
 		return false, err

@@ -213,7 +213,7 @@ func (d *defaultDownloader) DownloadFile(ctx context.Context, endpoint Endpoint,
 	}
 
 	if f, ok := w.(*os.File); ok {
-		glog.V(2).Infof("Data from url %s saved as %q, sha256 digest = %s", url, f.Name())
+		glog.V(2).Infof("Data from url %s saved as %q", url, f.Name())
 	}
 	return nil
 }

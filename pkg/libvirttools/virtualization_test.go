@@ -1,5 +1,5 @@
 /*
-Copyright 2016-2017 Mirantis
+Copyright 2016-2019 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,6 +29,8 @@ import (
 	"github.com/jonboulle/clockwork"
 
 	"github.com/Mirantis/virtlet/pkg/flexvolume"
+	"github.com/Mirantis/virtlet/pkg/fs"
+	fakefs "github.com/Mirantis/virtlet/pkg/fs/fake"
 	"github.com/Mirantis/virtlet/pkg/metadata"
 	fakemeta "github.com/Mirantis/virtlet/pkg/metadata/fake"
 	"github.com/Mirantis/virtlet/pkg/metadata/types"
@@ -94,15 +96,12 @@ func newContainerTester(t *testing.T, rec *testutils.TopLevelRecorder, cmds []fa
 	}
 	fakeCommander := fakeutils.NewCommander(rec, cmds)
 	fakeCommander.ReplaceTempPath("__pods__", "/fakedev")
-	fm := utils.DefaultFilesManipulator
-	if files != nil {
-		fm = fakeutils.NewFakeFilesManipulator(rec, files)
-	}
+
+	fs := fakefs.NewFakeFileSystem(t, rec, "", files)
 
 	ct.virtTool = NewVirtualizationTool(
 		ct.domainConn, ct.storageConn, imageManager, ct.metadataStore,
-		GetDefaultVolumeSource(), virtConfig, utils.NullMounter,
-		utils.FakeMountPointChecker, fm,
+		GetDefaultVolumeSource(), virtConfig, fs,
 		fakeCommander)
 	ct.virtTool.SetClock(ct.clock)
 
@@ -339,7 +338,7 @@ func TestDomainDefinitions(t *testing.T) {
 	flexVolumeDriver := flexvolume.NewDriver(func() string {
 		// note that this is only good for just one flexvolume
 		return fakeUUID
-	}, utils.NullMounter)
+	}, fs.NullFileSystem)
 	for _, tc := range []struct {
 		name        string
 		annotations map[string]string
