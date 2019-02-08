@@ -89,6 +89,8 @@ func (v *cephVolume) secretDef() *libvirtxml.Secret {
 	}
 }
 
+func (v *cephVolume) IsDisk() bool { return true }
+
 func (v *cephVolume) UUID() string {
 	return v.opts.UUID
 }

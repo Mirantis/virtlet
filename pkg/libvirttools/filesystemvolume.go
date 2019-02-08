@@ -36,6 +36,8 @@ type filesystemVolume struct {
 
 var _ VMVolume = &filesystemVolume{}
 
+func (v *filesystemVolume) IsDisk() bool { return false }
+
 func (v *filesystemVolume) UUID() string { return "" }
 
 func (v *filesystemVolume) Setup() (*libvirtxml.DomainDisk, *libvirtxml.DomainFilesystem, error) {

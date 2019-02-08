@@ -74,6 +74,8 @@ func (v *rawDeviceVolume) verifyRawDeviceWhitelisted(path string) error {
 	return fmt.Errorf("device '%s' not whitelisted on this virtlet node", path)
 }
 
+func (v *rawDeviceVolume) IsDisk() bool { return true }
+
 func (v *rawDeviceVolume) UUID() string {
 	return v.opts.UUID
 }

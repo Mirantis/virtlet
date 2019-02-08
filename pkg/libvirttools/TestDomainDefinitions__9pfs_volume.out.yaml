@@ -69,9 +69,9 @@
         <disk type="file" device="cdrom">
           <driver name="qemu" type="raw"></driver>
           <source file="/var/lib/virtlet/config/config-231700d5-c9a6-5a49-738d-99a954c51550.iso"></source>
-          <target dev="sdc" bus="scsi"></target>
+          <target dev="sdb" bus="scsi"></target>
           <readonly></readonly>
-          <address type="drive" controller="0" bus="0" target="0" unit="2"></address>
+          <address type="drive" controller="0" bus="0" target="0" unit="1"></address>
         </disk>
         <controller type="scsi" index="0" model="virtio-scsi">
           <address type="pci" domain="0x0000" bus="0x00" slot="0x01" function="0x0"></address>

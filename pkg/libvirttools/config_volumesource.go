@@ -45,6 +45,8 @@ func GetConfigVolume(config *types.VMConfig, owner volumeOwner) ([]VMVolume, err
 	}, nil
 }
 
+func (v *configVolume) IsDisk() bool { return true }
+
 func (v *configVolume) UUID() string { return "" }
 
 func (v *configVolume) cloudInitGenerator() *CloudInitGenerator {

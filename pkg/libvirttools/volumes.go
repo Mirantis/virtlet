@@ -56,6 +56,7 @@ type VMVolumeSource func(config *types.VMConfig, owner volumeOwner) ([]VMVolume,
 
 // VMVolume describes a volume provider.
 type VMVolume interface {
+	IsDisk() bool
 	UUID() string
 	Setup() (*libvirtxml.DomainDisk, *libvirtxml.DomainFilesystem, error)
 	WriteImage(diskPathMap) error

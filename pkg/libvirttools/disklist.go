@@ -37,6 +37,21 @@ func (di *diskItem) setup(config *types.VMConfig) (*libvirtxml.DomainDisk, *libv
 	if err != nil {
 		return nil, nil, err
 	}
+	if di.volume.IsDisk() {
+		if diskDef == nil {
+			panic("no disk for disk volume")
+		}
+		if fsDef != nil {
+			panic("got fsDef for disk volume")
+		}
+	} else {
+		if diskDef != nil {
+			panic("got disk for fs volume")
+		}
+		if fsDef == nil {
+			panic("no fsDef for fs volume")
+		}
+	}
 	if diskDef != nil {
 		diskDef.Target = di.driver.target()
 		diskDef.Address = di.driver.address()
@@ -62,10 +77,15 @@ func newDiskList(config *types.VMConfig, source VMVolumeSource, owner volumeOwne
 		return nil, err
 	}
 	var items []*diskItem
-	for n, volume := range vmVols {
-		driver, err := diskDriverFactory(n)
-		if err != nil {
-			return nil, err
+	n := 0
+	for _, volume := range vmVols {
+		var driver diskDriver
+		if volume.IsDisk() {
+			driver, err = diskDriverFactory(n)
+			if err != nil {
+				return nil, err
+			}
+			n++
 		}
 		items = append(items, &diskItem{driver, volume})
 	}
@@ -111,7 +131,7 @@ func (dl *diskList) writeImages(domain virt.Domain) error {
 	volumeMap := make(diskPathMap)
 	for _, item := range dl.items {
 		uuid := item.volume.UUID()
-		if uuid != "" {
+		if uuid != "" && item.driver != nil {
 			diskPath, err := item.driver.diskPath(domainDesc)
 			if err != nil {
 				return err

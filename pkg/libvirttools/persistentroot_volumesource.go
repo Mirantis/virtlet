@@ -43,6 +43,8 @@ func (v *persistentRootVolume) devHandler() *blockdev.LogicalDeviceHandler {
 	return blockdev.NewLogicalDeviceHandler(v.owner.Commander(), "", "")
 }
 
+func (v *persistentRootVolume) IsDisk() bool { return true }
+
 func (v *persistentRootVolume) UUID() string {
 	return v.dev.UUID()
 }

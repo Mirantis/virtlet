@@ -93,6 +93,8 @@ func (v *qcow2Volume) createQCOW2Volume(capacity uint64, capacityUnit string) (v
 	})
 }
 
+func (v *qcow2Volume) IsDisk() bool { return true }
+
 func (v *qcow2Volume) UUID() string {
 	return v.uuid
 }
