@@ -25,7 +25,8 @@ import (
 )
 
 const (
-	NginxImage = "nginx:1.14"
+	NginxImage   = "docker.io/nginx:1.14.2"
+	BusyboxImage = "docker.io/busybox:1.30.0"
 )
 
 // ErrTimeout is the timeout error returned from functions wrapped by WithTimeout

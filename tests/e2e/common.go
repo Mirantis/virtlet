@@ -51,6 +51,12 @@ var (
 	controller            *framework.Controller
 )
 
+// UsingCirros() returns true if cirros image is being used for tests
+// (which has some limitations)
+func UsingCirros() bool {
+	return strings.Contains(*vmImageLocation, "cirros")
+}
+
 // scheduleWaitSSH schedules SSH interface initialization before the test context starts
 func scheduleWaitSSH(vm **framework.VMInterface, ssh *framework.Executor) {
 	BeforeAll(func() {
