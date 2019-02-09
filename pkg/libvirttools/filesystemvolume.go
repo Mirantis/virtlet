@@ -53,7 +53,7 @@ func (v *filesystemVolume) Setup() (*libvirtxml.DomainDisk, *libvirtxml.DomainFi
 		err = fsys.ChownForEmulator(v.volumeMountPoint, v.chownRecursively)
 	}
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create vm pod path: %v", err)
+		return nil, nil, fmt.Errorf("failed to create vm pod path %q: %v", v.volumeMountPoint, err)
 	}
 
 	fsDef := &libvirtxml.DomainFilesystem{
