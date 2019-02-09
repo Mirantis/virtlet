@@ -18,15 +18,27 @@ limitations under the License.
 
 package fs
 
-import "syscall"
+import (
+	"fmt"
+	"os/exec"
+	"syscall"
+)
 
 // Mount inplements Mount method of FileSystem interface.
 func (fs *realFileSystem) Mount(source string, target string, fstype string, bind bool) error {
-	flags := uintptr(0)
-	if bind {
-		flags = syscall.MS_BIND | syscall.MS_REC
+	if !bind {
+		return syscall.Mount(source, target, fstype, uintptr(0), "")
 	}
-	return syscall.Mount(source, target, fstype, flags, "")
+
+	// In case of bind mounts, we want to do it in the outer mount namespace.
+	// This is used for hostPath volumes, for example.
+	args := []string{"/usr/bin/nsenter", "-t", "1", "-m", "/bin/mount", "--bind", source, target}
+	if out, err := exec.Command(args[0], args[1:]...).CombinedOutput(); err != nil {
+		return fmt.Errorf("mount %v: %v; output: %v", args, err, string(out))
+	}
+
+	return nil
+
 }
 
 // Unmount inplements Unmount method of FileSystem interface.

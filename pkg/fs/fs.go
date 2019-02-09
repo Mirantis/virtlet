@@ -51,7 +51,8 @@ type DelimitedReader interface {
 // FileSystem defines a filesystem interface interface
 type FileSystem interface {
 	// Mount mounts the specified source under the target path.
-	// For bind mounts, bind must be true.
+	// For bind mounts, bind must be true. The bind mounts will
+	// happen in the host mount namespace (that of PID 1).
 	Mount(source string, target string, fstype string, bind bool) error
 	// Unmount unmounts the specified target directory. If detach
 	// is true, MNT_DETACH option is used (disconnect the
