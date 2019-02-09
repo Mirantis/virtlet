@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/Mirantis/virtlet/tests/e2e/framework"
 	"github.com/golang/glog"
@@ -93,7 +92,11 @@ func checkInterPodConnectivity(instance *VMInstance) error {
 
 func startNginxPod(controller *framework.Controller) (*framework.PodInterface, error) {
 	// Create a Pod to test in-cluster network connectivity
-	p, err := controller.RunPod("nginx", framework.NginxImage, nil, time.Minute*4, 80)
+	p, err := controller.RunPod(
+		"nginx", framework.NginxImage,
+		framework.RunPodOptions{
+			ExposePorts: []int32{80},
+		})
 	if err != nil {
 		return nil, err
 	}

@@ -51,13 +51,37 @@ import (
 
 	virtlet_v1 "github.com/Mirantis/virtlet/pkg/api/virtlet.k8s/v1"
 	virtletclientv1 "github.com/Mirantis/virtlet/pkg/client/clientset/versioned/typed/virtlet.k8s/v1"
+	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 const (
-	retries = 5
+	retries              = 5
+	defaultRunPodTimeout = 4 * time.Minute
 )
 
 var ClusterURL = flag.String("cluster-url", "http://127.0.0.1:8080", "apiserver URL")
+
+// HostPathMount specifies a host path to mount into a pod sandbox.
+type HostPathMount struct {
+	// The path on the host.
+	HostPath string
+	// The path inside the container.
+	ContainerPath string
+}
+
+// RunPodOptions specifies the options for RunPod
+type RunPodOptions struct {
+	// The command to run (optional).
+	Command []string
+	// Timeout. Defaults to 4 minutes.
+	Timeout time.Duration
+	// The list of ports to expose.
+	ExposePorts []int32
+	// The list of host paths to mount.
+	HostPathMounts []HostPathMount
+	// Node name to run this pod on.
+	NodeName string
+}
 
 // Controller is the entry point for various operations on k8s+virtlet entities
 type Controller struct {
@@ -363,31 +387,20 @@ func (c *Controller) Namespace() string {
 }
 
 // RunPod is a helper method to create a pod in a simple configuration (similar to `kubectl run`)
-func (c *Controller) RunPod(name, image string, command []string, timeout time.Duration, exposePorts ...int32) (*PodInterface, error) {
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   name,
-			Labels: map[string]string{"id": name},
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:            name,
-					Image:           image,
-					ImagePullPolicy: v1.PullIfNotPresent,
-					Command:         command,
-				},
-			},
-		},
+func (c *Controller) RunPod(name, image string, opts RunPodOptions) (*PodInterface, error) {
+	if opts.Timeout == 0 {
+		opts.Timeout = defaultRunPodTimeout
 	}
+	pod := generatePodSpec(name, image, opts)
+	fmt.Printf("POD:\n%s\n", utils.ToJSON(pod))
 	podInterface := newPodInterface(c, pod)
 	if err := podInterface.Create(); err != nil {
 		return nil, err
 	}
-	if err := podInterface.Wait(timeout); err != nil {
+	if err := podInterface.Wait(opts.Timeout); err != nil {
 		return nil, err
 	}
-	if len(exposePorts) > 0 {
+	if len(opts.ExposePorts) > 0 {
 		svc := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
@@ -396,7 +409,7 @@ func (c *Controller) RunPod(name, image string, command []string, timeout time.D
 				Selector: map[string]string{"id": name},
 			},
 		}
-		for _, port := range exposePorts {
+		for _, port := range opts.ExposePorts {
 			svc.Spec.Ports = append(svc.Spec.Ports, v1.ServicePort{
 				Name: fmt.Sprintf("port%d", port),
 				Port: port,
@@ -409,4 +422,49 @@ func (c *Controller) RunPod(name, image string, command []string, timeout time.D
 		podInterface.hasService = true
 	}
 	return podInterface, nil
+}
+
+func generatePodSpec(name, image string, opts RunPodOptions) *v1.Pod {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: map[string]string{"id": name},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            name,
+					Image:           image,
+					ImagePullPolicy: v1.PullIfNotPresent,
+					Command:         opts.Command,
+				},
+			},
+		},
+	}
+
+	if opts.NodeName != "" {
+		pod.Spec.NodeSelector = map[string]string{
+			"kubernetes.io/hostname": opts.NodeName,
+		}
+	}
+
+	for n, hpm := range opts.HostPathMounts {
+		name := fmt.Sprintf("vol%d", n)
+		pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{
+			Name: name,
+			VolumeSource: v1.VolumeSource{
+				HostPath: &v1.HostPathVolumeSource{
+					Path: hpm.HostPath,
+				},
+			},
+		})
+		pod.Spec.Containers[0].VolumeMounts = append(
+			pod.Spec.Containers[0].VolumeMounts,
+			v1.VolumeMount{
+				Name:      name,
+				MountPath: hpm.ContainerPath,
+			})
+	}
+
+	return pod
 }
