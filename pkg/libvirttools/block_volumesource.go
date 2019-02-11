@@ -32,6 +32,8 @@ type blockVolume struct {
 
 var _ VMVolume = &blockVolume{}
 
+func (v *blockVolume) IsDisk() bool { return true }
+
 func (v *blockVolume) UUID() string {
 	return v.dev.UUID()
 }

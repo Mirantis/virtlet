@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Mirantis/virtlet/pkg/fs"
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
@@ -53,12 +54,12 @@ type UUIDGen func() string
 // https://kubernetes.io/docs/concepts/storage/volumes/#flexVolume
 type Driver struct {
 	uuidGen UUIDGen
-	mounter utils.Mounter
+	fs      fs.FileSystem
 }
 
 // NewDriver creates a Driver struct
-func NewDriver(uuidGen UUIDGen, mounter utils.Mounter) *Driver {
-	return &Driver{uuidGen: uuidGen, mounter: mounter}
+func NewDriver(uuidGen UUIDGen, fs fs.FileSystem) *Driver {
+	return &Driver{uuidGen: uuidGen, fs: fs}
 }
 
 func (d *Driver) populateVolumeDir(targetDir string, opts map[string]interface{}) error {
@@ -119,7 +120,7 @@ func (d *Driver) mount(targetMountDir, jsonOptions string) (map[string]interface
 		return nil, err
 	}
 
-	if err := d.mounter.Mount("tmpfs", targetMountDir, "tmpfs", false); err != nil {
+	if err := d.fs.Mount("tmpfs", targetMountDir, "tmpfs", false); err != nil {
 		return nil, fmt.Errorf("error mounting tmpfs at %q: %v", targetMountDir, err)
 	}
 
@@ -127,7 +128,7 @@ func (d *Driver) mount(targetMountDir, jsonOptions string) (map[string]interface
 	defer func() {
 		// try to unmount upon error or panic
 		if !done {
-			d.mounter.Unmount(targetMountDir, true)
+			d.fs.Unmount(targetMountDir, true)
 		}
 	}()
 
@@ -141,7 +142,7 @@ func (d *Driver) mount(targetMountDir, jsonOptions string) (map[string]interface
 
 // Invocation: <driver executable> unmount <mount dir>
 func (d *Driver) unmount(targetMountDir string) (map[string]interface{}, error) {
-	if err := d.mounter.Unmount(targetMountDir, true); err != nil {
+	if err := d.fs.Unmount(targetMountDir, true); err != nil {
 		return nil, fmt.Errorf("unmount %q: %v", targetMountDir, err.Error())
 	}
 

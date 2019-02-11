@@ -1,5 +1,5 @@
 /*
-Copyright 2016-2017 Mirantis
+Copyright 2016-2019 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,6 +29,8 @@ import (
 	"github.com/jonboulle/clockwork"
 
 	"github.com/Mirantis/virtlet/pkg/flexvolume"
+	"github.com/Mirantis/virtlet/pkg/fs"
+	fakefs "github.com/Mirantis/virtlet/pkg/fs/fake"
 	"github.com/Mirantis/virtlet/pkg/metadata"
 	fakemeta "github.com/Mirantis/virtlet/pkg/metadata/fake"
 	"github.com/Mirantis/virtlet/pkg/metadata/types"
@@ -85,24 +87,23 @@ func newContainerTester(t *testing.T, rec *testutils.TopLevelRecorder, cmds []fa
 	}
 
 	imageManager := newFakeImageManager(ct.rec)
-	ct.kubeletRootDir = filepath.Join(ct.tmpDir, "kubelet-root")
+	ct.kubeletRootDir = filepath.Join(ct.tmpDir, "__fs__/kubelet-root")
+	mountDir := filepath.Join(ct.tmpDir, "__fs__/mounts")
 	virtConfig := VirtualizationConfig{
-		VolumePoolName:     "volumes",
-		RawDevices:         []string{"loop*"},
-		KubeletRootDir:     ct.kubeletRootDir,
-		StreamerSocketPath: "/var/lib/libvirt/streamer.sock",
+		VolumePoolName:       "volumes",
+		RawDevices:           []string{"loop*"},
+		KubeletRootDir:       ct.kubeletRootDir,
+		StreamerSocketPath:   "/var/lib/libvirt/streamer.sock",
+		SharedFilesystemPath: mountDir,
 	}
 	fakeCommander := fakeutils.NewCommander(rec, cmds)
 	fakeCommander.ReplaceTempPath("__pods__", "/fakedev")
-	fm := utils.DefaultFilesManipulator
-	if files != nil {
-		fm = fakeutils.NewFakeFilesManipulator(rec, files)
-	}
+
+	fs := fakefs.NewFakeFileSystem(t, rec, mountDir, files)
 
 	ct.virtTool = NewVirtualizationTool(
 		ct.domainConn, ct.storageConn, imageManager, ct.metadataStore,
-		GetDefaultVolumeSource(), virtConfig, utils.NullMounter,
-		utils.FakeMountPointChecker, fm,
+		GetDefaultVolumeSource(), virtConfig, fs,
 		fakeCommander)
 	ct.virtTool.SetClock(ct.clock)
 
@@ -327,6 +328,7 @@ func TestDoubleStartError(t *testing.T) {
 type volMount struct {
 	name          string
 	containerPath string
+	podSubpath    string
 }
 
 type volDevice struct {
@@ -339,7 +341,7 @@ func TestDomainDefinitions(t *testing.T) {
 	flexVolumeDriver := flexvolume.NewDriver(func() string {
 		// note that this is only good for just one flexvolume
 		return fakeUUID
-	}, utils.NullMounter)
+	}, fs.NullFileSystem)
 	for _, tc := range []struct {
 		name        string
 		annotations map[string]string
@@ -405,6 +407,7 @@ func TestDomainDefinitions(t *testing.T) {
 				{
 					name:          "ceph",
 					containerPath: "/var/lib/whatever",
+					podSubpath:    "volumes/virtlet~flexvolume_driver",
 				},
 			},
 		},
@@ -463,6 +466,16 @@ func TestDomainDefinitions(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "9pfs volume",
+			mounts: []volMount{
+				{
+					name:          "9pfs-vol",
+					containerPath: "/var/lib/foobar",
+					podSubpath:    "volumes/kubernetes.io~rbd",
+				},
+			},
+		},
 		// TODO: add test cases for rootfs / persistent rootfs file injection
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -491,7 +504,7 @@ func TestDomainDefinitions(t *testing.T) {
 			var mounts []types.VMMount
 			for _, m := range tc.mounts {
 				mounts = append(mounts, types.VMMount{
-					HostPath:      filepath.Join(ct.kubeletRootDir, sandbox.Uid, "volumes/virtlet~flexvolume_driver", m.name),
+					HostPath:      filepath.Join(ct.kubeletRootDir, sandbox.Uid, m.podSubpath, m.name),
 					ContainerPath: m.containerPath,
 				})
 			}

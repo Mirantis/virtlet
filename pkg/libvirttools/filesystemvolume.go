@@ -36,21 +36,24 @@ type filesystemVolume struct {
 
 var _ VMVolume = &filesystemVolume{}
 
+func (v *filesystemVolume) IsDisk() bool { return false }
+
 func (v *filesystemVolume) UUID() string { return "" }
 
 func (v *filesystemVolume) Setup() (*libvirtxml.DomainDisk, *libvirtxml.DomainFilesystem, error) {
+	fsys := v.owner.FileSystem()
 	err := os.MkdirAll(v.volumeMountPoint, 0777)
 	if err == nil {
-		err = ChownForEmulator(v.volumeMountPoint, false)
+		err = fsys.ChownForEmulator(v.volumeMountPoint, false)
 	}
 	if err == nil {
-		err = v.owner.Mounter().Mount(v.mount.HostPath, v.volumeMountPoint, "bind", true)
+		err = fsys.Mount(v.mount.HostPath, v.volumeMountPoint, "bind", true)
 	}
 	if err == nil {
-		err = ChownForEmulator(v.volumeMountPoint, v.chownRecursively)
+		err = fsys.ChownForEmulator(v.volumeMountPoint, v.chownRecursively)
 	}
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create vm pod path: %v", err)
+		return nil, nil, fmt.Errorf("failed to create vm pod path %q: %v", v.volumeMountPoint, err)
 	}
 
 	fsDef := &libvirtxml.DomainFilesystem{
@@ -65,7 +68,7 @@ func (v *filesystemVolume) Setup() (*libvirtxml.DomainDisk, *libvirtxml.DomainFi
 func (v *filesystemVolume) Teardown() error {
 	var err error
 	if _, err = os.Stat(v.volumeMountPoint); err == nil {
-		err = v.owner.Mounter().Unmount(v.volumeMountPoint, true)
+		err = v.owner.FileSystem().Unmount(v.volumeMountPoint, true)
 	}
 	if err == nil {
 		err = os.Remove(v.volumeMountPoint)

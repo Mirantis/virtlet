@@ -22,11 +22,12 @@ import (
 	"time"
 
 	"github.com/Mirantis/virtlet/pkg/flexvolume"
+	"github.com/Mirantis/virtlet/pkg/fs"
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
-	driver := flexvolume.NewDriver(utils.NewUUID, utils.NewMounter())
+	driver := flexvolume.NewDriver(utils.NewUUID, fs.RealFileSystem)
 	os.Stdout.WriteString(driver.Run(os.Args[1:]))
 }

@@ -26,6 +26,7 @@ import (
 
 	"github.com/Mirantis/virtlet/pkg/api/virtlet.k8s/v1"
 	"github.com/Mirantis/virtlet/pkg/diag"
+	"github.com/Mirantis/virtlet/pkg/fs"
 	"github.com/Mirantis/virtlet/pkg/image"
 	"github.com/Mirantis/virtlet/pkg/imagetranslation"
 	"github.com/Mirantis/virtlet/pkg/libvirttools"
@@ -134,16 +135,10 @@ func (v *VirtletManager) Run() error {
 		virtConfig.StreamerSocketPath = streamerSocketPath
 	}
 
-	mpc, err := utils.NewMountPointChecker()
-	if err != nil {
-		return fmt.Errorf("couldn't create mountpoint checker: %v", err)
-	}
-
 	volSrc := libvirttools.GetDefaultVolumeSource()
 	v.virtTool = libvirttools.NewVirtualizationTool(
 		conn, conn, v.imageStore, v.metadataStore, volSrc, virtConfig,
-		utils.NewMounter(), mpc, utils.DefaultFilesManipulator,
-		utils.DefaultCommander)
+		fs.RealFileSystem, utils.DefaultCommander)
 
 	runtimeService := NewVirtletRuntimeService(v.virtTool, v.metadataStore, v.fdManager, streamServer, v.imageStore, nil)
 	imageService := NewVirtletImageService(v.imageStore, translator, nil)

@@ -1,5 +1,7 @@
+// +build !linux
+
 /*
-Copyright 2017 Mirantis
+Copyright 2018 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,33 +16,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fake
+package fs
 
 import (
-	"strings"
+	"errors"
 )
 
-var pathReplacements = [][2]string{
-	{
-		"/__config__/",
-		"/var/lib/virtlet/config/",
-	},
-	{
-		"/__pods__/",
-		"/var/lib/kubelet/pods/",
-	},
-	{
-		"/__fs__/",
-		"/",
-	},
-}
-
-func fixPath(s string) string {
-	for _, pr := range pathReplacements {
-		p := strings.Index(s, pr[0])
-		if p >= 0 {
-			s = pr[1] + s[p+len(pr[0]):]
-		}
-	}
-	return s
+// GetFsStatsForPath is a placeholder for an unimplemented function
+func GetFsStatsForPath(path string) (uint64, uint64, error) {
+	return 0, 0, errors.New("not implemented")
 }

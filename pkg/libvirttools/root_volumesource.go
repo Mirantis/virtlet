@@ -89,6 +89,8 @@ func (v *rootVolume) createVolume() (virt.StorageVolume, error) {
 	})
 }
 
+func (v *rootVolume) IsDisk() bool { return true }
+
 func (v *rootVolume) UUID() string { return "" }
 
 func (v *rootVolume) Setup() (*libvirtxml.DomainDisk, *libvirtxml.DomainFilesystem, error) {

@@ -95,7 +95,7 @@ func (v *VirtualizationTool) checkSandboxNetNs(sandbox metadata.PodSandboxMetada
 		return err
 	}
 
-	if !v.mountPointChecker.IsPathAnNs(sinfo.ContainerSideNetwork.NsPath) {
+	if !v.fsys.IsPathAnNs(sinfo.ContainerSideNetwork.NsPath) {
 		// NS didn't found, need RunSandbox again
 		if err := sandbox.Save(func(s *types.PodSandboxInfo) (*types.PodSandboxInfo, error) {
 			if s != nil {

@@ -411,4 +411,10 @@ func removeVolatilePathsFromDomainDef(def *libvirtxml.Domain) {
 		}
 		*toUpdate = fixPath(*toUpdate)
 	}
+
+	for _, fs := range def.Devices.Filesystems {
+		if fs.Source != nil && fs.Source.Mount != nil {
+			fs.Source.Mount.Dir = fixPath(fs.Source.Mount.Dir)
+		}
+	}
 }

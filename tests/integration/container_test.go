@@ -28,6 +28,7 @@ import (
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
 	"github.com/Mirantis/virtlet/pkg/flexvolume"
+	"github.com/Mirantis/virtlet/pkg/fs"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/Mirantis/virtlet/tests/criapi"
 )
@@ -67,7 +68,7 @@ func newContainerTester(t *testing.T) *containerTester {
 			{Image: imageCirrosUrl},
 			{Image: imageCopyCirrosUrl},
 		},
-		fv: flexvolume.NewDriver(utils.NewUUID, utils.NewMounter()),
+		fv: flexvolume.NewDriver(utils.NewUUID, fs.RealFileSystem),
 	}
 }
 

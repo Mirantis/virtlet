@@ -1,7 +1,7 @@
-// +build linux
+// +build !linux
 
 /*
-Copyright 2018 Mirantis
+Copyright 2019 Mirantis
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,18 +16,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+package fs
 
-import (
-	"syscall"
-)
+// Mount inplements Mount method of FileSystem interface.
+func (fs *realFileSystem) Mount(source string, target string, fstype string, bind bool) error {
+	panic("Not implemented")
+}
 
-// GetFsStatsForPath returns the info about inode usage and space usage
-// (in bytes) for the filesystem that contains the provided path.
-func GetFsStatsForPath(path string) (uint64, uint64, error) {
-	fs := syscall.Statfs_t{}
-	if err := syscall.Statfs(path, &fs); err != nil {
-		return 0, 0, err
-	}
-	return (fs.Blocks - fs.Bfree) * uint64(fs.Bsize), fs.Files - fs.Ffree, nil
+// Unmount inplements Unmount method of FileSystem interface.
+func (fs *realFileSystem) Unmount(target string, detach bool) error {
+	panic("Not implemented")
 }

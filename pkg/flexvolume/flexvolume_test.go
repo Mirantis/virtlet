@@ -18,15 +18,14 @@ package flexvolume
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
+	fakefs "github.com/Mirantis/virtlet/pkg/fs/fake"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	testutils "github.com/Mirantis/virtlet/pkg/utils/testing"
 )
@@ -34,75 +33,6 @@ import (
 const (
 	fakeUUID = "abb67e3c-71b3-4ddd-5505-8c4215d5c4eb"
 )
-
-type fakeMounter struct {
-	t       *testing.T
-	tmpDir  string
-	journal []string
-}
-
-var _ utils.Mounter = &fakeMounter{}
-
-func newFakeMounter(t *testing.T, tmpDir string) *fakeMounter {
-	return &fakeMounter{t: t, tmpDir: tmpDir}
-}
-
-func (mounter *fakeMounter) validatePath(target string) {
-	if filepath.Dir(target) != filepath.Clean(mounter.tmpDir) {
-		mounter.t.Fatalf("bad path encountered by the mounter: %q (tmpDir %q)", target, mounter.tmpDir)
-	}
-}
-
-func (mounter *fakeMounter) Mount(source string, target string, fstype string, bind bool) error {
-	mounter.validatePath(target)
-	mounter.journal = append(mounter.journal, fmt.Sprintf("mount: %s %s %s %v", source, target, fstype, bind))
-
-	// We want to check directory contents both before & after mount,
-	// see comment in FlexVolumeDriver.mount() in flexvolume.go.
-	// So we move the original contents to .shadowed subdir.
-	shadowedPath := filepath.Join(target, ".shadowed")
-	if err := os.Mkdir(shadowedPath, 0755); err != nil {
-		mounter.t.Fatalf("os.Mkdir(): %v", err)
-	}
-
-	pathsToShadow, err := filepath.Glob(filepath.Join(target, "*"))
-	if err != nil {
-		mounter.t.Fatalf("filepath.Glob(): %v", err)
-	}
-	for _, pathToShadow := range pathsToShadow {
-		filename := filepath.Base(pathToShadow)
-		if filename == ".shadowed" {
-			continue
-		}
-		if err := os.Rename(pathToShadow, filepath.Join(shadowedPath, filename)); err != nil {
-			mounter.t.Fatalf("os.Rename(): %v", err)
-		}
-	}
-	return nil
-}
-
-func (mounter *fakeMounter) Unmount(target string, detach bool) error {
-	// we make sure that path is under our tmpdir before wiping it
-	mounter.validatePath(target)
-	mounter.journal = append(mounter.journal, fmt.Sprintf("unmount: %s %v", target, detach))
-
-	paths, err := filepath.Glob(filepath.Join(target, "*"))
-	if err != nil {
-		mounter.t.Fatalf("filepath.Glob(): %v", err)
-	}
-	for _, path := range paths {
-		if filepath.Base(path) != ".shadowed" {
-			continue
-		}
-		if err := os.RemoveAll(path); err != nil {
-			mounter.t.Fatalf("os.RemoveAll(): %v", err)
-		}
-	}
-
-	// We don't clean up '.shadowed' dir here because flexvolume driver
-	// recursively removes the whole dir tree anyway.
-	return nil
-}
 
 func TestFlexVolume(t *testing.T) {
 	tmpDir, err := ioutil.TempDir("", "flexvolume-test")
@@ -134,7 +64,7 @@ func TestFlexVolume(t *testing.T) {
 		message      string
 		fields       map[string]interface{}
 		files        map[string]interface{}
-		mountJournal []string
+		mountJournal []*testutils.Record
 	}{
 		{
 			name:   "init",
@@ -185,8 +115,11 @@ func TestFlexVolume(t *testing.T) {
 					"virtlet-flexvolume.json": utils.ToJSONUnindented(cephJSONVolumeInfo),
 				},
 			},
-			mountJournal: []string{
-				fmt.Sprintf("mount: tmpfs %s tmpfs false", cephDir),
+			mountJournal: []*testutils.Record{
+				{
+					Name:  "Mount",
+					Value: []interface{}{"tmpfs", cephDir, "tmpfs", false},
+				},
 			},
 		},
 		{
@@ -194,8 +127,11 @@ func TestFlexVolume(t *testing.T) {
 			args:   []string{"unmount", cephDir},
 			status: "Success",
 			subdir: "ceph",
-			mountJournal: []string{
-				fmt.Sprintf("unmount: %s true", cephDir),
+			mountJournal: []*testutils.Record{
+				{
+					Name:  "Unmount",
+					Value: []interface{}{cephDir, true},
+				},
 			},
 		},
 		{
@@ -209,8 +145,11 @@ func TestFlexVolume(t *testing.T) {
 					"virtlet-flexvolume.json": utils.ToJSONUnindented(cephJSONVolumeInfo),
 				},
 			},
-			mountJournal: []string{
-				fmt.Sprintf("mount: tmpfs %s tmpfs false", cephDir),
+			mountJournal: []*testutils.Record{
+				{
+					Name:  "Mount",
+					Value: []interface{}{"tmpfs", cephDir, "tmpfs", false},
+				},
 			},
 		},
 		{
@@ -218,8 +157,11 @@ func TestFlexVolume(t *testing.T) {
 			args:   []string{"unmount", cephDir},
 			status: "Success",
 			subdir: "ceph",
-			mountJournal: []string{
-				fmt.Sprintf("unmount: %s true", cephDir),
+			mountJournal: []*testutils.Record{
+				{
+					Name:  "Unmount",
+					Value: []interface{}{cephDir, true},
+				},
 			},
 		},
 		{
@@ -256,10 +198,11 @@ func TestFlexVolume(t *testing.T) {
 		t.Run(step.name, func(t *testing.T) {
 			var subdir string
 			args := step.args
-			mounter := newFakeMounter(t, tmpDir)
+			rec := testutils.NewToplevelRecorder()
+			fs := fakefs.NewFakeFileSystem(t, rec, tmpDir, nil)
 			d := NewDriver(func() string {
 				return fakeUUID
-			}, mounter)
+			}, fs)
 			result := d.Run(args)
 			var m map[string]interface{}
 			if err := json.Unmarshal([]byte(result), &m); err != nil {
@@ -299,8 +242,8 @@ func TestFlexVolume(t *testing.T) {
 					t.Errorf("bad file content.\n%s\n-- instead of --\n%s", utils.ToJSON(files), utils.ToJSON(step.files))
 				}
 			}
-			if !reflect.DeepEqual(mounter.journal, step.mountJournal) {
-				t.Errorf("unexpected mount journal: %#v instead of %#v", mounter.journal, step.mountJournal)
+			if !reflect.DeepEqual(rec.Content(), step.mountJournal) {
+				t.Errorf("unexpected mount journal: %#v instead of %#v", rec.Content(), step.mountJournal)
 			}
 		})
 	}
