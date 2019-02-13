@@ -106,6 +106,8 @@ type FDSource interface {
 	// specified key. It's intended to be called after
 	// Virtlet restart.
 	Recover(key string, data []byte) error
+	// RetrieveFDs retrieves FDs in case the FD is null
+	RetrieveFDs(key string) ([]int, error)
 	// Stop stops any goroutines associated with FDSource
 	// but doesn't release the namespaces
 	Stop() error
@@ -161,6 +163,19 @@ func (s *FDServer) getFDs(key string) ([]int, error) {
 	fds, found := s.fds[key]
 	if !found {
 		return nil, fmt.Errorf("bad fd key: %q", key)
+	}
+
+	var err error
+	if fds == nil {
+		// Run here means:
+		// first: the virtlet gets restarted and recoverNetworkNamespaces is called
+		//        but tap fd is missing
+		// then: VM gets restarted for some reasons
+		fds, err = s.source.RetrieveFDs(key)
+		if err != nil {
+			return nil, err
+		}
+		s.fds[key] = fds
 	}
 	return fds, nil
 }
