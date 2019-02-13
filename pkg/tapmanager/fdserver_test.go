@@ -79,6 +79,13 @@ func (s *sampleFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) 
 	return []int{int(f.Fd())}, []byte("abcdef"), nil
 }
 
+func (s *sampleFDSource) RetrieveFDs(key string) ([]int, error) {
+	if s.stopped {
+		return nil, errors.New("sampleFDSource is stopped")
+	}
+	return nil, nil
+}
+
 func (s *sampleFDSource) Recover(key string, data []byte) error {
 	if s.stopped {
 		return errors.New("sampleFDSource is stopped")
