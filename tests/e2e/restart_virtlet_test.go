@@ -19,7 +19,9 @@ package e2e
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	. "github.com/onsi/gomega"
@@ -64,15 +66,22 @@ var _ = Describe("Virtlet restart", func() {
 		defer closeFunc()
 		localExecutor := framework.LocalExecutor(ctx)
 
-		By(fmt.Sprintf("Running command: kubectl logs -n %s %s", controller.Namespace(), vm.Name))
-		err := localExecutor.Run(nil, &stdout, &stdout, "kubectl", "-n", controller.Namespace(), "logs", vm.Name)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(stdout.String()).Should(ContainSubstring("login as 'cirros' user."))
+		Eventually(func() error {
+			By(fmt.Sprintf("Running command: kubectl logs -n %s %s", controller.Namespace(), vm.Name))
+			err := localExecutor.Run(nil, &stdout, &stdout, "kubectl", "-n", controller.Namespace(), "logs", vm.Name)
+			if err != nil {
+				return err
+			}
+			if !strings.Contains(stdout.String(), "login as 'cirros' user.") {
+				return errors.New("no login substring in stdout")
+			}
+			return err
+		}, 60*5, 3).Should(Succeed())
 
 		By(fmt.Sprintf("Running command: kubectl attach -n %s -i %s", controller.Namespace(), vm.Name))
 		stdin := bytes.NewBufferString("\nTESTTEXT\n\n")
 		stdout.Reset()
-		err = localExecutor.Run(stdin, &stdout, &stdout, "kubectl", "-n", controller.Namespace(), "attach", "-i", vm.Name)
+		err := localExecutor.Run(stdin, &stdout, &stdout, "kubectl", "-n", controller.Namespace(), "attach", "-i", vm.Name)
 		Expect(err).NotTo(HaveOccurred())
 
 		By(fmt.Sprintf("Running again command: kubectl logs -n %s %s", controller.Namespace(), vm.Name))
