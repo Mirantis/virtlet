@@ -28,7 +28,7 @@ import (
 	. "github.com/Mirantis/virtlet/tests/e2e/ginkgo-ext"
 )
 
-var _ = Describe("Virtlet restart [Disruptive]", func() {
+var _ = Describe("Virtlet restart", func() {
 	var (
 		vm *framework.VMInterface
 	)
