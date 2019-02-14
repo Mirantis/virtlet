@@ -7,6 +7,7 @@ set -o errtrace
 CRIPROXY_DEB_URL="${CRIPROXY_DEB_URL:-https://github.com/Mirantis/criproxy/releases/download/v0.14.0/criproxy-nodeps_0.14.0_amd64.deb}"
 VIRTLET_IMAGE="${VIRTLET_IMAGE:-mirantis/virtlet}"
 VIRTLET_SKIP_RSYNC="${VIRTLET_SKIP_RSYNC:-}"
+VIRTLET_SKIP_VENDOR="${VIRTLET_SKIP_VENDOR:-false}"
 VIRTLET_RSYNC_PORT="${VIRTLET_RSYNC_PORT:-18730}"
 VIRTLET_ON_MASTER="${VIRTLET_ON_MASTER:-}"
 VIRTLET_MULTI_NODE="${VIRTLET_MULTI_NODE:-}"
@@ -180,6 +181,7 @@ function ensure_build_container {
                -e VIRTLET_MULTI_NODE="${VIRTLET_MULTI_NODE:-}" \
                -e GITHUB_TOKEN="${GITHUB_TOKEN:-}" \
                -e MKDOCS_SERVE_ADDRESS="${MKDOCS_SERVE_ADDRESS:-}" \
+               -e VIRTLET_SKIP_VENDOR="${VIRTLET_SKIP_VENDOR:-false}" \
                ${docker_cert_args[@]+"${docker_cert_args[@]}"} \
                --name virtlet-build \
                --tmpfs /tmp \
@@ -215,9 +217,11 @@ function sync_source {
     cd "${project_dir}"
     if [[ ! ${VIRTLET_SKIP_RSYNC} ]]; then
         local -a filters=(
-            --filter '- /vendor/'
             --filter '- /_output/'
         )
+        if [[ ${VIRTLET_SKIP_VENDOR:-false} != "true" ]]; then
+            filters+=(--filter '- /vendor/')
+        fi
         if [[ ! ${rsync_git} ]]; then
             filters+=(--filter '- /.git/')
         fi
@@ -532,6 +536,7 @@ function update_generated_docs_internal {
 }
 
 function update_generated_internal {
+  install_vendor_internal
   vendor/k8s.io/code-generator/generate-groups.sh all \
     github.com/Mirantis/virtlet/pkg/client github.com/Mirantis/virtlet/pkg/api \
     virtlet.k8s:v1 \
