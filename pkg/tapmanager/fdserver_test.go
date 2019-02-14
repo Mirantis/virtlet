@@ -79,6 +79,31 @@ func (s *sampleFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) 
 	return []int{int(f.Fd())}, []byte("abcdef"), nil
 }
 
+func (s *sampleFDSource) RetrieveFDs(key string) ([]int, error) {
+	if s.stopped {
+		return nil, errors.New("sampleFDSource is stopped")
+	}
+
+	f, err := os.Open(filepath.Join(s.tmpDir, key))
+	if err != nil {
+		return nil, err
+	}
+
+	content, err := ioutil.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+
+	if string(content) != "42" {
+		return nil, fmt.Errorf("bad data passed to RetrieveFDs: %q", content)
+	}
+
+	if err = os.Remove(filepath.Join(s.tmpDir, key)); err != nil {
+		return nil, err
+	}
+	return []int{int(f.Fd())}, nil
+}
+
 func (s *sampleFDSource) Recover(key string, data []byte) error {
 	if s.stopped {
 		return errors.New("sampleFDSource is stopped")
@@ -98,7 +123,7 @@ func (s *sampleFDSource) Recover(key string, data []byte) error {
 	}
 
 	s.files[key] = nil
-	return nil
+	return ioutil.WriteFile(filepath.Join(s.tmpDir, key), []byte(fdData.Content), 0644)
 }
 
 func (s *sampleFDSource) Release(key string) error {
@@ -247,6 +272,25 @@ func TestFDServerRecovery(t *testing.T) {
 		if !src.isRecovered("foobar") {
 			t.Errorf("the key is not recovered")
 		}
+		if err := c.ReleaseFDs("foobar"); err != nil {
+			t.Errorf("Error releasing the recovered FDs: %v", err)
+		}
+	})
+}
+
+func TestFDServerRetrieveFds(t *testing.T) {
+	withFDClient(t, func(c *FDClient, src *sampleFDSource) {
+		if err := c.Recover("foobar", sampleFDData{"42"}); err != nil {
+			t.Errorf("Recover(): %v", err)
+		}
+		if !src.isRecovered("foobar") {
+			t.Errorf("the key is not recovered")
+		}
+
+		if _, err := src.RetrieveFDs("foobar"); err != nil {
+			t.Errorf("failed to RetrieveFDs: %v", err)
+		}
+
 		if err := c.ReleaseFDs("foobar"); err != nil {
 			t.Errorf("Error releasing the recovered FDs: %v", err)
 		}

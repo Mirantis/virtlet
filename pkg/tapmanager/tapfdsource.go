@@ -341,6 +341,47 @@ func (s *TapFDSource) Recover(key string, data []byte) error {
 	})
 }
 
+// RetrieveFDs retrieve the FDs
+// It is only the case if VM exited but recover didn't populate the FDs
+func (s *TapFDSource) RetrieveFDs(key string) ([]int, error) {
+	var podNet *podNetwork
+	var fds []int
+	func() {
+		s.Lock()
+		defer s.Unlock()
+		podNet = s.fdMap[key]
+	}()
+	if podNet == nil {
+		return nil, fmt.Errorf("bad key %q to retrieve FDs", key)
+	}
+
+	netNSPath := cni.PodNetNSPath(podNet.pnd.PodID)
+	vmNS, err := ns.GetNS(netNSPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open network namespace at %q: %v", netNSPath, err)
+	}
+
+	if err := utils.CallInNetNSWithSysfsRemounted(vmNS, func(hostNS ns.NetNS) error {
+		allLinks, err := netlink.LinkList()
+		if err != nil {
+			return fmt.Errorf("error listing the links: %v", err)
+		}
+
+		return nettools.RecoverContainerSideNetwork(podNet.csn, netNSPath, allLinks, hostNS)
+	}); err != nil {
+		return nil, err
+	}
+
+	for _, ifDesc := range podNet.csn.Interfaces {
+		// Fail if not all succeeded
+		if ifDesc.Fo == nil {
+			return nil, fmt.Errorf("failed to open tap interface %q", ifDesc.Name)
+		}
+		fds = append(fds, int(ifDesc.Fo.Fd()))
+	}
+	return fds, nil
+}
+
 func (s *TapFDSource) setupNetNS(key string, pnd *PodNetworkDesc, initNet func(netNSPath string, allLinks []netlink.Link, hostNS ns.NetNS) (*network.ContainerSideNetwork, error)) error {
 	netNSPath := cni.PodNetNSPath(pnd.PodID)
 	vmNS, err := ns.GetNS(netNSPath)
