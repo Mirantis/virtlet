@@ -18,6 +18,7 @@ package framework
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -198,7 +199,12 @@ func (*DockerContainerExecInterface) Close() error {
 
 // Start is a placeholder for fulfilling Executor interface
 func (*DockerContainerExecInterface) Start(stdin io.Reader, stdout, stderr io.Writer, command ...string) (Command, error) {
-	return nil, fmt.Errorf("Not Implemented")
+	return nil, errors.New("not implemented")
+}
+
+// Logs is a placeholder for fulfilling Executor interface
+func (*DockerContainerExecInterface) Logs() (string, error) {
+	return "", errors.New("not implemented")
 }
 
 func containerHandleDataPiping(resp types.HijackedResponse, inStream io.Reader, outStream, errorStream io.Writer) error {

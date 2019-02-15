@@ -54,6 +54,7 @@ type Executor interface {
 	io.Closer
 	Run(stdin io.Reader, stdout, stderr io.Writer, command ...string) error
 	Start(stdin io.Reader, stdout, stderr io.Writer, command ...string) (Command, error)
+	Logs() (string, error)
 }
 
 // Run executes command with the given executor, returns stdout/stderr as strings

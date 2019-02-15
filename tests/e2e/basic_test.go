@@ -108,6 +108,12 @@ var _ = Describe("Virtlet [Basic cirros tests]", func() {
 				return b.String(), nil
 			}, 120, 5).Should(ContainSubstring("++foo++"))
 		})
+
+		It("Should be readable via Kubernetes API", func() {
+			c, err := vmPod.Container("")
+			Expect(err).NotTo(HaveOccurred())
+			Eventually(c.Logs, 120, 5).Should(ContainSubstring("++foo++"))
+		})
 	})
 
 	It("Should provide VNC interface [Conformance]", func(done Done) {

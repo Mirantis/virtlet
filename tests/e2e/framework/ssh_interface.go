@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -114,6 +115,11 @@ func (si *sshInterface) Close() error {
 		return err
 	}
 	return nil
+}
+
+// Logs is a placeholder for fulfilling Executor interface
+func (*sshInterface) Logs() (string, error) {
+	return "", errors.New("not implemented")
 }
 
 type sshCommand struct {

@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"os/signal"
@@ -162,7 +163,9 @@ func (pi *PodInterface) WaitForDestruction(timing ...time.Duration) error {
 	}, timeout, pollPeriond, consistencyPeriod)
 }
 
-// Container returns interface to execute commands in one of pod's containers
+// Container returns an interface to handle one of the pod's
+// containers. If name is empty, it takes the first container
+// of the pod.
 func (pi *PodInterface) Container(name string) (Executor, error) {
 	if name == "" && len(pi.Pod.Spec.Containers) > 0 {
 		name = pi.Pod.Spec.Containers[0].Name
@@ -319,4 +322,29 @@ func (*containerInterface) Close() error {
 // Start is a placeholder for fulfilling the Executor interface
 func (*containerInterface) Start(stdin io.Reader, stdout, stderr io.Writer, command ...string) (Command, error) {
 	return nil, errors.New("Not Implemented")
+}
+
+// Logs returns the logs of the container as a string.
+func (ci *containerInterface) Logs() (string, error) {
+	restClient := ci.podInterface.controller.client.RESTClient()
+	req := restClient.Get().
+		Name(ci.podInterface.Pod.Name).
+		Namespace(ci.podInterface.Pod.Namespace).
+		Resource("pods").
+		SubResource("log")
+	req.VersionedParams(&v1.PodLogOptions{
+		Container: ci.name,
+	}, scheme.ParameterCodec)
+	stream, err := req.Stream()
+	if err != nil {
+		return "", err
+	}
+	defer stream.Close()
+
+	bs, err := ioutil.ReadAll(stream)
+	if err != nil {
+		return "", fmt.Errorf("ReadAll(): %v", err)
+	}
+
+	return string(bs), nil
 }
