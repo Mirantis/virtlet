@@ -323,7 +323,7 @@ func withCeph(monitorIP, secret *string, kubeSecret string) {
 					return err
 				}
 				return fmt.Errorf("secret %s was not deleted", kubeSecret)
-			})
+			}).Should(Succeed())
 		}
 	})
 }

@@ -36,7 +36,7 @@ var _ = Describe("Virtlet [Basic cirros tests]", func() {
 	)
 
 	BeforeAll(func() {
-		vm = controller.VM("cirros-vm")
+		vm = controller.VM("test-vm")
 		Expect(vm.CreateAndWait(VMOptions{}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
 		var err error
 		vmPod, err = vm.Pod()
@@ -69,6 +69,7 @@ var _ = Describe("Virtlet [Basic cirros tests]", func() {
 		var (
 			logPath      string
 			nodeExecutor framework.Executor
+			ssh          framework.Executor
 		)
 
 		BeforeAll(func() {
@@ -85,29 +86,27 @@ var _ = Describe("Virtlet [Basic cirros tests]", func() {
 				}
 			}
 			Expect(logPath).NotTo(BeEmpty())
+			ssh = waitSSH(vm)
+			_, err = framework.RunSimple(ssh, "echo ++foo++ | sudo tee /dev/console")
+			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("Should contain login string in pod log and each line of that log must be a valid JSON", func() {
-			Eventually(func() error {
+		It("Should contain the echoed string and each line of the log must be a valid JSON", func() {
+			Eventually(func() (string, error) {
 				out, err := framework.RunSimple(nodeExecutor, "cat", logPath)
 				if err != nil {
-					return err
+					return "", err
 				}
-				found := 0
+				var b strings.Builder
 				for _, line := range strings.Split(out, "\n") {
 					var entry map[string]string
 					if err := json.Unmarshal([]byte(line), &entry); err != nil {
-						return fmt.Errorf("error unmarshalling json: %v", err)
+						return "", fmt.Errorf("error unmarshalling json: %v", err)
 					}
-					if strings.HasPrefix(entry["log"], "login as 'cirros' user. default password") {
-						found++
-					}
+					b.WriteString(line + "\n")
 				}
-				if found != 1 {
-					return fmt.Errorf("expected login prompt to appear exactly once in the log, but got %d occurrences", found)
-				}
-				return nil
-			})
+				return b.String(), nil
+			}, 120, 5).Should(ContainSubstring("++foo++"))
 		})
 	})
 
