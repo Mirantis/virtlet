@@ -42,7 +42,9 @@ type InterfaceDescription struct {
 	// namespace or to control file in sysfs for sr-iov VF.
 	// It may be nil if the interface was recovered after restarting Virtlet.
 	// It's only needed during the initial VM startup.
-	Fo *os.File
+	// The json tag is here so that bogus File object doesn't get stored
+	// in the metadata db.
+	Fo *os.File `json:"-"`
 	// Name contains original interface name for sr-iov interface.
 	Name string
 	// HardwareAddr contains original hardware address for CNI-created
