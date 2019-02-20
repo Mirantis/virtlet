@@ -29,7 +29,7 @@ import (
 	. "github.com/Mirantis/virtlet/tests/e2e/ginkgo-ext"
 )
 
-var _ = Describe("Virtlet [Basic cirros tests]", func() {
+var _ = Describe("Virtlet [Basic tests]", func() {
 	var (
 		vm    *framework.VMInterface
 		vmPod *framework.PodInterface

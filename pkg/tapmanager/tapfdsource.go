@@ -341,8 +341,8 @@ func (s *TapFDSource) Recover(key string, data []byte) error {
 	})
 }
 
-// RetrieveFDs retrieve the FDs
-// It is only the case if VM exited but recover didn't populate the FDs
+// RetrieveFDs retrieves the FDs.
+// It's only used in case if VM exited but Recover() didn't populate the FDs
 func (s *TapFDSource) RetrieveFDs(key string) ([]int, error) {
 	var podNet *podNetwork
 	var fds []int
