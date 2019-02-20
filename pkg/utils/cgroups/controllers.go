@@ -94,8 +94,15 @@ func (c *RealManager) GetProcessControllers() (map[string]string, error) {
 		// "6:memory:/user.slice/user-xxx.slice/session-xx.scope"
 		parts := strings.SplitN(line, ":", 3)
 
+		name := parts[1]
+		if strings.HasPrefix(name, "name=") {
+			// Handle named cgroup hierarchies like name=systemd
+			// The corresponding directory tree will be /sys/fs/cgroup/systemd
+			name = name[5:]
+		}
+
 		// use second part as controller name and third as its path
-		ctrls[parts[1]] = parts[2]
+		ctrls[name] = parts[2]
 
 		if err == io.EOF {
 			break
