@@ -141,15 +141,26 @@ func deleteVM(vm *framework.VMInterface) {
 	}
 }
 
-// do asserts that function with multiple return values doesn't fail
-// considering we have func `foo(something) (something, error)`
+// do asserts that function with multiple return values doesn't fail.
+// Considering we have func `foo(something) (something, error)`:
 //
 // `x := do(foo(something))` is equivalent to
 // val, err := fn(something)
 // Expect(err).To(Succeed())
 // x = val
+//
+// The rule is that the function must return at least 2 values,
+// of which the first one is returned as the first value of do(),
+// and the last value is interpreted as error (the second value of do()).
 func do(value interface{}, extra ...interface{}) interface{} {
-	ExpectWithOffset(1, value, extra...).To(BeAnything())
+	if len(extra) == 0 {
+		panic("bad usage of do() -- no extra values")
+	}
+	lastValue := extra[len(extra)-1]
+	if lastValue != nil {
+		err := lastValue.(error)
+		Expect(err).NotTo(HaveOccurred())
+	}
 	return value
 }
 
@@ -323,7 +334,7 @@ func withCeph(monitorIP, secret *string, kubeSecret string) {
 					return err
 				}
 				return fmt.Errorf("secret %s was not deleted", kubeSecret)
-			})
+			}).Should(Succeed())
 		}
 	})
 }

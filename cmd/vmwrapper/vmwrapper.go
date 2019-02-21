@@ -71,13 +71,17 @@ func main() {
 		}
 	}
 
-	// FIXME: move the pid of qemu instance out of /kubepods/podxxxxxxx
-	// for some cases it will be killed by kubelet after the virtlet pod is deleted/recreated
+	// FIXME: move the pid of qemu instance out of kubelet-managed
+	// for cgroups that aren't managed by libvirt.
+	// If we don't do this, the VM pod will be killed by kubelet when Virtlet pod
+	// is removed dnd cgroup-per-qos is enabled in kubelet settings.
 	cm := cgroups.NewManager(os.Getpid(), nil)
-	if _, err := cm.GetProcessController("hugetlb"); err == nil {
-		err = cm.MoveProcess("hugetlb", "/")
-		if err != nil {
-			glog.Warningf("failed to move pid into hugetlb path /: %v", err)
+	for _, ctl := range []string{"hugetlb", "systemd", "pids"} {
+		if _, err := cm.GetProcessController(ctl); err == nil {
+			err = cm.MoveProcess(ctl, "/")
+			if err != nil {
+				glog.Warningf("failed to move pid into cgroup %q path /: %v", ctl, err)
+			}
 		}
 	}
 

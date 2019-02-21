@@ -17,7 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	"fmt"
 	"regexp"
 	"strconv"
 	"time"
@@ -43,11 +42,11 @@ var _ = Describe("VM resources", func() {
 		do(vm.Pod())
 	})
 
+	scheduleWaitSSH(&vm, &ssh)
+
 	AfterAll(func() {
 		deleteVM(vm)
 	})
-
-	scheduleWaitSSH(&vm, &ssh)
 
 	It("Should have CPU count as set for the domain [Conformance]", func() {
 		checkCPUCount(vm, ssh, 2)
@@ -67,17 +66,14 @@ var _ = Describe("VM resources", func() {
 	})
 
 	It("Should grow the root volume size if requested", func() {
-		Eventually(func() error {
+		minSize := 3900
+		Eventually(func() (int, error) {
 			sizeStr := do(framework.RunSimple(ssh, "/bin/sh", "-c", `df -m / | tail -1 | awk "{print \$2}"`)).(string)
 			size, err := strconv.Atoi(sizeStr)
 			if err != nil {
-				return err
+				return 0, err
 			}
-			minSize := 3900
-			if size < minSize {
-				return fmt.Errorf("the size is %d but needs to be at least %d", size, minSize)
-			}
-			return nil
-		})
+			return size, nil
+		}).Should(BeNumerically(">=", minSize))
 	})
 })

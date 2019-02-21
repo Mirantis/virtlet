@@ -2,6 +2,7 @@ package framework
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os/exec"
 	"syscall"
@@ -50,6 +51,11 @@ func (l *LocalCmd) Start(stdin io.Reader, stdout, stderr io.Writer, command ...s
 
 func (l *LocalCmd) Close() error {
 	return nil
+}
+
+// Logs is a placeholder for fulfilling Executor interface
+func (l *LocalCmd) Logs() (string, error) {
+	return "", errors.New("not implemented")
 }
 
 type localCommand struct {

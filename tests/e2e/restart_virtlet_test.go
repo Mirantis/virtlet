@@ -17,9 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	"bytes"
-	"context"
-	"fmt"
 	"time"
 
 	. "github.com/onsi/gomega"
@@ -28,17 +25,23 @@ import (
 	. "github.com/Mirantis/virtlet/tests/e2e/ginkgo-ext"
 )
 
-var _ = Describe("Virtlet restart [Disruptive]", func() {
+var _ = Describe("Virtlet restart", func() {
 	var (
-		vm *framework.VMInterface
+		vm    *framework.VMInterface
+		vmPod *framework.PodInterface
+		ssh   framework.Executor
 	)
 
 	BeforeAll(func() {
-		vm = controller.VM("cirros-vm")
+		vm = controller.VM("restart-test-vm")
 		vm.CreateAndWait(VMOptions{}.ApplyDefaults(), time.Minute*5, nil)
 		var err error
-		_, err = vm.Pod()
+		vmPod, err = vm.Pod()
 		Expect(err).NotTo(HaveOccurred())
+
+		preRestartSsh := waitSSH(vm)
+		defer preRestartSsh.Close()
+		do(framework.RunSimple(preRestartSsh, "echo ++prerestart++ | sudo tee /dev/console"))
 
 		// restart virtlet before all tests
 		virtletPod, err := vm.VirtletPod()
@@ -51,34 +54,27 @@ var _ = Describe("Virtlet restart [Disruptive]", func() {
 	})
 
 	AfterAll(func() {
-		deleteVM(vm)
+		if ssh != nil {
+			ssh.Close()
+		}
+		if vm != nil {
+			deleteVM(vm)
+		}
 	})
 
 	It("Should allow to ssh to VM after virtlet pod restart", func() {
-		waitSSH(vm)
+		ssh = waitSSH(vm)
+		out := do(framework.RunSimple(ssh, "echo abcdef")).(string)
+		Expect(out).To(Equal("abcdef"))
 	}, 3*60)
 
 	It("Should keep logs from another session", func() {
-		var stdout bytes.Buffer
-		ctx, closeFunc := context.WithCancel(context.Background())
-		defer closeFunc()
-		localExecutor := framework.LocalExecutor(ctx)
-
-		By(fmt.Sprintf("Running command: kubectl logs -n %s %s", controller.Namespace(), vm.Name))
-		err := localExecutor.Run(nil, &stdout, &stdout, "kubectl", "-n", controller.Namespace(), "logs", vm.Name)
+		c, err := vmPod.Container("")
 		Expect(err).NotTo(HaveOccurred())
-		Expect(stdout.String()).Should(ContainSubstring("login as 'cirros' user."))
+		Eventually(c.Logs, 120, 5).Should(ContainSubstring("++prerestart++"))
 
-		By(fmt.Sprintf("Running command: kubectl attach -n %s -i %s", controller.Namespace(), vm.Name))
-		stdin := bytes.NewBufferString("\nTESTTEXT\n\n")
-		stdout.Reset()
-		err = localExecutor.Run(stdin, &stdout, &stdout, "kubectl", "-n", controller.Namespace(), "attach", "-i", vm.Name)
-		Expect(err).NotTo(HaveOccurred())
-
-		By(fmt.Sprintf("Running again command: kubectl logs -n %s %s", controller.Namespace(), vm.Name))
-		stdout.Reset()
-		err = localExecutor.Run(nil, &stdout, &stdout, "kubectl", "-n", controller.Namespace(), "logs", vm.Name)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(stdout.String()).Should(ContainSubstring("TESTTEXT"))
+		ssh = waitSSH(vm)
+		do(framework.RunSimple(ssh, "echo ++afterrestart++ | sudo tee /dev/console"))
+		Eventually(c.Logs, 60, 5).Should(ContainSubstring("++afterrestart++"))
 	}, 3*60)
 })
