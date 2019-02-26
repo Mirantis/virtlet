@@ -13,12 +13,12 @@ You'll need the following to run the local environment:
   be enough, but please follow the Docker documentation for your Linux
   distribution),
 * [kubeadm-dind-cluster](https://github.com/kubernetes-sigs/kubeadm-dind-cluster/)
-  script for Kubernetes version 1.12 (`dind-cluster-v1.12.sh`).
+  script for Kubernetes version 1.13 (`dind-cluster-v1.13.sh`).
   
 You can get the cluster startup script like this:
 ```
-$ wget -O ~/dind-cluster-v1.12.sh https://github.com/kubernetes-sigs/kubeadm-dind-cluster/releases/download/v0.1.0/dind-cluster-v1.12.sh
-$ chmod +x ~/dind-cluster-v1.12.sh
+$ wget -O ~/dind-cluster-v1.13.sh https://github.com/kubernetes-sigs/kubeadm-dind-cluster/releases/download/v0.1.0/dind-cluster-v1.13.sh
+$ chmod +x ~/dind-cluster-v1.13.sh
 ```
 
 ## Running the local environment
@@ -34,7 +34,7 @@ $ # build Virtlet binaries & the image
 $ build/cmd.sh build
 
 $ # start DIND cluster
-$ ~/dind-cluster-v1.12.sh up
+$ ~/dind-cluster-v1.13.sh up
 
 $ # copy binaries to kube-node-1
 $ build/cmd.sh copy-dind
@@ -50,7 +50,7 @@ $ build/cmd.sh e2e -test.v -ginkgo.focus="Should have default route"
 
 $ # Restart the DIND cluster. Binaries from copy-dind are preserved
 $ # (you may copy newer ones with another copy-dind command)
-$ ~/dind-cluster-v1.12.sh up
+$ ~/dind-cluster-v1.13.sh up
 
 $ # start Virtlet daemonset again
 $ build/cmd.sh start-dind

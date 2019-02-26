@@ -169,8 +169,8 @@ e2e: &e2e
         elif [[ ${CIRCLE_JOB} = e2e_multi_cni ]]; then
           export MULTI_CNI=1
           echo >&2 "*** Using multiple CNIs (flannel + calico)"
-        elif [[ ${CIRCLE_JOB} = e2e_1_11 ]]; then
-          export KUBE_VERSION=1.11
+        elif [[ ${CIRCLE_JOB} = e2e_1_12 ]]; then
+          export KUBE_VERSION=1.12
         fi
         # APISERVER_PORT is set explicitly to avoid dynamic allocation
         # of the port by kdc
@@ -391,7 +391,7 @@ jobs:
   e2e_multi_cni:
     <<: *e2e
 
-  e2e_1_11:
+  e2e_1_12:
     <<: *e2e
 
   push_branch:
@@ -526,7 +526,7 @@ workflows:
             only: /^master$|^.*-net$/
           tags:
             only: /^v[0-9].*/
-    - e2e_1_11:
+    - e2e_1_12:
         requires:
         - build
         filters:
@@ -548,7 +548,7 @@ workflows:
         - e2e_flannel
         - e2e_weave
         - e2e_multi_cni
-        - e2e_1_11
+        - e2e_1_12
         - integration
         filters:
           branches:

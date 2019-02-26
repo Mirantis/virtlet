@@ -4,7 +4,7 @@ set -o nounset
 set -o pipefail
 set -o errtrace
 
-DIND_SCRIPT="${DIND_SCRIPT:-$HOME/dind-cluster-v1.12.sh}"
+DIND_SCRIPT="${DIND_SCRIPT:-$HOME/dind-cluster-v1.13.sh}"
 circle_token_file="$HOME/.circle-token"
 
 job_num="${1:-}"
@@ -41,7 +41,7 @@ cd virtlet-circle-dump
 url="$(curl -sSL -u "${CIRCLE_TOKEN}:" "${base_url}/${job_num}/artifacts" |
             jq -r '.[]|select(.path=="tmp/cluster_state/kdc-dump.gz")|.url')"
 echo >&2 "Getting cluster dump from ${url}"
-curl -sSL "${url}" | gunzip | ~/dind-cluster-v1.12.sh split-dump
+curl -sSL "${url}" | gunzip | ~/dind-cluster-v1.13.sh split-dump
 
 url="$(curl -sSL -u "${CIRCLE_TOKEN}:" "${base_url}/${job_num}/artifacts" |
             jq -r '.[]|select(.path=="tmp/cluster_state/virtlet-dump.json.gz")|.url')"

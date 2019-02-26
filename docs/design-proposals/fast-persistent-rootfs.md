@@ -4,7 +4,7 @@ Right now, the persistent rootfs for VMs is initialized by the means
 of `qemu-img convert` which converts a QCOW2 image to raw one and
 writes the result over a block device mapped on the host. It's
 possible to overcome the problem by utilizing the new persistent
-volume snapshotting feature in Kubernetes 1.12. It's also possible to
+volume snapshotting feature in Kubernetes 1.13. It's also possible to
 implement a solution for VMs which use local libvirt volume as their
 root filesystem. In both cases, we'll need to add a CRD and a
 controller for managing persistent root filesystems.
@@ -113,7 +113,7 @@ actions on libvirt volume objects.
 
 ## Using persistent volume snapshots
 
-Kubernetes v1.12 adds support for
+Kubernetes v1.13 adds support for
 [persistent volume snapshots](https://kubernetes.io/blog/2018/10/09/introducing-volume-snapshot-alpha-for-kubernetes/)
 for CSI, which is supported by Ceph CSI driver among others. We can
 keep a pool of snapshots that correspond to different images. After
@@ -154,7 +154,7 @@ VirtletVMIdentitySet yaml and the name of the pod).
 
 ## Appendix A. Experimenting with Ceph CSI and external-snapshotter
 
-For this experiment, kubeadm-dind-cluster with k8s 1.12 was used.
+For this experiment, kubeadm-dind-cluster with k8s 1.13 was used.
 The following settings were applied:
 ```console
 $ export FEATURE_GATES="BlockVolume=true,CSIBlockVolume=true,VolumeSnapshotDataSource=true"
