@@ -344,6 +344,21 @@ use the following construct in the pod annotations:
 VirtletCloudInitUserDataScript: "@virtlet-mount-script@"
 ```
 
+# Disabling cloud-init based network configuration
+
+As the network configuration is applied only upon the first startup,
+it's not used when
+[persistent root filesystem](../volumes/#persistent-root-filesystem)
+is used, so new network configuration can be passed using DHCP to a
+new pod with the same rootfs. Moreover, in some cases it may be
+desirable to force Virtlet to use DHCP instead of cloud-init based
+network config. To do so, you need to add the following annotation
+to the pod:
+
+```yaml
+VirtletForceDHCPNetworkConfig: "true"
+```
+
 # Additional links
 
 These links may help to understand some basics about cloud-init:

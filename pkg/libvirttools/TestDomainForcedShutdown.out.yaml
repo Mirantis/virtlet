@@ -131,6 +131,7 @@
         CPUModel: ""
         CPUSetting: null
         DiskDriver: scsi
+        ForceDHCPNetworkConfig: false
         InjectedFiles: null
         MetaData: null
         RootVolumeSize: 0

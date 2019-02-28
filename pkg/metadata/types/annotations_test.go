@@ -163,6 +163,18 @@ func TestVirtletAnnotations(t *testing.T) {
 				CDImageType: "nocloud",
 			},
 		},
+		{
+			name: "force DHCP network config",
+			annotations: map[string]string{
+				"VirtletForceDHCPNetworkConfig": "true",
+			},
+			va: &VirtletAnnotations{
+				VCPUCount:              1,
+				DiskDriver:             "scsi",
+				CDImageType:            "nocloud",
+				ForceDHCPNetworkConfig: true,
+			},
+		},
 		// bad metadata items follow
 		{
 			name:        "bad vcpu count",

@@ -389,6 +389,18 @@ func TestCloudInitGenerator(t *testing.T) {
 			verifyNetworkConfig: true,
 		},
 		{
+			name: "pod with forced dhcp network config",
+			config: &types.VMConfig{
+				PodName:           "foo",
+				PodNamespace:      "default",
+				ParsedAnnotations: &types.VirtletAnnotations{ForceDHCPNetworkConfig: true},
+			},
+			verifyMetaData: true,
+			verifyUserData: true,
+			// make sure network config is null
+			verifyNetworkConfig: true,
+		},
+		{
 			name: "injecting mount script into user data script",
 			config: &types.VMConfig{
 				PodName:      "foo",
