@@ -45,6 +45,7 @@ const (
 	sshKeysKeyName                    = "VirtletSSHKeys"
 	chown9pfsMountsKeyName            = "VirtletChown9pfsMounts"
 	systemUUIDKeyName                 = "VirtletSystemUUID"
+	forceDHCPNetworkConfigKeyName     = "VirtletForceDHCPNetworkConfig"
 	// CloudInitUserDataSourceKeyName is the name of user data source key in the pod annotations.
 	CloudInitUserDataSourceKeyName = "VirtletCloudInitUserDataSource"
 	// SSHKeySourceKeyName is the name of ssh key source key in the pod annotations.
@@ -119,6 +120,10 @@ type VirtletAnnotations struct {
 	// SystemUUID specifies fixed SMBIOS UUID to be used for the domain.
 	// If not set, the SMBIOS UUID will be automatically generated from the Pod ID.
 	SystemUUID *uuid.UUID
+	// ForceDHCPNetworkConfig prevents Virtlet from using Cloud-Init based network
+	// configuration and makes it only provide DHCP. Note that this is will
+	// not work for multi-CNI configuration.
+	ForceDHCPNetworkConfig bool
 }
 
 // ExternalDataLoader is used to load extra pod data from
@@ -316,6 +321,14 @@ func (va *VirtletAnnotations) parsePodAnnotations(ns string, podAnnotations map[
 		if va.SystemUUID, err = uuid.ParseHex(systemUUIDStr); err != nil {
 			return fmt.Errorf("failed to parse %q as a UUID: %v", systemUUIDStr, err)
 		}
+	}
+
+	if podAnnotations[chown9pfsMountsKeyName] == "true" {
+		va.VirtletChown9pfsMounts = true
+	}
+
+	if podAnnotations[forceDHCPNetworkConfigKeyName] == "true" {
+		va.ForceDHCPNetworkConfig = true
 	}
 
 	return nil

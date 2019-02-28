@@ -177,9 +177,11 @@ func (g *CloudInitGenerator) generateUserData(volumeMap diskPathMap) ([]byte, er
 }
 
 func (g *CloudInitGenerator) generateNetworkConfiguration() ([]byte, error) {
-	if g.config.RootVolumeDevice() != nil {
-		// We don't use network config with persistent rootfs
-		// for now because with some cloud-init
+	if g.config.ParsedAnnotations.ForceDHCPNetworkConfig || g.config.RootVolumeDevice() != nil {
+		// Don't use cloud-init network config if asked not
+		// to do so.
+		// Also, we don't use network config with persistent
+		// rootfs for now because with some cloud-init
 		// implementations it's applied only once
 		return nil, nil
 	}
