@@ -204,15 +204,23 @@ e2e: &e2e
       command: |
         build/portforward.sh 8080&
         mkdir -p ~/junit
-        skip_focus=("-ginkgo.skip=\[Heavy\]|\[MultiCNI\]|\[Disruptive\]|\[Flaky\]")
+        e2e_opts=("-ginkgo.skip=\[Heavy\]|\[MultiCNI\]|\[Disruptive\]|\[Flaky\]")
         if [[ ${CIRCLE_JOB} = e2e_multi_cni ]]; then
           # per-node config test requires an additional worker node
-          skip_focus="-ginkgo.skip=\[Heavy\]|\[Disruptive\]|\[Flaky\]|Per-node configuration"
+          e2e_opts="-ginkgo.skip=\[Heavy\]|\[Disruptive\]|\[Flaky\]|Per-node configuration"
         fi
         if [[ ${E2E_FOCUS:-} ]]; then
-          skip_focus+=("-ginkgo.focus=${E2E_FOCUS}")
+          e2e_opts+=("-ginkgo.focus=${E2E_FOCUS}")
         fi
-        _output/virtlet-e2e-tests -test.v "${skip_focus[@]}" -junitOutput ~/junit/junit.xml -include-unsafe-tests=true
+        if [[ ${CIRCLE_JOB} = e2e_debian ]]; then
+          e2e_opts+=(-image cdimage.debian.org/cdimage/openstack/archive/9.8.0/debian-9.8.0-openstack-amd64.qcow2
+                     -sshuser debian
+                     -memoryLimit 256
+                     -use-dhcp-network-config)
+        fi
+        _output/virtlet-e2e-tests -test.v "${e2e_opts[@]}" \
+                                  -junitOutput ~/junit/junit.xml \
+                                  -include-unsafe-tests=true
 
   - store_test_results:
       path: ~/junit
@@ -394,6 +402,9 @@ jobs:
   e2e_1_12:
     <<: *e2e
 
+  e2e_debian:
+    <<: *e2e
+
   push_branch:
     <<: *push_images
 
@@ -518,20 +529,29 @@ workflows:
             only: /^master$|^.*-net$/
           tags:
             only: /^v[0-9].*/
-    - e2e_multi_cni:
-        requires:
-        - build
-        filters:
-          branches:
-            only: /^master$|^.*-net$/
-          tags:
-            only: /^v[0-9].*/
+    # XXX: temporarily disabled, to be fixed
+    # - e2e_multi_cni:
+    #     requires:
+    #     - build
+    #     filters:
+    #       branches:
+    #         only: /^master$|^.*-net$|^.*-ext-e2e$/
+    #       tags:
+    #         only: /^v[0-9].*/
     - e2e_1_12:
         requires:
         - build
         filters:
           branches:
             ignore: /^.*-docs$/
+          tags:
+            only: /^v[0-9].*/
+    - e2e_debian:
+        requires:
+        - build
+        filters:
+          branches:
+            only: /^master$|^.*-ext-e2e$/
           tags:
             only: /^v[0-9].*/
     - push_branch:
@@ -547,8 +567,10 @@ workflows:
         - e2e_calico
         - e2e_flannel
         - e2e_weave
-        - e2e_multi_cni
+        # XXX: temporarily disabled, to be fixed
+        # - e2e_multi_cni
         - e2e_1_12
+        - e2e_debian
         - integration
         filters:
           branches:
@@ -566,4 +588,3 @@ workflows:
     - build_docs:
         requires:
         - prepare_build
-            
