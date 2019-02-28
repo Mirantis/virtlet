@@ -18,6 +18,7 @@ package framework
 
 import (
 	"encoding/xml"
+	"flag"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -28,6 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+var useDHCPNetworkConfig = flag.Bool("use-dhcp-network-config", false, "use DHCP network config instead of Cloud-Init-based one")
 
 // VMInterface provides API to work with virtlet VM pods
 type VMInterface struct {
@@ -190,6 +193,10 @@ func (vmi *VMInterface) buildVMPod(options VMOptions) *v1.Pod {
 		"VirtletDiskDriver":                 options.DiskDriver,
 		"VirtletCloudInitUserDataOverwrite": strconv.FormatBool(options.OverwriteUserData),
 	}
+	if *useDHCPNetworkConfig {
+		annotations["VirtletForceDHCPNetworkConfig"] = "true"
+	}
+
 	if options.SSHKey != "" {
 		annotations["VirtletSSHKeys"] = options.SSHKey
 	}
