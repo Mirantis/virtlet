@@ -38,7 +38,11 @@ import (
 const (
 	cephContainerName = "ceph_cluster"
 	// avoid having the loop device on top of overlay2/aufs when using k-d-c
-	loopDeviceTestDir = "/dind/virtlet-e2e-tests"
+	loopDeviceTestDir = "/dind/virtlet-e2e-test-dir"
+	// The path to mkfs.ext2 may differ between the OSes. Also, on
+	// CirrOS, mkfs.ext2 is not under the default PATH when we do
+	// 'ssh sudo ...'
+	mkfsCommand = `export PATH="/usr/sbin:/sbin:$PATH"; sudo mkfs.ext2 %q`
 )
 
 var (
@@ -356,7 +360,7 @@ func makeVMWithMountAndSymlinkScript(nodeName string, PVCs []framework.PVCSpec, 
 
 func expectToBeUsableForFilesystem(ssh framework.Executor, devPath string) {
 	Eventually(func() error {
-		_, err := framework.RunSimple(ssh, fmt.Sprintf("sudo /usr/sbin/mkfs.ext2 %s", devPath))
+		_, err := framework.RunSimple(ssh, fmt.Sprintf(mkfsCommand, devPath))
 		return err
 	}, 60*5, 3).Should(Succeed())
 	do(framework.RunSimple(ssh, fmt.Sprintf("sudo mount %s /mnt", devPath)))

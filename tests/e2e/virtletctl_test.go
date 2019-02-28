@@ -67,7 +67,7 @@ var _ = Describe("virtletctl", func() {
 			_, err := controller.ConfigMaps().Create(cm)
 			Expect(err).NotTo(HaveOccurred())
 
-			vm = controller.VM("virtletctl-cirros-vm")
+			vm = controller.VM("virtletctl-test-vm")
 			Expect(vm.CreateAndWait(VMOptions{
 				SSHKeySource: "configmap/sshkey",
 			}.ApplyDefaults(), time.Minute*5, nil)).To(Succeed())
@@ -99,8 +99,8 @@ var _ = Describe("virtletctl", func() {
 			defer closeFunc()
 			localExecutor := framework.LocalExecutor(ctx)
 
-			output := callVirtletctl(localExecutor, "ssh", "--namespace", controller.Namespace(), "cirros@virtletctl-cirros-vm", "--", "-i", tempfileName, "hostname")
-			Expect(output).To(Equal("virtletctl-cirros-vm"))
+			output := callVirtletctl(localExecutor, "ssh", "--namespace", controller.Namespace(), *sshUser+"@virtletctl-test-vm", "--", "-i", tempfileName, "hostname")
+			Expect(output).To(Equal("virtletctl-test-vm"))
 		}, 60)
 
 		It("Should dump Virtlet diagnostics on diag dump subcommand", func(done Done) {

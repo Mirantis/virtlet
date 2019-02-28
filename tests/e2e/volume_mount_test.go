@@ -243,5 +243,5 @@ func addFlexvolMount(pod *framework.PodInterface, name string, mountPath string,
 func shouldBeMounted(ssh framework.Executor, path string) {
 	Eventually(func() (string, error) {
 		return framework.RunSimple(ssh, "ls -l "+path)
-	}, 60).Should(ContainSubstring("lost+found"))
+	}, 180, 5).Should(ContainSubstring("lost+found"))
 }

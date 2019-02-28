@@ -227,7 +227,9 @@ func itShouldHaveNetworkConnectivity(podIface func() *framework.PodInterface, ss
 
 		It("Should be able to access another k8s endpoint"+suffix, func(done Done) {
 			defer close(done)
-			cmd := fmt.Sprintf("curl -s --connect-timeout 5 http://nginx.%s.svc.cluster.local", controller.Namespace())
+			// wget is present in CirrOS, Ubuntu and Debian images that we use, unlike curl,
+			// so we use it here
+			cmd := fmt.Sprintf("wget -O - -T 5 http://nginx.%s.svc.cluster.local", controller.Namespace())
 			Eventually(func() (string, error) {
 				return framework.RunSimple(ssh(), cmd)
 			}, 60).Should(ContainSubstring("Thank you for using nginx."))
