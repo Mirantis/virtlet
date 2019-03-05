@@ -258,8 +258,12 @@ account.</p>
 <p>There are some conventions about branch naming that are respected by
 CircleCI. Namely, branches with names ending with <code>-net</code> will be
 checked with extra e2e jobs that examine Weave, Flannel and multi-CNI
-based network setups. For branches with names ending with <code>-docs</code> only
-documentation will be built.</p>
+based network setups. For branches with names ending with <code>-ext-e2e</code>,
+all the jobs that are run for <code>-net</code> branches are run, as well as an
+additional job that verifies Virtlet against a Debian OpenStack image.
+For branches with names ending with <code>-docs</code> only documentation will be
+built. For <code>master</code> branch, the same policy is used as for <code>-ext-e2e</code>
+branches.</p>
 <p>Also, you can append <code>[ci skip]</code> to your commit message to have CI
 skip the particular commit/PR altogether.</p>
               

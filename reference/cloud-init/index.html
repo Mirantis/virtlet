@@ -162,6 +162,9 @@
     <li class="toctree-l3"><a href="#workarounds-for-volume-mounting-and-raw-block-volumes">Workarounds for volume mounting and raw block volumes</a></li>
     
 
+    <li class="toctree-l3"><a href="#disabling-cloud-init-based-network-configuration">Disabling cloud-init based network configuration</a></li>
+    
+
     <li class="toctree-l3"><a href="#additional-links">Additional links</a></li>
     
 
@@ -592,6 +595,18 @@ be replaced with the content that's normally written to
 this order). Given that the script starts with <code>#!/bin/sh</code>, you can
 use the following construct in the pod annotations:</p>
 <pre><code class="yaml">VirtletCloudInitUserDataScript: &quot;@virtlet-mount-script@&quot;
+</code></pre>
+
+<h1 id="disabling-cloud-init-based-network-configuration">Disabling cloud-init based network configuration</h1>
+<p>As the network configuration is applied only upon the first startup,
+it's not used when
+<a href="../volumes/#persistent-root-filesystem">persistent root filesystem</a>
+is used, so new network configuration can be passed using DHCP to a
+new pod with the same rootfs. Moreover, in some cases it may be
+desirable to force Virtlet to use DHCP instead of cloud-init based
+network config. To do so, you need to add the following annotation
+to the pod:</p>
+<pre><code class="yaml">VirtletForceDHCPNetworkConfig: &quot;true&quot;
 </code></pre>
 
 <h1 id="additional-links">Additional links</h1>
