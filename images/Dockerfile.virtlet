@@ -16,5 +16,8 @@ COPY _output/virtletctl /usr/local/bin
 COPY _output/virtlet-longevity-tests /usr/local/bin
 COPY _output/vmwrapper /
 COPY _output/virtlet-e2e-tests /
+RUN GRPC_HEALTH_PROBE_VERSION=v0.2.2 && \
+    curl -L -s -o /usr/local/bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/${GRPC_HEALTH_PROBE_VERSION}/grpc_health_probe-linux-amd64 && \
+    chmod +x /usr/local/bin/grpc_health_probe
 
 CMD ["/start.sh"]
