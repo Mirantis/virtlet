@@ -5,12 +5,15 @@ set -o nounset
 set -o pipefail
 set -o errtrace
 
-KUBE_VERSION="${KUBE_VERSION:-1.13}"
+KUBE_VERSION="${KUBE_VERSION:-1.14}"
 CRIPROXY_DEB_URL="${CRIPROXY_DEB_URL:-https://github.com/Mirantis/criproxy/releases/download/v0.14.0/criproxy-nodeps_0.14.0_amd64.deb}"
 NONINTERACTIVE="${NONINTERACTIVE:-}"
 NO_VM_CONSOLE="${NO_VM_CONSOLE:-}"
 INJECT_LOCAL_IMAGE="${INJECT_LOCAL_IMAGE:-}"
-dind_script="dind-cluster-v${KUBE_VERSION}.sh"
+KDC_VERSION="${KDC_VERSION:-v0.2.0}"
+KDC_BASE_LOCATION="${KDC_BASE_LOCATION:-https://github.com/kubernetes-sigs/kubeadm-dind-cluster/releases/download}"
+kdc_script="dind-cluster-v${KUBE_VERSION}.sh"
+kdc_url="${KDC_BASE_LOCATION}/${KDC_VERSION}/${kdc_script}"
 kubectl="${HOME}/.kubeadm-dind-cluster/kubectl"
 BASE_LOCATION="${BASE_LOCATION:-https://raw.githubusercontent.com/Mirantis/virtlet/master/}"
 RELEASE_LOCATION="${RELEASE_LOCATION:-https://github.com/Mirantis/virtlet/releases/download/}"
@@ -98,24 +101,24 @@ function demo::ask-user {
 
 function demo::get-dind-cluster {
   download="true"
-  if [[ -f ${dind_script} ]]; then
-    demo::step "Will update ${dind_script} script to the latest version"
+  if [[ -f ${kdc_script} ]]; then
+    demo::step "Will update ${kdc_script} script to the latest version"
     if [[ ! ${NONINTERACTIVE} ]]; then
-        demo::ask-user "Do you want to redownload ${dind_script} ?" download
+        demo::ask-user "Do you want to redownload ${kdc_script} ?" download
         if [[ ${download} = "true" ]]; then
-          rm "${dind_script}"
+          rm "${kdc_script}"
         fi
     else
-       demo::step "Will now clear existing ${dind_script}"
-       rm "${dind_script}"
+       demo::step "Will now clear existing ${kdc_script}"
+       rm "${kdc_script}"
     fi
   fi
 
   if [[ ${download} = "true" ]]; then
-    demo::step "Will download ${dind_script} into current directory"
+    demo::step "Will download ${kdc_script} into current directory"
     demo::ask-before-continuing
-    wget "https://raw.githubusercontent.com/kubernetes-sigs/kubeadm-dind-cluster/master/fixed/${dind_script}"
-    chmod +x "${dind_script}"
+    wget -O "${kdc_script}" "${kdc_url}"
+    chmod +x "${kdc_script}"
   fi
 }
 
@@ -135,8 +138,8 @@ function demo::start-dind-cluster {
   fi
   echo "To clean up the cluster, use './dind-cluster-v${KUBE_VERSION}.sh clean'" >&2
   demo::ask-before-continuing
-  "./${dind_script}" clean
-  "./${dind_script}" up
+  "./${kdc_script}" clean
+  "./${kdc_script}" up
 }
 
 function demo::jq-patch {
