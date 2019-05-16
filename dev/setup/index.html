@@ -265,11 +265,11 @@
   be enough, but please follow the Docker documentation for your Linux
   distribution),</li>
 <li><a href="https://github.com/kubernetes-sigs/kubeadm-dind-cluster/">kubeadm-dind-cluster</a>
-  script for Kubernetes version 1.13 (<code>dind-cluster-v1.13.sh</code>).</li>
+  script for Kubernetes version 1.14 (<code>dind-cluster-v1.14.sh</code>).</li>
 </ul>
 <p>You can get the cluster startup script like this:</p>
-<pre><code>$ wget -O ~/dind-cluster-v1.13.sh https://github.com/kubernetes-sigs/kubeadm-dind-cluster/releases/download/v0.1.0/dind-cluster-v1.13.sh
-$ chmod +x ~/dind-cluster-v1.13.sh
+<pre><code>$ wget -O ~/dind-cluster-v1.14.sh https://github.com/kubernetes-sigs/kubeadm-dind-cluster/releases/download/v0.1.0/dind-cluster-v1.14.sh
+$ chmod +x ~/dind-cluster-v1.14.sh
 </code></pre>
 
 <h2 id="running-the-local-environment">Running the local environment</h2>
@@ -283,7 +283,7 @@ $ # build Virtlet binaries &amp; the image
 $ build/cmd.sh build
 
 $ # start DIND cluster
-$ ~/dind-cluster-v1.13.sh up
+$ ~/dind-cluster-v1.14.sh up
 
 $ # copy binaries to kube-node-1
 $ build/cmd.sh copy-dind
@@ -299,7 +299,7 @@ $ build/cmd.sh e2e -test.v -ginkgo.focus=&quot;Should have default route&quot;
 
 $ # Restart the DIND cluster. Binaries from copy-dind are preserved
 $ # (you may copy newer ones with another copy-dind command)
-$ ~/dind-cluster-v1.13.sh up
+$ ~/dind-cluster-v1.14.sh up
 
 $ # start Virtlet daemonset again
 $ build/cmd.sh start-dind
