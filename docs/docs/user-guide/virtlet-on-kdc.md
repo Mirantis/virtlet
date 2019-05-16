@@ -4,13 +4,13 @@ The steps described here are performed automatically by
 [demo.sh](https://github.com/Mirantis/virtlet/blob/master/deploy/demo.sh) script.
 
 1. Start [kubeadm-dind-cluster](https://github.com/kubernetes-sigs/kubeadm-dind-cluster)
-   with Kubernetes version 1.13 (you're not required to download it to your home directory).
+   with Kubernetes version 1.14 (you're not required to download it to your home directory).
    The cluster script stores appropriate kubectl version in `~/.kubeadm-dind-cluster`.
 
-        wget -O ~/dind-cluster-v1.13.sh \
-          https://github.com/kubernetes-sigs/kubeadm-dind-cluster/releases/download/v0.1.0/dind-cluster-v1.13.sh
-        chmod +x ~/dind-cluster-v1.13.sh
-        ~/dind-cluster-v1.13.sh up
+        wget -O ~/dind-cluster-v1.14.sh \
+          https://github.com/kubernetes-sigs/kubeadm-dind-cluster/releases/download/v0.2.0/dind-cluster-v1.14.sh
+        chmod +x ~/dind-cluster-v1.14.sh
+        ~/dind-cluster-v1.14.sh up
         export PATH="$HOME/.kubeadm-dind-cluster:$PATH"
 
 1. Label a node to accept Virtlet pod:

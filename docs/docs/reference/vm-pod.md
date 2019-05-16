@@ -260,8 +260,8 @@ kube-system   weave-net-88jv4                 2/2     Running   1          69m
 kube-system   weave-net-kz698                 2/2     Running   0          69m
 kube-system   weave-net-rbnmf                 2/2     Running   1          69m
 root@k8s-0:~# kubectl get nodes
-NAME    STATUS   ROLES    AGE   VERSION
-k8s-0   Ready    master   69m   v1.13.3
-k8s-1   Ready    <none>   69m   v1.13.3
-k8s-2   Ready    <none>   69m   v1.13.3
+NAME          STATUS   ROLES    AGE   VERSION
+kube-master   Ready    master   29m   v1.14.1
+kube-node-1   Ready    <none>   28m   v1.14.1
+kube-node-2   Ready    <none>   28m   v1.14.1
 ```
