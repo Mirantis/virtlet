@@ -1,6 +1,11 @@
-hash: 570ae013eb3ccd8485245bc75a71526b9a31594d9663bb84d79886ee011f4f1c
-updated: 2018-09-03T12:51:13.004207457+03:00
+hash: 528ec005c304af89cbfd59fc6f52ebbfc471f08f57375da5fd3a80c9652fe476
+updated: 2019-06-15T07:20:09.632998063Z
 imports:
+- name: cloud.google.com/go
+  version: 3b1ae45394a234c385be014e9a488f2bb6eef821
+  subpackages:
+  - compute/metadata
+  - internal
 - name: github.com/aykevl/osfs
   version: e4b1ff739ec92f420bca98d909fffb71fc68e29c
 - name: github.com/boltdb/bolt
@@ -17,10 +22,6 @@ imports:
   - pkg/version
 - name: github.com/coreos/go-systemd
   version: 4484981625c1a6a2ecb40a390fcb6a9bcfee76e3
-- name: github.com/cpuguy83/go-md2man
-  version: 691ee98543af2f262f35fbb54bdd42f00b9b9cc5
-  subpackages:
-  - md2man
 - name: github.com/davecgh/go-spew
   version: 5215b55f46b2b919f50a1df0eaa5886afe4e3b3d
   subpackages:
@@ -33,36 +34,10 @@ imports:
 - name: github.com/docker/docker
   version: 4f3616fb1c112e206b88cb7a9922bf49067a7756
   subpackages:
-  - api
-  - api/types
-  - api/types/blkiodev
-  - api/types/container
-  - api/types/events
-  - api/types/filters
-  - api/types/image
-  - api/types/mount
-  - api/types/network
-  - api/types/registry
-  - api/types/strslice
-  - api/types/swarm
-  - api/types/swarm/runtime
-  - api/types/time
-  - api/types/versions
-  - api/types/volume
-  - client
   - pkg/ioutils
-  - pkg/jsonlog
-  - pkg/jsonmessage
   - pkg/longpath
-  - pkg/mount
-  - pkg/parsers
   - pkg/pools
   - pkg/stdcopy
-  - pkg/sysinfo
-  - pkg/system
-  - pkg/term
-  - pkg/term/windows
-  - pkg/tlsconfig
 - name: github.com/docker/engine-api
   version: dea108d3aa0c67d7162a3fd8aa65f38a430019fd
   subpackages:
@@ -105,7 +80,7 @@ imports:
   - protoc-gen-gogo/descriptor
   - sortkeys
 - name: github.com/golang/glog
-  version: 23def4e6c14b4da8ac2ed8007337bc5eb5007998
+  version: 44145f04b68cf362d9c4df2182967c2275eaefed
 - name: github.com/golang/groupcache
   version: 02826c3e79038b59d737d3b1c0a1d937f71a4433
   subpackages:
@@ -192,15 +167,11 @@ imports:
   subpackages:
   - difflib
 - name: github.com/renstrom/dedent
-  version: a1eba44eaecc89804e4b05ce2d17168eb353d524
+  version: 8478954c3bc893cf36c5ee7c822266b993a3b3ee
 - name: github.com/russross/blackfriday
   version: cadec560ec52d93835bf2f15bd794700d3a2473b
-- name: github.com/shurcooL/sanitized_anchor_name
-  version: 10ef21a441db47d8b13ebcc5fd2310f636973c77
 - name: github.com/spf13/cobra
   version: a1f051bc3eba734da4772d60e2d677f47cf93ef4
-  subpackages:
-  - doc
 - name: github.com/spf13/pflag
   version: 4c012f6dcd9546820e378d0bdda4d8fc772cdfea
 - name: github.com/vishvananda/netlink
@@ -210,7 +181,7 @@ imports:
 - name: github.com/vishvananda/netns
   version: 8ba1072b58e0c2a240eb5f6120165c7776c3e7b8
 - name: go.universe.tf/netboot
-  version: cc33920b4f3296801a64d731d269978116f40d92
+  version: 01f30467ac8e8f4e3a3c6b6a8642d62a04e97631
   subpackages:
   - dhcp4
 - name: golang.org/x/crypto
@@ -228,6 +199,7 @@ imports:
   subpackages:
   - bpf
   - context
+  - context/ctxhttp
   - html
   - html/atom
   - html/charset
@@ -242,8 +214,15 @@ imports:
   - proxy
   - trace
   - websocket
+- name: golang.org/x/oauth2
+  version: a6bd8cefa1811bd24b86f8902872e4e8225f74c4
+  subpackages:
+  - google
+  - internal
+  - jws
+  - jwt
 - name: golang.org/x/sync
-  version: 1d60e4601c6fd243af51cc01ddf169918a5407ca
+  version: 112230192c580c3556b8cee6403af37a4fc5f28c
   subpackages:
   - syncmap
 - name: golang.org/x/sys
@@ -278,6 +257,18 @@ imports:
   - rate
 - name: golang.org/x/tools
   version: 2382e3994d48b1d22acc2c86bcad0a2aff028e32
+- name: google.golang.org/appengine
+  version: b2f4a3cf3c67576a2ee09e1fe62656a5086ce880
+  subpackages:
+  - internal
+  - internal/app_identity
+  - internal/base
+  - internal/datastore
+  - internal/log
+  - internal/modules
+  - internal/remote_api
+  - internal/urlfetch
+  - urlfetch
 - name: google.golang.org/grpc
   version: 777daa17ff9b5daef1cfdf915088a2ada3332bf0
   subpackages:
@@ -620,10 +611,12 @@ imports:
   - pkg/apis/clientauthentication/v1alpha1
   - pkg/version
   - plugin/pkg/client/auth/exec
+  - plugin/pkg/client/auth/gcp
   - rest
   - rest/fake
   - rest/watch
   - testing
+  - third_party/forked/golang/template
   - tools/auth
   - tools/cache
   - tools/clientcmd
@@ -644,6 +637,7 @@ imports:
   - util/flowcontrol
   - util/homedir
   - util/integer
+  - util/jsonpath
   - util/retry
 - name: k8s.io/code-generator
   version: 7ead8f38b01cf8653249f5af80ce7b2c8aba12e2
