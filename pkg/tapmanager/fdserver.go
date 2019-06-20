@@ -451,7 +451,7 @@ func (c *FDClient) close(conn *net.UnixConn) error {
 func (c *FDClient) request(hdr *fdHeader, data []byte) (*fdHeader, []byte, []byte, error) {
 	conn, err := c.connect()
 	if err != nil {
-		return nil, nil, nil, errors.New("not connected")
+		return nil, nil, nil, fmt.Errorf("not connected: %v", err)
 	}
 	defer c.close(conn)
 
