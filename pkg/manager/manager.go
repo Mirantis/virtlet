@@ -35,6 +35,8 @@ import (
 	"github.com/Mirantis/virtlet/pkg/stream"
 	"github.com/Mirantis/virtlet/pkg/tapmanager"
 	"github.com/Mirantis/virtlet/pkg/utils"
+	"google.golang.org/grpc/health"
+	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
 const (
@@ -145,6 +147,9 @@ func (v *VirtletManager) Run() error {
 
 	v.server = NewServer()
 	v.server.Register(runtimeService, imageService)
+
+	healthServer := health.NewServer()
+	grpc_health_v1.RegisterHealthServer(v.server.server, healthServer)
 
 	if err := v.recoverAndGC(); err != nil {
 		// we consider recover / gc errors non-fatal

@@ -226,7 +226,7 @@ spec:
             command:
             - /bin/sh
             - -c
-            - socat - UNIX:/run/virtlet.sock </dev/null
+            - grpc_health_probe -addr UNIX:/run/virtlet.sock
       - name: vms
         image: mirantis/virtlet
         imagePullPolicy: IfNotPresent

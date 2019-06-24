@@ -73,7 +73,7 @@ spec:
             command:
             - /bin/sh
             - -c
-            - socat - UNIX:/run/virtlet.sock </dev/null
+            - grpc_health_probe -addr UNIX:/run/virtlet.sock
         resources: {}
         securityContext:
           privileged: true
