@@ -291,27 +291,33 @@ func (v *VirtletRuntimeService) CreateContainer(ctx context.Context, in *kubeapi
 	podSandboxID := in.PodSandboxId
 	name := config.GetMetadata().Name
 
-	// Was a container already started in this sandbox?
-	// NOTE: there is no distinction between lack of key and other types of
-	// errors when accessing boltdb. This will be changed when we switch to
-	// storing whole marshaled sandbox metadata as json.
-	remainingContainers, err := v.metadataStore.ListPodContainers(podSandboxID)
-	if err != nil {
-		glog.V(3).Infof("Error retrieving pod %q containers", podSandboxID)
-	} else {
-		for _, container := range remainingContainers {
-			glog.V(3).Infof("CreateContainer: there's already a container in the sandbox (id: %s)", container.GetID())
-			response := &kubeapi.CreateContainerResponse{ContainerId: container.GetID()}
-			return response, nil
-		}
-	}
-
 	sandboxInfo, err := v.metadataStore.PodSandbox(podSandboxID).Retrieve()
 	if err != nil {
 		return nil, err
 	}
 	if sandboxInfo == nil {
 		return nil, fmt.Errorf("sandbox %q not in Virtlet metadata store", podSandboxID)
+	}
+
+	// Was a container already started in this sandbox?
+	// NOTE: there is no distinction between lack of key and other types of
+	// errors when accessing boltdb. This will be changed when we switch to
+	// storing whole marshaled sandbox metadata as json.
+	curContainers, err := v.metadataStore.ListPodContainers(podSandboxID)
+	if err != nil {
+		glog.V(3).Infof("Error retrieving pod %q containers", podSandboxID)
+	} else {
+		for _, container := range curContainers {
+			// TODO: check container name; if it's the same, update the network config
+			glog.V(3).Infof("CreateContainer: there's already a container in the sandbox (id: %s)", container.GetID())
+			//err := v.updateContainer(sandboxInfo, container.GetID())
+			err := v.virtTool.UpdateContainerNetwork(container.GetID(), sandboxInfo.ContainerSideNetwork)
+			if err != nil {
+				return nil, err
+			}
+			response := &kubeapi.CreateContainerResponse{ContainerId: container.GetID()}
+			return response, nil
+		}
 	}
 
 	fdKey := podSandboxID

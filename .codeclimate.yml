@@ -15,7 +15,8 @@ checks:
   method-count:
     config:
       # CRI runtime implementation has >20 methods
-      threshold: 25
+      # Also, VirtualizationTool has plenty
+      threshold: 30
   method-lines:
     config:
       threshold: 200
