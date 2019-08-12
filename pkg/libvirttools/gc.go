@@ -35,21 +35,22 @@ const (
 // passes it to all GC submodules, collecting from them list of
 // possible errors, which is returned to outer scope
 func (v *VirtualizationTool) GarbageCollect() (allErrors []error) {
-	ids, fatal, errors := v.retrieveListOfContainerIDs()
-	if errors != nil {
-		allErrors = append(allErrors, errors...)
-	}
-	if fatal {
-		return
-	}
+	return nil
+	// ids, fatal, errors := v.retrieveListOfContainerIDs()
+	// if errors != nil {
+	// 	allErrors = append(allErrors, errors...)
+	// }
+	// if fatal {
+	// 	return
+	// }
 
-	allErrors = append(allErrors, v.removeOrphanDomains(ids)...)
-	allErrors = append(allErrors, v.removeOrphanRootVolumes(ids)...)
-	allErrors = append(allErrors, v.removeOrphanQcow2Volumes(ids)...)
-	allErrors = append(allErrors, v.removeOrphanConfigImages(ids, configIsoDir)...)
-	allErrors = append(allErrors, v.removeOrphanVirtualBlockDevices(ids, "", "")...)
+	// allErrors = append(allErrors, v.removeOrphanDomains(ids)...)
+	// allErrors = append(allErrors, v.removeOrphanRootVolumes(ids)...)
+	// allErrors = append(allErrors, v.removeOrphanQcow2Volumes(ids)...)
+	// allErrors = append(allErrors, v.removeOrphanConfigImages(ids, configIsoDir)...)
+	// allErrors = append(allErrors, v.removeOrphanVirtualBlockDevices(ids, "", "")...)
 
-	return
+	// return
 }
 
 func (v *VirtualizationTool) retrieveListOfContainerIDs() ([]string, bool, []error) {
