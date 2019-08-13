@@ -412,6 +412,30 @@ func (v *VirtualizationTool) CreateContainer(config *types.VMConfig, netFdKey st
 	return settings.domainUUID, nil
 }
 
+func (v *VirtualizationTool) updateDiskImages(containerID string) error {
+	domain, err := v.domainConn.LookupDomainByUUIDString(containerID)
+	if err != nil {
+		return fmt.Errorf("failed to look up domain %q: %v", containerID, err)
+	}
+
+	config, _, err := v.getVMConfigFromMetadata(containerID)
+	if err != nil {
+		return err
+	}
+
+	if config == nil {
+		glog.Warningf("No info found for domain %q in the metadata store. Not updating disk images", containerID)
+		return nil
+	}
+
+	diskList, err := newDiskList(config, v.volumeSource, v)
+	if err != nil {
+		return err
+	}
+
+	return diskList.writeImages(domain)
+}
+
 func (v *VirtualizationTool) startContainer(containerID string) error {
 	domain, err := v.domainConn.LookupDomainByUUIDString(containerID)
 	if err != nil {
@@ -424,6 +448,10 @@ func (v *VirtualizationTool) startContainer(containerID string) error {
 	}
 	if state != virt.DomainStateShutoff {
 		return fmt.Errorf("domain %q: bad state %v upon StartContainer()", containerID, state)
+	}
+
+	if err := v.updateDiskImages(containerID); err != nil {
+		return fmt.Errorf("domain %q: error updating disk images: %v", containerID, err)
 	}
 
 	if err = domain.Create(); err != nil {
