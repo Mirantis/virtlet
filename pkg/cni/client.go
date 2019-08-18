@@ -143,6 +143,10 @@ func (c *realClient) cniRuntimeConf(podID, podName, podNs string) *libcni.Runtim
 			{"K8S_POD_NAME", podName},
 			{"K8S_POD_INFRA_CONTAINER_ID", podID},
 		}
+	} else {
+		r.Args = [][2]string{
+			{"IgnoreUnknown", "1"},
+		}
 	}
 	return r
 }
