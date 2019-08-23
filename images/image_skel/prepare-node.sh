@@ -51,5 +51,7 @@ if [[ ! ${VIRTLET_DISABLE_KVM:-} ]]; then
     echo "*** Virtlet startup failed ***" >&2
     exit 1
   fi
-  chown libvirt-qemu.kvm /dev/kvm
+  groupadd -g 121 kvm || true
+  useradd -g kvm libvirt-qemu || true
+  usermod -G root libvirt-qemu || true
 fi
