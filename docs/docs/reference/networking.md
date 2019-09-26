@@ -83,7 +83,7 @@ Each CNI config must include `cniVersion` field, with minimum version being
 
 ## Sample configuration
 
-Please refer to the [detailed documentation](https://github.com/Mirantis/virtlet/blob/master/docs/multiple-interfaces.md#example-files)
+Please refer to the [detailed documentation](https://github.com/hwchiu/virtlet/blob/master/docs/docs/reference/networking.md#-setting-up-multiple-cnis)
 that contains an example of configuration files for CNI Genie with Calico being used for
 the primary interface and Flannel being used for the secondary one.
 

@@ -22,7 +22,7 @@ node.
 ## Virtlet manager
 
 The main binary is responsible for providing API fullfiling
-[CRI specification](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/container-runtime-interface-v1.md).
+[CRI specification](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/container-runtime-interface.md).
 It serves the requests from kubelet by doing the following:
 
 * setting up libvirt VM environment (virtual drives, network

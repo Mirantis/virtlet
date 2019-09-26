@@ -104,7 +104,7 @@ enabling read-write access for the VM.
 ## Using FlexVolumes
 
 Virtlet uses custom
-[FlexVolume](https://github.com/kubernetes/community/blob/master/contributors/devel/flexvolume.md)
+[FlexVolume](https://kubernetes.io/docs/concepts/storage/volumes/#flexvolume)
 driver (`virtlet/flexvolume_driver`) to specify block devices for the
 VMs. Flexvolume options must include `type` field with one of the
 following values:

@@ -25,7 +25,7 @@ Virtlet-specific annotation or an image that has Virtlet-specific prefix.
    (CPU, memory, etc.) as well as pod's nodeSelector and pod/node affinity
    constraints, taints/tolerations and so on.
  * `kubelet` running on the target node accepts the pod.
- * `kubelet` invokes a [CRI](https://contributor.kubernetes.io/contributors/devel/container-runtime-interface/)
+ * `kubelet` invokes a [CRI](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/container-runtime-interface.md)
    call RunPodSandbox to create the pod sandbox which
    will enclose all the containers in the pod definition. Note that at this
    point no information about the containers within the pod is passed
@@ -51,7 +51,7 @@ Virtlet-specific annotation or an image that has Virtlet-specific prefix.
    `PullImage` CRI call to pull the image if it doesn't exist or if
    `imagePullPolicy: Always` is used.
  * If `PullImage` is invoked, Virtlet resolves the image location based on the
-   [image name translation configuration](https://github.com/Mirantis/virtlet/blob/master/docs/image-name-translation.md),
+   [image name translation configuration](https://github.com/hwchiu/virtlet/blob/master/docs/docs/reference/images.md#image-name-translation),
    then downloads the file and stores it in the image store.
  * After the image is ready (no pull was needed or the `PullImage` call completed
    successfully), kubelet uses `CreateContainer` CRI call to create
