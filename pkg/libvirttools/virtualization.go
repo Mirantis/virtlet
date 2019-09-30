@@ -33,6 +33,7 @@ import (
 	"github.com/Mirantis/virtlet/pkg/fs"
 	"github.com/Mirantis/virtlet/pkg/metadata"
 	"github.com/Mirantis/virtlet/pkg/metadata/types"
+	"github.com/Mirantis/virtlet/pkg/network"
 	"github.com/Mirantis/virtlet/pkg/utils"
 	"github.com/Mirantis/virtlet/pkg/virt"
 )
@@ -410,6 +411,51 @@ func (v *VirtualizationTool) CreateContainer(config *types.VMConfig, netFdKey st
 
 	ok = true
 	return settings.domainUUID, nil
+}
+
+func (v *VirtualizationTool) updateDiskImages(containerID string) error {
+	domain, err := v.domainConn.LookupDomainByUUIDString(containerID)
+	if err != nil {
+		return fmt.Errorf("failed to look up domain %q: %v", containerID, err)
+	}
+
+	config, _, err := v.getVMConfigFromMetadata(containerID)
+	if err != nil {
+		return err
+	}
+
+	if config == nil {
+		glog.Warningf("No info found for domain %q in the metadata store. Not updating disk images", containerID)
+		return nil
+	}
+
+	diskList, err := newDiskList(config, v.volumeSource, v)
+	if err != nil {
+		return err
+	}
+
+	return diskList.writeImages(domain)
+}
+
+// UpdateContainerNetwork updates network info for the container
+func (v *VirtualizationTool) UpdateContainerNetwork(containerID string, csn *network.ContainerSideNetwork) error {
+	if err := v.metadataStore.Container(containerID).Save(
+		func(c *types.ContainerInfo) (*types.ContainerInfo, error) {
+			// make sure the container is not removed during the call
+			if c != nil {
+				c.Config.ContainerSideNetwork = csn
+			}
+			return c, nil
+		}); err != nil {
+		return fmt.Errorf("error updating container info: %v", err)
+	}
+
+	// propagate network config to cloud-init
+	if err := v.updateDiskImages(containerID); err != nil {
+		return fmt.Errorf("domain %q: error updating disk images: %v", containerID, err)
+	}
+
+	return nil
 }
 
 func (v *VirtualizationTool) startContainer(containerID string) error {
