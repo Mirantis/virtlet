@@ -51,7 +51,7 @@ Virtlet-specific annotation or an image that has Virtlet-specific prefix.
    `PullImage` CRI call to pull the image if it doesn't exist or if
    `imagePullPolicy: Always` is used.
  * If `PullImage` is invoked, Virtlet resolves the image location based on the
-   [image name translation configuration](https://github.com/hwchiu/virtlet/blob/master/docs/docs/reference/images.md#image-name-translation),
+   [image name translation configuration](https://github.com/Mirantis/virtlet/blob/master/docs/docs/reference/images.md#image-name-translation),
    then downloads the file and stores it in the image store.
  * After the image is ready (no pull was needed or the `PullImage` call completed
    successfully), kubelet uses `CreateContainer` CRI call to create
