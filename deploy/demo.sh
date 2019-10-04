@@ -437,9 +437,6 @@ if [[ ${MULTI_CNI} ]]; then
   export CNI_PLUGIN=flannel
 fi
 demo::start-dind-cluster
-if [[ ${MULTI_CNI} ]]; then
-  demo::install-cni-genie
-fi
 for virtlet_node in "${virtlet_nodes[@]}"; do
   demo::fix-mounts "${virtlet_node}"
   demo::install-cri-proxy "${virtlet_node}"
@@ -448,6 +445,9 @@ for virtlet_node in "${virtlet_nodes[@]}"; do
   fi
   demo::label-and-untaint-node "${virtlet_node}"
 done
+if [[ ${MULTI_CNI} ]]; then
+  demo::install-cni-genie
+fi
 demo::start-virtlet
 demo::start-nginx
 demo::start-vm
