@@ -134,7 +134,9 @@ func (c *realClient) cniRuntimeConf(podID, podName, podNs string) *libcni.Runtim
 	r := &libcni.RuntimeConf{
 		ContainerID: podID,
 		NetNS:       PodNetNSPath(podID),
-		IfName:      "virtlet-eth0",
+		// Some older CNI Genie versions insist on using eth0
+		// interface name. We used to have virtlet-eth0 here.
+		IfName: "eth0",
 	}
 	if podName != "" && podNs != "" {
 		r.Args = [][2]string{
