@@ -72,6 +72,60 @@ func expectedExtractedLinkInfo(contNsPath string) *cnicurrent.Result {
 	}
 }
 
+func expectedExtractedCalicoLinkInfo(contNsPath string) *cnicurrent.Result {
+	return &cnicurrent.Result{
+		Interfaces: []*cnicurrent.Interface{
+			{
+				Name:    "eth0",
+				Mac:     innerHwAddr,
+				Sandbox: contNsPath,
+			},
+		},
+		IPs: []*cnicurrent.IPConfig{
+			{
+				Version:   "4",
+				Interface: 0,
+				Address: net.IPNet{
+					IP: net.IP{10, 1, 90, 5},
+					// FIXME: actually, Calico uses
+					// 255.255.255.255 as netmask here
+					// (but we don't want to overcomplicate the test)
+					Mask: net.IPMask{255, 255, 255, 0},
+				},
+				Gateway: net.IP{169, 254, 1, 1},
+			},
+		},
+		Routes: []*cnitypes.Route{
+			{
+				Dst: net.IPNet{
+					IP:   net.IP{169, 254, 1, 1},
+					Mask: net.IPMask{255, 255, 255, 255},
+				},
+				GW: net.IP{0, 0, 0, 0},
+			},
+			{
+				Dst: net.IPNet{
+					IP:   net.IP{0, 0, 0, 0},
+					Mask: net.IPMask{0, 0, 0, 0},
+				},
+				GW: net.IP{169, 254, 1, 1},
+			},
+		},
+	}
+}
+
+func addCalicoRoutes(t *testing.T, origContVeth netlink.Link) {
+	addTestRoute(t, &netlink.Route{
+		Dst:       parseAddr("169.254.1.1/32").IPNet,
+		Scope:     SCOPE_LINK,
+		LinkIndex: origContVeth.Attrs().Index,
+	})
+	addTestRoute(t, &netlink.Route{
+		Gw:    parseAddr("169.254.1.1/32").IPNet.IP,
+		Scope: SCOPE_UNIVERSE,
+	})
+}
+
 // withTemporaryNSAvailable creates a new network namespace and
 // passes is as an argument to the specified function.
 // It does NOT change current network namespace.
@@ -347,6 +401,23 @@ func TestExtractLinkInfo(t *testing.T) {
 	})
 }
 
+func TestExtractCalicoLinkInfo(t *testing.T) {
+	withFakeCNIVeth(t, defaultMTU, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+		addCalicoRoutes(t, origContVeth)
+
+		info, err := ExtractLinkInfo(origContVeth, contNS.Path())
+		if err != nil {
+			log.Panicf("failed to grab interface info: %v", err)
+		}
+
+		expectedInfo := expectedExtractedCalicoLinkInfo(contNS.Path())
+		if !reflect.DeepEqual(info, expectedInfo) {
+			t.Errorf("interface info mismatch. Expected:\n%s\nActual:\n%s",
+				spew.Sdump(expectedInfo), spew.Sdump(*info))
+		}
+	})
+}
+
 func verifyContainerSideNetwork(t *testing.T, origContVeth netlink.Link, contNsPath string, hostNS ns.NetNS, mtu int) {
 	allLinks, err := netlink.LinkList()
 	if err != nil {
@@ -491,46 +562,63 @@ func verifyVethHaveConfiguration(t *testing.T, info *cnicurrent.Result) {
 	}
 
 	for _, route := range routeList {
-		if route.Gw != nil {
-			if route.Gw.String() == info.Routes[0].GW.String() {
-				return
+		fmt.Printf("ZZZZZ route: %+v\n", route)
+		for _, expRoute := range info.Routes {
+			if route.Gw != nil {
+				if route.Gw == nil && expRoute.GW.Equal(net.IPv4zero) {
+					return
+				}
+				if route.Gw.String() == expRoute.GW.String() {
+					return
+				}
 			}
 		}
 	}
 
-	t.Errorf("not found desired route to: %s", info.Routes[0].GW.String())
+	t.Errorf("not found desired route via: %s", info.Routes[0].GW.String())
+}
+
+func verifyTeardown(t *testing.T, hostNS, contNS ns.NetNS, origContVeth netlink.Link) {
+	if err := StripLink(origContVeth); err != nil {
+		log.Panicf("StripLink() failed: %v", err)
+	}
+	allLinks, err := netlink.LinkList()
+	if err != nil {
+		log.Panicf("error listing links: %v", err)
+	}
+
+	csn, err := SetupContainerSideNetwork(expectedExtractedCalicoLinkInfo(contNS.Path()), contNS.Path(), allLinks, false, hostNS)
+	if err != nil {
+		log.Panicf("failed to set up container side network: %v", err)
+	}
+
+	if err := Teardown(csn); err != nil {
+		log.Panicf("failed to tear down container side network: %v", err)
+	}
+
+	verifyNoLinks(t, []string{"br0", "tap0"})
+	verifyVethHaveConfiguration(t, expectedExtractedCalicoLinkInfo(contNS.Path()))
+
+	// re-quiry origContVeth attrs
+	origContVeth, err = netlink.LinkByName(origContVeth.Attrs().Name)
+	if err != nil {
+		log.Panicf("the original cni veth is gone")
+	}
+	if !reflect.DeepEqual(origContVeth.Attrs().HardwareAddr, csn.Interfaces[0].HardwareAddr) {
+		t.Errorf("cni veth hardware address wasn't restored")
+	}
 }
 
 func TestTeardownContainerSideNetwork(t *testing.T) {
 	withFakeCNIVethAndGateway(t, defaultMTU, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
-		if err := StripLink(origContVeth); err != nil {
-			log.Panicf("StripLink() failed: %v", err)
-		}
-		allLinks, err := netlink.LinkList()
-		if err != nil {
-			log.Panicf("error listing links: %v", err)
-		}
+		verifyTeardown(t, hostNS, contNS, origContVeth)
+	})
+}
 
-		csn, err := SetupContainerSideNetwork(expectedExtractedLinkInfo(contNS.Path()), contNS.Path(), allLinks, false, hostNS)
-		if err != nil {
-			log.Panicf("failed to set up container side network: %v", err)
-		}
-
-		if err := Teardown(csn); err != nil {
-			log.Panicf("failed to tear down container side network: %v", err)
-		}
-
-		verifyNoLinks(t, []string{"br0", "tap0"})
-		verifyVethHaveConfiguration(t, expectedExtractedLinkInfo(contNS.Path()))
-
-		// re-quiry origContVeth attrs
-		origContVeth, err = netlink.LinkByName(origContVeth.Attrs().Name)
-		if err != nil {
-			log.Panicf("the original cni veth is gone")
-		}
-		if !reflect.DeepEqual(origContVeth.Attrs().HardwareAddr, csn.Interfaces[0].HardwareAddr) {
-			t.Errorf("cni veth hardware address wasn't restored")
-		}
+func TestTeardownCalico(t *testing.T) {
+	withFakeCNIVeth(t, defaultMTU, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+		addCalicoRoutes(t, origContVeth)
+		verifyTeardown(t, hostNS, contNS, origContVeth)
 	})
 }
 

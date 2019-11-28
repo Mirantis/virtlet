@@ -269,7 +269,10 @@ func (s *Server) ackDHCP(pkt *dhcp4.Packet, serverIP net.IP) (*dhcp4.Packet, err
 	return s.prepareResponse(pkt, serverIP, dhcp4.MsgAck)
 }
 
+// TODO: https://github.com/kubevirt/kubevirt/blob/master/pkg/virt-launcher/virtwrap/network/dhcp/dhcp.go#L236
+// and also sortRoutes() from there
 func (s *Server) getStaticRoutes(ip net.IPNet) (router, routes []byte, err error) {
+	routableNets := []net.IPNet{ip}
 	if len(s.config.Result.Routes) == 0 {
 		return nil, nil, nil
 	}
@@ -279,6 +282,7 @@ func (s *Server) getStaticRoutes(ip net.IPNet) (router, routes []byte, err error
 		if route.Dst.IP == nil {
 			return nil, nil, fmt.Errorf("invalid route: %#v", route)
 		}
+		routableNets = append(routableNets, route.Dst)
 		dstIP := route.Dst.IP.To4()
 		gw := route.GW
 		if gw == nil {
@@ -295,12 +299,27 @@ func (s *Server) getStaticRoutes(ip net.IPNet) (router, routes []byte, err error
 			}
 		} else {
 			gw = gw.To4()
+			if gw.Equal(net.IPv4zero) {
+				// this is used to pass the link-scoped route
+				// to 169.254.1.1 used by Calico
+				gw = nil
+			}
 		}
-		if !ip.Contains(gw) {
-			continue
-		}
-		if gw != nil && dstIP.Equal(net.IPv4zero) {
-			if s, _ := route.Dst.Mask.Size(); s == 0 {
+
+		if gw != nil {
+			routable := false
+			for _, routableNet := range routableNets {
+				if routableNet.Contains(gw) {
+					routable = true
+					break
+				}
+			}
+			if !routable {
+				glog.V(2).Infof("Skipping CNI route with unroutable gw: %+v", route)
+				continue
+			}
+
+			if s, _ := route.Dst.Mask.Size(); dstIP.Equal(net.IPv4zero) && s == 0 {
 				router = gw
 				continue
 			}

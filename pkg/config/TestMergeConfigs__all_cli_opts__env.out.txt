@@ -11,6 +11,5 @@ export VIRTLET_DISABLE_KVM=1
 export VIRTLET_SRIOV_SUPPORT=1
 export VIRTLET_CNI_PLUGIN_DIR=/some/cni/bin/dir
 export VIRTLET_CNI_CONFIG_DIR=/some/cni/conf/dir
-export VIRTLET_CALICO_SUBNET=22
 export IMAGE_REGEXP_TRANSLATION=''
 export VIRTLET_CPU_MODEL=host-model

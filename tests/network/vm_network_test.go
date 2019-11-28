@@ -87,17 +87,17 @@ func sampleCNIResult() *cnicurrent.Result {
 		Routes: []*cnitypes.Route{
 			{
 				Dst: net.IPNet{
-					IP:   net.IP{0, 0, 0, 0},
-					Mask: net.IPMask{0, 0, 0, 0},
-				},
-				GW: net.IP{10, 1, 90, 1},
-			},
-			{
-				Dst: net.IPNet{
 					IP:   net.IP{10, 10, 42, 0},
 					Mask: net.IPMask{255, 255, 255, 0},
 				},
 				GW: net.IP{10, 1, 90, 90},
+			},
+			{
+				Dst: net.IPNet{
+					IP:   net.IP{0, 0, 0, 0},
+					Mask: net.IPMask{0, 0, 0, 0},
+				},
+				GW: net.IP{10, 1, 90, 1},
 			},
 		},
 	}
@@ -331,7 +331,7 @@ func (tst *tapFDSourceTester) setupServerAndConnectToFDServer() *tapmanager.FDCl
 		tst.t.Fatalf("the server and/or the client is already present")
 	}
 
-	src, err := tapmanager.NewTapFDSource(tst.cniClient, false, 24)
+	src, err := tapmanager.NewTapFDSource(tst.cniClient, false)
 	if err != nil {
 		tst.t.Fatalf("Error creating tap fd source: %v", err)
 	}
@@ -388,8 +388,6 @@ func TestTapFDSource(t *testing.T) {
 		interfaceCount int
 		// info specifies CNI result to return from the fake CNI
 		info *cnicurrent.Result
-		// dummyInfo specifies CNI result to use for the dummy Calico gateway
-		dummyInfo *cnicurrent.Result
 		// expectedResult specifies the expected CNI result. Defaults to the same
 		// as info
 		expectedResult *cnicurrent.Result
@@ -506,17 +504,17 @@ func TestTapFDSource(t *testing.T) {
 				Routes: []*cnitypes.Route{
 					{
 						Dst: net.IPNet{
-							IP:   net.IP{0, 0, 0, 0},
-							Mask: net.IPMask{0, 0, 0, 0},
-						},
-						GW: net.IP{10, 1, 90, 1},
-					},
-					{
-						Dst: net.IPNet{
 							IP:   net.IP{10, 10, 42, 0},
 							Mask: net.IPMask{255, 255, 255, 0},
 						},
 						GW: net.IP{10, 1, 90, 90},
+					},
+					{
+						Dst: net.IPNet{
+							IP:   net.IP{0, 0, 0, 0},
+							Mask: net.IPMask{0, 0, 0, 0},
+						},
+						GW: net.IP{10, 1, 90, 1},
 					},
 				},
 			},
@@ -591,17 +589,17 @@ func TestTapFDSource(t *testing.T) {
 				Routes: []*cnitypes.Route{
 					{
 						Dst: net.IPNet{
-							IP:   net.IP{0, 0, 0, 0},
-							Mask: net.IPMask{0, 0, 0, 0},
-						},
-						GW: net.IP{10, 1, 90, 1},
-					},
-					{
-						Dst: net.IPNet{
 							IP:   net.IP{10, 10, 42, 0},
 							Mask: net.IPMask{255, 255, 255, 0},
 						},
 						GW: net.IP{10, 1, 90, 90},
+					},
+					{
+						Dst: net.IPNet{
+							IP:   net.IP{0, 0, 0, 0},
+							Mask: net.IPMask{0, 0, 0, 0},
+						},
+						GW: net.IP{10, 1, 90, 1},
 					},
 				},
 			},
@@ -640,17 +638,17 @@ func TestTapFDSource(t *testing.T) {
 				Routes: []*cnitypes.Route{
 					{
 						Dst: net.IPNet{
-							IP:   net.IP{0, 0, 0, 0},
-							Mask: net.IPMask{0, 0, 0, 0},
-						},
-						GW: net.IP{10, 1, 90, 1},
-					},
-					{
-						Dst: net.IPNet{
 							IP:   net.IP{10, 10, 42, 0},
 							Mask: net.IPMask{255, 255, 255, 0},
 						},
 						GW: net.IP{10, 1, 90, 90},
+					},
+					{
+						Dst: net.IPNet{
+							IP:   net.IP{0, 0, 0, 0},
+							Mask: net.IPMask{0, 0, 0, 0},
+						},
+						GW: net.IP{10, 1, 90, 1},
 					},
 				},
 			},
@@ -735,25 +733,6 @@ func TestTapFDSource(t *testing.T) {
 					},
 				},
 			},
-			dummyInfo: &cnicurrent.Result{
-				Interfaces: []*cnicurrent.Interface{
-					{
-						Name:    "eth0",
-						Mac:     clientMacAddrs[2],
-						Sandbox: "placeholder",
-					},
-				},
-				IPs: []*cnicurrent.IPConfig{
-					{
-						Version:   "4",
-						Interface: 0,
-						Address: net.IPNet{
-							IP:   net.IP{192, 168, 135, 132},
-							Mask: net.IPMask{255, 255, 255, 255},
-						},
-					},
-				},
-			},
 			expectedResult: &cnicurrent.Result{
 				Interfaces: []*cnicurrent.Interface{
 					{
@@ -768,18 +747,25 @@ func TestTapFDSource(t *testing.T) {
 						Interface: 0,
 						Address: net.IPNet{
 							IP:   net.IP{192, 168, 135, 131},
-							Mask: net.IPMask{255, 255, 255, 0},
+							Mask: net.IPMask{255, 255, 255, 255},
 						},
-						Gateway: net.IP{192, 168, 135, 132},
+						Gateway: net.IP{169, 254, 1, 1},
 					},
 				},
 				Routes: []*cnitypes.Route{
 					{
 						Dst: net.IPNet{
+							IP:   net.IP{169, 254, 1, 1},
+							Mask: net.IPMask{255, 255, 255, 255},
+						},
+						GW: net.IP{0, 0, 0, 0},
+					},
+					{
+						Dst: net.IPNet{
 							IP:   net.IP{0, 0, 0, 0},
 							Mask: net.IPMask{0, 0, 0, 0},
 						},
-						GW: net.IP{192, 168, 135, 132},
+						GW: net.IP{169, 254, 1, 1},
 					},
 				},
 			},
@@ -799,9 +785,9 @@ func TestTapFDSource(t *testing.T) {
 			dhcpExpectedSubstrings: [][]string{
 				{
 					"new_ip_address='192.168.135.131'",
-					"new_network_number='192.168.135.0'",
-					"new_routers='192.168.135.132'",
-					"new_subnet_mask='255.255.255.0'",
+					"new_network_number='192.168.135.131'",
+					"new_classless_static_routes='169.254.1.1/32 0.0.0.0 0.0.0.0/0 169.254.1.1'",
+					"new_subnet_mask='255.255.255.255'",
 					"tap0: offered 192.168.135.131 from 169.254.254.2",
 				},
 			},
@@ -852,25 +838,6 @@ func TestTapFDSource(t *testing.T) {
 					},
 				},
 			},
-			dummyInfo: &cnicurrent.Result{
-				Interfaces: []*cnicurrent.Interface{
-					{
-						Name:    "eth0",
-						Mac:     clientMacAddrs[2],
-						Sandbox: "placeholder",
-					},
-				},
-				IPs: []*cnicurrent.IPConfig{
-					{
-						Version:   "4",
-						Interface: 0,
-						Address: net.IPNet{
-							IP:   net.IP{192, 168, 135, 132},
-							Mask: net.IPMask{255, 255, 255, 255},
-						},
-					},
-				},
-			},
 			expectedResult: &cnicurrent.Result{
 				Interfaces: []*cnicurrent.Interface{
 					{
@@ -890,9 +857,9 @@ func TestTapFDSource(t *testing.T) {
 						Interface: 0,
 						Address: net.IPNet{
 							IP:   net.IP{192, 168, 135, 131},
-							Mask: net.IPMask{255, 255, 255, 0},
+							Mask: net.IPMask{255, 255, 255, 255},
 						},
-						Gateway: net.IP{192, 168, 135, 132},
+						Gateway: net.IP{169, 254, 1, 1},
 					},
 					{
 						Version:   "4",
@@ -906,10 +873,17 @@ func TestTapFDSource(t *testing.T) {
 				Routes: []*cnitypes.Route{
 					{
 						Dst: net.IPNet{
+							IP:   net.IP{169, 254, 1, 1},
+							Mask: net.IPMask{255, 255, 255, 255},
+						},
+						GW: net.IP{0, 0, 0, 0},
+					},
+					{
+						Dst: net.IPNet{
 							IP:   net.IP{0, 0, 0, 0},
 							Mask: net.IPMask{0, 0, 0, 0},
 						},
-						GW: net.IP{192, 168, 135, 132},
+						GW: net.IP{169, 254, 1, 1},
 					},
 				},
 			},
@@ -929,9 +903,9 @@ func TestTapFDSource(t *testing.T) {
 			dhcpExpectedSubstrings: [][]string{
 				{
 					"new_ip_address='192.168.135.131'",
-					"new_network_number='192.168.135.0'",
-					"new_routers='192.168.135.132'",
-					"new_subnet_mask='255.255.255.0'",
+					"new_network_number='192.168.135.131'",
+					"new_classless_static_routes='169.254.1.1/32 0.0.0.0 0.0.0.0/0 169.254.1.1'",
+					"new_subnet_mask='255.255.255.255'",
 					"tap0: offered 192.168.135.131 from 169.254.254.2",
 				},
 				{
@@ -979,9 +953,6 @@ func TestTapFDSource(t *testing.T) {
 				tst := newTapFDSourceTester(t, podId, tc.info, vnt.hostNS, tc.extraRoutes, tc.mtu)
 				defer tst.teardown()
 				c := tst.setupServerAndConnectToFDServer()
-				if tc.dummyInfo != nil {
-					tst.cniClient.ExpectDummyPod(tc.dummyInfo, vnt.hostNS, tc.extraRoutes)
-				}
 				tst.cniClient.UseBadResult(tst.podId, samplePodName, samplePodNS, tc.useBadResult)
 				csnBytes, err := c.AddFDs(fdKey, &tapmanager.GetFDPayload{
 					Description: &tapmanager.PodNetworkDesc{

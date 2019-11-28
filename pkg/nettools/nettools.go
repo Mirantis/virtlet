@@ -294,8 +294,8 @@ func findLinkByAddress(links []netlink.Link, address net.IPNet) (netlink.Link, e
 func ValidateAndFixCNIResult(netConfig *cnicurrent.Result, nsPath string, allLinks []netlink.Link) (*cnicurrent.Result, error) {
 	// If there are no routes provided, we consider it a broken
 	// config and extract interface config instead. That's the
-	// case with Weave CNI plugin. We don't do this for multiple CNI
-	// at this point.
+	// case with Weave and Calico CNI plugins. We don't do this
+	// for multiple CNI at this point.
 	if len(netConfig.IPs) == 1 && (cni.GetPodIP(netConfig) == "" || len(netConfig.Routes) == 0) {
 		dnsInfo := netConfig.DNS
 
@@ -452,20 +452,20 @@ func ExtractLinkInfo(link netlink.Link, nsPath string) (*cnicurrent.Result, erro
 	if err != nil {
 		return nil, fmt.Errorf("failed to list routes: %v", err)
 	}
+
+	// We put the default routes last so as to avoid problem with
+	// Calico's gateway. The idea comes from
+	// https://github.com/kubevirt/kubevirt/blob/db76f4acc187e35541b7cff8e6c3e99073fef329/pkg/virt-launcher/virtwrap/network/dhcp/dhcp.go#L217
+	var defaultRoutes []*cnitypes.Route
 	for _, route := range routes {
 		switch {
 		case route.Protocol == RTPROT_KERNEL:
 			// route created by kernel
-		case route.Gw == nil:
-			// these routes can't be represented properly
-			// by CNI result because CNI will consider
-			// them having IP's default Gateway value as
-			// Gw
 		case (route.Dst == nil || route.Dst.IP == nil) && route.Gw == nil:
 			// route has only Src
 		case (route.Dst == nil || route.Dst.IP == nil):
 			result.IPs[0].Gateway = route.Gw
-			result.Routes = append(result.Routes, &cnitypes.Route{
+			defaultRoutes = append(defaultRoutes, &cnitypes.Route{
 				Dst: net.IPNet{
 					IP:   net.IP{0, 0, 0, 0},
 					Mask: net.IPMask{0, 0, 0, 0},
@@ -473,12 +473,20 @@ func ExtractLinkInfo(link netlink.Link, nsPath string) (*cnicurrent.Result, erro
 				GW: route.Gw,
 			})
 		default:
-			result.Routes = append(result.Routes, &cnitypes.Route{
+			cniRoute := &cnitypes.Route{
 				Dst: *route.Dst,
 				GW:  route.Gw,
-			})
+			}
+			if cniRoute.GW == nil {
+				// cniRoute.GW being nil means using Gateway from IPConfig,
+				// but here we need to pass the null gateway which is
+				// used for link-scoped route to 169.154.1.1 in Calico
+				cniRoute.GW = net.IP{0, 0, 0, 0}
+			}
+			result.Routes = append(result.Routes, cniRoute)
 		}
 	}
+	result.Routes = append(result.Routes, defaultRoutes...)
 
 	return result, nil
 }
@@ -749,22 +757,55 @@ func ConfigureLink(link netlink.Link, info *cnicurrent.Result) error {
 			if err := netlink.AddrAdd(link, linkAddr); err != nil {
 				return fmt.Errorf("error adding address %v to link %q: %v", addr.Address, link.Attrs().Name, err)
 			}
+			routableNets := []net.IPNet{*linkAddr.IPNet}
 
+			// FIXME: this is best-effort attempt to re-add the routes.
+			// It may likely fail in case of multiple CNI b/c of confusion
+			// re which interfae the link-scoped route belongs to,
+			// but this is not really necessary to let CNI tear down
+			// the netns, most of the time
 			for _, route := range info.Routes {
-				// TODO: that's too naive - if there are more than one interfaces which have this gw address
-				// in their subnet - same gw will be added on both of them
-				// in theory this should be ok, but there is can lead to configuration other than prepared
-				// by cni plugins
-				if linkAddr.Contains(route.GW) {
-					err := netlink.RouteAdd(&netlink.Route{
+				fmt.Printf("ZZZZZ route %+v\n", route)
+				if route.GW.Equal(net.IPv4zero) {
+					fmt.Printf("ZZZZZ adding dst-only route\n")
+					// this is used for link-scoped routes,
+					// for example, Calico's 169.254.1.1
+					if err := netlink.RouteAdd(&netlink.Route{
+						LinkIndex: link.Attrs().Index,
+						Scope:     SCOPE_LINK,
+						Dst:       &route.Dst,
+					}); err != nil {
+						glog.Warningf("Error adding link-scoped route (dst %v): %v", route.Dst, err)
+					}
+					routableNets = append(routableNets, route.Dst)
+					continue
+				}
+
+				routable := false
+				for _, routableNet := range routableNets {
+					if routableNet.Contains(route.GW) {
+						routable = true
+						break
+					} else {
+						fmt.Printf("ZZZZZ %v does not contain %v\n", routableNet, route.GW)
+					}
+				}
+
+				if routable {
+					fmt.Printf("ZZZZZ adding gw route\n")
+					// TODO: that's too naive - if there are more than one interfaces which have this gw address
+					// in their subnet - same gw will be added on both of them
+					// in theory this should be ok, but there is can lead to configuration other than prepared
+					// by cni plugins
+					if err := netlink.RouteAdd(&netlink.Route{
 						LinkIndex: link.Attrs().Index,
 						Scope:     SCOPE_UNIVERSE,
 						Dst:       &route.Dst,
 						Gw:        route.GW,
-					})
-					if err != nil {
-						return fmt.Errorf("error adding route (dst %v gw %v): %v", route.Dst, route.GW, err)
+					}); err != nil {
+						glog.Warningf("error adding route (dst %v gw %v): %v", route.Dst, route.GW, err)
 					}
+					routableNets = append(routableNets, route.Dst)
 				}
 			}
 		}

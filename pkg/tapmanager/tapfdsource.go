@@ -38,11 +38,6 @@ import (
 	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
-const (
-	calicoDefaultSubnet = 24
-	calicoSubnetVar     = "VIRTLET_CALICO_SUBNET"
-)
-
 // InterfaceDescription contains interface type with additional data
 // needed to identify it
 type InterfaceDescription struct {
@@ -97,40 +92,23 @@ type podNetwork struct {
 type TapFDSource struct {
 	sync.Mutex
 
-	cniClient          cni.Client
-	dummyNetwork       *cnicurrent.Result
-	dummyNetworkNsPath string
-	fdMap              map[string]*podNetwork
-	enableSriov        bool
-	calicoSubnetSize   int
+	cniClient   cni.Client
+	fdMap       map[string]*podNetwork
+	enableSriov bool
 }
 
 var _ FDSource = &TapFDSource{}
 
 // NewTapFDSource returns a TapFDSource for the specified CNI plugin &
 // config dir
-func NewTapFDSource(cniClient cni.Client, enableSriov bool, calicoSubnetSize int) (*TapFDSource, error) {
+func NewTapFDSource(cniClient cni.Client, enableSriov bool) (*TapFDSource, error) {
 	s := &TapFDSource{
-		cniClient:        cniClient,
-		fdMap:            make(map[string]*podNetwork),
-		calicoSubnetSize: calicoSubnetSize,
-		enableSriov:      enableSriov,
+		cniClient:   cniClient,
+		fdMap:       make(map[string]*podNetwork),
+		enableSriov: enableSriov,
 	}
 
 	return s, nil
-}
-
-func (s *TapFDSource) getDummyNetwork() (*cnicurrent.Result, string, error) {
-	if s.dummyNetwork == nil {
-		var err error
-		s.dummyNetwork, s.dummyNetworkNsPath, err = s.cniClient.GetDummyNetwork()
-		if err != nil {
-			return nil, "", err
-		}
-		// s.dummyGateway = dummyResult.IPs[0].Address.IP
-
-	}
-	return s.dummyNetwork, s.dummyNetworkNsPath, nil
 }
 
 // GetFDs implements GetFDs method of FDSource interface
@@ -185,10 +163,12 @@ func (s *TapFDSource) GetFDs(key string, data []byte) ([]int, []byte, error) {
 			gotError = true
 			return nil, fmt.Errorf("error fixing cni configuration: %v", err)
 		}
-		if err := nettools.FixCalicoNetworking(netConfig, s.calicoSubnetSize, s.getDummyNetwork); err != nil {
+
+		if err := nettools.FixCalicoNetworking(netConfig); err != nil {
 			// don't fail in this case because there may be even no Calico
 			glog.Warningf("Calico detection/fix didn't work: %v", err)
 		}
+
 		glog.V(3).Infof("CNI Result after fix:\n%s", spew.Sdump(netConfig))
 
 		var err error

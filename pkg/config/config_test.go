@@ -114,7 +114,6 @@ func TestMergeConfigs(t *testing.T) {
 				" --enable-sriov" +
 				" --cni-bin-dir /some/cni/bin/dir" +
 				" --cni-conf-dir /some/cni/conf/dir" +
-				" --calico-subnet-size 22" +
 				" --cpu-model host-model" +
 				" --enable-regexp-image-translation=false",
 		},
@@ -133,7 +132,6 @@ func TestMergeConfigs(t *testing.T) {
 				" --enable-sriov" +
 				" --cni-bin-dir /some/cni/bin/dir" +
 				" --cni-conf-dir /some/cni/conf/dir" +
-				" --calico-subnet-size 22" +
 				" --cpu-model host-model" +
 				" --enable-regexp-image-translation=false",
 			configs: []*virtlet_v1.VirtletConfig{GetDefaultConfig()},
@@ -147,8 +145,7 @@ func TestMergeConfigs(t *testing.T) {
 					RawDevices: pstr("vd*"),
 				},
 				{
-					EnableSriov:      pbool(true),
-					CalicoSubnetSize: pint(22),
+					EnableSriov: pbool(true),
 				},
 			},
 		},
@@ -183,7 +180,6 @@ const (
     enableSriov: true
     cniPluginDir: /some/cni/bin/dir
     cniConfigDir: /some/cni/conf/dir
-    calicoSubnetSize: 22
     cpuModel: host-model
     enableRegexpImageTranslation: false
     logLevel: 3`

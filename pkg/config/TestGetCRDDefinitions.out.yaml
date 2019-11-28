@@ -43,10 +43,6 @@
             properties:
               config:
                 properties:
-                  calicoSubnetSize:
-                    maximum: 32
-                    minimum: 0
-                    type: integer
                   cniConfigDir:
                     type: string
                   cniPluginDir:

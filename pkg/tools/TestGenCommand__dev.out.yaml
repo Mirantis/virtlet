@@ -178,12 +178,6 @@ spec:
               key: loglevel
               name: virtlet-config
               optional: true
-        - name: VIRTLET_CALICO_SUBNET
-          valueFrom:
-            configMapKeyRef:
-              key: calico-subnet
-              name: virtlet-config
-              optional: true
         - name: IMAGE_REGEXP_TRANSLATION
           valueFrom:
             configMapKeyRef:
@@ -484,10 +478,6 @@ spec:
           properties:
             config:
               properties:
-                calicoSubnetSize:
-                  maximum: 32
-                  minimum: 0
-                  type: integer
                 cniConfigDir:
                   type: string
                 cniPluginDir:
