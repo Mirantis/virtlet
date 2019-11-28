@@ -270,15 +270,6 @@ func (in *VirtletConfig) DeepCopyInto(out *VirtletConfig) {
 			**out = **in
 		}
 	}
-	if in.CalicoSubnetSize != nil {
-		in, out := &in.CalicoSubnetSize, &out.CalicoSubnetSize
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int)
-			**out = **in
-		}
-	}
 	if in.EnableRegexpImageTranslation != nil {
 		in, out := &in.EnableRegexpImageTranslation, &out.EnableRegexpImageTranslation
 		if *in == nil {

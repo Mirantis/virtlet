@@ -497,6 +497,54 @@ func TestCloudInitGenerator(t *testing.T) {
 			}, "nocloud"),
 			verifyNetworkConfig: true,
 		},
+		// FIXME: it's not possible to produce link-scoped routes
+		// through cloud-init, so this may need more work
+		// {
+		// 	name: "pod with calico network config",
+		// 	config: buildNetworkedPodConfig(&cnicurrent.Result{
+		// 		Interfaces: []*cnicurrent.Interface{
+		// 			{
+		// 				Name:    "cni0",
+		// 				Mac:     "00:11:22:33:44:55",
+		// 				Sandbox: "/var/run/netns/bae464f1-6ee7-4ee2-826e-33293a9de95e",
+		// 			},
+		// 		},
+		// 		IPs: []*cnicurrent.IPConfig{
+		// 			{
+		// 				Version: "4",
+		// 				Address: net.IPNet{
+		// 					IP:   net.IPv4(192, 168, 135, 136),
+		// 					Mask: net.CIDRMask(32, 32),
+		// 				},
+		// 				Gateway:   net.IPv4(169, 254, 1, 1),
+		// 				Interface: 0,
+		// 			},
+		// 		},
+		// 		Routes: []*cnitypes.Route{
+		// 			// link-scoped route
+		// 			{
+		// 				Dst: net.IPNet{
+		// 					IP:   net.IPv4(168, 254, 1, 1),
+		// 					Mask: net.CIDRMask(32, 32),
+		// 				},
+		// 				GW: net.IPv4zero,
+		// 			},
+		// 			// default route
+		// 			{
+		// 				Dst: net.IPNet{
+		// 					IP:   net.IPv4zero,
+		// 					Mask: net.CIDRMask(0, 32),
+		// 				},
+		// 				GW: net.IPv4(168, 254, 1, 1),
+		// 			},
+		// 		},
+		// 		DNS: cnitypes.DNS{
+		// 			Nameservers: []string{"1.2.3.4"},
+		// 			Search:      []string{"some", "search"},
+		// 		},
+		// 	}, "nocloud"),
+		// 	verifyNetworkConfig: true,
+		// },
 		{
 			name: "pod with multiple network interfaces",
 			config: buildNetworkedPodConfig(&cnicurrent.Result{

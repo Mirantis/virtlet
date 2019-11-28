@@ -1,4 +1,3 @@
-calicoSubnetSize: 24
 cniConfigDir: /etc/cni/net.d
 cniPluginDir: /opt/cni/bin
 cpuModel: ""

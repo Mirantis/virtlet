@@ -17,29 +17,17 @@ limitations under the License.
 package nettools
 
 import (
+	"encoding/json"
 	"log"
 	"net"
 	"reflect"
 	"testing"
 
 	"github.com/containernetworking/cni/pkg/ns"
-	cnitypes "github.com/containernetworking/cni/pkg/types"
 	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/vishvananda/netlink"
 )
-
-func addCalicoRoutes(t *testing.T, origContVeth netlink.Link) {
-	addTestRoute(t, &netlink.Route{
-		Dst:       parseAddr("169.254.1.1/32").IPNet,
-		Scope:     SCOPE_LINK,
-		LinkIndex: origContVeth.Attrs().Index,
-	})
-	addTestRoute(t, &netlink.Route{
-		Gw:    parseAddr("169.254.1.1/32").IPNet.IP,
-		Scope: SCOPE_UNIVERSE,
-	})
-}
 
 func withDummyNetworkNamespace(t *testing.T, toRun func(dummyNS ns.NetNS, dummyInfo *cnicurrent.Result)) {
 	withHostAndContNS(t, func(hostNS, contNS ns.NetNS) {
@@ -146,6 +134,41 @@ func TestCalicoDetection(t *testing.T) {
 	}
 }
 
+func verifyCalicoNetworking(t *testing.T, info *cnicurrent.Result, contNSPath string) {
+	// add dummy ipconfig to make it appear for FixCalicoNetworking
+	// as multi-CNI result
+	info.IPs = append(info.IPs, &cnicurrent.IPConfig{})
+
+	if err := FixCalicoNetworking(info); err != nil {
+		log.Panicf("FixCalicoNetworking(): %v", err)
+	}
+
+	expectedResult := expectedExtractedCalicoLinkInfo(contNSPath)
+	expectedResult.IPs = append(expectedResult.IPs, &cnicurrent.IPConfig{})
+	if !reflect.DeepEqual(info, expectedResult) {
+		t.Errorf("interface info mismatch. Expected:\n%s\nActual:\n%s",
+			spew.Sdump(expectedResult), spew.Sdump(info))
+	}
+
+	serializedInfo, err := json.Marshal(info)
+	if err != nil {
+		log.Panicf("marshalling CNI result: %v", err)
+	}
+
+	if err := FixCalicoNetworking(info); err != nil {
+		log.Panicf("[repeated] FixCalicoNetworking(): %v", err)
+	}
+
+	newSerializedInfo, err := json.Marshal(info)
+	if err != nil {
+		log.Panicf("marshalling CNI result: %v", err)
+	}
+
+	if string(serializedInfo) != string(newSerializedInfo) {
+		t.Errorf("FixCalicoNetworking not idempotent: was: %s now: %s", serializedInfo, newSerializedInfo)
+	}
+}
+
 func TestFixCalicoNetworking(t *testing.T) {
 	withDummyNetworkNamespace(t, func(dummyNS ns.NetNS, dummyInfo *cnicurrent.Result) {
 		withFakeCNIVeth(t, defaultMTU, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
@@ -154,13 +177,17 @@ func TestFixCalicoNetworking(t *testing.T) {
 			if err != nil {
 				log.Panicf("failed to grab interface info: %v", err)
 			}
-			// reuse 2nd copy of the CNI result as the dummy network config
-			if err := FixCalicoNetworking(info, 24, func() (*cnicurrent.Result, string, error) {
-				return dummyInfo, dummyNS.Path(), nil
-			}); err != nil {
-				log.Panicf("FixCalicoNetworking(): %v", err)
-			}
-			expectedResult := &cnicurrent.Result{
+			verifyCalicoNetworking(t, info, contNS.Path())
+		})
+	})
+}
+
+func TestFixCalicoNetworkingWithTruncatedResult(t *testing.T) {
+	// this covers multiple CNI case when ExtractLinkInfo is not available
+	withDummyNetworkNamespace(t, func(dummyNS ns.NetNS, dummyInfo *cnicurrent.Result) {
+		withFakeCNIVeth(t, defaultMTU, func(hostNS, contNS ns.NetNS, origHostVeth, origContVeth netlink.Link) {
+			addCalicoRoutes(t, origContVeth)
+			info := &cnicurrent.Result{
 				Interfaces: []*cnicurrent.Interface{
 					{
 						Name:    "eth0",
@@ -173,26 +200,16 @@ func TestFixCalicoNetworking(t *testing.T) {
 						Version:   "4",
 						Interface: 0,
 						Address: net.IPNet{
-							IP:   net.IP{10, 1, 90, 5},
+							IP: net.IP{10, 1, 90, 5},
+							// FIXME: actually, Calico uses
+							// 255.255.255.255 as netmask here
+							// (but we don't want to overcomplicate the test)
 							Mask: net.IPMask{255, 255, 255, 0},
 						},
-						Gateway: net.IP{10, 1, 90, 100},
-					},
-				},
-				Routes: []*cnitypes.Route{
-					{
-						Dst: net.IPNet{
-							IP:   net.IP{0, 0, 0, 0},
-							Mask: net.IPMask{0, 0, 0, 0},
-						},
-						GW: net.IP{10, 1, 90, 100},
 					},
 				},
 			}
-			if !reflect.DeepEqual(info, expectedResult) {
-				t.Errorf("interface info mismatch. Expected:\n%s\nActual:\n%s",
-					spew.Sdump(expectedResult), spew.Sdump(info))
-			}
+			verifyCalicoNetworking(t, info, contNS.Path())
 		})
 	})
 }

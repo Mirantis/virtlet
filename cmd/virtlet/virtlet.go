@@ -74,7 +74,7 @@ func runTapManager(config *v1.VirtletConfig) {
 		glog.Errorf("Error initializing CNI client: %v", err)
 		os.Exit(1)
 	}
-	src, err := tapmanager.NewTapFDSource(cniClient, *config.EnableSriov, *config.CalicoSubnetSize)
+	src, err := tapmanager.NewTapFDSource(cniClient, *config.EnableSriov)
 	if err != nil {
 		glog.Errorf("Error creating tap fd source: %v", err)
 		os.Exit(1)

@@ -195,10 +195,7 @@ func itShouldHaveNetworkConnectivity(podIface func() *framework.PodInterface, ss
 	}
 
 	It("Should have default route"+suffix, func() {
-		Expect(framework.RunSimple(ssh(), "/sbin/ip r")).To(SatisfyAll(
-			ContainSubstring("default via"),
-			ContainSubstring("src "+podIface().Pod.Status.PodIP),
-		))
+		Expect(framework.RunSimple(ssh(), "/sbin/ip r")).To(ContainSubstring("default via"))
 	})
 
 	It("Should have internet connectivity"+suffix, func(done Done) {

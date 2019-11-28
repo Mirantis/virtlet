@@ -54,8 +54,6 @@ type VirtletConfig struct {
 	CNIPluginDir *string `json:"cniPluginDir,omitempty"`
 	// CNIConfigDir specifies the location of CNI configurations.
 	CNIConfigDir *string `json:"cniConfigDir,omitempty"`
-	// CalicoSubnetSize specifies the size of Calico subnetwork.
-	CalicoSubnetSize *int `json:"calicoSubnetSize,omitempty"`
 	// EnableRegexpImageTranslation is true if regexp-based image
 	// translations are enabled.
 	EnableRegexpImageTranslation *bool `json:"enableRegexpImageTranslation,omitempty"`

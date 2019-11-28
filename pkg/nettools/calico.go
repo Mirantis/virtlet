@@ -38,7 +38,6 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/containernetworking/cni/pkg/ns"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/golang/glog"
@@ -117,16 +116,24 @@ func getDummyGateway(dummyNetwork *cnicurrent.Result) (net.IP, error) {
 	return nil, errors.New("Calico fix: couldn't find dummy gateway")
 }
 
-// FixCalicoNetworking updates netConfig to make Calico work with
-// Virtlet's DHCP-server based scheme. It does so by throwing away
-// Calico's gateway and dev route and using a fake gateway instead.
-// The fake gateway provided by getDummyGateway() is just an IP
-// address allocated by Calico IPAM, it's needed for proper ARP
-// responses for VMs.
+// FixCalicoNetworking fixes Calico's CNI result in case if multiple
+// CNIs are used, where route extraction in the container netns will
+// not work properly. This is done by making sure Calico's
+// link-scoped route to 169.254.1.1 and the default gateway
+// are present in the CNI result.
 // This function must be called from within the container network
 // namespace.
-func FixCalicoNetworking(netConfig *cnicurrent.Result, calicoSubnetSize int, getDummyNetwork func() (*cnicurrent.Result, string, error)) error {
+func FixCalicoNetworking(netConfig *cnicurrent.Result) error {
+	if len(netConfig.IPs) < 2 {
+		// In case of single CNI, our route extraction should work
+		return nil
+	}
+
 	for n, ipConfig := range netConfig.IPs {
+		if ipConfig.Version != "4" {
+			continue
+		}
+
 		link, err := getLinkForIPConfig(netConfig, n)
 		if err != nil {
 			glog.Warningf("Calico fix: skipping link for config %d: %v", n, err)
@@ -139,52 +146,36 @@ func FixCalicoNetworking(netConfig *cnicurrent.Result, calicoSubnetSize int, get
 		if !haveCalico {
 			continue
 		}
-		ipConfig.Address.Mask = net.CIDRMask(calicoSubnetSize, 32)
-		if haveCalicoGateway {
-			dummyNetwork, nsPath, err := getDummyNetwork()
-			if err != nil {
-				return err
-			}
-			dummyNS, err := ns.GetNS(nsPath)
-			if err != nil {
-				return err
-			}
-			if err := dummyNS.Do(func(ns.NetNS) error {
-				allLinks, err := netlink.LinkList()
-				if err != nil {
-					return fmt.Errorf("failed to list links inside the dummy netns: %v", err)
-				}
-				dummyNetwork, err := ValidateAndFixCNIResult(dummyNetwork, nsPath, allLinks)
-				if err != nil {
-					return err
-				}
-				dummyGateway, err := getDummyGateway(dummyNetwork)
-				if err != nil {
-					return err
-				}
-				ipConfig.Gateway = dummyGateway
-				return nil
-			}); err != nil {
-				return err
-			}
 
-			var newRoutes []*cnitypes.Route
-			// remove the default gateway
-			for _, r := range netConfig.Routes {
-				if r.Dst.Mask != nil {
-					ones, _ := r.Dst.Mask.Size()
-					if ones == 0 {
-						continue
-					}
-				}
-				newRoutes = append(newRoutes, r)
+		ipConfig.Gateway = calicoGatewayIP[:]
+
+		addDummyRoute := true
+		addGw := haveCalicoGateway
+		for _, r := range netConfig.Routes {
+			if s, _ := r.Dst.Mask.Size(); s == 32 && r.Dst.IP.Equal(calicoGatewayIP) && r.GW.Equal(net.IPv4zero) {
+				addDummyRoute = false
+			} else if s, _ := r.Dst.Mask.Size(); s == 0 && r.GW.Equal(calicoGatewayIP) {
+				addGw = false
 			}
-			netConfig.Routes = append(newRoutes, &cnitypes.Route{
+		}
+
+		if addDummyRoute {
+			netConfig.Routes = append(netConfig.Routes, &cnitypes.Route{
+				Dst: net.IPNet{
+					IP:   calicoGatewayIP[:],
+					Mask: net.IPMask{255, 255, 255, 255},
+				},
+				GW: net.IP{0, 0, 0, 0},
+			})
+		}
+
+		if addGw {
+			netConfig.Routes = append(netConfig.Routes, &cnitypes.Route{
 				Dst: net.IPNet{
 					IP:   net.IP{0, 0, 0, 0},
 					Mask: net.IPMask{0, 0, 0, 0},
 				},
-				GW: ipConfig.Gateway,
+				GW: calicoGatewayIP[:],
 			})
 		}
 	}

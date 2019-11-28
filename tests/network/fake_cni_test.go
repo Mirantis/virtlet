@@ -28,7 +28,6 @@ import (
 
 	"github.com/Mirantis/virtlet/pkg/cni"
 	"github.com/Mirantis/virtlet/pkg/nettools"
-	"github.com/Mirantis/virtlet/pkg/utils"
 )
 
 const (
@@ -151,18 +150,14 @@ func podKey(podId, podName, podNS string) string {
 // FakeCNIClient fakes a CNI client. It's only good for one-time
 // network setup for a single pod network namespace
 type FakeCNIClient struct {
-	// DummyPodId is an id of dummy pod which is used by the
-	// Calico workaround
-	DummyPodId string
-	entries    map[string]*fakeCNIEntry
+	entries map[string]*fakeCNIEntry
 }
 
 var _ cni.Client = &FakeCNIClient{}
 
 func NewFakeCNIClient() *FakeCNIClient {
 	return &FakeCNIClient{
-		DummyPodId: utils.NewUUID(),
-		entries:    make(map[string]*fakeCNIEntry),
+		entries: make(map[string]*fakeCNIEntry),
 	}
 }
 
@@ -179,21 +174,6 @@ func (c *FakeCNIClient) ExpectPod(podId, podName, podNS string, info *cnicurrent
 		extraRoutes: extraRoutes,
 		mtu:         mtu,
 	}
-}
-
-func (c *FakeCNIClient) ExpectDummyPod(info *cnicurrent.Result, hostNS ns.NetNS, extraRoutes map[int][]netlink.Route) {
-	c.ExpectPod(c.DummyPodId, "", "", info, hostNS, extraRoutes, 0)
-}
-
-func (c *FakeCNIClient) GetDummyNetwork() (*cnicurrent.Result, string, error) {
-	if err := cni.CreateNetNS(c.DummyPodId); err != nil {
-		return nil, "", fmt.Errorf("couldn't create netns for dummy pod %q: %v", c.DummyPodId, err)
-	}
-	result, err := c.AddSandboxToNetwork(c.DummyPodId, "", "")
-	if err != nil {
-		return nil, "", err
-	}
-	return result, cni.PodNetNSPath(c.DummyPodId), nil
 }
 
 func (c *FakeCNIClient) getEntry(podId, podName, podNS string) *fakeCNIEntry {
@@ -267,11 +247,6 @@ func (c *FakeCNIClient) VerifyRemoved(podId, podName, podNS string) {
 func (c *FakeCNIClient) Cleanup() {
 	for _, entry := range c.entries {
 		entry.cleanup()
-	}
-	if _, found := c.entries[podKey(c.DummyPodId, "", "")]; found {
-		if err := cni.DestroyNetNS(c.DummyPodId); err != nil {
-			log.Panicf("Error destroying dummy pod network ns: %v", err)
-		}
 	}
 }
 

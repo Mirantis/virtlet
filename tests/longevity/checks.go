@@ -42,11 +42,6 @@ func testVM(instance *VMInstance) error {
 }
 
 func checkDefaultRoute(instance *VMInstance) error {
-	vmPod, err := instance.vm.Pod()
-	if err != nil {
-		return err
-	}
-
 	glog.V(4).Infof("Should have default route")
 	out, err := framework.RunSimple(instance.ssh, "/sbin/ip r")
 	if err != nil {
@@ -54,9 +49,6 @@ func checkDefaultRoute(instance *VMInstance) error {
 	}
 	if !strings.Contains(out, "default via") {
 		return fmt.Errorf("Should contain `default via` line but it's missing")
-	}
-	if !strings.Contains(out, "src "+vmPod.Pod.Status.PodIP) {
-		return fmt.Errorf("Should contain `src %s` line but it's missing", vmPod.Pod.Status.PodIP)
 	}
 	return nil
 }

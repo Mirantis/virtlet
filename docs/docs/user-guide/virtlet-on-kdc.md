@@ -70,7 +70,6 @@ by Virtlet when it's deployed using k8s yaml produced by `virtletctl gen`:
   * `disable_kvm` - disables KVM support and forces QEMU instead. Use "1" as a value.
   * `download_protocol` - default image download protocol - either `http` or `https`. The default is https.
   * `loglevel` - integer log level value for the virtlet written as a string (e.g. "3", "2", "1").
-  * `calico-subnet` - netmask width for the Calico CNI. Default is "24".
   * `image_regexp_translation` - enables regexp syntax for the image name translation rules.
   * `disable_logging` - disables log streaming from VMs. Use "1" to disable.
 

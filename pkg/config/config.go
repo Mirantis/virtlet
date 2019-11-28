@@ -65,9 +65,6 @@ const (
 	defaultCNIConfigDir = "/etc/cni/net.d"
 	cniConfigDirEnv     = "VIRTLET_CNI_CONFIG_DIR"
 
-	defaultCalicoSubnet = 24
-	calicoSubnetEnv     = "VIRTLET_CALICO_SUBNET"
-
 	enableRegexpImageTranslationEnv = "IMAGE_REGEXP_TRANSLATION"
 	logLevelEnv                     = "VIRTLET_LOGLEVEL"
 
@@ -98,7 +95,6 @@ func configFieldSet(c *virtlet_v1.VirtletConfig) *fieldSet {
 	fs.addBoolField("enableSriov", "enable-sriov", "", "Enable SR-IOV support", enableSriovEnv, false, &c.EnableSriov)
 	fs.addStringField("cniPluginDir", "cni-bin-dir", "", "Path to CNI plugin binaries", cniPluginDirEnv, defaultCNIPluginDir, &c.CNIPluginDir)
 	fs.addStringField("cniConfigDir", "cni-conf-dir", "", "Path to the CNI configuration directory", cniConfigDirEnv, defaultCNIConfigDir, &c.CNIConfigDir)
-	fs.addIntField("calicoSubnetSize", "calico-subnet-size", "", "Calico subnet size to use", calicoSubnetEnv, defaultCalicoSubnet, 0, 32, &c.CalicoSubnetSize)
 	fs.addBoolField("enableRegexpImageTranslation", "enable-regexp-image-translation", "", "Enable regexp image name translation", enableRegexpImageTranslationEnv, true, &c.EnableRegexpImageTranslation)
 	fs.addStringField("cpuModel", "cpu-model", "", "CPU model to use in libvirt domain definition (libvirt's default value will be used if not set)", cpuModelEnv, defaultCPUModel, &c.CPUModel)
 	fs.addIntField("streamPort", "stream-port", "", "configurable port to the virtlet server", streamPortEnv, defaultStreamPort, 1, 65535, &c.StreamPort)
