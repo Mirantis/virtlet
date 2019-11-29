@@ -10,21 +10,13 @@ network-config:
     type: phy
   networks:
   - id: net-0
-    ip_address: 1.1.1.1
     link: cni0
-    netmask: 255.0.0.0
     network_id: net-0
-    routes:
-    - gateway: 1.2.3.4
-      netmask: 0.0.0.0
-      network: 0.0.0.0
-    type: ipv4
+    type: ipv4_dhcp
   - id: net-1
-    ip_address: 192.168.100.42
     link: cni1
-    netmask: 255.255.255.0
     network_id: net-1
-    type: ipv4
+    type: ipv4_dhcp
   services:
   - address:
     - 1.2.3.4

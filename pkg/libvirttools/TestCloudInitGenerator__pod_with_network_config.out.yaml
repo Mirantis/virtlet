@@ -4,13 +4,7 @@ network-config:
     mtu: 1500
     name: cni0
     subnets:
-    - address: 1.1.1.1
-      netmask: 255.0.0.0
-      routes:
-      - gateway: 1.2.3.4
-        netmask: 0.0.0.0
-        network: 0.0.0.0
-      type: static
+    - type: dhcp
     type: physical
   - address:
     - 1.2.3.4

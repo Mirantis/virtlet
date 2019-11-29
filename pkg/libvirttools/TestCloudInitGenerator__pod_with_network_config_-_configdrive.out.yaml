@@ -6,11 +6,9 @@ network-config:
     type: phy
   networks:
   - id: net-0
-    ip_address: 1.1.1.1
     link: cni0
-    netmask: 255.0.0.0
     network_id: net-0
-    type: ipv4
+    type: ipv4_dhcp
   services:
   - address:
     - 1.2.3.4

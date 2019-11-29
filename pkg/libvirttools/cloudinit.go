@@ -30,7 +30,6 @@ import (
 	"strings"
 
 	cnitypes "github.com/containernetworking/cni/pkg/types"
-	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	"github.com/kballard/go-shellquote"
@@ -207,12 +206,16 @@ func (g *CloudInitGenerator) generateNetworkConfigurationNoCloud() ([]byte, erro
 	var config []map[string]interface{}
 
 	// physical interfaces
-	for i, iface := range cniResult.Interfaces {
+	for _, iface := range cniResult.Interfaces {
 		if iface.Sandbox == "" {
 			// skip host interfaces
 			continue
 		}
-		subnets := g.getSubnetsForNthInterface(i, cniResult)
+		subnets := []map[string]interface{}{
+			{
+				"type": "dhcp",
+			},
+		}
 		mtu, err := mtuForMacAddress(iface.Mac, g.config.ContainerSideNetwork.Interfaces)
 		if err != nil {
 			return nil, err
@@ -240,65 +243,6 @@ func (g *CloudInitGenerator) generateNetworkConfigurationNoCloud() ([]byte, erro
 		return nil, err
 	}
 	return []byte("version: 1\n" + string(r)), nil
-}
-
-func (g *CloudInitGenerator) getSubnetsForNthInterface(interfaceNo int, cniResult *cnicurrent.Result) []map[string]interface{} {
-	var subnets []map[string]interface{}
-	routes := append(cniResult.Routes[:0:0], cniResult.Routes...)
-	gotDefault := false
-	for _, ipConfig := range cniResult.IPs {
-		if ipConfig.Interface == interfaceNo {
-			subnet := map[string]interface{}{
-				"type":    "static",
-				"address": ipConfig.Address.IP.String(),
-				"netmask": net.IP(ipConfig.Address.Mask).String(),
-			}
-
-			var subnetRoutes []map[string]interface{}
-			// iterate on routes slice in reverse order because at
-			// the end of loop found element will be removed from slice
-			allRoutesLen := len(routes)
-			for i := range routes {
-				cniRoute := routes[allRoutesLen-1-i]
-				var gw net.IP
-				if cniRoute.GW != nil && ipConfig.Address.Contains(cniRoute.GW) {
-					gw = cniRoute.GW
-				} else if cniRoute.GW == nil && !ipConfig.Gateway.IsUnspecified() {
-					gw = ipConfig.Gateway
-				} else {
-					continue
-				}
-				if ones, _ := cniRoute.Dst.Mask.Size(); ones == 0 {
-					if gotDefault {
-						glog.Warning("cloud-init: got more than one default route, using only the first one")
-						continue
-					}
-					gotDefault = true
-				}
-				route := map[string]interface{}{
-					"network": cniRoute.Dst.IP.String(),
-					"netmask": net.IP(cniRoute.Dst.Mask).String(),
-					"gateway": gw.String(),
-				}
-				subnetRoutes = append(subnetRoutes, route)
-				routes = append(routes[:allRoutesLen-1-i], routes[allRoutesLen-i:]...)
-			}
-			if subnetRoutes != nil {
-				subnet["routes"] = subnetRoutes
-			}
-
-			subnets = append(subnets, subnet)
-		}
-	}
-
-	// fallback to dhcp - should never happen, we always should have IPs
-	if subnets == nil {
-		subnets = append(subnets, map[string]interface{}{
-			"type": "dhcp",
-		})
-	}
-
-	return subnets
 }
 
 func getDNSData(cniDNS cnitypes.DNS) []map[string]interface{} {
@@ -352,15 +296,8 @@ func (g *CloudInitGenerator) generateNetworkConfigurationConfigDrive() ([]byte, 
 			"id": fmt.Sprintf("net-%d", i),
 			// config from openstack have as network_id network uuid
 			"network_id": fmt.Sprintf("net-%d", i),
-			"type":       fmt.Sprintf("ipv%s", ipConfig.Version),
+			"type":       fmt.Sprintf("ipv%s_dhcp", ipConfig.Version),
 			"link":       cniResult.Interfaces[ipConfig.Interface].Name,
-			"ip_address": ipConfig.Address.IP.String(),
-			"netmask":    net.IP(ipConfig.Address.Mask).String(),
-		}
-
-		routes := routesForIP(ipConfig.Address, cniResult.Routes)
-		if routes != nil {
-			netConf["routes"] = routes
 		}
 
 		networks = append(networks, netConf)
