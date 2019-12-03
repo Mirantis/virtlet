@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"strconv"
 	"time"
 
 	"github.com/golang/glog"
@@ -52,6 +53,7 @@ const (
 	domainShutdownOnRemoveTimeout = 60 * time.Second
 	domainDestroyCheckInterval    = 500 * time.Millisecond
 	domainDestroyTimeout          = 5 * time.Second
+	domainHostdevNo               = 0
 
 	// ContainerNsUUID template for container ns uuid generation
 	ContainerNsUUID = "67b7fb47-7735-4b64-86d2-6d062d121966"
@@ -83,18 +85,69 @@ type domainSettings struct {
 	systemUUID       *uuid.UUID
 }
 
+// Define a struct to store the device id info which will be used in pci-passthrough.
+type pciInfos struct {
+	pciHostDomain   uint
+	pciHostBus      uint
+	pciHostSlot     uint
+	pciHostFunction uint
+}
+
+// getPciInfo converts a device id to domain, bus, slot and function with uint, which
+// will be used in libvritxml.
+func getPciInfo(deviceID string) pciInfos {
+	var preInfo pciInfos
+	_, err := fmt.Sscanf(deviceID, "%x:%x:%x.%x", &preInfo.pciHostDomain, &preInfo.pciHostBus, &preInfo.pciHostSlot, &preInfo.pciHostFunction)
+
+	if err != nil {
+		glog.Errorf("Invalid format device id %q info : %v", deviceID, err)
+	}
+
+	return preInfo
+}
+
 func (ds *domainSettings) createDomain(config *types.VMConfig) *libvirtxml.Domain {
 	domainType := defaultDomainType
 	emulator := defaultEmulator
+	hostdevNo := domainHostdevNo
 	if !ds.useKvm {
 		domainType = noKvmDomainType
 		emulator = noKvmEmulator
+	}
+
+	var deviceIDs []pciInfos
+
+	for _, env := range config.Environment {
+		if strings.Contains(env.Key, "QAT") {
+			devinfo := getPciInfo(env.Value)
+			deviceIDs = append(deviceIDs, devinfo)
+		}
+	}
+
+	var hostdevs []libvirtxml.DomainHostdev
+	for index := range deviceIDs {
+		domainDevice := libvirtxml.DomainHostdev{
+			Managed: "yes",
+			SubsysPCI: &libvirtxml.DomainHostdevSubsysPCI{
+				Source: &libvirtxml.DomainHostdevSubsysPCISource{
+					Address: &libvirtxml.DomainAddressPCI{
+						Domain:   &deviceIDs[index].pciHostDomain,
+						Bus:      &deviceIDs[index].pciHostBus,
+						Slot:     &deviceIDs[index].pciHostSlot,
+						Function: &deviceIDs[index].pciHostFunction,
+					},
+				},
+			},
+		}
+		hostdevs = append(hostdevs, domainDevice)
+		hostdevNo += 1
 	}
 
 	scsiControllerIndex := uint(0)
 	domain := &libvirtxml.Domain{
 		Devices: &libvirtxml.DomainDeviceList{
 			Emulator: "/vmwrapper",
+			Hostdevs: hostdevs,
 			Inputs: []libvirtxml.DomainInput{
 				{Type: "tablet", Bus: "usb"},
 			},
@@ -147,6 +200,7 @@ func (ds *domainSettings) createDomain(config *types.VMConfig) *libvirtxml.Domai
 			Envs: []libvirtxml.DomainQEMUCommandlineEnv{
 				{Name: vconfig.EmulatorEnvVarName, Value: emulator},
 				{Name: vconfig.NetKeyEnvVarName, Value: ds.netFdKey},
+				{Name: vconfig.CurrentHostdevNo, Value: strconv.Itoa(hostdevNo)},
 				{Name: vconfig.ContainerIDEnvVarName, Value: config.DomainUUID},
 				{Name: vconfig.LogPathEnvVarName,
 					Value: filepath.Join(config.LogDirectory, config.LogPath)},

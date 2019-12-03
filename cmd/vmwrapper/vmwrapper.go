@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"syscall"
+	"strconv"
 
 	"github.com/golang/glog"
 
@@ -94,7 +95,7 @@ func main() {
 		emulator = defaultEmulator
 	} else {
 		netFdKey := os.Getenv(config.NetKeyEnvVarName)
-		nextToUseHostdevNo := 0
+		nextToUseHostdevNo, _ := strconv.Atoi(os.Getenv(config.CurrentHostdevNo))
 
 		if netFdKey != "" {
 			c := tapmanager.NewFDClient(fdSocketPath)
