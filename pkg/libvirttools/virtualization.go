@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"strconv"
 
 	"github.com/golang/glog"
 	"github.com/jonboulle/clockwork"
@@ -83,6 +84,33 @@ type domainSettings struct {
 	systemUUID       *uuid.UUID
 }
 
+type pciInfos struct {
+	pciHostDomain	 uint
+        pciHostBus 	 uint
+        pciHostSlot 	 uint
+        pciHostFunction  uint
+}
+
+func getPciInfo(deviceId string) (pciInfos) {
+	tmp := strings.Split(deviceId, ":")
+	funTmp := strings.Split(tmp[2], ".")
+	pciHostDomain, err := strconv.ParseUint(tmp[0], 16, 0)
+	pciHostBus, err := strconv.ParseUint(tmp[1], 16, 0)
+	pciHostSlot, err := strconv.ParseUint(funTmp[0], 16, 0)
+	pciHostFunction, err := strconv.ParseUint(funTmp[1], 16, 0)
+
+	if err != nil {
+		glog.Errorf("Invalid format device id %q info : %v", deviceId, err)
+	}
+
+	return pciInfos {
+		uint(pciHostDomain),
+		uint(pciHostBus),
+		uint(pciHostSlot),
+		uint(pciHostFunction),
+	}
+}
+
 func (ds *domainSettings) createDomain(config *types.VMConfig) *libvirtxml.Domain {
 	domainType := defaultDomainType
 	emulator := defaultEmulator
@@ -90,10 +118,21 @@ func (ds *domainSettings) createDomain(config *types.VMConfig) *libvirtxml.Domai
 		domainType = noKvmDomainType
 		emulator = noKvmEmulator
 	}
-	var pciHostDomain uint = 0
-	var pciHostBus uint = 63
-	var pciHostSlot uint = 1
-	var pciHostFunction uint = 6
+
+	var deviceIds []pciInfos
+
+	for i, env := range config.Environment {
+		if strings.Compare(env.Key, "QAT0") == 0 {
+			devinfo := getPciInfo(env.Value)
+			deviceIds = append(deviceIds, devinfo)
+		}
+		fmt.Println(i)
+	}
+
+	//var pciHostDomain uint = 0
+	//var pciHostBus uint = 63
+	//var pciHostSlot uint = 1
+	//var pciHostFunction uint = 6
 	fmt.Println("_ohno1_")
         fmt.Println(config.Environment[0].Value)
 	fmt.Println("_ohno_eeeeeeeeeee")
@@ -108,10 +147,10 @@ func (ds *domainSettings) createDomain(config *types.VMConfig) *libvirtxml.Domai
 					SubsysPCI: &libvirtxml.DomainHostdevSubsysPCI{
 						Source: &libvirtxml.DomainHostdevSubsysPCISource{
 							Address: &libvirtxml.DomainAddressPCI{
-								Domain:   &pciHostDomain,
-								Bus:      &pciHostBus,
-								Slot:     &pciHostSlot,
-								Function: &pciHostFunction,
+								Domain:   &deviceIds[0].pciHostDomain,
+								Bus:      &deviceIds[0].pciHostBus,
+								Slot:     &deviceIds[0].pciHostSlot,
+								Function: &deviceIds[0].pciHostFunction,
 							},
 						},
 					},
