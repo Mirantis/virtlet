@@ -121,12 +121,30 @@ func (ds *domainSettings) createDomain(config *types.VMConfig) *libvirtxml.Domai
 
 	var deviceIds []pciInfos
 
-	for i, env := range config.Environment {
-		if strings.Compare(env.Key, "QAT0") == 0 {
+	for _, env := range config.Environment {
+		if strings.Contains(env.Key, "QAT") {
 			devinfo := getPciInfo(env.Value)
 			deviceIds = append(deviceIds, devinfo)
 		}
-		fmt.Println(i)
+	}
+	var hostdevs []libvirtxml.DomainHostdev
+	if len(deviceIds) > 0 {
+		for i := 0; i < len(deviceIds); i++ {
+			domainDevice := libvirtxml.DomainHostdev {
+				Managed: "yes",
+                                SubsysPCI: &libvirtxml.DomainHostdevSubsysPCI{
+					Source: &libvirtxml.DomainHostdevSubsysPCISource{
+                                                Address: &libvirtxml.DomainAddressPCI{
+							Domain:   &deviceIds[i].pciHostDomain,
+                                                        Bus:      &deviceIds[i].pciHostBus,
+                                                        Slot:     &deviceIds[i].pciHostSlot,
+                                                        Function: &deviceIds[i].pciHostFunction,
+                                                },
+                                        },
+                                },
+			}
+			hostdevs = append(hostdevs, domainDevice)
+		}
 	}
 
 	//var pciHostDomain uint = 0
@@ -134,28 +152,29 @@ func (ds *domainSettings) createDomain(config *types.VMConfig) *libvirtxml.Domai
 	//var pciHostSlot uint = 1
 	//var pciHostFunction uint = 6
 	fmt.Println("_ohno1_")
-        fmt.Println(config.Environment[0].Value)
+        fmt.Println(config.Environment)
 	fmt.Println("_ohno_eeeeeeeeeee")
         fmt.Println(config.VolumeDevices)
 	scsiControllerIndex := uint(0)
 	domain := &libvirtxml.Domain{
 		Devices: &libvirtxml.DomainDeviceList{
 			Emulator: "/vmwrapper",
-			Hostdevs: []libvirtxml.DomainHostdev{
-				{
-					Managed: "yes",
-					SubsysPCI: &libvirtxml.DomainHostdevSubsysPCI{
-						Source: &libvirtxml.DomainHostdevSubsysPCISource{
-							Address: &libvirtxml.DomainAddressPCI{
-								Domain:   &deviceIds[0].pciHostDomain,
-								Bus:      &deviceIds[0].pciHostBus,
-								Slot:     &deviceIds[0].pciHostSlot,
-								Function: &deviceIds[0].pciHostFunction,
-							},
-						},
-					},
-				},
-			},
+			Hostdevs: hostdevs,
+//			[]libvirtxml.DomainHostdev{
+//				{
+//					Managed: "yes",
+//					SubsysPCI: &libvirtxml.DomainHostdevSubsysPCI{
+//						Source: &libvirtxml.DomainHostdevSubsysPCISource{
+//							Address: &libvirtxml.DomainAddressPCI{
+//								Domain:   &deviceIds[0].pciHostDomain,
+//								Bus:      &deviceIds[0].pciHostBus,
+//								Slot:     &deviceIds[0].pciHostSlot,
+//								Function: &deviceIds[0].pciHostFunction,
+//							},
+//						},
+//					},
+//				},
+//			},
 			Inputs: []libvirtxml.DomainInput{
 				{Type: "tablet", Bus: "usb"},
 			},
