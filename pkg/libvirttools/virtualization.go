@@ -84,6 +84,7 @@ type domainSettings struct {
 	systemUUID       *uuid.UUID
 }
 
+//Define a struct to store the device id info which will be used in pci-passthrough.
 type pciInfos struct {
 	pciHostDomain	 uint
         pciHostBus 	 uint
@@ -91,6 +92,8 @@ type pciInfos struct {
         pciHostFunction  uint
 }
 
+//getPciInfo converts a device id to domain, bus, slot and function with uint, which 
+//will be used in libvritxml.
 func getPciInfo(deviceId string) (pciInfos) {
 	tmp := strings.Split(deviceId, ":")
 	funTmp := strings.Split(tmp[2], ".")
