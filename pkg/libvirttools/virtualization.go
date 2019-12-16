@@ -154,10 +154,6 @@ func (ds *domainSettings) createDomain(config *types.VMConfig) *libvirtxml.Domai
 	//var pciHostBus uint = 63
 	//var pciHostSlot uint = 1
 	//var pciHostFunction uint = 6
-	fmt.Println("_ohno1_")
-        fmt.Println(config.Environment)
-	fmt.Println("_ohno_eeeeeeeeeee")
-        fmt.Println(config.VolumeDevices)
 	scsiControllerIndex := uint(0)
 	domain := &libvirtxml.Domain{
 		Devices: &libvirtxml.DomainDeviceList{
