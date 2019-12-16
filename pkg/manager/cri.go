@@ -19,8 +19,8 @@ package manager
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"path/filepath"
+	"strings"
 
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
@@ -167,6 +167,7 @@ func GetVMConfig(in *kubeapi.CreateContainerRequest, csn *network.ContainerSideN
 	}
 
 	for _, dev := range in.Config.Devices {
+
 		// Note that we shouldn't consider all devices as a vm volume device
 		// especially it consider a device bound vfio driver as volumes.
 		if strings.Contains(dev.HostPath, "/dev/vfio") {

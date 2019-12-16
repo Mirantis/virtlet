@@ -19,9 +19,9 @@ package libvirttools
 import (
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
-	"strconv"
 
 	"github.com/golang/glog"
 	"github.com/jonboulle/clockwork"
@@ -86,15 +86,15 @@ type domainSettings struct {
 
 // Define a struct to store the device id info which will be used in pci-passthrough.
 type pciInfos struct {
-	pciHostDomain	 uint
-        pciHostBus 	 uint
-        pciHostSlot 	 uint
-        pciHostFunction  uint
+	pciHostDomain   uint
+	pciHostBus      uint
+	pciHostSlot     uint
+	pciHostFunction uint
 }
 
-// getPciInfo converts a device id to domain, bus, slot and function with uint, which 
+// getPciInfo converts a device id to domain, bus, slot and function with uint, which
 // will be used in libvritxml.
-func getPciInfo(deviceID string) (pciInfos) {
+func getPciInfo(deviceID string) pciInfos {
 	tmp := strings.Split(deviceID, ":")
 	funTmp := strings.Split(tmp[2], ".")
 	pciHostDomain, err := strconv.ParseUint(tmp[0], 16, 0)
@@ -106,7 +106,7 @@ func getPciInfo(deviceID string) (pciInfos) {
 		glog.Errorf("Invalid format device id %q info : %v", deviceID, err)
 	}
 
-	return pciInfos {
+	return pciInfos{
 		uint(pciHostDomain),
 		uint(pciHostBus),
 		uint(pciHostSlot),
@@ -133,18 +133,18 @@ func (ds *domainSettings) createDomain(config *types.VMConfig) *libvirtxml.Domai
 	var hostdevs []libvirtxml.DomainHostdev
 	if len(deviceIds) > 0 {
 		for i := 0; i < len(deviceIds); i++ {
-			domainDevice := libvirtxml.DomainHostdev {
+			domainDevice := libvirtxml.DomainHostdev{
 				Managed: "yes",
-                                SubsysPCI: &libvirtxml.DomainHostdevSubsysPCI{
+				SubsysPCI: &libvirtxml.DomainHostdevSubsysPCI{
 					Source: &libvirtxml.DomainHostdevSubsysPCISource{
-                                                Address: &libvirtxml.DomainAddressPCI{
+						Address: &libvirtxml.DomainAddressPCI{
 							Domain:   &deviceIds[i].pciHostDomain,
-                                                        Bus:      &deviceIds[i].pciHostBus,
-                                                        Slot:     &deviceIds[i].pciHostSlot,
-                                                        Function: &deviceIds[i].pciHostFunction,
-                                                },
-                                        },
-                                },
+							Bus:      &deviceIds[i].pciHostBus,
+							Slot:     &deviceIds[i].pciHostSlot,
+							Function: &deviceIds[i].pciHostFunction,
+						},
+					},
+				},
 			}
 			hostdevs = append(hostdevs, domainDevice)
 		}
