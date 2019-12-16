@@ -84,7 +84,7 @@ type domainSettings struct {
 	systemUUID       *uuid.UUID
 }
 
-//Define a struct to store the device id info which will be used in pci-passthrough.
+// Define a struct to store the device id info which will be used in pci-passthrough.
 type pciInfos struct {
 	pciHostDomain	 uint
         pciHostBus 	 uint
@@ -92,10 +92,10 @@ type pciInfos struct {
         pciHostFunction  uint
 }
 
-//getPciInfo converts a device id to domain, bus, slot and function with uint, which 
-//will be used in libvritxml.
-func getPciInfo(deviceId string) (pciInfos) {
-	tmp := strings.Split(deviceId, ":")
+// getPciInfo converts a device id to domain, bus, slot and function with uint, which 
+// will be used in libvritxml.
+func getPciInfo(deviceID string) (pciInfos) {
+	tmp := strings.Split(deviceID, ":")
 	funTmp := strings.Split(tmp[2], ".")
 	pciHostDomain, err := strconv.ParseUint(tmp[0], 16, 0)
 	pciHostBus, err := strconv.ParseUint(tmp[1], 16, 0)
@@ -103,7 +103,7 @@ func getPciInfo(deviceId string) (pciInfos) {
 	pciHostFunction, err := strconv.ParseUint(funTmp[1], 16, 0)
 
 	if err != nil {
-		glog.Errorf("Invalid format device id %q info : %v", deviceId, err)
+		glog.Errorf("Invalid format device id %q info : %v", deviceID, err)
 	}
 
 	return pciInfos {
@@ -150,30 +150,11 @@ func (ds *domainSettings) createDomain(config *types.VMConfig) *libvirtxml.Domai
 		}
 	}
 
-	//var pciHostDomain uint = 0
-	//var pciHostBus uint = 63
-	//var pciHostSlot uint = 1
-	//var pciHostFunction uint = 6
 	scsiControllerIndex := uint(0)
 	domain := &libvirtxml.Domain{
 		Devices: &libvirtxml.DomainDeviceList{
 			Emulator: "/vmwrapper",
 			Hostdevs: hostdevs,
-//			[]libvirtxml.DomainHostdev{
-//				{
-//					Managed: "yes",
-//					SubsysPCI: &libvirtxml.DomainHostdevSubsysPCI{
-//						Source: &libvirtxml.DomainHostdevSubsysPCISource{
-//							Address: &libvirtxml.DomainAddressPCI{
-//								Domain:   &deviceIds[0].pciHostDomain,
-//								Bus:      &deviceIds[0].pciHostBus,
-//								Slot:     &deviceIds[0].pciHostSlot,
-//								Function: &deviceIds[0].pciHostFunction,
-//							},
-//						},
-//					},
-//				},
-//			},
 			Inputs: []libvirtxml.DomainInput{
 				{Type: "tablet", Bus: "usb"},
 			},
